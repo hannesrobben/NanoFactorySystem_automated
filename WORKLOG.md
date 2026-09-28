@@ -286,3 +286,35 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
     Z=0 is safe with the objective mounted.
   - The hardware tests were not run (no lab access in this session).
 
+### 2026-09-28 23:20 CEST — [T6] Dry-run an experiment with the dummy backend
+- **Status:** done
+- **Changes:**
+  - `mains/Experiments/default_exp_file.py`:
+    - **Bug fix**: `structure_size = fov,` was a tuple, so the template failed before touching any
+      hardware.
+    - New optional arguments `backend` and `plane`, forwarded to `Experiment`/`plane_fit`; without them the
+      behaviour is unchanged.
+  - `test/integration/test_dry_run_default_experiment.py` (new): runs `binary_testprint()` end to end on
+    the dummy backend. The flow is System start-up, `plane_fit(plane=<known sample plane>)`,
+    `build_programs()`, then `print_experiment()`. It checks:
+    - the output files exist, and every layer file is inside `tmp_path`;
+    - all 50 layer programs ran to completion as controller tasks, with 0 statements the simulation could
+      not execute;
+    - there were no controller faults or unknown commands;
+    - all 540 exposures lie within 20 µm of the plane, and camera images were stored;
+    - only `tmp_path` was written.
+
+    It is marked `slow` (about 10 s) but runs by default.
+  - `TODO.md`: T6 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest test/integration`: 1 passed (9.5 s). The whole suite: see T8.
+- **Commits:** `c6179d0` fix(mains): pass structure size as number in experiment template [T6];
+  `2e911c2` feat(mains): allow a dry run of the experiment template [T6];
+  `43cb532` test(integration): dry-run the experiment template on the dummy backend [T6]
+- **Notes:**
+  - `plane_fit()` is not simulated (maintainer decision); the dry run passes the known plane.
+  - The dry run uses `dhm_usage=False`. With the DHM, `opl_scan()` would hit the known defect
+    `dhm.opl_scan` → `motorscan` (T10).
+  - Other experiment scripts can be dry-run the same way once they accept `backend`/`plane`.
+- **Follow-ups:** none new.
+

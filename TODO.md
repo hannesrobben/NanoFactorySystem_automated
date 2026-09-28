@@ -11,14 +11,6 @@ Format rules (for humans and Claude):
 -->
 
 ## Open
-- [ ] T6: Dry-run an experiment with the dummy backend [group: testing-infrastructure]
-      Goal: Experiment scripts can be tested end to end without the lab.
-      Priority: medium | Depends on: T3
-      Done when:
-        - `mains/Experiments/default_exp_file.py` runs end to end with the dummy backend:
-          `plane_fit()`, then `build_programs()`, then `print_experiment()`.
-        - An integration test covers this dry run and writes only to `tmp_path`.
-
 - [ ] T7: Golden-file tests for AeroBasic generation [group: testing-infrastructure]
       Goal: Unintended changes in the generated `.pgm` programs are detected automatically.
       Priority: medium | Depends on: T4
@@ -193,4 +185,6 @@ Format rules (for humans and Claude):
 - [x] T15: Repair failing hardware-free unit tests — 2026-09-28 — Fixed `create_variable`/`AerotechVariable` (separate fix commit) and updated outdated tests with justification (axis names, Python 3.12 changes, timestamp header, removed `CornerRectangle`, wrong cm value); `test_prevent_mixed_axes` is strict xfail (T23). 31 passed, 1 xfailed. — commits: `69827fd`, `22e8e7e`
 
 - [x] T5: Triage and convert the device tests — 2026-09-28 — Every device/DHM/Femtika/tools/system/slicer test file is converted (dummy + `hardware` tests with assertions) or moved to `test/manual/`, reasons in WORKLOG.md; `python -m pytest` passes without hardware or config (104 passed, 14 skipped, 1 xfailed) and `-m hardware --run-hardware` collects 13 tests. — commits: `96d54a4`, `4cbda21`
+
+- [x] T6: Dry-run an experiment with the dummy backend — 2026-09-28 — `default_exp_file.py` runs end to end on the dummy backend (plane_fit with known plane, build_programs, print_experiment); integration test writes only to `tmp_path`; the dry run found and fixed a tuple bug in the template. — commits: `c6179d0`, `2e911c2`, `43cb532`
 
