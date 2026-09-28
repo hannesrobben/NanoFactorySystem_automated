@@ -91,3 +91,20 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   (3) simple sample/spot model first, with seeding `plane.zdc` as the fallback for T6.
   T3–T8 are waiting on this approval. **Resume at:** T2 approval, then T3 step 1 in §11 of the design.
 
+### 2026-09-28 22:46 CEST — [T2] Design the dummy hardware backend (approval)
+- **Status:** done
+- **Changes:**
+  - `docs/design/DUMMY_BACKEND.md`: status set to approved. §10 now records the maintainer decisions:
+    (1) `A3200` and `Aerotech3200` are merged later as T20, and T12 is only a rename;
+    (2) there is no `NANOFACTORY_BACKEND` variable, only the explicit `backend=` argument, and usage
+    must be documented; (3) `plane_fit()` is not simulated and gets `plane=...` instead, so spot
+    rendering was removed from the dummy camera and DHM. §4, §5, §9 and §11 were adjusted to match.
+  - `TODO.md`: T12 reworded to a pure rename; T20 (controller merge) added; T2 moved to Done. The
+    maintainer's own uncommitted T19 ("Identify each and every todo and note") is committed unchanged.
+  - `WORKLOG.md`: this entry.
+- **Tests:** none; this is a documentation change.
+- **Commits:** `b6340a4` docs(design): record maintainer decisions for dummy backend [T2]; the next
+  commit contains this entry. Note: the message of `b6340a4` still says "T19" for the controller
+  merge. The todo was renumbered to T20, because T19 was already taken.
+- **Follow-ups:** T12 (rename) comes next, then T3 following §11 of the design.
+

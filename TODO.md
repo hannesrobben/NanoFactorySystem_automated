@@ -87,14 +87,32 @@ Format rules (for humans and Claude):
         - The `## Commands` and `## Architecture` sections in CLAUDE.md are updated.
           `## Current Status` and `## Status Update Anchor` are left untouched.
 
-- [ ] T12: Decide the status of `devices/aerotech_old.py` (found during T1)
+- [ ] T12: Rename `devices/aerotech_old.py` to `devices/a3200.py` (found during T1)
       Goal: The active `A3200` controller is no longer hidden in a file that the `*_old.py` rule marks as legacy.
       Priority: high | Depends on: –
       Done when:
-        - The maintainer has decided whether `devices/aerotech_old.py` is renamed (e.g. to
-          `devices/a3200.py`) and whether `devices/aerotech_old_1.py` is deleted.
-        - The decision is implemented, and imports and CLAUDE.md are updated.
-      Notes: Needs maintainer input. Blocks T11. Details: `docs/reviews/CODE_REVIEW_2026-09-28.md` §2.
+        - `devices/aerotech_old.py` is renamed to `devices/a3200.py` with `git mv`, without content changes.
+        - `devices/__init__.py` and all other imports use the new module; `devices/aerotech_old_1.py`
+          stays untouched.
+        - The hardware-free tests give the same result as before the rename.
+      Notes: Maintainer decision 2026-09-28: rename now; merging with `Aerotech3200` follows in T20.
+      Needed before T3 modifies the controller. Details: `docs/reviews/CODE_REVIEW_2026-09-28.md` §2.
+
+- [ ] T20: Merge `A3200` and `Aerotech3200` into one controller class (follow-up of T12)
+      Goal: One controller class owns the socket, the ASCII protocol, the motion/laser helpers and the program tasks.
+      Priority: medium | Depends on: T12, T3, T5, T7
+      Done when:
+        - A single class, built on `AerotechAsciiInterface`, provides the µm-based methods of the old
+          `A3200` (`moveabs`, `position`, `wait`, `power`, `pulse`, `laseron/off`, `zline`, …) and the
+          task features of `Aerotech3200` (`run_program_as_task`, `xyz`, `save_log`, `.api`).
+        - `System.controller` and `System.a3200_new` refer to the same object; `Aerotech3200` remains
+          importable as a compatible alias or thin subclass (also constructible without user/config).
+        - For the same flows (System start-up, z-line, `print_structure`), the command log recorded by the
+          dummy transport is identical before and after the merge (the recorded logs are committed as
+          golden files).
+        - `AerotechError` subclasses `RuntimeError`, so existing `except` clauses for both keep working.
+        - Whether `zMax` also guards `.api.LINEAR` moves is decided by the maintainer and documented.
+      Notes: Maintainer decision 2026-09-28. Refactor only after the dummy backend and tests exist.
 
 - [ ] T9: Fix packaging and pin a working environment (found during T1)
       Goal: `pip install .` installs a complete, importable package on a fresh machine.
@@ -170,35 +188,21 @@ Format rules (for humans and Claude):
         - German identifiers (e.g. `run_testzweck_altesSystem`) and comments in active, non-legacy modules are
           translated, one module per commit.
 
+- [ ] T19: Identify each and every todo and note in all of the documents
+      Goal: Code should be free von notes and todo markers to enhance consistency in code structure. 
+      Priority: low | Depends on: –
+      Done when:
+        - every todo and note section is identified and summerized in a new file 'todo_notes.md' . delete notes and todos in documentation and document the meaning of it in the file. Create workpackages from this in the same style as 'TODO.md' but save them on the bottom of 'todo_notes.md'.  
+
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
 
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
-- [ ] T2: Design the dummy hardware backend [group: testing-infrastructure]
-      Goal: An approved design for a simulated hardware backend exists before implementation starts.
-      Priority: high | Depends on: T1
-      Done when:
-        - The design defines one `typing.Protocol` or ABC per device role, derived from the
-          methods actually used: motion controller (both `devices/A3200` and
-          `devices/aerotech.Aerotech3200`), attenuator, camera, DHM.
-        - It defines a single, explicit backend switch, e.g. `System(..., backend="dummy")`.
-          Real hardware is the default. An environment variable is at most a convenience override.
-        - `Aerotech3200` is simulated at the transport (TCP/ASCII) level, so the generated
-          AeroBasic command strings remain testable.
-        - The dummy devices are specified as deterministic (seeded where needed), with no
-          sleeps and no network access.
-        - They keep internal state (positions, laser power, running tasks) and record every
-          call in a call log.
-        - They return plausible synthetic data (camera images, DHM phase images, stage
-          positions), and the responses can be configured.
-        - The design explains operation without `~/nanofactory.json`, and lazy imports of
-          optional dependencies with a clear error message.
-        - It describes the file layout and the impact on the public API.
-        - The maintainer has approved the design.
-      Notes: Present the design and STOP until approval (move to "Blocked" while waiting).
-      Blocked by: waiting for maintainer approval of `docs/design/DUMMY_BACKEND.md` (incl. decisions in §10)
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
 - [x] T1: Record baseline and review the code — 2026-09-28 — Recorded the test baseline (global env: all 40 files fail on a NumPy ABI mismatch; clean venv: 16 passed / 20 failed / 16 errors over `test/`) in WORKLOG.md and wrote `docs/reviews/CODE_REVIEW_2026-09-28.md`; follow-ups T9–T18 added. — commits: `bf98f78`
+
+- [x] T2: Design the dummy hardware backend — 2026-09-28 — Wrote `docs/design/DUMMY_BACKEND.md` (seam/role protocols, explicit `backend=` switch, socket-level fake controller, deterministic simulated world with call log); approved by the maintainer with three decisions (controller merge later as T20, no env var, `plane_fit(plane=...)` instead of simulated detection). — commits: `46ae4b1`, `b6340a4`
+

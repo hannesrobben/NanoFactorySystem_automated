@@ -354,7 +354,7 @@ test/backends/           # T3: tests for the dummies (state, call log, determini
 ## 10. Maintainer decisions (2026-09-28)
 
 1. **Controllers.** Merging `A3200` and `Aerotech3200` into one class is possible and wanted, but
-   it happens **later** as its own todo (T19). The merge is verified by identical command logs
+   it happens **later** as its own todo (T20). The merge is verified by identical command logs
    against the fake transport, so it needs T3, T5 and T7 first. For now, T12 only renames
    `devices/aerotech_old.py` → `devices/a3200.py` (a pure `git mv` plus the import update), so T3
    does not modify a `*_old.py` file. `aerotech_old_1.py` stays untouched.
