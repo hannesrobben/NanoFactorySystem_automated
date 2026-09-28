@@ -243,3 +243,46 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   `22e8e7e` test(aerobasic): update outdated unit tests to the current API [T15]
 - **Follow-ups:** T23 (axis validation decision); T24 (`plot_movements` fails for most programs).
 
+### 2026-09-28 23:17 CEST — [T5] Triage and convert the device tests
+- **Status:** done
+- **Changes (one decision per file, with the reason):**
+
+  | File | Decision | Reason |
+  |---|---|---|
+  | `test/devices/test_aerotech.py` | converted: 8 dummy tests + 1 `hardware` | The script only logged the position. Now the commands, µm parsing, decimal comma, `zMax` safety, power, z-line task, fault handling and container are asserted on the fake; the hardware test asserts the real read-out. |
+  | `test/devices/test_attenuator.py` | converted: 4 dummy + 1 `hardware` | The script printed and plotted the lab file. Conversion is checked on a synthetic calibration; the hardware test checks that the lab file is monotonic and spans 0..10. Plotting was dropped. |
+  | `test/devices/test_camera.py` | converted: 1 dummy + 1 `hardware` | Same flow (`optexpose`, container) with assertions. |
+  | `test/devices/test_dhm_objective.py`, `_test_dhm_objective.py`, `_test_dhm.py`, `live_tilt.py`, `live_tilt_cv.py` | moved to `test/manual/devices/` | Interactive live views and objective checks; they need `offaxisholo` and a person to judge the images. |
+  | `test/dhm/test_dhm.py` | converted: 1 dummy + 1 `hardware` | Shared assertions for the simulated and the real client. The address now comes from the config instead of being hardcoded. |
+  | `test/dhm/DHMUserBackend.py`, `test/dhm/path/test.tif` | moved to `test/manual/dhm/` | Interactive user helper, not a test. |
+  | `test/test_femtika/__init__.py`, `test_device_no_laser.py` | converted: 8 dummy + 8 `hardware` (+ `test_linear`, skipped as before) | The inverted `EXECUTE_FEMTIKA_TESTS` guard is replaced by the marker. The same tests run on the real and the simulated controller and assert instead of printing. `test_move_home`/`test_homing` still move the real stage, as before. |
+  | `test/test_femtika/test_device_WITH_laser.py` | moved to `test/manual/femtika/` | Laser visibility has to be judged by a person. Imports fixed (the old top-level `aerobasic` package no longer exists) and the file made self-contained. |
+  | `test/tools/test_focus.py`, `test_layer.py`, `test_plane.py`, `test_grid.py`, `test_63x_focus.py` | moved to `test/manual/tools/` | Measurement procedures that expose the laser into a real sample; the outcome depends on the sample. Plane detection is not simulated (maintainer decision). |
+  | `test/tools/test_stitch.py`, `eval_grid.py`, `grid.png` | moved to `test/manual/tools/` | Need data files (`focus-2/…`) that are not in the repository. |
+  | `test/tools/test_focus_dummy.py` | new: 1 dummy test | Keeps the tools layer under test: `Focus` runs end to end on the dummy system (result "no focus"), and the exposure reaches the controller. |
+  | `test/test_system.py` | converted: 2 dummy + 1 `hardware` | Container content and homing are asserted on the dummy; the hardware test checks that the system opens and closes. |
+  | `test/test_config.py` | moved to `test/manual/print_config.py` | It only prints the config; `test/test_config_sources.py` tests the config. |
+  | `test/example_planefit.py` | moved to `test/manual/` | Example script, not a test (it was never collected). |
+  | `test/test_model3d.py` (slicer) | converted: `test/slicer/model3d_checks.py` + `test/slicer/test_model3d.py` | Hardware-free checks that used to abort the whole pytest run with `sys.exit`. The checks run via `runpy`, the test asserts that none failed, and temp files go to `tmp_path`. |
+  | `test/__ZLINE__.OGM`, `test/__zline__.pgm`, the same two in `test/dhm/` and `test/tools/` | deleted | Artefacts that `A3200.init_zline` wrote into the current working directory during earlier runs. |
+  | `nanofactorysystem/aerobasic/programs/drawings/test/*.py` | unchanged | Not in the directories listed in T5, and not collected (`testpaths = ["test"]`). These are height-structure scripts; left for T19 (inventory of notes) or a later triage. |
+
+  - `test/conftest.py`: new fixture `lab_user` for hardware tests.
+  - `TODO.md`: T5 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests (baseline B venv):**
+  - `python -m pytest`: **104 passed, 14 skipped, 1 xfailed**. The 14 skipped are the 13 hardware tests plus
+    `test_linear` (skipped as before). Baseline: the collection aborted with an INTERNALERROR.
+  - The same result with a home directory without `nanofactory.json`. `mvIMPACT` and `offaxisholo` are not
+    installed.
+  - `python -m pytest -m hardware --run-hardware --co` collects 13 hardware tests.
+  - The global interpreter on this PC still fails to import the package because of the NumPy ABI mismatch;
+    that is T9.
+- **Commits:** `96d54a4` test: move manual scripts to test/manual and remove artefacts [T5];
+  `4cbda21` test: convert device and system scripts into test cases [T5]
+- **Follow-ups:**
+  - Safety question for the maintainer: `TestFemtikaNoLaser.test_move_home` moves the real stage to
+    X=Y=Z=0 when run with `--run-hardware`. That is unchanged from before, but it is worth checking whether
+    Z=0 is safe with the objective mounted.
+  - The hardware tests were not run (no lab access in this session).
+

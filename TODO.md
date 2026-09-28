@@ -11,19 +11,6 @@ Format rules (for humans and Claude):
 -->
 
 ## Open
-- [ ] T5: Triage and convert the device tests [group: testing-infrastructure]
-      Goal: `python -m pytest` passes without hardware, and every test has a clear purpose.
-      Priority: high | Depends on: T4
-      Done when:
-        - Every file in `test/devices`, `test/dhm`, `test/test_femtika`, `test/tools` and
-          `test/test_system.py` (and the slicer tests, if any) is handled in one of three ways:
-          converted into dummy-based test cases, marked `hardware` with real assertions, or
-          moved to `test/manual/` (excluded from collection).
-        - The reason for each decision is recorded in WORKLOG.md.
-        - `python -m pytest` passes on a machine without hardware, without
-          `~/nanofactory.json`, and without `mvImpact` or `OffAxisHolo`.
-        - `python -m pytest -m hardware --run-hardware` collects the hardware tests.
-
 - [ ] T6: Dry-run an experiment with the dummy backend [group: testing-infrastructure]
       Goal: Experiment scripts can be tested end to end without the lab.
       Priority: medium | Depends on: T3
@@ -204,4 +191,6 @@ Format rules (for humans and Claude):
 - [x] T4: pytest configuration and shared fixtures — 2026-09-28 — Added `[tool.pytest.ini_options]` (testpaths, norecursedirs, markers `hardware`/`slow`) and `test/conftest.py` with `--run-hardware` and the fixtures `test_config`, `tmp_program_dir`, `dummy_backend`, `no_sleep`, `dummy_controller`, `dummy_system`; 7 fixture tests. — commits: `97c5612`
 
 - [x] T15: Repair failing hardware-free unit tests — 2026-09-28 — Fixed `create_variable`/`AerotechVariable` (separate fix commit) and updated outdated tests with justification (axis names, Python 3.12 changes, timestamp header, removed `CornerRectangle`, wrong cm value); `test_prevent_mixed_axes` is strict xfail (T23). 31 passed, 1 xfailed. — commits: `69827fd`, `22e8e7e`
+
+- [x] T5: Triage and convert the device tests — 2026-09-28 — Every device/DHM/Femtika/tools/system/slicer test file is converted (dummy + `hardware` tests with assertions) or moved to `test/manual/`, reasons in WORKLOG.md; `python -m pytest` passes without hardware or config (104 passed, 14 skipped, 1 xfailed) and `-m hardware --run-hardware` collects 13 tests. — commits: `96d54a4`, `4cbda21`
 
