@@ -23,18 +23,6 @@ Format rules (for humans and Claude):
           non-daemon threads.
       Notes: Blocks T5 (`python -m pytest` must pass). Details: `docs/reviews/CODE_REVIEW_2026-09-28.md` §5.
 
-- [ ] T4: pytest configuration and shared fixtures [group: testing-infrastructure]
-      Goal: The test suite has a consistent configuration and separates hardware tests cleanly.
-      Priority: high | Depends on: T3
-      Done when:
-        - `[tool.pytest.ini_options]` in `pyproject.toml` defines `testpaths`, the markers
-          `hardware` and `slow`, and `norecursedirs` for `_programs`, `manual` and the legacy
-          directories.
-        - `test/conftest.py` provides the `--run-hardware` option; `hardware` tests are
-          skipped without it, with a clear reason.
-        - `test/conftest.py` provides the fixtures `dummy_system`, `dummy_controller`,
-          `tmp_program_dir` and `test_config`.
-
 - [ ] T5: Triage and convert the device tests [group: testing-infrastructure]
       Goal: `python -m pytest` passes without hardware, and every test has a clear purpose.
       Priority: high | Depends on: T4
@@ -207,4 +195,6 @@ Format rules (for humans and Claude):
 - [x] T12: Rename `devices/aerotech_old.py` to `devices/a3200.py` — 2026-09-28 — Pure `git mv` plus the import in `devices/__init__.py`; hardware-free test results unchanged (16 passed / 11 failed / 3 errors, as in baseline B). — commits: `6b43511`
 
 - [x] T3: Implement the dummy hardware backend — 2026-09-28 — Added `nanofactorysystem.backends` (protocols, RealBackend, DummyBackend with socket-level fake A3200, simulated camera/DHM/attenuator, deterministic world and call log), lazy config with built-in default, device injection parameters, `System/Experiment(backend=...)` and `plane_fit(plane=...)`; 40 new tests, real-hardware path verified unchanged. — commits: `df14fd7`, `65cd58c`, `8dc0b46`, `597b8ba`
+
+- [x] T4: pytest configuration and shared fixtures — 2026-09-28 — Added `[tool.pytest.ini_options]` (testpaths, norecursedirs, markers `hardware`/`slow`) and `test/conftest.py` with `--run-hardware` and the fixtures `test_config`, `tmp_program_dir`, `dummy_backend`, `no_sleep`, `dummy_controller`, `dummy_system`; 7 fixture tests. — commits: `97c5612`
 

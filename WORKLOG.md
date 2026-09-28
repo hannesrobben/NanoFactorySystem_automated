@@ -186,3 +186,25 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
     behaviour.
   - How to use the dummy backend is documented in T8 (`test/README.md`).
 
+### 2026-09-28 23:06 CEST — [T4] pytest configuration and shared fixtures
+- **Status:** done
+- **Changes:**
+  - `pyproject.toml`: `[tool.pytest.ini_options]` with `testpaths = ["test"]`, `norecursedirs` (`_programs`,
+    `manual`, `old_to-delete`, `new`, plus pytest's defaults `.*`, `build`, `dist`, `*.egg`, `__pycache__`),
+    and the markers `hardware` and `slow`.
+  - `test/conftest.py` (new): the `--run-hardware` option; `hardware` tests are skipped without it, with the
+    reason "needs the lab hardware; run with --run-hardware on the lab PC". Fixtures: `test_config`,
+    `tmp_program_dir`, `dummy_backend`, `no_sleep`, `dummy_controller`, `dummy_system`. There is also the
+    helper `dummy_sys_args()`, which returns fresh arguments (see T21).
+  - `test/test_conftest.py` (new, 7 tests): marker handling via `pytester`, and every fixture.
+  - `test/backends/conftest.py` (deleted): its fixtures moved to `test/conftest.py`; `backend` was renamed
+    to `dummy_backend`.
+  - `test/backends/test_dummy_system.py`: uses `dummy_backend`.
+  - `TODO.md`: T4 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `test/test_conftest.py`: 7 passed. `test/backends` and `test/test_config_sources.py`:
+  40 passed. A plain `python -m pytest` now collects only `test/`, but still aborts during collection
+  (INTERNALERROR from `test/test_model3d.py`'s module-level `sys.exit()`); that file is triaged in T5.
+- **Commits:** `97c5612` test: add pytest configuration and shared fixtures [T4]
+- **Follow-ups:** none.
+
