@@ -42,6 +42,18 @@ Format rules (for humans and Claude):
         - The dummy devices have their own tests covering state handling, call log and determinism.
         - The behaviour on real hardware is unchanged; the default backend is still real hardware.
 
+- [ ] T15: Repair failing hardware-free unit tests (found during T1) [group: testing-infrastructure]
+      Goal: The existing unit tests for AeroBasic generation and units pass again, or fail visibly as known bugs.
+      Priority: high | Depends on: –
+      Done when:
+        - Every failure in `test/test_aerobasic/test_constants.py`, `test_program.py`,
+          `test_drawings/test_corners.py` and `test/test_utils/test_units.py` (baseline B in
+          WORKLOG.md) is resolved: the test is updated to the current API with a justification,
+          the code is fixed in a separate `fix:` commit, or the test is `xfail(strict=True)` with a todo.
+        - `test_program.py` no longer depends on leftover state in `test/_programs/` and starts no
+          non-daemon threads.
+      Notes: Blocks T5 (`python -m pytest` must pass). Details: `docs/reviews/CODE_REVIEW_2026-09-28.md` §5.
+
 - [ ] T4: pytest configuration and shared fixtures [group: testing-infrastructure]
       Goal: The test suite has a consistent configuration and separates hardware tests cleanly.
       Priority: high | Depends on: T3
@@ -97,6 +109,89 @@ Format rules (for humans and Claude):
           go (`test/_programs/`, `tmp_path`).
         - The `## Commands` and `## Architecture` sections in CLAUDE.md are updated.
           `## Current Status` and `## Status Update Anchor` are left untouched.
+
+- [ ] T12: Decide the status of `devices/aerotech_old.py` (found during T1)
+      Goal: The active `A3200` controller is no longer hidden in a file that the `*_old.py` rule marks as legacy.
+      Priority: high | Depends on: –
+      Done when:
+        - The maintainer has decided whether `devices/aerotech_old.py` is renamed (e.g. to
+          `devices/a3200.py`) and whether `devices/aerotech_old_1.py` is deleted.
+        - The decision is implemented, and imports and CLAUDE.md are updated.
+      Notes: Needs maintainer input. Blocks T11. Details: `docs/reviews/CODE_REVIEW_2026-09-28.md` §2.
+
+- [ ] T9: Fix packaging and pin a working environment (found during T1)
+      Goal: `pip install .` installs a complete, importable package on a fresh machine.
+      Priority: high | Depends on: –
+      Done when:
+        - `pyproject.toml` uses package discovery, so all subpackages are installed.
+        - All dependencies imported by active modules (`scipy`, `shapely`, `trimesh`, `qrcode`, `h5py`, …)
+          are declared, hardware-only packages are optional extras, and the versions are compatible with
+          NumPy 2 (e.g. `opencv-python>=4.10.0.84`).
+        - A fresh virtual environment with `pip install .[test]` can run `python -m pytest`.
+      Notes: The global interpreter on the lab PC currently fails to import the package (NumPy ABI). Details: `docs/reviews/CODE_REVIEW_2026-09-28.md` §2.
+
+- [ ] T10: Fix defects in the experiment flow (found during T1)
+      Goal: The experiment flow handles the DHM OPL scan and failed layers correctly.
+      Priority: high | Depends on: T3
+      Done when:
+        - `Experiment.opl_scan` calls an existing `Dhm` method (`motorscan`), and a dummy-backend test covers it.
+        - A failed controller task during `print_structure` is recorded in the progress log instead of
+          aborting via an uncaught `ValueError`, and a test covers it.
+        - Existing `substrate_information.json` is merged instead of silently discarding new data.
+        - An empty layer list does not raise `UnboundLocalError`.
+      Notes: Details: `docs/reviews/CODE_REVIEW_2026-09-28.md` §4.
+
+- [ ] T13: Add timeouts to hardware communication and wait loops (found during T1)
+      Goal: A missing or unresponsive device leads to a clear error instead of a hang.
+      Priority: medium | Depends on: T3
+      Done when:
+        - TCP connects (A3200, DHM) and receives use configurable timeouts; `send()` reads until the
+          terminating character.
+        - The polling loops in `aerotech_old.py` (`drivestatus`, `zline`) and `task.py`
+          (`wait_to_finish`, `finish`) have an upper time bound.
+        - Dummy-backend tests cover the timeout paths.
+      Notes: Details: `docs/reviews/CODE_REVIEW_2026-09-28.md` §1, §4.
+
+- [ ] T14: Remove the hardcoded calibration path from `IFOV_Lines` (found during T1)
+      Goal: Drawing classes do not read lab files.
+      Priority: medium | Depends on: T3
+      Done when:
+        - `IFOV_Lines` receives calibration data (or an attenuator) instead of opening
+          `C:/Software/3DPoli Fabrication/Calibration/Calibration.dat` itself.
+        - A test generates an `IFOV_Lines` program without the lab file.
+      Notes: Details: `docs/reviews/CODE_REVIEW_2026-09-28.md` §1.
+
+- [ ] T11: Fix small defects in `System` and the `A3200` controller (found during T1)
+      Goal: Rarely used helpers of `System` and `A3200` work as documented.
+      Priority: medium | Depends on: T12, T3
+      Done when:
+        - `System.object_pos`/`camera_pos` use `self.controller`.
+        - `A3200.home` (`in None`), `A3200.container` (dict iteration) and the use of `self.z` before
+          assignment are fixed.
+        - `AerotechAsciiInterface.send_one` no longer recurses infinitely.
+        - Each fix has a dummy-backend test.
+      Notes: Details: `docs/reviews/CODE_REVIEW_2026-09-28.md` §4.
+
+- [ ] T16: Fix always-true `assert (path, Path)` in experiment scripts (found during T1)
+      Goal: Path arguments of experiment scripts are actually checked.
+      Priority: low | Depends on: –
+      Done when:
+        - The 48 occurrences in `mains/**` are replaced by a working check or conversion, and pytest no longer
+          emits `PytestAssertRewriteWarning` for them.
+
+- [ ] T17: Clean up logging (found during T1)
+      Goal: Log output is neither duplicated nor mixed with `print`.
+      Priority: low | Depends on: –
+      Done when:
+        - `runtime.getLogger` does not add duplicate handlers on repeated calls.
+        - `print()` calls in `aerobasic/ascii.py` and `devices/aerotech/task.py` use the logger.
+
+- [ ] T18: Translate German identifiers and comments (found during T1)
+      Goal: The code base follows the English-only language rule.
+      Priority: low | Depends on: –
+      Done when:
+        - German identifiers (e.g. `run_testzweck_altesSystem`) and comments in active, non-legacy modules are
+          translated, one module per commit.
 
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
