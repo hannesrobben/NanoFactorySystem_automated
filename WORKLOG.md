@@ -122,3 +122,67 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Follow-ups:** `NanoFactorySystem-TREE.txt` still lists the old name. It is a stale snapshot that
   includes `.pyc` files, so I left it alone. CLAUDE.md's architecture section will be updated in T8.
 
+### 2026-09-28 23:03 CEST — [T3] Implement the dummy hardware backend
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/config.py`: config lookup order `use_config()` → `$NANOFACTORY_CONFIG` →
+    `~/nanofactory.json` → built-in `DEFAULT_CONFIG` (with a warning); `Config.load()`/`section()`;
+    `use_config()` context manager that swaps the content in place; `ConfigDefaults` descriptor
+    (lazy, deep-copied class defaults).
+  - `nanofactorysystem/system.py`: `_defaults` via `ConfigDefaults`; `backend=` parameter; injection of
+    drivers, transport, calibration file and program directory; `A3200.log` goes to the backend
+    workdir for non-real backends.
+  - `nanofactorysystem/devices/a3200.py`: `_defaults` via `ConfigDefaults`; keyword-only `transport`,
+    `program_dir`.
+  - `nanofactorysystem/devices/attenuator.py`: `_defaults` via `ConfigDefaults`; clear error when no
+    calibration file is configured.
+  - `nanofactorysystem/devices/camera.py`, `nanofactorysystem/devices/dhm.py`: `_defaults` via
+    `ConfigDefaults`; keyword-only `driver`.
+  - `nanofactorysystem/camera/camera.py`: `mvIMPACT` is imported on first use, with a clear `ImportError`;
+    importing the package no longer emits a warning.
+  - `nanofactorysystem/aerobasic/ascii.py`: `transport_factory` parameter; `DummyAsciiInterface`
+    documented as deprecated.
+  - `nanofactorysystem/devices/aerotech/__init__.py`: `transport_factory` and `program_dir`
+    parameters; `dummy=True` now uses `FakeA3200Transport`.
+  - `nanofactorysystem/experiment.py`: `backend=` parameter; `plane_fit(plane=...)`; the coordinate
+    system setup was extracted into `_init_coordinate_system()`.
+  - `nanofactorysystem/backends/__init__.py`, `protocols.py`, `real.py` (new): backend protocol,
+    `resolve_backend`, role and seam protocols, `RealBackend`.
+  - `nanofactorysystem/backends/dummy/__init__.py`, `world.py`, `calllog.py`, `a3200.py`, `camera.py`,
+    `dhm.py`, `attenuator.py` (new): `DummyBackend` and the simulated devices.
+  - `test/test_config_sources.py` (new, 9 tests), `test/backends/conftest.py` (new),
+    `test/backends/test_dummy_controller.py` (new, 16 tests), `test/backends/test_dummy_devices.py`
+    (new, 8 tests), `test/backends/test_dummy_system.py` (new, 7 tests).
+  - `TODO.md`: T3 moved to In Progress, then to Done; T21 and T22 added.
+  - `WORKLOG.md`: this entry.
+- **Tests:** baseline B venv, hardware-free files (`test/test_aerobasic`, `test/test_utils`,
+  `test/test_config_sources.py`, `test/backends`): 56 passed, 11 failed, 3 errors. The failures and errors
+  are identical to baseline B (T15); the 40 new tests all pass, in about 0.6 s. The new tests also pass
+  with a home directory that has no `nanofactory.json`, and `mvIMPACT`/`OffAxisHolo` are not installed.
+  `test_real_backend_constructs_the_same_objects` checks that the default backend still calls
+  `socket.socket(AF_INET, SOCK_STREAM)`, `CameraDevice(None, None)` and `DhmClient("192.168.22.2", 27182)`,
+  sends the same start-up commands, and writes `__zline__.pgm` and `A3200.log` to the current working
+  directory as before.
+- **Commits:** `df14fd7` refactor(config): resolve config lazily and add built-in default [T3];
+  `65cd58c` refactor(devices): add optional device injection and lazy mvIMPACT [T3];
+  `8dc0b46` feat(backends): add dummy backend with simulated devices [T3];
+  `597b8ba` feat(system): select hardware backend in System and Experiment [T3]
+- **Deviations from the design:**
+  - The built-in default config is a dict in `config.py` rather than `data/default_config.json`,
+    because packaging does not ship data files yet (T9).
+  - `Backend.dhm_driver(objective)` replaces `(host, port)`, because the DHM needs the objective's `dhmId`.
+  - Attribute access on `Config` still raises for missing sections. The new `Config.section()` returns
+    `{}`, which is what `ConfigDefaults` uses.
+  - The fake can report "running" for a configurable number of `TaskState` polls.
+  - Steps 5 and 6 were implemented before step 4.
+- **Behaviour notes:** `ConfigDefaults` returns a deep copy, so `A3200._defaults["tasks"]` is no longer shared
+  between instances. For the first instance nothing changes; before, a second `A3200` in the same process
+  skipped loading the z-line program.
+- **Follow-ups:**
+  - T21: `Parameter` pops keys from the caller's argument dicts, so reusing `sys_args` fails.
+  - T22: NumPy 2.5 deprecation in `attenuator.py:62`.
+  - The dummy backend reproduced T11 (`A3200.zline` needs `self.z`, which only exists after an absolute Z
+    move) and T10 (a task error raises `ValueError`). Both are covered by tests that document the current
+    behaviour.
+  - How to use the dummy backend is documented in T8 (`test/README.md`).
+

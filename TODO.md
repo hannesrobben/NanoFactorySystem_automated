@@ -11,14 +11,6 @@ Format rules (for humans and Claude):
 -->
 
 ## Open
-- [ ] T3: Implement the dummy hardware backend [group: testing-infrastructure]
-      Goal: The whole package can run against simulated devices on any machine.
-      Priority: high | Depends on: T2
-      Done when:
-        - The approved design is implemented, with type hints and English NumPy-style docstrings.
-        - The dummy devices have their own tests covering state handling, call log and determinism.
-        - The behaviour on real hardware is unchanged; the default backend is still real hardware.
-
 - [ ] T15: Repair failing hardware-free unit tests (found during T1) [group: testing-infrastructure]
       Goal: The existing unit tests for AeroBasic generation and units pass again, or fail visibly as known bugs.
       Priority: high | Depends on: –
@@ -183,6 +175,23 @@ Format rules (for humans and Claude):
       Done when:
         - every todo and note section is identified and summerized in a new file 'todo_notes.md' . delete notes and todos in documentation and document the meaning of it in the file. Create workpackages from this in the same style as 'TODO.md' but save them on the bottom of 'todo_notes.md'.  
 
+- [ ] T21: Stop `Parameter` from mutating the caller's argument dictionaries (found during T3)
+      Goal: Runtime arguments such as `sys_args` can be reused for several `System`/`Experiment` objects.
+      Priority: medium | Depends on: –
+      Done when:
+        - `Parameter.__init__` no longer pops keys from the section dicts it receives (e.g. `sys_args["controller"]["zMax"]`
+          is still present after `System(...)`).
+        - A test creates two `System` objects on the dummy backend from the same `sys_args` dict.
+      Notes: Today the second `System` built from a module-level `sys_args` (the pattern used in the experiment scripts)
+      fails with "Maximum z position is missing!".
+
+- [ ] T22: Fix NumPy 2.5 deprecation in `Attenuator` (found during T3)
+      Goal: The attenuator keeps working with future NumPy versions.
+      Priority: low | Depends on: –
+      Done when:
+        - `devices/attenuator.py:62` uses `reshape` instead of assigning `array.shape`, and the tests run without the
+          `DeprecationWarning`.
+
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
 
@@ -196,4 +205,6 @@ Format rules (for humans and Claude):
 - [x] T2: Design the dummy hardware backend — 2026-09-28 — Wrote `docs/design/DUMMY_BACKEND.md` (seam/role protocols, explicit `backend=` switch, socket-level fake controller, deterministic simulated world with call log); approved by the maintainer with three decisions (controller merge later as T20, no env var, `plane_fit(plane=...)` instead of simulated detection). — commits: `46ae4b1`, `b6340a4`
 
 - [x] T12: Rename `devices/aerotech_old.py` to `devices/a3200.py` — 2026-09-28 — Pure `git mv` plus the import in `devices/__init__.py`; hardware-free test results unchanged (16 passed / 11 failed / 3 errors, as in baseline B). — commits: `6b43511`
+
+- [x] T3: Implement the dummy hardware backend — 2026-09-28 — Added `nanofactorysystem.backends` (protocols, RealBackend, DummyBackend with socket-level fake A3200, simulated camera/DHM/attenuator, deterministic world and call log), lazy config with built-in default, device injection parameters, `System/Experiment(backend=...)` and `plane_fit(plane=...)`; 40 new tests, real-hardware path verified unchanged. — commits: `df14fd7`, `65cd58c`, `8dc0b46`, `597b8ba`
 
