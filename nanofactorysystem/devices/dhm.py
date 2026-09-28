@@ -35,9 +35,24 @@ class Dhm(Parameter):
         "oplOptPos": None,
     })
 
-    def __init__(self, user, objective, logger=None, **kwargs):
+    def __init__(self, user, objective, logger=None, *, driver=None, **kwargs):
 
-        """ Initialize the digital holographic microscope. """
+        """ Initialize the digital holographic microscope.
+
+        Parameters
+        ----------
+        user : str
+            User key in the configuration.
+        objective : dict
+            Objective data dictionary.
+        logger : logging.Logger, optional
+            Logger object.
+        driver : DhmDriver, optional
+            DHM client to use instead of connecting ``DhmClient(host, port)``,
+            e.g. a simulated client of the dummy backend.
+        **kwargs
+            Runtime configuration with the optional section ``dhm``.
+        """
 
         # Not open now
         self.opened = False
@@ -53,7 +68,10 @@ class Dhm(Parameter):
         # Open camera device
         host = self["host"]
         port = self["port"]
-        self.device = DhmClient(host, port)
+        if driver is None:
+            self.device = DhmClient(host, port)
+        else:
+            self.device = driver
         self.opened = True
         if not self.opened:
             self.log.error("Initializing of holographic microscope failed!")

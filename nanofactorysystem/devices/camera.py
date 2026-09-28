@@ -28,9 +28,25 @@ class Camera(Parameter):
         "GainAuto": 0,
     })
 
-    def __init__(self, user, objective, logger=None, **kwargs):
+    def __init__(self, user, objective, logger=None, *, driver=None, **kwargs):
 
-        """ Initialize the camera. """
+        """ Initialize the camera.
+
+        Parameters
+        ----------
+        user : str
+            User key in the configuration.
+        objective : dict
+            Objective data dictionary.
+        logger : logging.Logger, optional
+            Logger object.
+        driver : CameraDriver, optional
+            Camera driver to use instead of opening the MatrixVision device
+            ``CameraDevice(product, deviceID)``, e.g. a simulated driver of
+            the dummy backend.
+        **kwargs
+            Runtime configuration with the optional section ``camera``.
+        """
         # Not open now
         self.opened = False
 
@@ -45,7 +61,10 @@ class Camera(Parameter):
         self.log.info("Initializing camera.")
 
         # Open camera device
-        self.device = CameraDevice(product, deviceID)
+        if driver is None:
+            self.device = CameraDevice(product, deviceID)
+        else:
+            self.device = driver
         self.opened = self.device.opened
         if not self.opened:
             self.log.error("Initializing of camera device failed!")

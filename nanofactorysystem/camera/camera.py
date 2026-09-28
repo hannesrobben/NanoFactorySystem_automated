@@ -29,15 +29,40 @@
 ##########################################################################
 
 import ctypes
-import warnings
 
 import numpy as np
 
-try:
-    from mvIMPACT import acquire
-except ImportError:
-    acquire = None
-    warnings.warn("Could not import mvIMPACT -> No acquire function")
+# The MatrixVision library mvIMPACT is imported on first use, so that the
+# package can be imported on machines without it (e.g. with the dummy backend).
+acquire = None
+
+
+def _import_acquire():
+    """ Import ``mvIMPACT.acquire`` on first use.
+
+    Returns
+    -------
+    module
+        The ``mvIMPACT.acquire`` module.
+
+    Raises
+    ------
+    ImportError
+        If mvIMPACT is not installed.
+    """
+
+    global acquire
+    if acquire is None:
+        try:
+            from mvIMPACT import acquire as _acquire
+        except ImportError as error:
+            raise ImportError(
+                "The real camera backend needs mvIMPACT (Balluff/MATRIX VISION mvGenTL Acquire, "
+                "https://assets.balluff.com/documents/DRF_957356_AA_000/Building_page.html). "
+                "Install it, or use System(..., backend='dummy') for simulated hardware."
+            ) from error
+        acquire = _acquire
+    return acquire
 
 
 ##########################################################################
@@ -163,8 +188,7 @@ class CameraDevice(object):
         """ Initialize the camera. """
 
         # Initialize attributes
-        if acquire is None:
-            raise ImportError("mvIMPACT not imported")
+        _import_acquire()
         self._property = {}
 
         # Get camera device

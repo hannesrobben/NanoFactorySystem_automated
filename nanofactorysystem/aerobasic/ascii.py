@@ -1,6 +1,6 @@
 import socket
 import time
-from typing import Optional
+from typing import Callable, Optional
 
 from nanofactorysystem.aerobasic import AeroBasicAPI, SingleAxis
 from nanofactorysystem.aerobasic.constants import ReturnCode, Version, DataItemEnum
@@ -71,10 +71,25 @@ class AsciiCommandResponse:
 class AerotechAsciiInterface(AeroBasicAPI):
     COMMAND_TERMINATING_CHARACTER = 10  # \n
 
-    def __init__(self, hostname: str = "127.0.0.1", port: int = 8000):
+    def __init__(self, hostname: str = "127.0.0.1", port: int = 8000, *,
+                 transport_factory: Optional[Callable[[], "socket.socket"]] = None):
+        """ ASCII command interface of the Aerotech A3200 controller.
+
+        Parameters
+        ----------
+        hostname : str
+            Host of the ASCII command interface.
+        port : int
+            TCP port of the ASCII command interface.
+        transport_factory : callable, optional
+            Returns a socket-like object that is used by :meth:`connect`
+            instead of a new TCP socket, e.g. the simulated controller of the
+            dummy backend.
+        """
         super().__init__()
         self.hostname = hostname
         self.port = port
+        self.transport_factory = transport_factory
         self.history: list[AsciiCommandResponse] = []
 
         # TCP socket to the A3200 system
@@ -110,7 +125,10 @@ class AerotechAsciiInterface(AeroBasicAPI):
     def connect(self) -> "AerotechAsciiInterface":
         if self.socket is None:
             try:
-                self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                if self.transport_factory is None:
+                    self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                else:
+                    self.socket = self.transport_factory()
                 self.socket.connect((self.hostname, self.port))
             except ConnectionRefusedError:
                 self.logger.error(f"Connection to A3200 controller failed! ({self.hostname}:{self.port})")
