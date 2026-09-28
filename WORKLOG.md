@@ -208,3 +208,38 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Commits:** `97c5612` test: add pytest configuration and shared fixtures [T4]
 - **Follow-ups:** none.
 
+### 2026-09-28 23:11 CEST — [T15] Repair failing hardware-free unit tests
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/aerobasic/programs/__init__.py`: **bug fix**. `AerotechVariable.__call__` was missing,
+    so `create_variable()` could never instantiate a variable. The variable object was stored instead of its
+    name. The declaration comment had no line break. Nothing in the package used this yet, so no generated
+    program changes.
+  - `test/test_aerobasic/test_variables.py` (new, 3 tests): covers the fix.
+  - `test/test_aerobasic/test_constants.py`:
+    - `test_values` expects `"X Y"` (space-separated, as the AeroBasic commands and `test_program` require).
+    - `test_axis_parsing_invalid_value` asserts that 124 raises `ValueError` (Python ≥ 3.11 `Flag` STRICT
+      boundary) and that 28 is valid.
+    - `test_prevent_mixed_axes` is `xfail(strict=True)`: the validation was never implemented and
+      conflicts with `Aerotech3200.home()` (T23).
+  - `test/test_aerobasic/test_program.py`:
+    - Content is compared without the non-deterministic timestamp header (the header was added to
+      `to_text()` after the tests were written).
+    - The write tests use a temporary directory; before, they failed whenever `test/_programs` already
+      existed.
+    - Plotting is synchronous instead of in non-daemon threads. Plotting errors, which the threads
+      hid, are now warnings (T24).
+  - `test/test_aerobasic/test_drawings/test_corners.py`: removed `test_all_markers` and
+    `test_all_markers_optimized`, which used `CornerRectangle`. That class was deleted in `084f3aa`;
+    `Experiment.add_corner_structures` places the corners now, and the T6 dry run covers it.
+  - `test/test_utils/test_units.py`: `assertAlmostEquals` → `assertAlmostEqual` (removed in Python 3.12).
+    The expected cm value was wrong by a factor of 100 (0.573123 mm = 0.0573123 cm). Note: this file tests
+    a prototype `UnitFloat` class defined in the test itself, not package code.
+  - `TODO.md`: T15 moved to In Progress, then to Done; T23 and T24 added.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `test/test_aerobasic` and `test/test_utils`: 31 passed, 1 xfailed (baseline B: 16 passed,
+  11 failed, 3 errors). The plotting warnings are expected; see T24.
+- **Commits:** `69827fd` fix(aerobasic): make program variables usable [T15];
+  `22e8e7e` test(aerobasic): update outdated unit tests to the current API [T15]
+- **Follow-ups:** T23 (axis validation decision); T24 (`plot_movements` fails for most programs).
+

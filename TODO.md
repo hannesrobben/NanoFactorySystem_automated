@@ -11,18 +11,6 @@ Format rules (for humans and Claude):
 -->
 
 ## Open
-- [ ] T15: Repair failing hardware-free unit tests (found during T1) [group: testing-infrastructure]
-      Goal: The existing unit tests for AeroBasic generation and units pass again, or fail visibly as known bugs.
-      Priority: high | Depends on: –
-      Done when:
-        - Every failure in `test/test_aerobasic/test_constants.py`, `test_program.py`,
-          `test_drawings/test_corners.py` and `test/test_utils/test_units.py` (baseline B in
-          WORKLOG.md) is resolved: the test is updated to the current API with a justification,
-          the code is fixed in a separate `fix:` commit, or the test is `xfail(strict=True)` with a todo.
-        - `test_program.py` no longer depends on leftover state in `test/_programs/` and starts no
-          non-daemon threads.
-      Notes: Blocks T5 (`python -m pytest` must pass). Details: `docs/reviews/CODE_REVIEW_2026-09-28.md` §5.
-
 - [ ] T5: Triage and convert the device tests [group: testing-infrastructure]
       Goal: `python -m pytest` passes without hardware, and every test has a clear purpose.
       Priority: high | Depends on: T4
@@ -180,6 +168,23 @@ Format rules (for humans and Claude):
         - `devices/attenuator.py:62` uses `reshape` instead of assigning `array.shape`, and the tests run without the
           `DeprecationWarning`.
 
+- [ ] T23: Decide and implement axis validation for `SingleAxis` (found during T15)
+      Goal: It is clear whether combining axes of different stages (and `~`, `^`, empty `&`) is an error.
+      Priority: low | Depends on: –
+      Done when:
+        - The maintainer has decided whether mixed-stage combinations must raise `AxisError`. Note that
+          `Aerotech3200.home()` uses `Axis.YZ | Axis.AB` on purpose.
+        - Either the validation is implemented and the `xfail` on `test_prevent_mixed_axes` is removed, or the
+          test is rewritten to the decided behaviour.
+
+- [ ] T24: Fix `utils.visualization.plot_movements` (found during T15)
+      Goal: Generated programs can be plotted for manual inspection.
+      Priority: low | Depends on: –
+      Done when:
+        - `read_file`/`plot_movements` handle programs without movement, arcs (`CW`/`CCW`) and filled circles
+          without exceptions (today they raise `ValueError`, `LinAlgError` or `AxisError`).
+        - The "Could not plot" warnings in `test/test_aerobasic` are gone, and a test asserts that plotting works.
+
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
 
@@ -197,4 +202,6 @@ Format rules (for humans and Claude):
 - [x] T3: Implement the dummy hardware backend — 2026-09-28 — Added `nanofactorysystem.backends` (protocols, RealBackend, DummyBackend with socket-level fake A3200, simulated camera/DHM/attenuator, deterministic world and call log), lazy config with built-in default, device injection parameters, `System/Experiment(backend=...)` and `plane_fit(plane=...)`; 40 new tests, real-hardware path verified unchanged. — commits: `df14fd7`, `65cd58c`, `8dc0b46`, `597b8ba`
 
 - [x] T4: pytest configuration and shared fixtures — 2026-09-28 — Added `[tool.pytest.ini_options]` (testpaths, norecursedirs, markers `hardware`/`slow`) and `test/conftest.py` with `--run-hardware` and the fixtures `test_config`, `tmp_program_dir`, `dummy_backend`, `no_sleep`, `dummy_controller`, `dummy_system`; 7 fixture tests. — commits: `97c5612`
+
+- [x] T15: Repair failing hardware-free unit tests — 2026-09-28 — Fixed `create_variable`/`AerotechVariable` (separate fix commit) and updated outdated tests with justification (axis names, Python 3.12 changes, timestamp header, removed `CornerRectangle`, wrong cm value); `test_prevent_mixed_axes` is strict xfail (T23). 31 passed, 1 xfailed. — commits: `69827fd`, `22e8e7e`
 
