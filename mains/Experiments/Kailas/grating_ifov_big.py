@@ -67,7 +67,7 @@ def print_file(absolute_center: Point2D, resin_dimension: list, ask_continue_box
     else:
         # ToDo(HR) make ist more controllable
         assert (path, Path)
-        path = Path(mkdir(os.path.join(path, "Grating_different_size"), clean=False))
+        path = Path(mkdir(os.path.join(path, "grating_2mm"), clean=False))
     logger = getLogger(logfile=f"{path}/console.log")
 
     # Size of (oval) resin drop in micrometres
@@ -109,8 +109,8 @@ def print_file(absolute_center: Point2D, resin_dimension: list, ask_continue_box
         c_hatch = 0.3
         c_slice = 0.75
         # printing area settings
-        margin = 50
-        padding = 100
+        margin = 250
+        padding = 250
         # printing settings
         movement_axis = ["ABZ", "XYZ"]
         parameterset = {

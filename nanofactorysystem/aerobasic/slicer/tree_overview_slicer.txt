@@ -1,0 +1,27 @@
+tpp_slicer_v0.3
+├── docs
+│   ├── 00_uebersicht_und_bewertung.md
+│   ├── 01_slicing_strategien.md
+│   ├── 02_datenmodell_und_speicherung.md
+│   ├── 03_einheiten_offsets_druckzeit.md
+│   ├── 04_roadmap.md
+│   └── INTEGRATION.md
+├── examples
+│   └── slice_metalens.py
+├── README.md
+├── test_pipeline.py
+└── tpp_slicer
+    ├── geometry_io.py
+    ├── hatching.py
+    ├── model.py
+    ├── optimizer.py
+    ├── parameters.py
+    ├── pipeline.py
+    ├── preprocess.py
+    ├── slicing.py
+    ├── storage.py
+    ├── timing.py
+    ├── TODO.txt
+    ├── toolpath.py
+    ├── units.py
+    └── __init__.py

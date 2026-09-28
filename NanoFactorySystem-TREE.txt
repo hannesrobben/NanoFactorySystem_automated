@@ -1,0 +1,379 @@
+NanoFactorySystem
+├── .gitignore
+├── clean.py
+├── config
+│   ├── base.yaml
+│   ├── dhm_paper.yaml
+│   ├── hydra
+│   │   └── job_logging
+│   │       └── custom.yaml
+│   ├── objective
+│   │   ├── zeiss20x.yaml
+│   │   └── zeiss63x.yaml
+│   └── user
+│       ├── dwoiwode.yaml
+│       ├── hannes.yaml
+│       └── reinhard.yaml
+├── LICENSE
+├── mains
+│   ├── .output
+│   ├── A3200.log
+│   ├── Experiments
+│   │   ├── A3200.log
+│   │   ├── Big_substrate_20x
+│   │   │   ├── grating_ifov_test.py
+│   │   │   └── __pycache__
+│   │   │       └── grating_ifov_test.cpython-312.pyc
+│   │   ├── default_exp_file.py
+│   │   ├── dhm
+│   │   │   ├── dhm_img_4_SEM.py
+│   │   │   ├── dhm_paper.py
+│   │   │   ├── dhm_paper_aligning_DHM_camera.py
+│   │   │   ├── dhm_paper_power_refractiveIndex.py
+│   │   │   ├── dhm_paper_voxel_axial.py
+│   │   │   └── __pycache__
+│   │   │       ├── dhm_img_4_SEM.cpython-312.pyc
+│   │   │       ├── dhm_paper.cpython-312.pyc
+│   │   │       ├── dhm_paper_aligning_DHM_camera.cpython-312.pyc
+│   │   │       ├── dhm_paper_power_refractiveIndex.cpython-312.pyc
+│   │   │       └── dhm_paper_voxel_axial.cpython-312.pyc
+│   │   ├── dhm_paper_print.py
+│   │   ├── DHM_tomography
+│   │   │   ├── hollow_rect_first_print_63xobj.py
+│   │   │   └── __pycache__
+│   │   │       └── hollow_rect_first_print_63xobj.cpython-312.pyc
+│   │   ├── Grating_20x
+│   │   │   ├── grating_big_stitching.py
+│   │   │   ├── plane_fitting_20x.py
+│   │   │   ├── zumLaufBringen_20x.py
+│   │   │   ├── zumLaufBringen_20x_grating.py
+│   │   │   └── __pycache__
+│   │   │       ├── grating_big_stitching.cpython-312.pyc
+│   │   │       ├── plane_fitting_20x.cpython-312.pyc
+│   │   │       ├── zumLaufBringen_20x.cpython-312.pyc
+│   │   │       └── zumLaufBringen_20x_grating.cpython-312.pyc
+│   │   ├── Grating_63
+│   │   │   ├── Angle_test_NO_hatching.py
+│   │   │   ├── Angle_test_with_hatching.py
+│   │   │   ├── binary_grating_test1.py
+│   │   │   ├── coordinate_test.py
+│   │   │   ├── FOV_Stitch_test.py
+│   │   │   ├── grating_test_claude.py
+│   │   │   ├── grid_point_test.py
+│   │   │   ├── parameter_test.py
+│   │   │   ├── parameter_test_hatching_slicing.py
+│   │   │   ├── realignment_grating.py
+│   │   │   ├── test_program_cycle.py
+│   │   │   ├── test_stitching.py
+│   │   │   └── __pycache__
+│   │   │       ├── Angle_test_NO_hatching.cpython-312.pyc
+│   │   │       ├── Angle_test_with_hatching.cpython-312.pyc
+│   │   │       ├── binary_grating_test1.cpython-312.pyc
+│   │   │       ├── coordinate_test.cpython-312.pyc
+│   │   │       ├── FOV_Stitch_test.cpython-312.pyc
+│   │   │       ├── grating_test_claude.cpython-312.pyc
+│   │   │       ├── grid_point_test.cpython-312.pyc
+│   │   │       ├── parameter_test.cpython-312.pyc
+│   │   │       ├── parameter_test_hatching_slicing.cpython-312.pyc
+│   │   │       └── test_stitching.cpython-312.pyc
+│   │   ├── IFOV_63
+│   │   │   ├── ifov_test.py
+│   │   │   └── __pycache__
+│   │   │       └── ifov_test.cpython-312.pyc
+│   │   ├── __ZLINE__.OGM
+│   │   └── __zline__.pgm
+│   ├── grating_try.py
+│   ├── main.py
+│   ├── main_IFOV.py
+│   ├── restart_experiment.py
+│   ├── test_mask.npy
+│   ├── __ZLINE__.OGM
+│   └── __zline__.pgm
+├── nanofactorysystem
+│   ├── aerobasic
+│   │   ├── ascii.py
+│   │   ├── constants
+│   │   │   ├── axes.py
+│   │   │   ├── laser.py
+│   │   │   ├── motions.py
+│   │   │   ├── system.py
+│   │   │   ├── tasks.py
+│   │   │   ├── __init__.py
+│   │   │   └── __pycache__
+│   │   │       ├── axes.cpython-311.pyc
+│   │   │       ├── axes.cpython-312.pyc
+│   │   │       ├── laser.cpython-311.pyc
+│   │   │       ├── laser.cpython-312.pyc
+│   │   │       ├── motions.cpython-311.pyc
+│   │   │       ├── motions.cpython-312.pyc
+│   │   │       ├── system.cpython-311.pyc
+│   │   │       ├── system.cpython-312.pyc
+│   │   │       ├── tasks.cpython-311.pyc
+│   │   │       ├── tasks.cpython-312.pyc
+│   │   │       ├── __init__.cpython-311.pyc
+│   │   │       └── __init__.cpython-312.pyc
+│   │   ├── programs
+│   │   │   ├── drawings
+│   │   │   │   ├── apertures.py
+│   │   │   │   ├── base.py
+│   │   │   │   ├── calc_polygons.py
+│   │   │   │   ├── calibration_prints.py
+│   │   │   │   ├── cell.py
+│   │   │   │   ├── cell_geometry_2.py
+│   │   │   │   ├── circle.py
+│   │   │   │   ├── DOE.py
+│   │   │   │   ├── gratings.py
+│   │   │   │   ├── hatch_generator.py
+│   │   │   │   ├── height_function_structures
+│   │   │   │   │   ├── height_functions.py
+│   │   │   │   │   ├── README.md
+│   │   │   │   │   ├── slicer.py
+│   │   │   │   │   ├── structures.py
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   └── __pycache__
+│   │   │   │   │       ├── height_functions.cpython-312.pyc
+│   │   │   │   │       ├── slicer.cpython-312.pyc
+│   │   │   │   │       ├── structures.cpython-312.pyc
+│   │   │   │   │       └── __init__.cpython-312.pyc
+│   │   │   │   ├── height_function_structures_fixed.py
+│   │   │   │   ├── hollow_structure.py
+│   │   │   │   ├── ifov_gratings.py
+│   │   │   │   ├── laser_segments.py
+│   │   │   │   ├── layered_objects.py
+│   │   │   │   ├── lens.py
+│   │   │   │   ├── lines.py
+│   │   │   │   ├── new
+│   │   │   │   │   ├── basic_structures.py
+│   │   │   │   │   ├── calc_polygons_old.py
+│   │   │   │   │   ├── complete_example_0deg.png
+│   │   │   │   │   ├── complete_example_angle.png
+│   │   │   │   │   ├── grating_slicer.py
+│   │   │   │   │   ├── improved_structures_new.py
+│   │   │   │   │   ├── stitching_concept.py
+│   │   │   │   │   ├── stripes_example.png
+│   │   │   │   │   ├── test_stitching.py
+│   │   │   │   │   ├── test_workflow.py
+│   │   │   │   │   ├── tile_creator.py
+│   │   │   │   │   └── triangle.py
+│   │   │   │   ├── OLD_calibration_prints.py
+│   │   │   │   ├── old_to-delete
+│   │   │   │   │   ├── drawing_config.py
+│   │   │   │   │   ├── errors
+│   │   │   │   │   │   └── hatch_generator.py
+│   │   │   │   │   ├── height_function_structures.py
+│   │   │   │   │   ├── new logic.py
+│   │   │   │   │   ├── stitching.py
+│   │   │   │   │   ├── Tile_Manager_own+old.py
+│   │   │   │   │   ├── __init__ backup.py
+│   │   │   │   │   └── __init__.py
+│   │   │   │   ├── Plan.md
+│   │   │   │   ├── qr_code.py
+│   │   │   │   ├── Stacked_lens.py
+│   │   │   │   ├── test
+│   │   │   │   │   ├── complete_test_height.py
+│   │   │   │   │   ├── test_factor_matrix.py
+│   │   │   │   │   ├── test_heightstructure.py
+│   │   │   │   │   ├── test_height_structures_2.py
+│   │   │   │   │   └── __pycache__
+│   │   │   │   │       └── complete_test_height.cpython-312-pytest-9.0.2.pyc
+│   │   │   │   ├── test_output
+│   │   │   │   │   ├── tile_detail_colorblind.png
+│   │   │   │   │   ├── tile_detail_corner.png
+│   │   │   │   │   ├── tile_detail_inner.png
+│   │   │   │   │   └── tile_overview.png
+│   │   │   │   ├── tile_manager.py
+│   │   │   │   ├── z_line_matrix.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── __pycache__
+│   │   │   │       ├── apertures.cpython-312.pyc
+│   │   │   │       ├── base.cpython-312.pyc
+│   │   │   │       ├── basic_structures.cpython-312.pyc
+│   │   │   │       ├── calibration_prints.cpython-312.pyc
+│   │   │   │       ├── cell.cpython-312.pyc
+│   │   │   │       ├── cell_geometry_2.cpython-312.pyc
+│   │   │   │       ├── circle.cpython-312.pyc
+│   │   │   │       ├── DOE.cpython-312 (SFConflict nanofab 2025-09-23-14-03-46).pyc
+│   │   │   │       ├── DOE.cpython-312.pyc
+│   │   │   │       ├── hatch_generator.cpython-312.pyc
+│   │   │   │       ├── height_function_structures_fixed.cpython-312.pyc
+│   │   │   │       ├── hollow_structure.cpython-312.pyc
+│   │   │   │       ├── ifov_gratings.cpython-312.pyc
+│   │   │   │       ├── laser_segments.cpython-312.pyc
+│   │   │   │       ├── lens.cpython-312.pyc
+│   │   │   │       ├── lines.cpython-311.pyc
+│   │   │   │       ├── lines.cpython-312 (SFConflict nanofab 2025-09-23-14-03-46).pyc
+│   │   │   │       ├── lines.cpython-312.pyc
+│   │   │   │       ├── qr_code.cpython-312.pyc
+│   │   │   │       ├── Stacked_lens.cpython-312.pyc
+│   │   │   │       ├── tile_manager.cpython-312.pyc
+│   │   │   │       ├── __init__.cpython-311.pyc
+│   │   │   │       ├── __init__.cpython-312 (SFConflict nanofab 2025-09-23-14-03-46).pyc
+│   │   │   │       └── __init__.cpython-312.pyc
+│   │   │   ├── setups.py
+│   │   │   ├── slicer.py
+│   │   │   ├── zline.py
+│   │   │   ├── __init__.py
+│   │   │   └── __pycache__
+│   │   │       ├── setups.cpython-312.pyc
+│   │   │       ├── __init__.cpython-311.pyc
+│   │   │       └── __init__.cpython-312.pyc
+│   │   ├── slicer
+│   │   ├── __init__.py
+│   │   └── __pycache__
+│   │       ├── ascii.cpython-311.pyc
+│   │       ├── ascii.cpython-312.pyc
+│   │       ├── __init__.cpython-311.pyc
+│   │       └── __init__.cpython-312.pyc
+│   ├── camera
+│   │   ├── camera.py
+│   │   ├── optexpose.py
+│   │   ├── __init__.py
+│   │   └── __pycache__
+│   │       ├── camera.cpython-311.pyc
+│   │       ├── camera.cpython-312.pyc
+│   │       ├── optexpose.cpython-311.pyc
+│   │       ├── optexpose.cpython-312.pyc
+│   │       ├── __init__.cpython-311.pyc
+│   │       └── __init__.cpython-312.pyc
+│   ├── config.py
+│   ├── devices
+│   │   ├── aerotech
+│   │   │   ├── task.py
+│   │   │   ├── __init__.py
+│   │   │   └── __pycache__
+│   │   │       ├── task.cpython-312.pyc
+│   │   │       └── __init__.cpython-312.pyc
+│   │   ├── aerotech_old.py
+│   │   ├── aerotech_old_1.py
+│   │   ├── attenuator.py
+│   │   ├── camera.py
+│   │   ├── coordinate_system.py
+│   │   ├── dhm.py
+│   │   ├── __init__.py
+│   │   └── __pycache__
+│   │       ├── aerotech_old.cpython-311.pyc
+│   │       ├── aerotech_old.cpython-312 (SFConflict hannes.robben@phoenixd.uni-hannover.de 2025-04-22-13-57-18).pyc
+│   │       ├── aerotech_old.cpython-312.pyc
+│   │       ├── attenuator.cpython-311.pyc
+│   │       ├── attenuator.cpython-312.pyc
+│   │       ├── camera.cpython-311.pyc
+│   │       ├── camera.cpython-312.pyc
+│   │       ├── coordinate_system.cpython-311.pyc
+│   │       ├── coordinate_system.cpython-312 (SFConflict nanofab 2025-09-23-14-03-46).pyc
+│   │       ├── coordinate_system.cpython-312.pyc
+│   │       ├── dhm.cpython-311.pyc
+│   │       ├── dhm.cpython-312 (SFConflict nanofab 2025-09-23-14-03-46).pyc
+│   │       ├── dhm.cpython-312 (SFConflict nanofab@hot.uni-hannover.de 2025-06-16-11-46-11).pyc
+│   │       ├── dhm.cpython-312.pyc
+│   │       ├── __init__.cpython-311.pyc
+│   │       └── __init__.cpython-312.pyc
+│   ├── dhm
+│   │   ├── commands.py
+│   │   ├── dhmclient.py
+│   │   ├── motorscan.py
+│   │   ├── optimage.py
+│   │   ├── __init__.py
+│   │   └── __pycache__
+│   │       ├── commands.cpython-311.pyc
+│   │       ├── commands.cpython-312.pyc
+│   │       ├── dhmclient.cpython-311.pyc
+│   │       ├── dhmclient.cpython-312 (SFConflict nanofab 2025-09-23-14-03-46).pyc
+│   │       ├── dhmclient.cpython-312.pyc
+│   │       ├── motorscan.cpython-311.pyc
+│   │       ├── motorscan.cpython-312 (SFConflict hannes.robben@phoenixd.uni-hannover.de 2025-04-22-13-57-18).pyc
+│   │       ├── motorscan.cpython-312 (SFConflict nanofab 2025-09-23-14-03-46).pyc
+│   │       ├── motorscan.cpython-312.pyc
+│   │       ├── optimage.cpython-311.pyc
+│   │       ├── optimage.cpython-312.pyc
+│   │       ├── __init__.cpython-311.pyc
+│   │       └── __init__.cpython-312.pyc
+│   ├── experiment.py
+│   ├── experiment_old.py
+│   ├── hologram
+│   │   ├── container.py
+│   │   ├── __init__.py
+│   │   └── __pycache__
+│   │       ├── container.cpython-311.pyc
+│   │       ├── container.cpython-312 (SFConflict nanofab 2025-09-23-14-03-46).pyc
+│   │       ├── container.cpython-312.pyc
+│   │       ├── __init__.cpython-311.pyc
+│   │       └── __init__.cpython-312.pyc
+│   ├── image
+│   │   ├── container.py
+│   │   ├── functions.py
+│   │   ├── __init__.py
+│   │   └── __pycache__
+│   │       ├── container.cpython-311.pyc
+│   │       ├── container.cpython-312.pyc
+│   │       ├── functions.cpython-311.pyc
+│   │       ├── functions.cpython-312 (SFConflict nanofab 2025-09-23-14-03-46).pyc
+│   │       ├── functions.cpython-312.pyc
+│   │       ├── __init__.cpython-311.pyc
+│   │       └── __init__.cpython-312.pyc
+│   ├── parameter.py
+│   ├── runtime.py
+│   ├── system.py
+│   ├── tools
+│   │   ├── bisect.py
+│   │   ├── detector.py
+│   │   ├── focus.py
+│   │   ├── grid.py
+│   │   ├── layer.py
+│   │   ├── plane.py
+│   │   ├── ranges.py
+│   │   ├── stitch.py
+│   │   ├── transform.py
+│   │   ├── __init__.py
+│   │   └── __pycache__
+│   │       ├── bisect.cpython-311.pyc
+│   │       ├── bisect.cpython-312.pyc
+│   │       ├── detector.cpython-311.pyc
+│   │       ├── detector.cpython-312.pyc
+│   │       ├── focus.cpython-311.pyc
+│   │       ├── focus.cpython-312 (SFConflict hannes.robben@phoenixd.uni-hannover.de 2025-04-22-13-57-20).pyc
+│   │       ├── focus.cpython-312.pyc
+│   │       ├── grid.cpython-311.pyc
+│   │       ├── grid.cpython-312 (SFConflict nanofab 2025-09-23-14-03-46).pyc
+│   │       ├── grid.cpython-312.pyc
+│   │       ├── layer.cpython-311.pyc
+│   │       ├── layer.cpython-312.pyc
+│   │       ├── plane.cpython-311.pyc
+│   │       ├── plane.cpython-312 (SFConflict nanofab 2025-09-23-14-03-46).pyc
+│   │       ├── plane.cpython-312.pyc
+│   │       ├── ranges.cpython-311.pyc
+│   │       ├── ranges.cpython-312.pyc
+│   │       ├── transform.cpython-311.pyc
+│   │       ├── transform.cpython-312.pyc
+│   │       ├── __init__.cpython-311.pyc
+│   │       └── __init__.cpython-312.pyc
+│   ├── utils
+│   │   ├── geometry.py
+│   │   ├── typing.py
+│   │   ├── visualization.py
+│   │   ├── __init__.py
+│   │   └── __pycache__
+│   │       ├── geometry.cpython-312.pyc
+│   │       ├── typing.cpython-311.pyc
+│   │       ├── typing.cpython-312.pyc
+│   │       ├── visualization.cpython-312.pyc
+│   │       ├── __init__.cpython-311.pyc
+│   │       └── __init__.cpython-312.pyc
+│   ├── __init__.py
+│   └── __pycache__
+│       ├── config.cpython-311.pyc
+│       ├── config.cpython-312.pyc
+│       ├── experiment.cpython-312 (SFConflict hannes.robben@phoenixd.uni-hannover.de 2025-04-22-13-57-19).pyc
+│       ├── experiment.cpython-312 (SFConflict nanofab 2025-09-23-14-03-46).pyc
+│       ├── experiment.cpython-312.pyc
+│       ├── parameter.cpython-311.pyc
+│       ├── parameter.cpython-312.pyc
+│       ├── runtime.cpython-311.pyc
+│       ├── runtime.cpython-312.pyc
+│       ├── system.cpython-311.pyc
+│       ├── system.cpython-312 (SFConflict nanofab 2025-09-23-14-03-46).pyc
+│       ├── system.cpython-312.pyc
+│       ├── __init__.cpython-311.pyc
+│       └── __init__.cpython-312.pyc
+├── pyproject.toml
+├── README.md
+└── setup.py
