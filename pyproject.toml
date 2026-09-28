@@ -38,3 +38,21 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent"
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+norecursedirs = [
+    "_programs",
+    "manual",
+    "old_to-delete",
+    "new",
+    "__pycache__",
+    ".*",
+    "build",
+    "dist",
+    "*.egg",
+]
+markers = [
+    "hardware: needs the lab hardware (Femtika Laser Nanofactory); skipped unless --run-hardware is given",
+    "slow: takes more than a few seconds",
+]

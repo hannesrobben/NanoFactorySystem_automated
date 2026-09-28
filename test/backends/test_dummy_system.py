@@ -47,25 +47,25 @@ def test_resolve_backend():
         resolve_backend("simulated")
 
 
-def test_system_startup_on_dummy_backend(test_config, backend, tmp_path, monkeypatch):
+def test_system_startup_on_dummy_backend(test_config, dummy_backend, tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
-    with System("Test", "Zeiss 20x", backend=backend, **sys_args()) as system:
-        assert system.backend is backend
-        commands = backend.calllog.commands()
+    with System("Test", "Zeiss 20x", backend=dummy_backend, **sys_args()) as system:
+        assert system.backend is dummy_backend
+        commands = dummy_backend.calllog.commands()
         assert _without_load(commands) == STARTUP_COMMANDS
         load = [c for c in commands if c.startswith("PROGRAM 1 LOAD")]
-        assert load == [f'PROGRAM 1 LOAD "{backend.workdir / "__zline__.pgm"}"']
+        assert load == [f'PROGRAM 1 LOAD "{dummy_backend.workdir / "__zline__.pgm"}"']
         assert system.dhm.device.Config == 178
 
     # Nothing is written to the working directory; logs and programs go to the backend workdir
     assert [p.name for p in tmp_path.iterdir()] == ["dummy"]
-    assert (backend.workdir / "A3200.log").is_file()
-    assert backend.transport.unhandled == []
+    assert (dummy_backend.workdir / "A3200.log").is_file()
+    assert dummy_backend.transport.unhandled == []
 
 
-def test_system_roles(test_config, backend):
-    with System("Test", "Zeiss 20x", backend=backend, **sys_args()) as system:
+def test_system_roles(test_config, dummy_backend):
+    with System("Test", "Zeiss 20x", backend=dummy_backend, **sys_args()) as system:
         assert isinstance(system.controller, protocols.LegacyMotionController)
         assert isinstance(system.a3200_new, protocols.TaskController)
         assert isinstance(system.controller.attenuator, protocols.AttenuatorRole)
@@ -73,9 +73,9 @@ def test_system_roles(test_config, backend):
         assert isinstance(system.dhm, protocols.DhmRole)
 
 
-def test_system_motion_zline_and_laser_state(test_config, backend):
-    world = backend.world
-    with System("Test", "Zeiss 20x", backend=backend, **sys_args()) as system:
+def test_system_motion_zline_and_laser_state(test_config, dummy_backend):
+    world = dummy_backend.world
+    with System("Test", "Zeiss 20x", backend=dummy_backend, **sys_args()) as system:
         system.moveabs(x=100.0, y=50.0, z=20010.0)
         assert system.position("XYZ") == pytest.approx([100.0, 50.0, 20010.0])
 
@@ -90,10 +90,10 @@ def test_system_motion_zline_and_laser_state(test_config, backend):
     assert world.tasks[1].state == 7  # program_complete
 
 
-def test_system_without_dhm(test_config, backend):
-    with System("Test", "Zeiss 20x", backend=backend, dhm={"usage": False}, **sys_args()) as system:
+def test_system_without_dhm(test_config, dummy_backend):
+    with System("Test", "Zeiss 20x", backend=dummy_backend, dhm={"usage": False}, **sys_args()) as system:
         assert system.dhm is None
-    assert not backend.calllog.filter(device="dhm")
+    assert not dummy_backend.calllog.filter(device="dhm")
 
 
 def test_same_seed_gives_identical_runs(test_config, tmp_path):
