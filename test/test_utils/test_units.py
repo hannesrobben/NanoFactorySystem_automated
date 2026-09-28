@@ -86,31 +86,31 @@ class TestUnits(TestCase):
 
     def test_to_unit(self):
         a = UnitFloat(573.123, unit=Unit.um)
-        self.assertAlmostEquals(float(a), 0.573123)
+        self.assertAlmostEqual(float(a), 0.573123)
 
         for value, unit in [
-            (0.000573123, Unit.cm),
+            (0.0573123, Unit.cm),  # 1 cm = 10 mm
             (0.573123, Unit.mm),
             (573.123, Unit.um),
             (573123, Unit.nm),
         ]:
             b = a.to(unit)
             self.assertIsUnitFloat(b)
-            self.assertAlmostEquals(value, b.value)
+            self.assertAlmostEqual(value, b.value)
             self.assertEqual(unit, b.unit)
-            self.assertAlmostEquals(float(b), 0.573123)
+            self.assertAlmostEqual(float(b), 0.573123)
 
     def test_multiplication(self):
         a = UnitFloat(2.3, unit=Unit.um)
         b = a * 3
         self.assertIsUnitFloat(a)
         self.assertIsUnitFloat(b)
-        self.assertAlmostEquals(b.value, 6.9)
+        self.assertAlmostEqual(b.value, 6.9)
         self.assertEqual(b.unit, Unit.um)
 
         c = 4 * a
         self.assertIsUnitFloat(c)
-        self.assertAlmostEquals(c.value, 9.2)
+        self.assertAlmostEqual(c.value, 9.2)
         self.assertEqual(c.unit, Unit.um)
 
     def test_numpy(self):
@@ -123,14 +123,14 @@ class TestUnits(TestCase):
         b_np = a_np * 2
         self.assertIsUnitFloat(b_np[0])
         self.assertIsUnitFloat(b_np[1])
-        self.assertAlmostEquals(6.4, b_np[0].value)
-        self.assertAlmostEquals(10.4, b_np[1].value)
-        self.assertAlmostEquals(Unit.um, b_np[1].unit)
+        self.assertAlmostEqual(6.4, b_np[0].value)
+        self.assertAlmostEqual(10.4, b_np[1].value)
+        self.assertAlmostEqual(Unit.um, b_np[1].unit)
 
         # Addition
         c_np = a_np + UnitFloat(123, Unit.um)
-        self.assertAlmostEquals(3.323, c_np[0].value)
-        self.assertAlmostEquals(128.2, c_np[1].value)
+        self.assertAlmostEqual(3.323, c_np[0].value)
+        self.assertAlmostEqual(128.2, c_np[1].value)
         self.assertEqual(Unit.mm, c_np[0].unit)
         self.assertEqual(Unit.um, c_np[1].unit)
 
@@ -141,5 +141,5 @@ class TestUnits(TestCase):
         a_np = np.asarray(a)
         d_np = a_np.astype(float)
         print(d_np)
-        self.assertAlmostEquals(3.2, d_np[0])
-        self.assertAlmostEquals(0.0052, d_np[1])
+        self.assertAlmostEqual(3.2, d_np[0])
+        self.assertAlmostEqual(0.0052, d_np[1])
