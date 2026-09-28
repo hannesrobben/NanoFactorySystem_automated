@@ -133,7 +133,7 @@ def binary_testprint(absolute_center: Point2D, resin_dimension: list, ask_contin
     else:
         sys_args.update({"dhm": {"usage": dhm_usage}})
 
-    structure_size = fov,  # because structure is smaller than fov
+    structure_size = fov  # because structure is smaller than fov
     grid=(2, 3)
     with Experiment(
             path=path,
