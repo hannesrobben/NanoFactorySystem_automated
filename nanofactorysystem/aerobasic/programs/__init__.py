@@ -14,6 +14,10 @@ class AerotechVariable(AeroBasicAPI):
         self.name = name
         self.program = program
 
+    def __call__(self, command: str) -> str:
+        """ Assign the result of the given command to the variable, same as :meth:`send`. """
+        return self.send(command)
+
     def send(self, command: str) -> str:
         return self.program.send(f"${self.name} = {command}")
 
@@ -99,7 +103,7 @@ class AeroBasicProgram(AeroBasicAPI):
 
         if with_variables and len(self.variable_names) > 0:
             if not compact:
-                s += "' Declare variables"
+                s += "' Declare variables\n"
             s += "".join(map(lambda var: f"DVAR ${var}\n", self.variable_names))
             if not compact:
                 s += "\n"  # Extra line break for clarity
@@ -121,7 +125,7 @@ class AeroBasicProgram(AeroBasicAPI):
     def create_variable(self, name: str) -> AerotechVariable:
         variable = AerotechVariable(name, self)
         if name not in self.variable_names:
-            self.variable_names.append(variable)
+            self.variable_names.append(name)
         return variable
 
     def comment(self, text: str) -> str:
