@@ -87,17 +87,6 @@ Format rules (for humans and Claude):
         - The `## Commands` and `## Architecture` sections in CLAUDE.md are updated.
           `## Current Status` and `## Status Update Anchor` are left untouched.
 
-- [ ] T12: Rename `devices/aerotech_old.py` to `devices/a3200.py` (found during T1)
-      Goal: The active `A3200` controller is no longer hidden in a file that the `*_old.py` rule marks as legacy.
-      Priority: high | Depends on: –
-      Done when:
-        - `devices/aerotech_old.py` is renamed to `devices/a3200.py` with `git mv`, without content changes.
-        - `devices/__init__.py` and all other imports use the new module; `devices/aerotech_old_1.py`
-          stays untouched.
-        - The hardware-free tests give the same result as before the rename.
-      Notes: Maintainer decision 2026-09-28: rename now; merging with `Aerotech3200` follows in T20.
-      Needed before T3 modifies the controller. Details: `docs/reviews/CODE_REVIEW_2026-09-28.md` §2.
-
 - [ ] T20: Merge `A3200` and `Aerotech3200` into one controller class (follow-up of T12)
       Goal: One controller class owns the socket, the ASCII protocol, the motion/laser helpers and the program tasks.
       Priority: medium | Depends on: T12, T3, T5, T7
@@ -205,4 +194,6 @@ Format rules (for humans and Claude):
 - [x] T1: Record baseline and review the code — 2026-09-28 — Recorded the test baseline (global env: all 40 files fail on a NumPy ABI mismatch; clean venv: 16 passed / 20 failed / 16 errors over `test/`) in WORKLOG.md and wrote `docs/reviews/CODE_REVIEW_2026-09-28.md`; follow-ups T9–T18 added. — commits: `bf98f78`
 
 - [x] T2: Design the dummy hardware backend — 2026-09-28 — Wrote `docs/design/DUMMY_BACKEND.md` (seam/role protocols, explicit `backend=` switch, socket-level fake controller, deterministic simulated world with call log); approved by the maintainer with three decisions (controller merge later as T20, no env var, `plane_fit(plane=...)` instead of simulated detection). — commits: `46ae4b1`, `b6340a4`
+
+- [x] T12: Rename `devices/aerotech_old.py` to `devices/a3200.py` — 2026-09-28 — Pure `git mv` plus the import in `devices/__init__.py`; hardware-free test results unchanged (16 passed / 11 failed / 3 errors, as in baseline B). — commits: `6b43511`
 

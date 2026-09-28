@@ -108,3 +108,17 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   merge. The todo was renumbered to T20, because T19 was already taken.
 - **Follow-ups:** T12 (rename) comes next, then T3 following §11 of the design.
 
+### 2026-09-28 22:47 CEST — [T12] Rename `devices/aerotech_old.py` to `devices/a3200.py`
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/devices/aerotech_old.py` (renamed → `nanofactorysystem/devices/a3200.py`): no content change.
+  - `nanofactorysystem/devices/__init__.py`: imports `A3200` from `.a3200`.
+  - `TODO.md`: T12 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `pytest --continue-on-collection-errors test/test_aerobasic test/test_utils` (baseline B venv):
+  16 passed, 11 failed, 3 errors. This is identical to the baseline for these files; all failures are the
+  known ones (T15). `from nanofactorysystem import A3200` resolves to `nanofactorysystem.devices.a3200`.
+- **Commits:** `6b43511` refactor(devices): rename aerotech_old.py to a3200.py [T12]
+- **Follow-ups:** `NanoFactorySystem-TREE.txt` still lists the old name. It is a stale snapshot that
+  includes `.pyc` files, so I left it alone. CLAUDE.md's architecture section will be updated in T8.
+
