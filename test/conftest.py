@@ -6,6 +6,7 @@
 - ``dummy_backend``, ``dummy_controller``, ``dummy_system``: simulated
   hardware (see ``nanofactorysystem.backends``).
 - ``tmp_program_dir``: directory for generated AeroBasic programs.
+- ``lab_user``: first user of the lab configuration, for hardware tests.
 """
 import time
 
@@ -58,6 +59,17 @@ def test_config():
 
     with use_config(DEFAULT_CONFIG | {f"user:{TEST_USER_KEY}": TEST_USER}) as config:
         yield config
+
+
+@pytest.fixture
+def lab_user():
+    """ First user of the lab configuration (``~/nanofactory.json``), for hardware tests. """
+
+    from nanofactorysystem.config import sysConfig
+    users = sysConfig.users()
+    if not users:
+        pytest.skip("no user in the lab configuration (~/nanofactory.json)")
+    return users[0]
 
 
 @pytest.fixture

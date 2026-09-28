@@ -1,43 +1,53 @@
-##########################################################################
-# Copyright (c) 2023-2024 Reinhard Caspary                               #
-# <reinhard.caspary@phoenixd.uni-hannover.de>                            #
-# This program is free software under the terms of the MIT license.      #
-##########################################################################
+"""Tests for the laser attenuator calibration (devices/attenuator.py).
 
+Converted from a script that printed and plotted the lab calibration file:
+the dummy test checks the conversion on a synthetic calibration; the
+hardware test checks the real calibration file on the lab PC.
+"""
 import numpy as np
-import matplotlib.pyplot as plt
-from nanofactorysystem import Attenuator, getLogger, mkdir
+import pytest
 
-args = {
-    "attenuator": {
-        "fitKind": "quadratic",
-        },
-    }
+from nanofactorysystem import Attenuator
 
-user = "Reinhard"
-path = mkdir(".test/attenuator")
-logger = getLogger(logfile=f"{path}/console.log")
-att = Attenuator(user, logger, **args)
 
-logger.info("Calibration data:")
-for value, power in att.data:
-    logger.info(f"    {value:4.1f} V -> {power:6.2f} mW")
+@pytest.mark.parametrize("fit_kind", ["quadratic", "cubic"])
+def test_conversion_is_consistent(test_config, dummy_backend, fit_kind):
+    args = dummy_backend.attenuator_args() | {"fitKind": fit_kind}
+    att = Attenuator("Test", attenuator=args)
 
-dc = att.container()
-dc.write(f"{path}/attenuator.zdc")
-print(dc)
+    values = np.linspace(0.5, 9.5, 10)
+    powers = np.array([float(att.atop(v)) for v in values])
 
-cx = att.data[:,0]
-cy = att.data[:,1]
-x = np.linspace(att["valueMin"], att["valueMax"], 501)
-y = att.atop(x)
+    assert att.data.shape == (101, 2)
+    assert np.all(np.diff(powers) > 0)
+    assert [float(att.ptoa(p)) for p in powers] == pytest.approx(values, abs=0.05)
+    assert att["powerMin"] == 0.0
+    assert att["powerMax"] == pytest.approx(dummy_backend.world.max_power)
 
-fig, ax = plt.subplots(figsize=(12,9))
-plt.plot(cx, cy, "r+")
-plt.plot(x, y, "b")
-plt.xlabel("Set Value [V]")
-plt.ylabel("Laser Power [mW]")
-plt.savefig(f"{path}/calibration.png")
-plt.show()
 
-logger.info("Done.")
+def test_polynomial_fit(test_config, dummy_backend):
+    """ The polynomial fit does not pass through the data points (see Attenuator); only check its setup. """
+
+    att = Attenuator("Test", attenuator=dummy_backend.attenuator_args() | {"fitKind": "poly"})
+
+    assert att["polynomialOrder"] == 2
+    assert float(att.atop(10.0)) == pytest.approx(dummy_backend.world.max_power, rel=0.05)
+
+
+def test_container(test_config, dummy_backend):
+    att = Attenuator("Test", attenuator=dummy_backend.attenuator_args())
+
+    dc = att.container()
+
+    assert len(dc["meas/calibration.json"]["calibration"]) == 101
+
+
+@pytest.mark.hardware
+def test_real_calibration_file(lab_user):
+    att = Attenuator(lab_user, attenuator={"fitKind": "quadratic"})
+
+    a, p = att.data[:, 0], att.data[:, 1]
+    assert a[0] == 0.0 and a[-1] == 10.0
+    assert np.all(np.diff(a) > 0)
+    assert np.all(np.diff(p) >= 0), "laser power must not decrease with the attenuator value"
+    assert att["powerMax"] > att["powerMin"] >= 0.0

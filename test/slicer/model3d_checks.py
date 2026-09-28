@@ -302,4 +302,7 @@ print()
 print(f"===== {len(PASS)} passed, {len(FAIL)} failed =====")
 if FAIL:
     print("FAILED:", FAIL)
-sys.exit(1 if FAIL else 0)
+
+# Exit code only when run as a script; test_model3d.py runs this module with runpy
+if __name__ == "__main__":
+    sys.exit(1 if FAIL else 0)
