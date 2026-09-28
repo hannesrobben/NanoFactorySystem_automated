@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 from nanofactorysystem.aerobasic import AxisStatusDataItem, SingleAxis, SystemStatusDataItem, WaitMode, Axis
-from nanofactorysystem.aerobasic.ascii import AerotechAsciiInterface, DummyAsciiInterface
+from nanofactorysystem.aerobasic.ascii import AerotechAsciiInterface
 from nanofactorysystem.aerobasic.constants import AxisStatus
 from nanofactorysystem.aerobasic.constants.tasks import ProgrammingMode, TaskState, VelocityMode
 from nanofactorysystem.aerobasic.programs import AeroBasicProgram
@@ -31,8 +31,10 @@ class Aerotech3200:
         port : int
             TCP port of the ASCII command interface.
         dummy : bool
-            Deprecated. Use the dummy backend (``System(..., backend="dummy")``
-            or ``transport_factory``) instead.
+            Deprecated. Connects to a new simulated controller
+            (``FakeA3200Transport``) instead of the hardware. Prefer the
+            dummy backend (``System(..., backend="dummy")``) or
+            ``transport_factory``.
         transport_factory : callable, optional
             Returns a socket-like object used instead of a new TCP socket,
             see :class:`AerotechAsciiInterface`.
@@ -42,7 +44,10 @@ class Aerotech3200:
             directory and the execution copy in the home directory.
         """
         if dummy:
-            self.api = DummyAsciiInterface()
+            from nanofactorysystem.backends.dummy import FakeA3200Transport, SimulatedWorld
+            transport = FakeA3200Transport(SimulatedWorld())
+            self.api = AerotechAsciiInterface(hostname=hostname, port=port, transport_factory=lambda: transport)
+            self.api.connect()
         else:
             self.api = AerotechAsciiInterface(hostname=hostname, port=port, transport_factory=transport_factory)
         self.program_dir = Path(program_dir) if program_dir is not None else None

@@ -298,6 +298,13 @@ class AerotechAsciiInterface(AeroBasicAPI):
 
 
 class DummyAsciiInterface(AerotechAsciiInterface):
+    """ Deprecated: echoes every command instead of answering it.
+
+    Use ``nanofactorysystem.backends.dummy.FakeA3200Transport`` (via
+    ``AerotechAsciiInterface(transport_factory=...)`` or the dummy backend),
+    which answers queries and keeps a simulated state.
+    """
+
     def send(self, command: str) -> str:
         self.logger.debug(command)
         return command
