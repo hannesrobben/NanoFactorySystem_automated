@@ -195,27 +195,10 @@ Format rules (for humans and Claude):
 
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
-- [ ] T1: Record baseline and review the code [group: testing-infrastructure]
-      Goal: The current state of the code and the test suite is documented before any change.
-      Priority: high | Depends on: –
-      Done when:
-        - WORKLOG.md contains the baseline: per test file, collected / passed / failed / errors
-          and the reason.
-        - `docs/reviews/CODE_REVIEW_<YYYY-MM-DD>.md` exists, as a table with the columns
-          severity (high/medium/low), `file:line`, issue, recommendation.
-        - The review covers hardware coupling: devices opened in constructors or at import
-          time, hardcoded IPs, ports and lab paths.
-        - The review covers import-time side effects: `config.py` loading `~/nanofactory.json`,
-          and hard imports of `mvImpact`, `OffAxisHolo`, `PlotFont`.
-        - The review evaluates existing dummy, mock or simulation code
-          (search: `rg -i "dummy|mock|fake|simulat|offline|virtual"`).
-        - The review covers the state of the tests: scripts vs. test cases, outdated APIs,
-          missing assertions, tests that depend on each other.
-        - Every finding not covered by T2–T8 has its own todo.
-      Notes: Report only, no fixes. Legacy code (`old_to-delete/`, `new/`, `*_old.py`) is excluded.
 
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T1: Record baseline and review the code — 2026-09-28 — Recorded the test baseline (global env: all 40 files fail on a NumPy ABI mismatch; clean venv: 16 passed / 20 failed / 16 errors over `test/`) in WORKLOG.md and wrote `docs/reviews/CODE_REVIEW_2026-09-28.md`; follow-ups T9–T18 added. — commits: `bf98f78`
