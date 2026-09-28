@@ -11,20 +11,6 @@ Format rules (for humans and Claude):
 -->
 
 ## Open
-- [ ] T8: Write `test/README.md` and update the documentation [group: testing-infrastructure]
-      Goal: Anyone new understands why each test exists and how to run the test suite.
-      Priority: medium | Depends on: T5, T6, T7
-      Done when:
-        - `test/README.md` explains the test categories: unit (no hardware), dummy
-          integration, hardware, manual.
-        - For each category, a table lists module, what it tests, why it matters (which
-          failure it catches), and requirements.
-        - The README documents how to run each category, the markers and `--run-hardware`,
-          how to use the dummy backend (with an example test), and where generated artefacts
-          go (`test/_programs/`, `tmp_path`).
-        - The `## Commands` and `## Architecture` sections in CLAUDE.md are updated.
-          `## Current Status` and `## Status Update Anchor` are left untouched.
-
 - [ ] T20: Merge `A3200` and `Aerotech3200` into one controller class (follow-up of T12)
       Goal: One controller class owns the socket, the ASCII protocol, the motion/laser helpers and the program tasks.
       Priority: medium | Depends on: T12, T3, T5, T7
@@ -182,4 +168,6 @@ Format rules (for humans and Claude):
 - [x] T6: Dry-run an experiment with the dummy backend — 2026-09-28 — `default_exp_file.py` runs end to end on the dummy backend (plane_fit with known plane, build_programs, print_experiment); integration test writes only to `tmp_path`; the dry run found and fixed a tuple bug in the template. — commits: `c6179d0`, `2e911c2`, `43cb532`
 
 - [x] T7: Golden-file tests for AeroBasic generation — 2026-09-28 — 11 representative programs (DefaultSetup and SetupIFOV, incl. corners, stair, QR code, IFOV grating) are compared against `test/golden/*.txt`; `--update-golden` regenerates them deliberately. — commits: `175af6b`
+
+- [x] T8: Write `test/README.md` and update the documentation — 2026-09-28 — `test/README.md` documents the four test categories with per-module tables, run commands, markers, dummy backend usage and artefact locations; CLAUDE.md Commands, Architecture (and the outdated Configuration) sections updated. — commits: `1705ca4`
 

@@ -349,3 +349,33 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
     computed coordinates. If that happens, review and regenerate the references rather than loosening the
     comparison.
 
+### 2026-09-28 23:26 CEST — [T8] Write `test/README.md` and update the documentation
+- **Status:** done
+- **Changes:**
+  - `test/README.md` (new):
+    - the four categories (unit, dummy integration, hardware, manual), with a table per category: module,
+      what it tests, which failure it catches, requirements;
+    - run commands per category, the markers `hardware`/`slow`, `--run-hardware` and `--update-golden`;
+    - dummy backend usage with an example test and the fixture list;
+    - where generated artefacts go: `tmp_path`, `test/_programs/`, `test/golden/`.
+
+    The code examples were executed once as a temporary test (2 passed), and the temporary file was removed.
+  - `CLAUDE.md`:
+    - `## Commands`: test commands, pointer to `test/README.md`, pytest configuration, markers, fixtures,
+      environment requirement.
+    - `## Architecture`: new "Hardware backends" part, `devices/a3200.py`, the controller merge (T20), and
+      `plane_fit(plane=)` and the dry run in the experiment flow.
+    - `## Configuration`: the lookup order and lazy defaults, because the old text ("System fails without
+      the file") was wrong after T3; plus the T21 caveat.
+    - `## Current Status` and `## Status Update Anchor` do not exist in the file and were not added.
+  - `TODO.md`: T8 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests (final, baseline B venv):**
+  - `python -m pytest`: 128 passed, 14 skipped (13 hardware + `test_linear`), 1 xfailed.
+  - The same result without `~/nanofactory.json`.
+  - `-m hardware --run-hardware --co`: 13 tests collected.
+  - Global interpreter: still `ImportError: numpy.core.multiarray failed to import` (T9).
+- **Commits:** `1705ca4` docs: describe the test suite and the dummy backend [T8]
+- **Follow-ups:** none new. The `testing-infrastructure` group (T1–T8, plus T12 and T15, which were done as
+  prerequisites) is complete.
+
