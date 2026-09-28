@@ -7,8 +7,10 @@
   hardware (see ``nanofactorysystem.backends``).
 - ``tmp_program_dir``: directory for generated AeroBasic programs.
 - ``lab_user``: first user of the lab configuration, for hardware tests.
+- ``--update-golden`` / ``golden``: golden-file comparison of generated programs.
 """
 import time
+from pathlib import Path
 
 import pytest
 
@@ -26,6 +28,8 @@ TEST_USER = {
 def pytest_addoption(parser):
     parser.addoption("--run-hardware", action="store_true", default=False,
                      help="run tests marked 'hardware', which need the Laser Nanofactory lab hardware")
+    parser.addoption("--update-golden", action="store_true", default=False,
+                     help="rewrite the golden reference files in test/golden/ instead of comparing against them")
 
 
 def pytest_collection_modifyitems(config, items):
@@ -59,6 +63,44 @@ def test_config():
 
     with use_config(DEFAULT_CONFIG | {f"user:{TEST_USER_KEY}": TEST_USER}) as config:
         yield config
+
+
+GOLDEN_DIR = Path(__file__).parent / "golden"
+
+
+@pytest.fixture
+def golden(request):
+    """ Compare generated text with a reference file in ``test/golden/``.
+
+    Returns a function ``check(name, text)``. With ``--update-golden`` the
+    reference ``test/golden/<name>.txt`` is (re)written instead, so that
+    intended changes can be recorded deliberately. Line endings are
+    normalised to ``\\n``.
+    """
+
+    update = request.config.getoption("--update-golden")
+
+    def check(name: str, text: str) -> None:
+        path = GOLDEN_DIR / f"{name}.txt"
+        text = text.replace("\r\n", "\n")
+        if update:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8", newline="\n")
+            return
+        if not path.is_file():
+            pytest.fail(f"Golden file {path} is missing; create it with: python -m pytest {request.node.nodeid} "
+                        f"--update-golden")
+        expected = path.read_text(encoding="utf-8").replace("\r\n", "\n")
+        if text != expected:
+            import difflib
+            diff = "".join(difflib.unified_diff(expected.splitlines(True), text.splitlines(True),
+                                                fromfile=f"golden/{name}.txt", tofile="generated", n=2))
+            lines = diff.splitlines()
+            shown = "\n".join(lines[:60]) + (f"\n... ({len(lines) - 60} more diff lines)" if len(lines) > 60 else "")
+            pytest.fail(f"Generated program differs from golden/{name}.txt. If the change is intended, "
+                        f"run with --update-golden and review the diff.\n{shown}", pytrace=False)
+
+    return check
 
 
 @pytest.fixture
