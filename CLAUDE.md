@@ -12,31 +12,42 @@ Comments, docs and TODOs are often in German. `TODO.md` is the task list with th
 ## Commands
 
 ```bash
-python -m pip install .        # build/install package (pyproject.toml, setuptools)
+python -m pip install .        # build/install package (pyproject.toml, setuptools; subpackages not yet included, see T9)
 python clean.py                # remove build/, dist/, *.egg-info, __pycache__
-python -m pytest test/test_aerobasic            # hardware-free tests (AeroBasic program generation)
-python -m pytest test/test_aerobasic/test_drawings/test_circles.py::TestCircles::test_single_circle
+python -m pytest               # all tests without hardware (unit + dummy backend); hardware tests are skipped
+python -m pytest test/devices/test_aerotech.py::test_zmax_safety   # a single test
+python -m pytest -m "not slow"                  # skip the ~10 s experiment dry run
+python -m pytest -m hardware --run-hardware     # hardware tests, only on the lab PC
+python -m pytest test/test_aerobasic/test_golden_programs.py --update-golden   # re-record golden programs
 ```
 
-- Tests are `unittest.TestCase` classes, run with pytest. Only `test/test_aerobasic` and `test/test_utils` run without hardware. Tests under `test/devices`, `test/dhm`, `test/test_femtika`, `test/tools` and `test/test_system.py` talk to real devices, and many of them are plain scripts rather than test cases.
-- Generated test programs are written to `test/_programs/` (gitignored).
+- `test/README.md` describes every test module, the categories (unit, dummy integration, hardware, manual), the fixtures and how to use the dummy backend. Keep it up to date when adding, moving or removing tests.
+- pytest configuration is in `pyproject.toml` (`testpaths = ["test"]`; `test/manual/`, `_programs` and legacy directories are excluded). Markers: `hardware` (skipped without `--run-hardware`), `slow`. Shared fixtures are in `test/conftest.py`: `test_config`, `dummy_backend`, `dummy_controller`, `dummy_system`, `no_sleep`, `tmp_program_dir`, `golden`, `lab_user`.
+- `python -m pytest` must pass without hardware, without `~/nanofactory.json` and without `mvIMPACT`/`OffAxisHolo`. The environment needs NumPy-2-compatible builds (`opencv-python>=4.10.0.84`); the global interpreter on the lab PC currently fails with `numpy.core.multiarray failed to import` (T9).
+- Generated program references for golden tests are `test/golden/*.txt`; other test output goes to `tmp_path`, or `test/_programs/` (gitignored) for manual inspection.
 - Experiment entry scripts in `mains/` import siblings as `from Experiments.… import …`, so run them with `mains/` as the working directory (e.g. `cd mains && python main.py`).
-- Optional hardware and local dependencies (`mvImpact`, `OffAxisHolo`, `PlotFont`) are not installable from PyPI. The slicer also uses `trimesh`.
+- Optional hardware and local dependencies (`mvIMPACT`, `OffAxisHolo`, `PlotFont`) are not installable from PyPI; `mvIMPACT` is imported on first use of the real camera. The slicer also uses `trimesh`, `shapely` and `h5py`.
 
 ## Configuration
 
-- `nanofactorysystem/config.py` loads `sysConfig` from `~/nanofactory.json`, which has `user:<name>` and `objective:<name>` sections (e.g. `"Zeiss 20x"`, `"Zeiss 63x"`). If the file is missing, only a warning is issued, so `System(...)` then fails on unknown user or objective.
+- `nanofactorysystem/config.py` loads `sysConfig`, which has `user:<name>` and `objective:<name>` sections (e.g. `"Zeiss 20x"`, `"Zeiss 63x"`). Lookup order: `use_config(path_or_dict)` (context manager, swaps the content in place), `$NANOFACTORY_CONFIG`, `~/nanofactory.json`, then the built-in `DEFAULT_CONFIG` (devices and both objectives, no users, no calibration file) with a warning.
+- Class defaults of `System`, `A3200`, `Attenuator`, `Camera`, `Dhm` are `ConfigDefaults(section, {...})` descriptors, resolved on access (deep copy), so importing the package never reads config sections.
 - The YAML files in `config/` (Hydra layout) describe the same data but are not currently read by any Python code.
-- Runtime parameters are passed as nested dicts (`sys_args` with sections `attenuator`, `controller`, `sample`, `focus`, `layer`, `plane`, `dhm`, `camera`). Each component takes its own section via `popargs`, and `Parameter` subclasses merge these into their `_defaults`.
+- Runtime parameters are passed as nested dicts (`sys_args` with sections `attenuator`, `controller`, `sample`, `focus`, `layer`, `plane`, `dhm`, `camera`). Each component takes its own section via `popargs`, and `Parameter` subclasses merge these into their `_defaults`. `Parameter` pops the keys from the caller's dicts, so build a fresh `sys_args` for every `System` (T21).
 
 ## Architecture
 
 **Hardware layer**
-- `system.py` `System` aggregates `Camera`, `Dhm` (skipped when `sys_args["dhm"]["usage"]` is False) and `A3200` controller + attenuator (`devices/`). It also holds `a3200_new`, an `Aerotech3200` instance from `devices/aerotech/`.
-- There are two controller interfaces:
-  - `devices/A3200` is the older interface from Reinhard Caspary. It handles power/attenuator, z-line and the functions used by `tools/`.
+- `system.py` `System` aggregates `Camera`, `Dhm` (skipped when `sys_args["dhm"]["usage"]` is False) and `A3200` controller + attenuator (`devices/`). It also holds `a3200_new`, an `Aerotech3200` instance from `devices/aerotech/`, which shares the controller socket of `A3200`.
+- There are two controller interfaces (to be merged in T20):
+  - `devices/a3200.py` `A3200` is the older interface from Reinhard Caspary (renamed from `aerotech_old.py`; not legacy). It handles power/attenuator, z-line and the µm-based motion used by `System` and `tools/`.
   - `devices/aerotech.Aerotech3200` is the newer ASCII-protocol interface (`aerobasic/ascii.py`, TCP 127.0.0.1:8000). It sends AeroBasic commands through `.api` and runs `.pgm` files as controller tasks (`run_program_as_task`).
 - `tools/` holds measurement algorithms built on the camera and DHM: `Focus`, `Layer` (resin interface detection), `Plane`, `Grid`, `Stitch`, and `Transform` (camera↔stage pixel/µm transforms).
+
+**Hardware backends** (`backends/`, design in `docs/design/DUMMY_BACKEND.md`)
+- `System(..., backend=...)` and `Experiment(..., backend=...)` select the backend explicitly: `None`/`"real"` (default, lab hardware) or `"dummy"`/a `DummyBackend` object. There is no environment variable. The backend only replaces the seams that touch hardware; all facades stay the real classes. The device classes take matching keyword-only injection parameters: `A3200(transport=, program_dir=)`, `AerotechAsciiInterface(transport_factory=)`, `Aerotech3200(transport_factory=, program_dir=)`, `Camera(driver=)`, `Dhm(driver=)`.
+- `backends/protocols.py` defines the role protocols (what `System`/`tools`/`Experiment` use) and seam protocols (what a backend provides). Extend them when a consumer starts using a new device method.
+- `backends/dummy/`: one deterministic `SimulatedWorld` (stage, laser, exposures, tasks, virtual clock, seeded RNG, `CallLog`) shared by `FakeA3200Transport` (socket-level ASCII controller with a small AeroBasic interpreter for program tasks), `DummyCameraDriver`, `DummyDhmClient` and a synthetic attenuator calibration file. Plane detection is not simulated: dry runs pass a known plane via `Experiment.plane_fit(plane=...)`. New AeroBasic commands used by generated programs must be added to `FakeA3200Transport.execute()` (the dry-run test checks that every statement is simulated).
 
 **AeroBasic program generation** (`aerobasic/`)
 - `AeroBasicAPI` (in `aerobasic/__init__.py`) exposes AeroBasic commands as Python methods. `AeroBasicProgram` (in `aerobasic/programs/__init__.py`) collects these commands as text lines and writes a `.pgm` file.
@@ -55,7 +66,7 @@ python -m pytest test/test_aerobasic/test_drawings/test_circles.py::TestCircles:
 - `Experiment` is a context manager that owns a `System`. It lays out a grid of structures inside the resin-drop bounds, adding corner markers plus a QR code (the experiment UUID) unless `skip_corner=True`.
 - Typical flow:
   1. `plot_experiment()`
-  2. `plane_fit()`, which measures the substrate surface at sample points
+  2. `plane_fit()`, which measures the substrate surface at sample points (or uses a given `plane=`)
   3. `opl_scan()`, only when the DHM is used
   4. `add_structure(StructureType, name, axes, power, structure=DrawableObject)`
   5. `build_programs()`, which writes per-layer `.pgm` files and `structures.json`
@@ -65,7 +76,7 @@ python -m pytest test/test_aerobasic/test_drawings/test_circles.py::TestCircles:
 
 **Experiment scripts** (`mains/`)
 - `mains/Experiments/**` holds one script per experiment. Each defines a function like `print_file(absolute_center, resin_dimension, path, objective, user, dhm_usage, setup, ...)`, which builds `sys_args` and objective-specific parameters (FOV, zMax, drop direction, corner sizes) and runs the `Experiment` flow.
-- `mains/Experiments/default_exp_file.py` is the template for these scripts.
+- `mains/Experiments/default_exp_file.py` is the template for these scripts; its `binary_testprint(..., backend=, plane=)` can be dry-run on the dummy backend (see `test/integration/`).
 - `mains/main.py` selects one of these functions by import and supplies the resin edge coordinates and center for the current substrate.
 
 ## Maintainer Instructions (Hannes)
