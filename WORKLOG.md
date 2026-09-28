@@ -318,3 +318,34 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   - Other experiment scripts can be dry-run the same way once they accept `backend`/`plane`.
 - **Follow-ups:** none new.
 
+### 2026-09-28 23:23 CEST — [T7] Golden-file tests for AeroBasic generation
+- **Status:** done
+- **Changes:**
+  - `test/test_aerobasic/test_golden_programs.py` (new): 11 golden cases, each checked against its reference
+    and for determinism (two runs give the same text).
+    - `DefaultSetup` with `SetupIFOV` for 20x and 63x.
+    - With `DefaultSetup`: `Corner` (plain and rotated by 45°), `Rectangle3D`, `Stair` (drop direction down),
+      `FilledCircle2D` and `QRCode`.
+    - With `SetupIFOV`: `Rectangle2D_IFOV` (20x) and `BinaryGrating_IFOV` (63x).
+    - Each case renders the setup plus every layer program, as `Experiment.build_programs()` writes them,
+      without the timestamp header.
+  - `test/golden/*.txt` (new, 11 files, 179 kB): the reference programs. They are `.txt` because `*.pgm` is
+    gitignored; line endings are normalised on comparison, so Git's CRLF conversion on Windows does no
+    harm.
+  - `test/conftest.py`: `--update-golden` option and `golden` fixture. On a mismatch the test shows a unified
+    diff (truncated to 60 lines) and the command to update the references.
+  - `TODO.md`: T7 moved to In Progress, then to Done; T22 and T14 extended.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `test/test_aerobasic/test_golden_programs.py`: 23 passed. Also checked by hand: a tampered
+  reference file makes the test fail with a readable diff, and `--update-golden` restores it.
+- **Regenerating references:** `python -m pytest test/test_aerobasic/test_golden_programs.py --update-golden`,
+  then review `git diff test/golden` before committing.
+- **Commits:** `175af6b` test(aerobasic): add golden-file tests for generated programs [T7]
+- **Notes / follow-ups:**
+  - The IFOV structures read the lab calibration file from a hardcoded path (T14). The test points
+    `IFOV_Lines.calibrationFile` to a synthetic file; T14 was extended to replace this patch.
+  - T22 was extended: the same NumPy 2.5 deprecation occurs in `drawings/lines.py:82`.
+  - Numbers are formatted with 10 decimals. A different NumPy or platform could change the last digits of
+    computed coordinates. If that happens, review and regenerate the references rather than loosening the
+    comparison.
+

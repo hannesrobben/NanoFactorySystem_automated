@@ -11,15 +11,6 @@ Format rules (for humans and Claude):
 -->
 
 ## Open
-- [ ] T7: Golden-file tests for AeroBasic generation [group: testing-infrastructure]
-      Goal: Unintended changes in the generated `.pgm` programs are detected automatically.
-      Priority: medium | Depends on: T4
-      Done when:
-        - The generated `.pgm` text of representative structures is compared against stored
-          reference files, for both `DefaultSetup` and `SetupIFOV`.
-        - There is a documented way to regenerate the references deliberately
-          (e.g. `--update-golden`).
-
 - [ ] T8: Write `test/README.md` and update the documentation [group: testing-infrastructure]
       Goal: Anyone new understands why each test exists and how to run the test suite.
       Priority: medium | Depends on: T5, T6, T7
@@ -90,6 +81,8 @@ Format rules (for humans and Claude):
         - `IFOV_Lines` receives calibration data (or an attenuator) instead of opening
           `C:/Software/3DPoli Fabrication/Calibration/Calibration.dat` itself.
         - A test generates an `IFOV_Lines` program without the lab file.
+        - The `synthetic_ifov_calibration` monkeypatch in `test/test_aerobasic/test_golden_programs.py` is replaced by
+          the new way of passing calibration data (golden files unchanged or deliberately updated).
       Notes: Details: `docs/reviews/CODE_REVIEW_2026-09-28.md` §1.
 
 - [ ] T11: Fix small defects in `System` and the `A3200` controller (found during T1)
@@ -144,8 +137,8 @@ Format rules (for humans and Claude):
       Goal: The attenuator keeps working with future NumPy versions.
       Priority: low | Depends on: –
       Done when:
-        - `devices/attenuator.py:62` uses `reshape` instead of assigning `array.shape`, and the tests run without the
-          `DeprecationWarning`.
+        - `devices/attenuator.py:62` and `aerobasic/programs/drawings/lines.py:82` (`IFOV_Lines`, found during T7) use
+          `reshape` instead of assigning `array.shape`, and the tests run without the `DeprecationWarning`.
 
 - [ ] T23: Decide and implement axis validation for `SingleAxis` (found during T15)
       Goal: It is clear whether combining axes of different stages (and `~`, `^`, empty `&`) is an error.
@@ -187,4 +180,6 @@ Format rules (for humans and Claude):
 - [x] T5: Triage and convert the device tests — 2026-09-28 — Every device/DHM/Femtika/tools/system/slicer test file is converted (dummy + `hardware` tests with assertions) or moved to `test/manual/`, reasons in WORKLOG.md; `python -m pytest` passes without hardware or config (104 passed, 14 skipped, 1 xfailed) and `-m hardware --run-hardware` collects 13 tests. — commits: `96d54a4`, `4cbda21`
 
 - [x] T6: Dry-run an experiment with the dummy backend — 2026-09-28 — `default_exp_file.py` runs end to end on the dummy backend (plane_fit with known plane, build_programs, print_experiment); integration test writes only to `tmp_path`; the dry run found and fixed a tuple bug in the template. — commits: `c6179d0`, `2e911c2`, `43cb532`
+
+- [x] T7: Golden-file tests for AeroBasic generation — 2026-09-28 — 11 representative programs (DefaultSetup and SetupIFOV, incl. corners, stair, QR code, IFOV grating) are compared against `test/golden/*.txt`; `--update-golden` regenerates them deliberately. — commits: `175af6b`
 
