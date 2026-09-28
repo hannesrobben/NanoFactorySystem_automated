@@ -11,29 +11,6 @@ Format rules (for humans and Claude):
 -->
 
 ## Open
-- [ ] T2: Design the dummy hardware backend [group: testing-infrastructure]
-      Goal: An approved design for a simulated hardware backend exists before implementation starts.
-      Priority: high | Depends on: T1
-      Done when:
-        - The design defines one `typing.Protocol` or ABC per device role, derived from the
-          methods actually used: motion controller (both `devices/A3200` and
-          `devices/aerotech.Aerotech3200`), attenuator, camera, DHM.
-        - It defines a single, explicit backend switch, e.g. `System(..., backend="dummy")`.
-          Real hardware is the default. An environment variable is at most a convenience override.
-        - `Aerotech3200` is simulated at the transport (TCP/ASCII) level, so the generated
-          AeroBasic command strings remain testable.
-        - The dummy devices are specified as deterministic (seeded where needed), with no
-          sleeps and no network access.
-        - They keep internal state (positions, laser power, running tasks) and record every
-          call in a call log.
-        - They return plausible synthetic data (camera images, DHM phase images, stage
-          positions), and the responses can be configured.
-        - The design explains operation without `~/nanofactory.json`, and lazy imports of
-          optional dependencies with a clear error message.
-        - It describes the file layout and the impact on the public API.
-        - The maintainer has approved the design.
-      Notes: Present the design and STOP until approval (move to "Blocked" while waiting).
-
 - [ ] T3: Implement the dummy hardware backend [group: testing-infrastructure]
       Goal: The whole package can run against simulated devices on any machine.
       Priority: high | Depends on: T2
@@ -198,6 +175,29 @@ Format rules (for humans and Claude):
 
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
+- [ ] T2: Design the dummy hardware backend [group: testing-infrastructure]
+      Goal: An approved design for a simulated hardware backend exists before implementation starts.
+      Priority: high | Depends on: T1
+      Done when:
+        - The design defines one `typing.Protocol` or ABC per device role, derived from the
+          methods actually used: motion controller (both `devices/A3200` and
+          `devices/aerotech.Aerotech3200`), attenuator, camera, DHM.
+        - It defines a single, explicit backend switch, e.g. `System(..., backend="dummy")`.
+          Real hardware is the default. An environment variable is at most a convenience override.
+        - `Aerotech3200` is simulated at the transport (TCP/ASCII) level, so the generated
+          AeroBasic command strings remain testable.
+        - The dummy devices are specified as deterministic (seeded where needed), with no
+          sleeps and no network access.
+        - They keep internal state (positions, laser power, running tasks) and record every
+          call in a call log.
+        - They return plausible synthetic data (camera images, DHM phase images, stage
+          positions), and the responses can be configured.
+        - The design explains operation without `~/nanofactory.json`, and lazy imports of
+          optional dependencies with a clear error message.
+        - It describes the file layout and the impact on the public API.
+        - The maintainer has approved the design.
+      Notes: Present the design and STOP until approval (move to "Blocked" while waiting).
+      Blocked by: waiting for maintainer approval of `docs/design/DUMMY_BACKEND.md` (incl. decisions in §10)
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->

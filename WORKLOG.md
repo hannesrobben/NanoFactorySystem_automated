@@ -72,3 +72,22 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   T12 needs a maintainer decision (status of `devices/aerotech_old.py`) and affects the T2 design.
   Reproducing baseline B needs a NumPy-2-compatible environment; T9 will make that reproducible.
 
+### 2026-09-28 20:59 CEST — [T2] Design the dummy hardware backend
+- **Status:** blocked (waiting for maintainer approval)
+- **Changes:**
+  - `docs/design/DUMMY_BACKEND.md` (new): the design. It covers the role and seam protocols per device
+    (motion controller for both `A3200` and `Aerotech3200`, attenuator, camera, DHM), the single
+    `backend=` switch with real hardware as default, the socket-level `FakeA3200Transport`, the
+    deterministic `SimulatedWorld` with a call log and virtual clock, synthetic images, operation
+    without `~/nanofactory.json`, lazy `mvIMPACT` import, the file layout, the API impact and a
+    commit plan for T3.
+  - `TODO.md`: T2 moved to In Progress, then to Blocked.
+  - `WORKLOG.md`: this entry.
+- **Tests:** none; this is a design document only.
+- **Commits:** `46ae4b1` docs(design): propose dummy hardware backend [T2]
+- **Follow-ups:** The maintainer needs to approve the design and decide on §10:
+  (1) rename `devices/aerotech_old.py` → `devices/a3200.py` (T12) before modifying it;
+  (2) keep the `NANOFACTORY_BACKEND` environment variable, yes or no;
+  (3) simple sample/spot model first, with seeding `plane.zdc` as the fallback for T6.
+  T3–T8 are waiting on this approval. **Resume at:** T2 approval, then T3 step 1 in §11 of the design.
+
