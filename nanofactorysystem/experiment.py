@@ -25,8 +25,9 @@ from nanofactorysystem.aerobasic.programs.drawings import DrawableObject, Drawab
 from nanofactorysystem.aerobasic.programs.drawings.lines import Corner
 from nanofactorysystem.aerobasic.programs.drawings.qr_code import QRCode, QrErrorCorrection
 from nanofactorysystem.aerobasic.programs.setups import DefaultSetup, SetupIFOV
+from nanofactorysystem.backends import BackendLike
 from nanofactorysystem.devices.coordinate_system import CoordinateSystem, PlaneFit, DropDirection, Unit, \
-    Point2D, Point3D, Coordinate
+    Point2D, Point3D, Coordinate, ZFunction
 from nanofactorysystem.dhm.optimage import optImageMedian
 from nanofactorysystem.utils.visualization import read_file, plot_movements
 
@@ -80,7 +81,20 @@ class Experiment(object):
                  skip_corner: bool = False,
                  plane_fit_mode: int = 0,
                  setup: Literal["IFOV_off", "IFOV_on"] = "IFOV_off",
-                 substrate_information: dict=None):
+                 substrate_information: dict=None,
+                 backend: BackendLike = None):
+        """ Experiment on one substrate.
+
+        Only the new parameter is documented here; see the class attributes
+        for the others.
+
+        Parameters
+        ----------
+        backend : {"real", "dummy"}, Backend or None
+            Hardware backend passed to :class:`System`. None or ``"real"``
+            (default) uses the lab hardware, ``"dummy"`` or a
+            ``DummyBackend`` object simulated devices.
+        """
 
         self.path = path
         self.user = str(user)
@@ -127,7 +141,7 @@ class Experiment(object):
 
         # Init system object
         self.log.info("Initialize system object...")
-        self.system = System(user, objective, logger, **sys_args)
+        self.system = System(user, objective, logger, backend=backend, **sys_args)
 
         # Set default laser power
         self.system.controller.power(default_power)
@@ -414,7 +428,24 @@ class Experiment(object):
         if show:
             plt.show()
 
-    def plane_fit(self, force: bool = False):
+    def plane_fit(self, force: bool = False, *, plane: Optional[ZFunction] = None):
+        """ Determine the substrate surface and the global coordinate system.
+
+        Parameters
+        ----------
+        force : bool
+            Measure again even if stored plane detection results exist.
+        plane : ZFunction, optional
+            Known substrate surface (z in µm as function of x, y in µm). If
+            given, no measurement is done and this plane is used directly,
+            e.g. for dry runs with the dummy backend.
+        """
+        if plane is not None:
+            self.plane_fit_function = plane
+            self.log.info(f"Using given substrate plane {plane!r} (no plane detection)")
+            self._init_coordinate_system(plane)
+            return
+
         path = self.path / "planefit"
         mkdir(path, clean=False)
         plane_dc_path = path / "plane.zdc"
@@ -452,12 +483,15 @@ class Experiment(object):
         plane_fit_function = PlaneFit.from_points(np.asarray(plane_points))  # in um
         self.plane_fit_function = plane_fit_function
         self.log.info(str(plane_fit_function))
+        self._init_coordinate_system(plane_fit_function)
 
-        # Global coordinate system
+    def _init_coordinate_system(self, z_function: ZFunction):
+        """ Create the global coordinate system from the substrate surface. """
+
         self.coordinate_system_grid_to_absolute = CoordinateSystem(
             offset_x=self.absolute_grid_center[0],
             offset_y=self.absolute_grid_center[1],
-            z_function=plane_fit_function,
+            z_function=z_function,
             drop_direction=self.drop_direction,
             unit=Unit.um
         )

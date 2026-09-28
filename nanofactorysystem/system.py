@@ -13,6 +13,7 @@ import math
 
 from scidatacontainer import Container
 
+from .backends import BackendLike, resolve_backend
 from .config import sysConfig, popargs, ConfigDefaults
 from .devices import Camera, Dhm, A3200
 from .parameter import Parameter
@@ -29,9 +30,26 @@ class System(Parameter):
         "delay": 10.0,
     })
 
-    def __init__(self, user, objective, logger=None, **kwargs):
+    def __init__(self, user, objective, logger=None, *, backend: BackendLike = None, **kwargs):
 
-        """ Initialize the scanner algorithm. """
+        """ Initialize the system and connect to all devices.
+
+        Parameters
+        ----------
+        user : str
+            User key in the configuration.
+        objective : str
+            Objective key in the configuration, e.g. ``"Zeiss 20x"``.
+        logger : logging.Logger, optional
+            Logger object.
+        backend : {"real", "dummy"}, Backend or None
+            Hardware backend. None or ``"real"`` (default) uses the lab
+            hardware. ``"dummy"`` or a ``DummyBackend`` object uses
+            simulated devices; see :mod:`nanofactorysystem.backends`.
+        **kwargs
+            Runtime configuration sections (``system``, ``sample``,
+            ``camera``, ``dhm``, ``attenuator``, ``controller``).
+        """
         from nanofactorysystem.devices.aerotech import Aerotech3200
 
         # Not open now
@@ -41,6 +59,11 @@ class System(Parameter):
         args = popargs(kwargs, "system")
         super().__init__(user, logger, **args)
         self.log.info("Initializing system.")
+
+        # Hardware backend
+        self.backend = resolve_backend(backend)
+        if self.backend.name != "real":
+            self.log.warning(f"SIMULATED HARDWARE ({self.backend!r}) - nothing is printed!")
 
         # Store objective data dictionary
         self.objective = sysConfig.objective(objective)
@@ -54,7 +77,8 @@ class System(Parameter):
 
         # Initialize the MatrixVision camera
         args = popargs(kwargs, "camera")
-        self.camera = Camera(user, self.objective, logger=self.log, **args)
+        driver = self.backend.camera_driver(args["camera"].get("product"), args["camera"].get("deviceID"))
+        self.camera = Camera(user, self.objective, logger=self.log, driver=driver, **args)
         if not self.camera.opened:
             self.log.error("Can't connect to camera!")
             raise RuntimeError("Can't connect to camera!")
@@ -66,7 +90,8 @@ class System(Parameter):
         else:
             dhm_usage = True
         if dhm_usage:
-            self.dhm = Dhm(user, self.objective, logger=self.log, **args)
+            driver = self.backend.dhm_driver(self.objective)
+            self.dhm = Dhm(user, self.objective, logger=self.log, driver=driver, **args)
             if not self.dhm.opened:
                 self.log.error("Can't connect to holographic microscope!")
                 raise RuntimeError("Can't connect to holographic microscope!")
@@ -75,9 +100,14 @@ class System(Parameter):
 
         # Initialize the Aerotech A3200 controller
         args = popargs(kwargs, ("attenuator", "controller"))
-        self.controller = A3200(user, self.log, **args)
+        attenuator_args = self.backend.attenuator_args()
+        if attenuator_args:
+            args["attenuator"] = args["attenuator"] | attenuator_args
+        program_dir = self.backend.program_dir()
+        self.controller = A3200(user, self.log, transport=self.backend.controller_transport(),
+                                program_dir=program_dir, **args)
         self.controller.init_zline()
-        self.a3200_new = Aerotech3200()
+        self.a3200_new = Aerotech3200(program_dir=program_dir)
         # self.a3200.connect()
         self.a3200_new.api.socket = self.controller.socket
 
@@ -105,7 +135,8 @@ class System(Parameter):
         if self.dhm is not None:
             self.dhm.close()
         self.camera["AcquisitionMode"] = "Continuous"
-        self.a3200_new.save_log()
+        program_dir = self.backend.program_dir()
+        self.a3200_new.save_log(program_dir if program_dir is not None else ".")
         self.camera.close()
 
         try:
