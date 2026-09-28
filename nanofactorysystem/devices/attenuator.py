@@ -14,7 +14,7 @@ import numpy
 from scidatacontainer import Container, register
 from scipy.interpolate import interp1d
 
-from ..config import sysConfig, popargs
+from ..config import sysConfig, popargs, ConfigDefaults
 from ..parameter import Parameter
 
 # Register binary data calibration format
@@ -27,15 +27,15 @@ class Attenuator(Parameter):
     It loads a calibration file and provides translation between
     attenuator value and laser power in both directions. """
 
-    _defaults = sysConfig.attenuator | {
-        "calibrationFile": sysConfig.attenuator["calibrationFile"],
+    _defaults = ConfigDefaults("attenuator", {
+        "calibrationFile": None,
         "fitKind": "cubic",
         "polynomialOrder": None,
         "valueMin": 0.0,
         "valueMax": 10.0,
         "powerMin": None,
         "powerMax": None,
-    }
+    }, from_config=("calibrationFile",))
 
     def __init__(self, user, logger=None, **kwargs):
 
@@ -45,6 +45,9 @@ class Attenuator(Parameter):
         self.log.info("Initializing attenuator.")
 
         # Read content of the binary calibration file
+        if self["calibrationFile"] is None:
+            raise RuntimeError("attenuator.calibrationFile is not configured! Set it in the config file "
+                               "or pass it in the 'attenuator' section of the arguments.")
         with open(self["calibrationFile"], "rb") as fp:
             self.raw = fp.read()
         if len(self.raw) % 16:

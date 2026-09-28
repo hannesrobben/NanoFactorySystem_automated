@@ -12,7 +12,7 @@ import time
 import datetime
 import numpy as np
 
-from ..config import sysConfig, popargs
+from ..config import sysConfig, popargs, ConfigDefaults
 from ..dhm import DhmClient, optImage, motorScan
 from ..hologram import HoloContainer
 from ..parameter import Parameter
@@ -21,7 +21,7 @@ from ..parameter import Parameter
 class Dhm(Parameter):
     """ Class for digital holographic microscope. """
 
-    _defaults = sysConfig.dhm | {
+    _defaults = ConfigDefaults("dhm", {
         "contrastQuantile": 0.05,
         "maxOverflow": 9,
         "oplMode": "both",
@@ -33,7 +33,7 @@ class Dhm(Parameter):
         "oplOptImage": True,
         "oplInitPos": None,
         "oplOptPos": None,
-    }
+    })
 
     def __init__(self, user, objective, logger=None, **kwargs):
 

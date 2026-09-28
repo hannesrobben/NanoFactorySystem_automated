@@ -23,7 +23,7 @@ from typing import Any, Optional
 from scidatacontainer import Container
 
 from .attenuator import Attenuator
-from ..config import sysConfig, popargs
+from ..config import sysConfig, popargs, ConfigDefaults
 from ..parameter import Parameter
 
 # Task states
@@ -95,14 +95,14 @@ END PROGRAM
 class A3200(Parameter):
     """ Class for controlling an Aerotech A3200 system."""
 
-    _defaults = sysConfig.controller | {
+    _defaults = ConfigDefaults("controller", {
         "xInit": None,
         "yInit": None,
         "zInit": None,
         "zMax": None,
         "tasks": {},
         "softwareVersion": None,
-    }
+    })
 
     def __init__(self, user, logger=None, **kwargs):
 

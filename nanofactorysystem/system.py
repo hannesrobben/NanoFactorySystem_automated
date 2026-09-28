@@ -13,7 +13,7 @@ import math
 
 from scidatacontainer import Container
 
-from .config import sysConfig, popargs
+from .config import sysConfig, popargs, ConfigDefaults
 from .devices import Camera, Dhm, A3200
 from .parameter import Parameter
 from .tools import Transform
@@ -23,11 +23,11 @@ from .tools import Transform
 class System(Parameter):
     """ Main class for the Femtika Nanofactory system. """
 
-    _defaults = sysConfig.system | {
+    _defaults = ConfigDefaults("system", {
         "backOffset": -300.0,
         "speed": 2000.0,
         "delay": 10.0,
-    }
+    })
 
     def __init__(self, user, objective, logger=None, **kwargs):
 

@@ -9,7 +9,7 @@
 ##########################################################################
 
 from ..camera import CameraDevice, optExpose
-from ..config import sysConfig, popargs
+from ..config import sysConfig, popargs, ConfigDefaults
 from ..image import ImageContainer
 from ..parameter import Parameter
 
@@ -17,7 +17,7 @@ from ..parameter import Parameter
 class Camera(Parameter):
     """ Camera class. """
 
-    _defaults = sysConfig.camera | {
+    _defaults = ConfigDefaults("camera", {
         "AcquisitionMode": "SingleFrame",
         "ExposureMode": "Timed",
         "ExposureTime": 20000,
@@ -26,7 +26,7 @@ class Camera(Parameter):
         "GainSelector": "AnalogAll",
         "Gain": 0,
         "GainAuto": 0,
-    }
+    })
 
     def __init__(self, user, objective, logger=None, **kwargs):
 
