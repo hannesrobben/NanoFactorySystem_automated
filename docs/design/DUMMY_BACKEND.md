@@ -1,6 +1,6 @@
 # Design: Dummy Hardware Backend
 
-Status: **proposed. Waiting for maintainer approval (T2).**
+Status: **approved by the maintainer on 2026-09-28, with the decisions in §10.**
 Date: 2026-09-28. Basis: `docs/reviews/CODE_REVIEW_2026-09-28.md` (T1).
 
 ## 1. Goals and non-goals
@@ -43,8 +43,8 @@ System ──┬─ A3200 (old facade) ─────┐
   (encoding, `recv`, return-code handling, `~LASTERROR` follow-up) and the old `A3200.run()` are
   both exercised.
 - All fakes share one `SimulatedWorld`. For example, a `LINEAR` sent to the controller moves the
-  stage the camera renders from, and a z-line exposure crossing the resin interface leaves a spot
-  that later camera images show.
+  stage that the camera and `System.position()` report, and every laser exposure is recorded
+  there with its position and power.
 
 ## 3. Protocols (one per device role)
 
@@ -163,10 +163,9 @@ System(user, objective, logger=None, *, backend: Backend | str | None = None, **
 Experiment(..., backend: Backend | str | None = None)          # forwarded to System
 ```
 
-- `backend=None` resolves as follows: `NANOFACTORY_BACKEND` environment variable if set, otherwise
-  `"real"`. An explicit argument **always** wins over the environment variable. The variable is only
-  a convenience override, e.g. `NANOFACTORY_BACKEND=dummy python mains/main.py` dry-runs any
-  experiment script without editing it.
+- `backend=None` and `backend="real"` both select real hardware. There is **no** environment
+  variable (decision 2 in §10), so a stray variable on the lab PC can never silently switch to
+  simulation. Usage of the dummy backend is documented in `test/README.md` (T8).
 - `backend="dummy"` builds a `DummyBackend` with default settings. `backend=DummyBackend(seed=…,
   world=…, workdir=…)` passes a configured instance, which is what tests use.
 - An unknown value raises `ValueError`. Selecting the dummy backend logs
@@ -217,14 +216,12 @@ in their docstrings. `dummy=True` is re-routed to the new fake transport, so it 
   (`SYSTEMSTATUS Timer`) return deterministic values. There is no wall clock anywhere.
 - **Laser**: attenuator value (`$AO[0].A`), which gives the power through the synthetic
   calibration; the laser-override state; and the IFOV state.
-- **Sample model**: `SampleModel(substrate_plane=(c, a, b), resin_thickness_um=75.0)`. The lower
-  interface is `z_low(x, y) = c + a·x + b·y` (µm). The upper interface is `z_low + thickness`.
-  The defaults put the interface inside the configured `zMax`, and a small tilt is used so that
-  the plane fit has something to find.
+- **Sample model**: `SampleModel(substrate_plane=(c, a, b))`, where the substrate surface is
+  `z(x, y) = c + a·x + b·y` (µm). It is **not** used to simulate the plane detection (decision 3
+  in §10). It is the known plane that a dry run hands to `Experiment.plane_fit(plane=...)`.
 - **Exposures**: each segment written with the laser on (a `LINEAR` while override is ON, a z-line
-  task, or a `pulse`) is recorded as an `Exposure(x, y, z_from, z_to, power, t)`. An exposure that
-  **crosses an interface** with power above a threshold becomes a visible `Spot(x, y, radius)`.
-  This is the simplest rule that lets `Focus`/`Layer`/`Plane` converge on the configured plane.
+  task, or a `pulse`) is recorded as an `Exposure(x, y, z_from, z_to, power, t)`. Tests can assert
+  on it. Exposures are not rendered into images.
 - **Call log**: a single ordered `CallLog` of `CallRecord(device, call, args, result, t_virtual)`.
   It records every transport command (the raw ASCII line and the response frame), every camera or
   DHM driver access, and every program executed. It has helpers such as `commands()` (the controller
@@ -268,19 +265,17 @@ in their docstrings. `dummy=True` is re-routed to the new fake transport, so it 
   `AcquisitionMode` etc. from `Camera._defaults`, plus `family`, `product`, `serial` and
   `deviceID`. `property(name)` returns min/max values, so `setaoi` and `optExpose` work.
 - `getimage()` renders a `uint8` image: a background (level ∝ `ExposureTime`, clipped at 255,
-  so `optExpose` converges) plus seeded Gaussian noise plus every visible spot as a Gaussian disc.
-  The spot position is taken from `Transform` (the objective's `cameraPitch`) relative to the
-  current stage XY. There is no z-dependent defocus in v1.
+  so `optExpose` converges) plus seeded Gaussian noise. It contains no exposure spots and no
+  defocus, because plane detection is not simulated (§10, decision 3).
 
 ### 5.4 `DummyDhmClient`
 
 - Every key in `DhmClient._commands` is backed by a state dict with the real types.
   `ConfigList`/`Config` contain the objective ids from the config (178 for 20x, 180 for 63x),
   and the initial `Config` matches the objective, so `Dhm.__init__` does not `sleep(2)`.
-- `CameraImage` is an off-axis hologram: carrier fringes, plus a phase taken from the height
-  of the visible spots, plus seeded noise. Its intensity scales with `CameraShutter` and saturates,
-  so `optImage` converges. Fringe contrast is `exp(-((MotorPos - opl_opt) / w)²)`, so
-  `motorscan` finds `opl_opt`.
+- `CameraImage` is an off-axis hologram: carrier fringes plus seeded noise. Its intensity scales
+  with `CameraShutter` and saturates, so `optImage` converges. Fringe contrast is
+  `exp(-((MotorPos - opl_opt) / w)²)`, so `motorscan` finds `opl_opt`.
 
 ### 5.5 Attenuator
 
@@ -330,12 +325,12 @@ fast.
 ```
 nanofactorysystem/
   backends/
-    __init__.py          # Backend protocol, resolve_backend(), RealBackend, DummyBackend, BACKEND_ENV_VAR
+    __init__.py          # Backend protocol, resolve_backend(), RealBackend, DummyBackend
     protocols.py         # role and seam protocols (§3)
     real.py              # RealBackend
     dummy/
       __init__.py        # DummyBackend (seed, world, workdir, strict, …)
-      world.py           # SimulatedWorld, SampleModel, Exposure, Spot, VirtualClock
+      world.py           # SimulatedWorld, SampleModel, Exposure, VirtualClock
       calllog.py         # CallLog, CallRecord
       a3200.py           # FakeA3200Transport, AeroBasic interpreter
       camera.py          # DummyCameraDriver
@@ -348,38 +343,38 @@ test/backends/           # T3: tests for the dummies (state, call log, determini
 ## 9. Impact on the public API
 
 - **Added**: `nanofactorysystem.backends` (`DummyBackend`, `RealBackend`, `resolve_backend`),
-  `config.use_config`, the keyword-only injection parameters from §4, and `System.backend`.
+  `config.use_config`, the keyword-only injection parameters from §4, `System.backend`, and
+  `Experiment.plane_fit(..., plane=None)`.
 - **Unchanged**: all existing positional and keyword signatures, the defaults, and the behaviour
-  with `backend` omitted and `NANOFACTORY_BACKEND` unset. No `BREAKING CHANGE`.
+  with `backend` omitted. No `BREAKING CHANGE`.
 - **Changed, but compatible**: a missing config section yields `{}` instead of `AttributeError`.
   `import nanofactorysystem` works without the config file (a warning instead of a crash).
   `Aerotech3200(dummy=True)` now answers queries.
 
-## 10. Decisions needed from the maintainer
+## 10. Maintainer decisions (2026-09-28)
 
-1. **`devices/aerotech_old.py` (T12).** The active `A3200` has to receive two keyword parameters
-   and the lazy `_defaults`, but CLAUDE.md forbids modifying `*_old.py`. **Proposal:** implement
-   T12 first as a pure `git mv devices/aerotech_old.py devices/a3200.py` plus the import update in
-   `devices/__init__.py`, in a separate `refactor:` commit, then apply the T3 changes to
-   `devices/a3200.py`. `aerotech_old_1.py` stays untouched and legacy. Alternatively, you allow
-   a one-time edit of `aerotech_old.py`.
-2. **Environment variable.** `NANOFACTORY_BACKEND` as a convenience override (explicit argument
-   wins; loud warning), yes or no? Without it, T6 has to thread `backend=` through the experiment
-   script's `print_file`/`testprint` function.
-3. **Scope of T3.** The fidelity of the sample/spot model is aimed at making `plane_fit()`
-   converge in T6. If `Focus`/`Layer` need more realism than §5.1 describes (e.g. defocus with z),
-   T3 would add it. The alternative is that the T6 dry run seeds `planefit/plane.zdc` from the
-   known plane (which `Experiment.plane_fit` already loads when present) and T3 keeps the simple
-   model. **Proposal:** try the simple model first, and fall back to seeding only if it does not
-   converge, with the reason recorded in WORKLOG.md.
+1. **Controllers.** Merging `A3200` and `Aerotech3200` into one class is possible and wanted, but
+   it happens **later** as its own todo (T19). The merge is verified by identical command logs
+   against the fake transport, so it needs T3, T5 and T7 first. For now, T12 only renames
+   `devices/aerotech_old.py` → `devices/a3200.py` (a pure `git mv` plus the import update), so T3
+   does not modify a `*_old.py` file. `aerotech_old_1.py` stays untouched.
+2. **No environment variable.** The backend is chosen only by the explicit `backend=` argument.
+   The dummy backend must be usable from tests and from experiment scripts, and its usage is
+   documented (`test/README.md`, T8).
+3. **`plane_fit()` is not simulated.** `Experiment.plane_fit` gets an optional
+   `plane: ZFunction | None = None` argument. When it is given, the measurement is skipped and the
+   plane is used directly. When it is omitted, the behaviour is unchanged. The dry run (T6) passes
+   the dummy world's known plane. The arguments and control of `plane_fit` will be reworked later,
+   so this stays minimal.
 
 ## 11. Implementation plan (T3), as separate commits
 
-1. `refactor(devices)`: rename `aerotech_old.py` → `a3200.py` (if decision 1 is approved).
+1. `refactor(devices)`: rename `aerotech_old.py` → `a3200.py` (T12).
 2. `refactor(config)`: config sources, built-in default, `{}` for missing sections, the
    `ConfigDefaults` descriptor.
 3. `refactor(devices)`: keyword-only injection parameters; lazy `mvIMPACT` import.
-4. `feat(backends)`: protocols, `RealBackend`, `resolve_backend`, and `System`/`Experiment` wiring.
+4. `feat(backends)`: protocols, `RealBackend`, `DummyBackend`, `resolve_backend`, and the
+   `System`/`Experiment` wiring, including `Experiment.plane_fit(plane=...)`.
 5. `feat(backends)`: `SimulatedWorld`, `CallLog`, `FakeA3200Transport` and the interpreter, plus tests.
 6. `feat(backends)`: dummy camera, DHM and attenuator, plus tests (including determinism and
    protocol conformance).
