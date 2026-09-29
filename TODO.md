@@ -27,17 +27,6 @@ Format rules (for humans and Claude):
         - Whether `zMax` also guards `.api.LINEAR` moves is decided by the maintainer and documented.
       Notes: Maintainer decision 2026-09-28. Refactor only after the dummy backend and tests exist.
 
-- [ ] T14: Remove the hardcoded calibration path from `IFOV_Lines` (found during T1)
-      Goal: Drawing classes do not read lab files.
-      Priority: medium | Depends on: T3
-      Done when:
-        - `IFOV_Lines` receives calibration data (or an attenuator) instead of opening
-          `C:/Software/3DPoli Fabrication/Calibration/Calibration.dat` itself.
-        - A test generates an `IFOV_Lines` program without the lab file.
-        - The `synthetic_ifov_calibration` monkeypatch in `test/test_aerobasic/test_golden_programs.py` is replaced by
-          the new way of passing calibration data (golden files unchanged or deliberately updated).
-      Notes: Details: `docs/reviews/CODE_REVIEW_2026-09-28.md` §1.
-
 - [ ] T11: Fix small defects in `System` and the `A3200` controller (found during T1)
       Goal: Rarely used helpers of `System` and `A3200` work as documented.
       Priority: medium | Depends on: T12, T3
@@ -144,4 +133,6 @@ Format rules (for humans and Claude):
 - [x] T21: Stop `Parameter` from mutating the caller's argument dictionaries — 2026-09-29 — `Parameter` works on a copy of each section, so `sys_args` can be reused; also fixed `Camera` ignoring `product`/`deviceID`. — commits: `4911149`, `5af8e45`
 
 - [x] T13: Add timeouts to hardware communication and wait loops — 2026-09-29 — Configurable connect timeouts (10 s), optional response timeouts, responses read until the terminator, bounded axis/z-line waits and stall/stop bounds for tasks; terminated `~LASTERROR`; 12 dummy tests. — commits: `1ee7ef0`, `8d9d4dc`
+
+- [x] T14: Remove the hardcoded calibration path from `IFOV_Lines` — 2026-09-29 — `IFOV_Lines` takes a `PowerCalibration` (explicit, active context, or configured file); `Experiment.build_programs()` uses its attenuator calibration; golden files unchanged; 8 new tests. — commits: `eb26199`, `69547ba`
 

@@ -501,3 +501,37 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   - A task that makes no progress for 600 s is reported as failed.
 - **Follow-ups:** none. The values should be checked on the lab PC during the first hardware test run.
 
+### 2026-09-29 09:54 CEST — [T14] Remove the hardcoded calibration path from `IFOV_Lines`
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/devices/power_calibration.py` (new):
+    - `PowerCalibration` implements the fits previously in `IFOV_Lines` (2nd order polynomial or quadratic
+      spline) and uses `reshape` instead of assigning `array.shape`.
+    - `from_file`, `from_config`, `to_json`.
+    - Context manager `power_calibration()`, plus the helpers `active_power_calibration()` and
+      `resolve_power_calibration()`.
+  - `nanofactorysystem/aerobasic/programs/drawings/lines.py`: `IFOV_Lines(calibration=None)`; the hardcoded
+    `calibrationFile` class attribute and `_load_calibration_file()` are removed.
+  - `nanofactorysystem/experiment.py`: `build_programs()` activates the calibration of
+    `self.system.controller.attenuator` (the actual work moved to `_build_programs()`).
+  - `test/test_aerobasic/test_power_calibration.py` (new, 8 tests).
+  - `test/test_aerobasic/test_golden_programs.py`: activates a synthetic calibration instead of patching the
+    class attribute.
+  - `CLAUDE.md` (architecture) and `test/README.md` (new row).
+  - `TODO.md`: T14 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest`: 155 passed, 14 skipped, 1 xfailed. The golden files are unchanged: the IFOV
+  programs are identical when the same calibration data is used. The NumPy deprecation warnings from
+  `lines.py` are gone.
+- **Commits:** `eb26199` refactor(drawings): take laser power calibration from outside [T14];
+  `69547ba` test(aerobasic): cover the power calibration of IFOV structures [T14]
+- **Behaviour on hardware:**
+  - Inside an `Experiment`, IFOV powers are converted with the calibration data the attenuator loaded,
+    that is `attenuator.calibrationFile` from `~/nanofactory.json`. On the lab PC this is the same file that
+    was hardcoded before.
+  - Outside an experiment, the configured file is used.
+- **Follow-ups:**
+  - `IFOV_Lines.to_json()` cannot serialise the `Point2D` objects in `lines`. This is pre-existing and not
+    reached by the experiment flow (IFOV_Lines is only used inside other structures).
+  - The `lines.py` half of T22 is done by this change.
+
