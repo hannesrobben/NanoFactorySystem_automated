@@ -55,9 +55,10 @@ class Camera(Parameter):
 
         # Initialize parameter class
         args = popargs(kwargs, "camera")
-        product = args.pop("product", None)
-        deviceID = args.pop("deviceID", None)
-        super().__init__(user, logger, **args)
+        section = dict(args["camera"])
+        product = section.pop("product", None)
+        deviceID = section.pop("deviceID", None)
+        super().__init__(user, logger, camera=section)
         self.log.info("Initializing camera.")
 
         # Open camera device
