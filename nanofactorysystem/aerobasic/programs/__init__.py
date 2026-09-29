@@ -95,11 +95,9 @@ class AeroBasicProgram(AeroBasicAPI):
         self.lines += program.lines
 
     def to_text(self, *, with_variables=True, with_ending=True, compact=False, add_timestamp=True) -> str:
-        # TODO(dwoiwode): Make compact even more compact by multiple variable declarations per line
         s = ""
         if add_timestamp:
             s += f"' Created on {datetime.datetime.now():%Y-%m-%d %H:%M:%S.%f} by ({self.__class__.__name__})\n"
-            # TODO(dwoiwode): More metadata?
 
         if with_variables and len(self.variable_names) > 0:
             if not compact:
@@ -143,7 +141,6 @@ class AeroBasicProgram(AeroBasicAPI):
             if remove_comments and line.startswith("'"):
                 continue
 
-            # TODO: Mode check for e.g. VELOCITY ON, ABSOLUTE, ...
 
             new_program.send(line)
 

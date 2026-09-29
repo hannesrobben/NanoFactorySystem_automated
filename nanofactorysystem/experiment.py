@@ -4,6 +4,7 @@
 # This program is free software under the terms of the MIT license.      #
 ##########################################################################
 import json
+import logging
 import os.path
 import time
 import uuid
@@ -17,7 +18,7 @@ import numpy as np
 from matplotlib.patches import Ellipse, Rectangle
 from scidatacontainer import Container
 
-from nanofactorysystem import System, ImageContainer, Plane, mkdir
+from nanofactorysystem import System, ImageContainer, Plane, mkdir, getLogger
 from nanofactorysystem.aerobasic import SingleAxis, AxisStatusDataItem
 from nanofactorysystem.aerobasic.ascii import AerotechError
 from nanofactorysystem.aerobasic.programs import AeroBasicProgram
@@ -28,6 +29,7 @@ from nanofactorysystem.aerobasic.programs.setups import DefaultSetup, SetupIFOV
 from nanofactorysystem.backends import BackendLike
 from nanofactorysystem.devices.coordinate_system import CoordinateSystem, PlaneFit, DropDirection, Unit, \
     Point2D, Point3D, Coordinate, ZFunction
+from nanofactorysystem.devices.power_calibration import PowerCalibration, power_calibration
 from nanofactorysystem.dhm.optimage import optImageMedian
 from nanofactorysystem.utils.visualization import read_file, plot_movements
 
@@ -39,7 +41,7 @@ class CornerPosition(Enum):
     BL = 3
 
 
-# test für merge
+# test for merge
 
 class StructureType(Enum):
     DUMMY = 0
@@ -153,7 +155,7 @@ class Experiment(object):
         elif setup == "IFOV_on":
             self.a3200.api(SetupIFOV(objective=self.objective))
             # raise NotImplementedError(
-            #     "Es muss nochmal das IFOV Setup angepasst werden")
+            #     "The IFOV setup has to be adjusted again")
         else:
             raise NotImplementedError("Please use an existing setup!")
 
@@ -216,29 +218,31 @@ class Experiment(object):
 
     def _save_substrate_information(self, path, file):
         if file is None:
-            # todo - maybe create empty file?
-            #   at least information about corner of experiment are important
-            #   as well as whole substrate drop boundaries
             return
         assert isinstance(file, dict), "Substrate information must be a dictionary!"
         file_path = Path(os.path.join(path, "substrate_information.json"))
 
-        # if a file is already existing, then we have to update the file
+        # If the file already exists (several experiments on one substrate), merge the new
+        # information into it; new values replace old values with the same key.
         if file_path.exists():
-            # read the file
             data = json.loads(file_path.read_text())
-            # update information
-            #todo something something data+file bla
+            data.update(file)
         else:
             data = file
 
         file_path.write_text(json.dumps(data, indent=4))
 
+    def _log_file(self) -> Optional[str]:
+        """ Return the file of the most recently added file handler of the logger, or None. """
+
+        files = [h.baseFilename for h in self.log.handlers if isinstance(h, logging.FileHandler)]
+        return files[-1] if files else None
+
     def _create_experiment_dictionary(self, *, skip_corner, setup):
         self.exp_dict = {"path": str(self.path),
                          "user": self.user,
-                         "objective": "Zeiss 20x",
-                         "logger": self.log.handlers[1].baseFilename,
+                         "objective": self.objective,
+                         "logger": self._log_file(),
                          "sys_args": self.sys_args,
                          "default_power": self.default_power,
                          "low_speed_um": self.low_speed_um,
@@ -264,6 +268,64 @@ class Experiment(object):
                          "plane_fit_mode": self.plane_fit_mode,
                          "setup": setup
                          }
+
+    @staticmethod
+    def parameters_from_dictionary(path) -> dict:
+        """ Rebuild the constructor arguments of a stored experiment.
+
+        Reads ``experiment_dictionary.json``, which every experiment writes into
+        its folder, e.g. to restart an aborted print with
+        ``Experiment(**Experiment.parameters_from_dictionary(path))``.
+
+        Parameters
+        ----------
+        path : str or Path
+            Experiment folder.
+
+        Returns
+        -------
+        dict
+            Keyword arguments for :class:`Experiment`. ``logger`` writes to the
+            stored log file (or ``console.log`` in the folder).
+        """
+
+        path = Path(path)
+        data = json.loads((path / "experiment_dictionary.json").read_text())
+
+        def vector(text) -> list[float]:
+            # Stored with str(): "[5720. 27190.]" or "(500, 500)"
+            return [float(v) for v in str(text).strip("[]() ").replace(",", " ").split()]
+
+        logfile = data.get("logger") or path / "console.log"
+        return {
+            "path": Path(data["path"]),
+            "user": data["user"],
+            "objective": data["objective"],
+            "logger": getLogger(logfile=logfile),
+            "sys_args": data["sys_args"],
+            "default_power": data["default_power"],
+            "low_speed_um": data["low_speed_um"],
+            "high_speed_um": data["high_speed_um"],
+            "resin_corner_tr": Point2D(*vector(data["resin_corner_tr"])),
+            "resin_corner_bl": Point2D(*vector(data["resin_corner_bl"])),
+            "structure_size": data["structure_size"],
+            "margin": data["margin"],
+            "padding": data["padding"],
+            "absolute_grid_center": Point2D(*vector(data["absolute_grid_center"])),
+            "grid": tuple(int(v) for v in vector(data["grid_size"])),
+            "n_mid_points": data["n_mid_points"],
+            "drop_direction": DropDirection(data["drop_direction"]),
+            "corner_z": data["corner_z"],
+            "corner_width": data["corner_width"],
+            "corner_length": data["corner_length"],
+            "corner_height": data["corner_height"],
+            "corner_hatch": data["corner_hatch"],
+            "corner_slice": data["corner_slice"],
+            "fov_dim": tuple(vector(data["fov_dim"])),
+            "skip_corner": bool(data["skip_corner"]),
+            "plane_fit_mode": data["plane_fit_mode"],
+            "setup": data["setup"] or "IFOV_off",
+        }
 
     def iter_experiment_locations(self) -> Iterator[tuple[float, float]]:
         """ Return experiment locations in um """
@@ -338,7 +400,7 @@ class Experiment(object):
 
     def sample_points_for_plane_fitting(self) -> list[tuple[float, float]]:
         n_rows = self.grid[0]  # + 1
-        n_cols = self.grid[1]  # + 1 todo check if +1 is necessary for planefit_mode=0
+        n_cols = self.grid[1]
         points = []
         if self.plane_fit_mode == 0:  # plane fitting points also in between structures
             for i in range(n_rows + 1):
@@ -456,7 +518,6 @@ class Experiment(object):
 
         else:
             # Plane needs micrometer coordinates
-            # ToDo(HR): Implement a controllable variable to access single plane fit outside of experiment.py
             if self.system.objective['magnification'] == 63.0:
                 zlo = self.system.z0
                 zup = None
@@ -516,7 +577,7 @@ class Experiment(object):
             # Dummy call to avoid low intensity images on motorscan.
             optImageMedian(dhm=self.system.dhm, vmedian=127, logger=self.log)
 
-            m0 = self.system.dhm.opl_scan(m0)
+            m0 = self.system.dhm.motorscan(m0)
             self.log.info(
                 f"OPL motor pos at {image_center}: {self.system.dhm.device.MotorPos:.1f} µm (set: {m0:.1f} µm)")
             with open(opl_dc_path, "w") as fp:
@@ -702,9 +763,6 @@ class Experiment(object):
             structure = s_2_repeat["structure"]
             axes = s_2_repeat["axes"]
             power = s_2_repeat["power"]
-            # todo
-            #   - add structure is finished -- building program is next - how to differentiate between same name(adding (1)) and repition (adding (number repition))
-            #   - repition der programm funktioniert gar nicht weil in den layer programmen absolut verfahren wird und nicht relativ
 
         # Unknown structure type
         else:
@@ -740,7 +798,7 @@ class Experiment(object):
                           n_dhm_img: int = 0,
                           stitching: bool = False):
         plotting_structure = False
-        # if not stitching:  # todo doesnt work with ifov !
+        # if not stitching:
         #     plotting_structure = True
         self.log.info(f"Creating layer programs for {name}: {structure}")
         assert isinstance(structure, DrawableObject)
@@ -753,7 +811,6 @@ class Experiment(object):
         # Make sure that power is not None
         power = float(power)
 
-        # todo check for big structures maximal deviation between corners z should be on the lowest/ highest z value depending on drop orientation
         # Absolute center coordinates
         offset_x = structure.center_point.X
         offset_y = structure.center_point.Y
@@ -811,7 +868,7 @@ class Experiment(object):
         for layer_id, layer in enumerate(structure.iterate_layers(coordinate_system)):
             layer_pgm = AeroBasicProgram()
 
-            if stitching:  # funktioniert anscheinend!
+            if stitching:  # apparently works!
                 x_offset, y_offset = structure.get_tile_center_for_layer(layer_id)
                 x_value = x_structure_center + x_offset / 1000
                 y_value = y_structure_center + y_offset / 1000
@@ -861,6 +918,11 @@ class Experiment(object):
         return layer_pgm_paths, structure_config
 
     def build_programs(self):
+        # Structures that set the laser power (IFOV) use the calibration of this system's attenuator
+        with power_calibration(PowerCalibration(self.system.controller.attenuator.data)):
+            self._build_programs()
+
+    def _build_programs(self):
 
         path = self.path / "structures"
         mkdir(path, clean=False)
@@ -962,7 +1024,6 @@ class Experiment(object):
         # allgmein power
 
         # Set laser power
-        # todo (HR) - improvement of printing process by adjustable power (between layers or even between lines)
         self.system.controller.power(power)
 
         # Absolute coordinates of structure center
@@ -986,11 +1047,12 @@ class Experiment(object):
             raise ValueError(f"Unknown drop direction {self.drop_direction}!")
 
         # Write all layers of the structure
+        layer_id = layer_count = None  # stay None if the structure has no layers
         t1 = time.time()
         for layer_count in range(len(pgm_files_list))[::order]:
             layer_pgm_path = pgm_files_list[layer_count]
             layer_id = int(str(layer_pgm_path).split('.')[-2])
-            # Einzelheiten über das Programm. Wenn das Programm bestimmte Größe überschreiten sollte, dann sollte man überdenken ob man das nicht vielleicht aufsplittet
+            # Details about the program: if a program exceeds a certain size, consider splitting it
             try:
                 task = self.a3200.run_program_as_task(layer_pgm_path, task_id=1)
                 task.wait_to_finish()
@@ -1005,6 +1067,7 @@ class Experiment(object):
                                            drop_direction=self.drop_direction)
             except AerotechError as e:
                 self.log.error(f"Program failed for {name}: {e}")
+                self._stop_failed_task(task_id=1)
                 self.update_print_progress(name, layer_id=layer_id, layer_count=layer_count, order=order, error=e,
                                            drop_direction=self.drop_direction, error_log=True)
         t2 = time.time()
@@ -1019,6 +1082,14 @@ class Experiment(object):
             dhm_image_count=dhm_image_count + 10)
         self.update_print_progress(name, layer_id=layer_id, layer_count=layer_count, order=order,
                                    drop_direction=self.drop_direction, finished=True)
+
+    def _stop_failed_task(self, task_id: int) -> None:
+        """ Stop a task after a failed program, so that the next program can be loaded. """
+
+        try:
+            self.a3200.api.PROGRAM_STOP(task_id)
+        except AerotechError as error:
+            self.log.error(f"Could not stop task {task_id}: {error}")
 
     def print_experiment(self):
         if self.structure_configs is None:
@@ -1068,7 +1139,8 @@ class Experiment(object):
             if error_log:
                 data["error log"].append(data["current_structure"])
         else:
-            completed_structure = data["current_structure"]
+            # Without any printed layer there is no current structure yet; record at least its name
+            completed_structure = data["current_structure"] or {"name": name, "finished layer": layer_id}
             data["finished_structures"].append(completed_structure)
             if error_log:
                 data["error log"].append(data["current_structure"])
@@ -1132,7 +1204,7 @@ class Experiment(object):
                 #     else:
                 #         raise ValueError("Invalid resume order")
                 # NEW--------------------------------------------------------------
-                # lange version für den kurzen for block unten
+                # long version of the short for block below
                 # for f in layer_files:
                 #     layer_id = extract_layer_id(f)
                 #

@@ -152,7 +152,6 @@ class Simple_DOE(DrawableObject):
         """
         Very basic implementation of a DOE structure printed with Rectangles one by one.
         Future version should deliver layer by layer across all pixels.
-        ToDo(HR) algorithm
         """
         program = DrawableAeroBasicProgram(coordinate_system)
         for i in range(self.rows):
@@ -196,8 +195,6 @@ class Binary_grating(DrawableObject):
                  ):
         super().__init__()
         self.center = center
-        # todo future - make the axis on which the grating is orientated parameterized
-        # todo: überlegen wie man es besser macht: gesamtbreite und periode oder breite von Berg & Tal sowie n_periode um gesamtbreite zu berechnen
         self.center = center
         self.full_width_grating = max_width
         self.length_grating = max_length  # max_length of grating - no
@@ -260,7 +257,6 @@ class Binary_grating(DrawableObject):
             assert self.width_phase<self.period_width, "max_width of period has to be bigger than the max_width of grating"
 
             x_offset = -self.full_width_grating/2 + self.width_phase/2 + step*self.period_width
-            # todo future: make sure that the structure doesnt exceed full_width! somehow to do with n_grating and number of periods + full max_width grating?
             step_rectangle = Rectangle3D(
                 center=self.center + Point3D(X=x_offset, Y=0, Z=0),
                 width=self.width_phase,

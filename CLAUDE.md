@@ -12,7 +12,7 @@ Comments, docs and TODOs are often in German. `TODO.md` is the task list with th
 ## Commands
 
 ```bash
-python -m pip install .        # build/install package (pyproject.toml, setuptools; subpackages not yet included, see T9)
+python -m pip install ".[test]"   # install package with all subpackages and test dependencies (pyproject.toml)
 python clean.py                # remove build/, dist/, *.egg-info, __pycache__
 python -m pytest               # all tests without hardware (unit + dummy backend); hardware tests are skipped
 python -m pytest test/devices/test_aerotech.py::test_zmax_safety   # a single test
@@ -23,7 +23,7 @@ python -m pytest test/test_aerobasic/test_golden_programs.py --update-golden   #
 
 - `test/README.md` describes every test module, the categories (unit, dummy integration, hardware, manual), the fixtures and how to use the dummy backend. Keep it up to date when adding, moving or removing tests.
 - pytest configuration is in `pyproject.toml` (`testpaths = ["test"]`; `test/manual/`, `_programs` and legacy directories are excluded). Markers: `hardware` (skipped without `--run-hardware`), `slow`. Shared fixtures are in `test/conftest.py`: `test_config`, `dummy_backend`, `dummy_controller`, `dummy_system`, `no_sleep`, `tmp_program_dir`, `golden`, `lab_user`.
-- `python -m pytest` must pass without hardware, without `~/nanofactory.json` and without `mvIMPACT`/`OffAxisHolo`. The environment needs NumPy-2-compatible builds (`opencv-python>=4.10.0.84`); the global interpreter on the lab PC currently fails with `numpy.core.multiarray failed to import` (T9).
+- `python -m pytest` must pass without hardware, without `~/nanofactory.json` and without `mvIMPACT`/`OffAxisHolo`. The environment needs NumPy-2-compatible builds (`opencv-python>=4.10.0.84`, pinned in `pyproject.toml`); an older OpenCV fails with `numpy.core.multiarray failed to import`.
 - Generated program references for golden tests are `test/golden/*.txt`; other test output goes to `tmp_path`, or `test/_programs/` (gitignored) for manual inspection.
 - Experiment entry scripts in `mains/` import siblings as `from Experiments.… import …`, so run them with `mains/` as the working directory (e.g. `cd mains && python main.py`).
 - Optional hardware and local dependencies (`mvIMPACT`, `OffAxisHolo`, `PlotFont`) are not installable from PyPI; `mvIMPACT` is imported on first use of the real camera. The slicer also uses `trimesh`, `shapely` and `h5py`.
@@ -33,15 +33,19 @@ python -m pytest test/test_aerobasic/test_golden_programs.py --update-golden   #
 - `nanofactorysystem/config.py` loads `sysConfig`, which has `user:<name>` and `objective:<name>` sections (e.g. `"Zeiss 20x"`, `"Zeiss 63x"`). Lookup order: `use_config(path_or_dict)` (context manager, swaps the content in place), `$NANOFACTORY_CONFIG`, `~/nanofactory.json`, then the built-in `DEFAULT_CONFIG` (devices and both objectives, no users, no calibration file) with a warning.
 - Class defaults of `System`, `A3200`, `Attenuator`, `Camera`, `Dhm` are `ConfigDefaults(section, {...})` descriptors, resolved on access (deep copy), so importing the package never reads config sections.
 - The YAML files in `config/` (Hydra layout) describe the same data but are not currently read by any Python code.
-- Runtime parameters are passed as nested dicts (`sys_args` with sections `attenuator`, `controller`, `sample`, `focus`, `layer`, `plane`, `dhm`, `camera`). Each component takes its own section via `popargs`, and `Parameter` subclasses merge these into their `_defaults`. `Parameter` pops the keys from the caller's dicts, so build a fresh `sys_args` for every `System` (T21).
+- Runtime parameters are passed as nested dicts (`sys_args` with sections `attenuator`, `controller`, `sample`, `focus`, `layer`, `plane`, `dhm`, `camera`). Each component takes its own section via `popargs`, and `Parameter` subclasses merge these into their `_defaults`. `Parameter` works on a copy of each section, so a `sys_args` dict can be reused.
 
 ## Architecture
 
 **Hardware layer**
-- `system.py` `System` aggregates `Camera`, `Dhm` (skipped when `sys_args["dhm"]["usage"]` is False) and `A3200` controller + attenuator (`devices/`). It also holds `a3200_new`, an `Aerotech3200` instance from `devices/aerotech/`, which shares the controller socket of `A3200`.
-- There are two controller interfaces (to be merged in T20):
-  - `devices/a3200.py` `A3200` is the older interface from Reinhard Caspary (renamed from `aerotech_old.py`; not legacy). It handles power/attenuator, z-line and the µm-based motion used by `System` and `tools/`.
-  - `devices/aerotech.Aerotech3200` is the newer ASCII-protocol interface (`aerobasic/ascii.py`, TCP 127.0.0.1:8000). It sends AeroBasic commands through `.api` and runs `.pgm` files as controller tasks (`run_program_as_task`).
+- `system.py` `System` aggregates `Camera`, `Dhm` (skipped when `sys_args["dhm"]["usage"]` is False) and the `A3200` controller + attenuator (`devices/`). `System.controller` and `System.a3200_new` are the same object.
+- One controller class since T20: `devices/a3200.py` `A3200(Parameter, AerotechController)`.
+  - All commands go through one `aerobasic/ascii.py` `AerotechAsciiInterface` (`.api`, TCP 127.0.0.1:8000), which records the command history (`save_log()` → `A3200.log`).
+  - Config-based µm helpers used by `System` and `tools/`: `moveabs`, `moveinc`, `position`, `wait`, `power`, `pulse`, `laseron/off`, `zline`, `home(axes)`, `container`; `run()` sends a raw command.
+  - Program tasks from `devices/aerotech.AerotechController` used by `Experiment`: `run_program_as_task` (loads `.pgm` files as controller tasks), `xyz`, `axis_status`, `save_log`.
+  - Safety: the helpers check `zMax` (and close the connection when exceeded); in addition, `api.z_limit` refuses immediate absolute Z moves beyond `zMax` sent through `.api` (maintainer decision). Programs run as tasks are not checked.
+  - `devices/aerotech.Aerotech3200` is the same task handling without user/config (e.g. for scripts and `test_femtika`), with an optional `z_max` and its own `home()` sequence.
+  - `AerotechError` is a `RuntimeError`; `TaskFailedError` (a failed or stalled task) is also a `ValueError`.
 - `tools/` holds measurement algorithms built on the camera and DHM: `Focus`, `Layer` (resin interface detection), `Plane`, `Grid`, `Stitch`, and `Transform` (camera↔stage pixel/µm transforms).
 
 **Hardware backends** (`backends/`, design in `docs/design/DUMMY_BACKEND.md`)
@@ -54,6 +58,7 @@ python -m pytest test/test_aerobasic/test_golden_programs.py --update-golden   #
 - `programs/setups.py` provides `DefaultSetup` (stages plus galvo, IFOV off) and `SetupIFOV` (Aerotech IFOV mode, objective-specific). The chosen setup changes which axes (`"XYZ"` vs `"ABZ"`) and accelerations are valid.
 - `programs/drawings/` defines `DrawableObject`, the abstract base of every printable structure. A structure implements `iterate_layers(coordinate_system)`, which yields one `DrawableAeroBasicProgram` per layer. Each layer's coordinates pass through `devices/coordinate_system.CoordinateSystem`, which maps local µm coordinates to stage coordinates using an offset, a `ZFunction` (`StaticOffset`/`Plane`/`PlaneFit` from plane fitting) and `DropDirection` (the z sign, which differs per objective).
 - `DrawableObject.to_json()` serializes the constructor arguments, which lets experiments be saved and restarted.
+- Structures that set the laser power in mW (`IFOV_Lines` and the IFOV structures built on it) convert it with a `devices/power_calibration.PowerCalibration`: an explicit `calibration=` argument, else the one activated with `power_calibration(...)` (`Experiment.build_programs()` activates the running system's attenuator calibration), else `attenuator.calibrationFile` from the config.
 - Structure families:
   - `lines.py` (`Rectangle3D`, `Stair`, `Corner`, …)
   - `height_function_structures/` (gratings, lenses, DOEs built from `HeightFunctions` + slicer)

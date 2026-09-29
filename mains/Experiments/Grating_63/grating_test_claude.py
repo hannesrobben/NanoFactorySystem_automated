@@ -81,7 +81,7 @@ def gratings_testprint(absolute_center: Point2D, resin_dimension: list, ask_cont
     if path is None:
         path = Path(mkdir(f".output/gratings_test/print_{datetime.datetime.now():%Y%m%d}", clean=False))
     else:
-        assert (path, Path)
+        path = Path(path)  # accept str or Path
         path = Path(mkdir(os.path.join(path, "grating_function_test_2"), clean=False))
     logger = getLogger(logfile=f"{path}/console.log")
 

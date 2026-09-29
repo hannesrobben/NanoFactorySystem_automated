@@ -42,11 +42,7 @@ def pytest_collection_modifyitems(config, items):
 
 
 def dummy_sys_args():
-    """ Return fresh runtime arguments for ``System`` on the dummy backend.
-
-    A new dictionary is needed for every ``System``, because the parameter
-    classes pop keys from the dictionaries they receive (see T21).
-    """
+    """ Return runtime arguments for ``System`` on the dummy backend. """
 
     return {"controller": {"zMax": 25000.0}}
 

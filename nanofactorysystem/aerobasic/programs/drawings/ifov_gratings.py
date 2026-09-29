@@ -137,10 +137,10 @@ class BinaryGrating_IFOV(DrawableObject):
 
         for i in range(total_iterations):
             if i < n_full:
-                # Vollständige Periode: Mittelpunkt liegt bei regulärem k
+                # Complete period: the center lies at the regular k
                 k = self.y_dim / 2 - self.duty_width / 2 - i * self.period - phase_offset
             else:
-                # Partielle Periode am Ende: verfügbare Breite bestimmt den Mittelpunkt
+                # Partial period at the end: the available width determines the center
                 frac_length = (self.n_periods % 1) * self.period
                 partial_top = -self.y_dim / 2 + frac_length - phase_offset
                 # k = -self.y_dim / 2 + min(self.duty_width, frac_length) / 2
@@ -215,7 +215,7 @@ class BinaryGrating_IFOV(DrawableObject):
                 program.add_programm(layer_program)
                 # yielding full layer program with every 2D rectangle
                 yield layer_program
-        # program ohne plotting
+        # program without plotting
         # for z_height in np.arange(start_z, self.structure_height + slice_size_opt/2, slice_size_opt):
         #     layer_program = DrawableAeroBasicProgram(coordinate_system)
         #     # z-coordinate movement in rect2d
@@ -312,7 +312,7 @@ class Rectangle2D_IFOV(DrawableObject):
 
     def iterate_layers(self, coordinate_system: CoordinateSystem,  mode="normal", plot_name=None):
         if mode.lower() == "normal":
-            # hatching line by line - snake pattern von unten nach oben
+            # hatching line by line - snake pattern from bottom to top
             yield from self.iterate_layers_line_hatching(coordinate_system, plot_name=plot_name)
         elif mode.lower() == "contur":
             yield from self.iterate_layer_contur(coordinate_system)
@@ -321,18 +321,16 @@ class Rectangle2D_IFOV(DrawableObject):
 
     def iterate_layer_contur(self, coordinate_system: CoordinateSystem):
         raise NotImplementedError("iterate_layer_contur not yet implemented")
-        # todo - mit polyline auf ifov umschreiben und dann neue berechnung der punkte wie bei hollow structure
-        #   dient dazu eine andere hatching taktik auszuprobieren-vielleicht möglich die Sachen an den Seiten umzustellen
 
     def iterate_layers_line_hatching(self, coordinate_system: CoordinateSystem, plot_name=None) -> Iterator[IFOV_AeroBasicProgram]:
         program = DrawableAeroBasicProgram(coordinate_system)
         # top_left = self.center + Point2D(X=-self.x_length/2*np.cos(self.phi), Y=self.y_length/2*np.sin(self.phi))
 
-        if self.hatching_direction == HatchingDirection.X:  # kontinuierliche Linien in y Richtung , hatching entlang der x achse
+        if self.hatching_direction == HatchingDirection.X:  # continuous lines in y direction, hatching along the x axis
             hatching_length = self.x_length
             length = self.y_length
             angle = self.phi
-        elif self.hatching_direction == HatchingDirection.Y:  # kontinuierliche Linien in x Richtung , hatching entlang der y achse
+        elif self.hatching_direction == HatchingDirection.Y:  # continuous lines in x direction, hatching along the y axis
             hatching_length = self.y_length
             length = self.x_length
             angle = self.phi - 90
@@ -455,11 +453,10 @@ class Rectangle3D_IFOV(DrawableObject):
                 hatching_direction=self.hatching_direction,
                 angle=self.angle
             )
-            program = DrawableAeroBasicProgram(coordinate_system)  # todo ist das notwendig
+            program = DrawableAeroBasicProgram(coordinate_system)
 
-            # FEEEEEHLLLLLEEEERRRR  -- das ist nicht die korrekt z-ccord - sie ist RELATIV und NICHT absolut
+            # ERROR -- this is not the correct z coordinate - it is RELATIVE and NOT absolute
             # program.RAPID(Z=z_offset + self.center.Z)
-            # todo (HR) check if it has an influence if LINEAR is used - out of the scope of IFOV should be working
             if plot_progress:
                 program.add_programm(rectangle.draw_on(coordinate_system, plot_name=f"3D_layer_{i}_"))
             else:

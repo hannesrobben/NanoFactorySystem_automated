@@ -41,7 +41,6 @@ sys_args = {
 }
 
 
-# ToDo(HR): how do i transfer a dict or other system arguments to this function?
 def print_2pp(
     absolute_center: Point2D,
     resin_dimension: list,
@@ -65,15 +64,11 @@ def print_2pp(
     path: Path argument for root directory where the experimental data will be safe in a subdirectory called ...
             If nothing is given, the export_path will be in the subdirectory .output
     """
-    # ToDo: DropDirection noch mit übergeben und testen ob das funktioniert
 
     if model_path is None:
         raise NotFoundErr("No 3D model found.")
 
-    # ToDo: Has to be changed in future in order to allow more prints of the same experiment on one substrate without
-    # deleting all the different data of previous prints
     if path is None:
-        # ToDo(HR) Adjust referencing to another more suitable path
         path = Path(
             mkdir(
                 f".output/dhm_paper/testprint{datetime.datetime.now():%Y%m%d}",
@@ -81,8 +76,7 @@ def print_2pp(
             )
         )
     else:
-        # ToDo(HR) make ist more controllable
-        assert (path, Path)
+        path = Path(path)  # accept str or Path
         path = Path(mkdir(os.path.join(path, "testprint2"), clean=False))
     logger = getLogger(logfile=f"{path}/console.log")
 
@@ -171,8 +165,8 @@ def print_2pp(
         margin=margin,
         padding=padding,
         absolute_grid_center=absolute_grid_center,
-        grid=grid,  # ToDo: changing depending on experiment - e.g. (number of repetitions, number of structures)
-        n_mid_points=0,  # ToDo changing depending on experiment
+        grid=grid,
+        n_mid_points=0,
         drop_direction=drop_direction,
         corner_z=-2,
         corner_width=c_width,
@@ -202,7 +196,6 @@ def print_2pp(
                 return
             experiment.opl_scan(m0=350.0, force=False)
 
-        # TODO: Take image of whole scene
         # center = experiment.coordinate_system_grid_to_absolute.convert({"X": 0, "Y": 0, "Z": 0})
         # experiment.measure(coordinate=center, name="before")
 
@@ -250,7 +243,6 @@ def print_2pp(
             return
         experiment.print_experiment()
 
-        # TODO: Take image of whole scene
         # experiment.measure(coordinate=center, name="after")
 
 

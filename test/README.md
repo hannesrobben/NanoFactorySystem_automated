@@ -32,24 +32,33 @@ The configuration is in `[tool.pytest.ini_options]` in `pyproject.toml`: `testpa
   lab configuration (`lab_user` fixture, the first `user:` entry in `~/nanofactory.json`).
 - `slow`: the test takes more than a few seconds. It still runs by default; deselect it with `-m "not slow"`.
 
-**Environment.** The package needs a NumPy-2-compatible set of `opencv-python` (≥ 4.10.0.84) and
-`SciDataContainer`. With older builds, `import nanofactorysystem` fails with
-`numpy.core.multiarray failed to import` (see T9). A clean virtual environment with `numpy`, `scipy`,
-`matplotlib`, `scikit-image`, `opencv-python`, `SciDataContainer`, `shapely`, `trimesh`, `qrcode`, `h5py`,
-`tqdm` and `pytest` is enough to run the suite from the repository root.
+**Environment.** Set up a virtual environment and install the package with the test extra:
+
+```bash
+python -m venv .venv            # outside a synced folder, if possible
+.venv/Scripts/python -m pip install ".[test]"      # Windows; use .venv/bin/python elsewhere
+```
+
+`pyproject.toml` requires `opencv-python>=4.10.0.84`, the first release built for NumPy 2. With an older
+OpenCV next to NumPy 2, `import nanofactorysystem` fails with `numpy.core.multiarray failed to import`.
+On Windows, keep the path of the virtual environment short: `shapely` fails to load its DLL when the path
+is longer than 260 characters.
 
 ## Unit tests
 
 | Module | What it tests | Why it matters (failure it catches) | Requirements |
 |---|---|---|---|
-| `test_aerobasic/test_constants.py` | Parsing and combining axes (`Axis`, `SingleAxis`, `Stages`) | Wrong axis names in `ENABLE`/`HOME`/`LINEAR` commands. `test_prevent_mixed_axes` is a strict `xfail` until the decision in T23. | – |
+| `test_aerobasic/test_constants.py` | Parsing and combining axes (`Axis`, `SingleAxis`, `Stages`) | Wrong axis names in `ENABLE`/`HOME`/`LINEAR` commands; invalid axis combinations (`~`, `^`, empty `&`). | – |
 | `test_aerobasic/test_coordinate_system.py` | Plane fit and the local → stage coordinate transformation | Structures written at the wrong height or position on a tilted substrate | – |
 | `test_aerobasic/test_program.py` | `AeroBasicProgram` text output and writing `.pgm` files | Broken program files that the controller rejects | – |
+| `test_aerobasic/test_power_calibration.py` | Power (mW) → attenuator conversion for IFOV structures: explicit, active and configured calibration; `Experiment` uses its attenuator | Wrong laser power in IFOV programs; programs depending on a lab-only file | – |
 | `test_aerobasic/test_variables.py` | `create_variable`, `DVAR` declarations | Invalid variable declarations in generated programs | – |
 | `test_aerobasic/test_drawings/test_circles.py`, `test_corners.py` | Circle and corner structures generate programs | Exceptions in drawing code; the program content is checked by the golden tests | – |
 | `test_aerobasic/test_golden_programs.py` | Generated text of 11 representative programs (DefaultSetup and SetupIFOV) against `test/golden/*.txt` | **Any unintended change** of the commands sent to the machine, e.g. after refactoring the drawing classes | – |
+| `test_utils/test_visualization.py` | Reading programs into movements and plotting them (arcs, variables, empty programs) | Broken movement plots used for manual inspection of generated programs | – |
 | `test_utils/test_units.py` | Prototype unit conversion (`UnitFloat`, defined in the test) with `Unit` | Wrong mm/µm/cm factors | – |
 | `test_config_sources.py` | Config lookup order, built-in default, `use_config`, lazy class defaults | The package failing to import without `~/nanofactory.json`; the config not being switchable in tests | – |
+| `test_runtime.py` | `getLogger()` does not duplicate handlers and switches log files; failed controller commands are logged, not printed | Duplicated or misrouted log lines when several experiments run in one process | – |
 | `test_conftest.py` | The `--run-hardware` handling and the shared fixtures | Hardware tests running (or silently not running) on the wrong machine | – |
 | `slicer/test_model3d.py` | `Model3D_Slicer`: STL → toolpath → layer programs, JSON and HDF5 export (checks in `slicer/model3d_checks.py`) | Regressions in the 3D-model slicing pipeline | `trimesh`, `shapely`, `h5py` (skipped if missing) |
 
@@ -63,12 +72,16 @@ level, so the exact command strings are checked.
 |---|---|---|---|
 | `backends/test_dummy_controller.py` | The fake A3200: protocol frames, motion, laser and exposures, program tasks, fault injection, call log | The simulation itself being wrong, which would make all other dummy tests meaningless | – |
 | `backends/test_dummy_devices.py` | Camera, DHM and attenuator facades on the simulated devices; determinism; protocol conformance | Exposure/OPL optimisation or calibration conversion breaking | – |
+| `backends/test_command_logs.py` | Golden command logs (`test/golden/commands_*.txt`) of System use and complete experiments (DefaultSetup and SetupIFOV) | **Any change of the commands sent to the controller**, e.g. by refactoring the controller classes (recorded before the T20 merge) | – (experiment flows marked `slow`) |
+| `backends/test_controller_merge.py` | One controller object in `System`, program tasks on `A3200`, zMax guard for `.api` moves, `Aerotech3200` without config, error types | Moving above the safe z range through `.api`; regressions of the controller merge | – |
+| `backends/test_timeouts.py` | Connect/response timeouts, reading split responses, bounded waiting for axes, z-line, stalled tasks and `PROGRAM STOP` | A missing or hung device freezing the program instead of failing with an error | – |
 | `backends/test_dummy_system.py` | `System` start-up command sequence, z-line, backend switch; the real backend still opens the same devices | `System` sending different commands to the machine; the default backend changing | – |
 | `devices/test_aerotech.py` | The old `A3200` controller: commands, µm parsing, `zMax` safety, power, z-line, errors | Moving outside the safe z range; wrong units | – (plus 1 hardware test) |
 | `devices/test_attenuator.py` | Power ↔ attenuator conversion | Wrong laser power | – (plus 1 hardware test) |
 | `devices/test_camera.py` | Exposure optimisation, image container | Unusable camera images | – (plus 1 hardware test) |
 | `dhm/test_dhm.py` | DHM client: objective selection, shutter, motor, hologram | DHM communication errors | – (plus 1 hardware test) |
 | `test_femtika/test_device_no_laser.py` | `Aerotech3200` status, positions, tasks, homing on the simulated controller | Parsing errors in the status answers of the controller | – (the same tests also run as hardware tests) |
+| `test_experiment.py` | `Experiment`: printing all layers, a failed layer (logged, printing continues), empty structures, OPL scan, substrate information, experiment dictionary | A single failed layer aborting a whole print; wrong metadata for restarts | – |
 | `test_system.py` | `System` data container, homing | Missing metadata in stored experiments | – (plus 1 hardware test) |
 | `tools/test_focus_dummy.py` | `Focus` runs end to end on `System`; the z-line exposure reaches the controller | The tools breaking on API changes of `System` | – |
 | `integration/test_dry_run_default_experiment.py` | `mains/Experiments/default_exp_file.py` end to end: start-up, `plane_fit` (known plane), `build_programs`, `print_experiment` | An experiment script failing on the lab PC halfway through a print | – (marked `slow`) |
@@ -158,16 +171,13 @@ backend = DummyBackend()
 binary_testprint(..., path=Path("dry_run"), backend=backend, plane=backend.world.sample.plane())
 ```
 
-Remember that the parameter classes pop keys from the `sys_args` dictionaries they receive (T21): build a
-new dictionary for every `System`/`Experiment`.
-
 ## Where generated files go
 
 - `tmp_path` (pytest's per-test temporary directory): everything the unit and dummy tests write. This
   includes experiment output, the backend workdir (calibration file, `__zline__.pgm`, `A3200.log`) and
   programs.
 - `test/_programs/` (gitignored): programs and movement plots written by `test_program.py` and the drawing
-  tests, kept for manual inspection. Plotting failures appear as warnings (T24).
+  tests, kept for manual inspection.
 - `test/golden/`: the committed reference programs. Change them only with `--update-golden`, and review the
   diff.
 - Hardware and manual scripts may write into the current working directory, as they always did (for example

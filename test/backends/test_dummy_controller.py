@@ -2,7 +2,7 @@
 import pytest
 
 from nanofactorysystem.aerobasic import AxisStatusDataItem, SingleAxis
-from nanofactorysystem.aerobasic.ascii import AerotechAsciiInterface, AerotechError
+from nanofactorysystem.aerobasic.ascii import AerotechAsciiInterface, AerotechError, TaskFailedError
 from nanofactorysystem.aerobasic.constants.tasks import TaskState
 from nanofactorysystem.aerobasic.programs import AeroBasicProgram
 from nanofactorysystem.backends.dummy import FakeA3200Transport, SimulatedWorld
@@ -156,7 +156,7 @@ def test_loading_missing_program_fails(api):
 
 
 def test_program_error_while_running(tmp_path, transport, world, no_sleep):
-    """ A task error surfaces as ValueError from Task.wait_to_finish (current behaviour, see T10). """
+    """ A task error surfaces as TaskFailedError (an AerotechError and a ValueError). """
 
     a3200 = Aerotech3200(transport_factory=lambda: transport, program_dir=tmp_path)
     a3200.connect()
@@ -167,7 +167,7 @@ def test_program_error_while_running(tmp_path, transport, world, no_sleep):
     task = a3200.run_program_as_task(program, task_id=1)
     assert task.task_state == TaskState.program_running
 
-    with pytest.raises(ValueError, match="42"):
+    with pytest.raises(TaskFailedError, match="42"):
         task.wait_to_finish()
     assert task.task_state == TaskState.error
 
@@ -197,3 +197,10 @@ def test_deprecated_dummy_flag_answers_queries():
 
     assert a3200.xyz.Z == 20.0
     assert a3200.version.major == "4"
+
+
+def test_send_one_falls_back_without_recursion(api, transport):
+    assert api.send_one("~VERSION") == "4.9.0.0"
+
+    transport.fail_next(r"^ABSOLUTE$")
+    assert api.send_one("ABSOLUTE") == ""  # retried with the fallback

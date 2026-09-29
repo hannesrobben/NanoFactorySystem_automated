@@ -28,6 +28,26 @@ class SingleAxis(Flag):
             if axis in self:
                 yield axis
 
+    # Axis combinations: "|" may combine any axes, also of different stages
+    # (e.g. Axis.YZ | Axis.AB in Aerotech3200.home()). Operations that would
+    # produce axes that were not asked for, or none at all, are errors.
+
+    def __invert__(self):
+        raise AxisError(f"Inverting axes is not supported ({self!r})")
+
+    def __xor__(self, other):
+        raise AxisError(f"XOR of axes is not supported ({self!r} ^ {other!r})")
+
+    __rxor__ = __xor__
+
+    def __and__(self, other):
+        result = super().__and__(other)
+        if isinstance(result, SingleAxis) and result.value == 0:
+            raise AxisError(f"{self!r} & {other!r} has no common axis")
+        return result
+
+    __rand__ = __and__
+
     @enum.property
     def parameter_name(self) -> str:
         return " ".join(map(lambda x: x.name, self))

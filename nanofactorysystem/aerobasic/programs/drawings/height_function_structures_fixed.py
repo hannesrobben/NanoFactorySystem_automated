@@ -82,12 +82,12 @@ class HeightFunctions:
         """
         Sinusoidal grating
 
-        period: Gitterperiode (z.B. in Âµm)
-        height: GesamthÃ¶he (z0 bis z0 + height)
-        phase_deg: Phasenverschiebung in Grad [0, 360)
-        z0: Minimaler z-Wert
+        period: grating period (e.g. in µm)
+        height: total height (z0 to z0 + height)
+        phase_deg: phase shift in degrees [0, 360)
+        z0: minimum z value
 
-        angle_deg: Rotation des gratings
+        angle_deg: rotation of the grating
         """
         theta = np.deg2rad(angle_deg)
         phase_frac = phase_deg / 360.0
@@ -117,13 +117,13 @@ class HeightFunctions:
                        angle_deg: float = 0, z0: float = 0, phase_deg: float = 0) -> Callable:
         """Binary (step) grating
 
-        period: Gitterperiode (z.B. in Âµm)
-        duty_cycle: Breite des Plateaus in gleicher Einheit wie period
-        phase_deg: Phasenverschiebung in Grad [0, 360)
+        period: grating period (e.g. in µm)
+        duty_cycle: width of the plateau in the same unit as period
+        phase_deg: phase shift in degrees [0, 360)
 
-        angle_deg: Rotation des gratings
-        z0: Offset der HÃ¶he
-        height: HÃ¶he des Gratingplateaus
+        angle_deg: rotation of the grating
+        z0: height offset
+        height: height of the grating plateau
         """
         theta = np.deg2rad(angle_deg)
         dc_frac = duty_cycle / period
@@ -403,7 +403,6 @@ def _clip_segments_to_bounds(segments: List[Tuple],
                 x_min <= x2 <= x_max and y_min <= y2 <= y_max):
             clipped.append(((x1, y1), (x2, y2)))
         else:
-            # TODO: Implement proper Cohen-Sutherland line clipping
             # For now, skip segments that extend outside bounds
             pass
 
@@ -698,7 +697,7 @@ class HeightFunctionStructure(DrawableObject):
         # stitching process
         if self.needs_stitching:
             # subdivide structure into tiles
-            tiles = self._tile_manager #note todo
+            tiles = self._tile_manager
 
             for tile in tiles:
                 x_min, x_max, y_min, y_max = tile["tile_dimension"]  # get dimensions of tile
@@ -708,7 +707,6 @@ class HeightFunctionStructure(DrawableObject):
                 #move to center - absolut coordinate system with LINEAR movement
 
                 if self.center.Z <= self.base_height:
-                    # create program for base (rectangle) - todo think about aperture in the future
                     socket = Rectangle3D(
                         center=self.center,
                         width=x_max-x_min,

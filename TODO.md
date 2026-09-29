@@ -11,138 +11,6 @@ Format rules (for humans and Claude):
 -->
 
 ## Open
-- [ ] T20: Merge `A3200` and `Aerotech3200` into one controller class (follow-up of T12)
-      Goal: One controller class owns the socket, the ASCII protocol, the motion/laser helpers and the program tasks.
-      Priority: medium | Depends on: T12, T3, T5, T7
-      Done when:
-        - A single class, built on `AerotechAsciiInterface`, provides the µm-based methods of the old
-          `A3200` (`moveabs`, `position`, `wait`, `power`, `pulse`, `laseron/off`, `zline`, …) and the
-          task features of `Aerotech3200` (`run_program_as_task`, `xyz`, `save_log`, `.api`).
-        - `System.controller` and `System.a3200_new` refer to the same object; `Aerotech3200` remains
-          importable as a compatible alias or thin subclass (also constructible without user/config).
-        - For the same flows (System start-up, z-line, `print_structure`), the command log recorded by the
-          dummy transport is identical before and after the merge (the recorded logs are committed as
-          golden files).
-        - `AerotechError` subclasses `RuntimeError`, so existing `except` clauses for both keep working.
-        - Whether `zMax` also guards `.api.LINEAR` moves is decided by the maintainer and documented.
-      Notes: Maintainer decision 2026-09-28. Refactor only after the dummy backend and tests exist.
-
-- [ ] T9: Fix packaging and pin a working environment (found during T1)
-      Goal: `pip install .` installs a complete, importable package on a fresh machine.
-      Priority: high | Depends on: –
-      Done when:
-        - `pyproject.toml` uses package discovery, so all subpackages are installed.
-        - All dependencies imported by active modules (`scipy`, `shapely`, `trimesh`, `qrcode`, `h5py`, …)
-          are declared, hardware-only packages are optional extras, and the versions are compatible with
-          NumPy 2 (e.g. `opencv-python>=4.10.0.84`).
-        - A fresh virtual environment with `pip install .[test]` can run `python -m pytest`.
-      Notes: The global interpreter on the lab PC currently fails to import the package (NumPy ABI). Details: `docs/reviews/CODE_REVIEW_2026-09-28.md` §2.
-
-- [ ] T10: Fix defects in the experiment flow (found during T1)
-      Goal: The experiment flow handles the DHM OPL scan and failed layers correctly.
-      Priority: high | Depends on: T3
-      Done when:
-        - `Experiment.opl_scan` calls an existing `Dhm` method (`motorscan`), and a dummy-backend test covers it.
-        - A failed controller task during `print_structure` is recorded in the progress log instead of
-          aborting via an uncaught `ValueError`, and a test covers it.
-        - Existing `substrate_information.json` is merged instead of silently discarding new data.
-        - An empty layer list does not raise `UnboundLocalError`.
-      Notes: Details: `docs/reviews/CODE_REVIEW_2026-09-28.md` §4.
-
-- [ ] T13: Add timeouts to hardware communication and wait loops (found during T1)
-      Goal: A missing or unresponsive device leads to a clear error instead of a hang.
-      Priority: medium | Depends on: T3
-      Done when:
-        - TCP connects (A3200, DHM) and receives use configurable timeouts; `send()` reads until the
-          terminating character.
-        - The polling loops in `aerotech_old.py` (`drivestatus`, `zline`) and `task.py`
-          (`wait_to_finish`, `finish`) have an upper time bound.
-        - Dummy-backend tests cover the timeout paths.
-      Notes: Details: `docs/reviews/CODE_REVIEW_2026-09-28.md` §1, §4.
-
-- [ ] T14: Remove the hardcoded calibration path from `IFOV_Lines` (found during T1)
-      Goal: Drawing classes do not read lab files.
-      Priority: medium | Depends on: T3
-      Done when:
-        - `IFOV_Lines` receives calibration data (or an attenuator) instead of opening
-          `C:/Software/3DPoli Fabrication/Calibration/Calibration.dat` itself.
-        - A test generates an `IFOV_Lines` program without the lab file.
-        - The `synthetic_ifov_calibration` monkeypatch in `test/test_aerobasic/test_golden_programs.py` is replaced by
-          the new way of passing calibration data (golden files unchanged or deliberately updated).
-      Notes: Details: `docs/reviews/CODE_REVIEW_2026-09-28.md` §1.
-
-- [ ] T11: Fix small defects in `System` and the `A3200` controller (found during T1)
-      Goal: Rarely used helpers of `System` and `A3200` work as documented.
-      Priority: medium | Depends on: T12, T3
-      Done when:
-        - `System.object_pos`/`camera_pos` use `self.controller`.
-        - `A3200.home` (`in None`), `A3200.container` (dict iteration) and the use of `self.z` before
-          assignment are fixed.
-        - `AerotechAsciiInterface.send_one` no longer recurses infinitely.
-        - Each fix has a dummy-backend test.
-      Notes: Details: `docs/reviews/CODE_REVIEW_2026-09-28.md` §4.
-
-- [ ] T16: Fix always-true `assert (path, Path)` in experiment scripts (found during T1)
-      Goal: Path arguments of experiment scripts are actually checked.
-      Priority: low | Depends on: –
-      Done when:
-        - The 48 occurrences in `mains/**` are replaced by a working check or conversion, and pytest no longer
-          emits `PytestAssertRewriteWarning` for them.
-
-- [ ] T17: Clean up logging (found during T1)
-      Goal: Log output is neither duplicated nor mixed with `print`.
-      Priority: low | Depends on: –
-      Done when:
-        - `runtime.getLogger` does not add duplicate handlers on repeated calls.
-        - `print()` calls in `aerobasic/ascii.py` and `devices/aerotech/task.py` use the logger.
-
-- [ ] T18: Translate German identifiers and comments (found during T1)
-      Goal: The code base follows the English-only language rule.
-      Priority: low | Depends on: –
-      Done when:
-        - German identifiers (e.g. `run_testzweck_altesSystem`) and comments in active, non-legacy modules are
-          translated, one module per commit.
-
-- [ ] T19: Identify each and every todo and note in all of the documents
-      Goal: Code should be free von notes and todo markers to enhance consistency in code structure. 
-      Priority: low | Depends on: –
-      Done when:
-        - every todo and note section is identified and summerized in a new file 'todo_notes.md' . delete notes and todos in documentation and document the meaning of it in the file. Create workpackages from this in the same style as 'TODO.md' but save them on the bottom of 'todo_notes.md'.  
-
-- [ ] T21: Stop `Parameter` from mutating the caller's argument dictionaries (found during T3)
-      Goal: Runtime arguments such as `sys_args` can be reused for several `System`/`Experiment` objects.
-      Priority: medium | Depends on: –
-      Done when:
-        - `Parameter.__init__` no longer pops keys from the section dicts it receives (e.g. `sys_args["controller"]["zMax"]`
-          is still present after `System(...)`).
-        - A test creates two `System` objects on the dummy backend from the same `sys_args` dict.
-      Notes: Today the second `System` built from a module-level `sys_args` (the pattern used in the experiment scripts)
-      fails with "Maximum z position is missing!".
-
-- [ ] T22: Fix NumPy 2.5 deprecation in `Attenuator` (found during T3)
-      Goal: The attenuator keeps working with future NumPy versions.
-      Priority: low | Depends on: –
-      Done when:
-        - `devices/attenuator.py:62` and `aerobasic/programs/drawings/lines.py:82` (`IFOV_Lines`, found during T7) use
-          `reshape` instead of assigning `array.shape`, and the tests run without the `DeprecationWarning`.
-
-- [ ] T23: Decide and implement axis validation for `SingleAxis` (found during T15)
-      Goal: It is clear whether combining axes of different stages (and `~`, `^`, empty `&`) is an error.
-      Priority: low | Depends on: –
-      Done when:
-        - The maintainer has decided whether mixed-stage combinations must raise `AxisError`. Note that
-          `Aerotech3200.home()` uses `Axis.YZ | Axis.AB` on purpose.
-        - Either the validation is implemented and the `xfail` on `test_prevent_mixed_axes` is removed, or the
-          test is rewritten to the decided behaviour.
-
-- [ ] T24: Fix `utils.visualization.plot_movements` (found during T15)
-      Goal: Generated programs can be plotted for manual inspection.
-      Priority: low | Depends on: –
-      Done when:
-        - `read_file`/`plot_movements` handle programs without movement, arcs (`CW`/`CCW`) and filled circles
-          without exceptions (today they raise `ValueError`, `LinAlgError` or `AxisError`).
-        - The "Could not plot" warnings in `test/test_aerobasic` are gone, and a test asserts that plotting works.
-
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
 
@@ -170,4 +38,34 @@ Format rules (for humans and Claude):
 - [x] T7: Golden-file tests for AeroBasic generation — 2026-09-28 — 11 representative programs (DefaultSetup and SetupIFOV, incl. corners, stair, QR code, IFOV grating) are compared against `test/golden/*.txt`; `--update-golden` regenerates them deliberately. — commits: `175af6b`
 
 - [x] T8: Write `test/README.md` and update the documentation — 2026-09-28 — `test/README.md` documents the four test categories with per-module tables, run commands, markers, dummy backend usage and artefact locations; CLAUDE.md Commands, Architecture (and the outdated Configuration) sections updated. — commits: `1705ca4`
+
+- [x] T9: Fix packaging and pin a working environment — 2026-09-29 — `pyproject.toml` discovers all subpackages, declares all runtime dependencies (OpenCV pinned for NumPy 2) and a `test` extra; a fresh venv with `pip install ".[test]"` passes the suite. — commits: `7aecd16`
+
+- [x] T10: Fix defects in the experiment flow — 2026-09-29 — `opl_scan` uses `motorscan`, a failed layer is logged (task stopped, printing continues) via the new `TaskFailedError`, substrate information is merged, empty structures work, and the experiment dictionary stores the right objective and log file; 6 new dummy tests. — commits: `b1d19a2`, `b0ed53e`
+
+- [x] T21: Stop `Parameter` from mutating the caller's argument dictionaries — 2026-09-29 — `Parameter` works on a copy of each section, so `sys_args` can be reused; also fixed `Camera` ignoring `product`/`deviceID`. — commits: `4911149`, `5af8e45`
+
+- [x] T13: Add timeouts to hardware communication and wait loops — 2026-09-29 — Configurable connect timeouts (10 s), optional response timeouts, responses read until the terminator, bounded axis/z-line waits and stall/stop bounds for tasks; terminated `~LASTERROR`; 12 dummy tests. — commits: `1ee7ef0`, `8d9d4dc`
+
+- [x] T14: Remove the hardcoded calibration path from `IFOV_Lines` — 2026-09-29 — `IFOV_Lines` takes a `PowerCalibration` (explicit, active context, or configured file); `Experiment.build_programs()` uses its attenuator calibration; golden files unchanged; 8 new tests. — commits: `eb26199`, `69547ba`
+
+- [x] T11: Fix small defects in `System` and the `A3200` controller — 2026-09-29 — Fixed `object_pos`/`camera_pos`, `A3200.home`, `A3200.container`, `self.z` before an absolute z move and the recursive `send_one`; a dummy test per fix. — commits: `6ef8d37`, `b65b604`
+
+- [x] T22: Fix NumPy 2.5 deprecation in `Attenuator` — 2026-09-29 — `reshape` instead of assigning `array.shape` in `Attenuator` and `CameraDevice` (the `IFOV_Lines` case went away in T14); the suite passes with the deprecation as error. — commits: `daa757e`
+
+- [x] T16: Fix always-true `assert (path, Path)` in experiment scripts — 2026-09-29 — The 48 always-true asserts in `mains/` are replaced by `path = Path(path)`, which accepts the str paths the callers pass; no warnings remain. — commits: `d1f1f67`
+
+- [x] T17: Clean up logging — 2026-09-29 — `getLogger()` no longer duplicates handlers (one console handler, one log file that is replaced for a new file); command failures are logged instead of printed. — commits: `2da7be2`, `cdcee08`
+
+- [x] T24: Fix `utils.visualization.plot_movements` — 2026-09-29 — Arcs, ragged segments, empty programs, degenerate axes and RAPID/variables are handled; all program plots work and plotting errors fail the tests again; 5 new tests. — commits: `da404d1`, `e2df115`
+
+- [x] T25: Fix argument passing in experiment scripts — 2026-09-29 — The restart script now rebuilds the experiment from `experiment_dictionary.json` via the new `Experiment.parameters_from_dictionary()` (the original finding about the logger was inaccurate, see WORKLOG), and the template passes substrate information; dummy restart test added. — commits: `56e4d9a`, `412c763`
+
+- [x] T23: Decide and implement axis validation for `SingleAxis` — 2026-09-29 — Maintainer decision: mixing stages allowed; `~`, `^` and an empty `&` raise `AxisError`; the xfail test is replaced by `test_axis_combinations`. — commits: `6d4009a`
+
+- [x] T20: Merge `A3200` and `Aerotech3200` into one controller class — 2026-09-29 — `A3200` builds on the new `AerotechController` and one ASCII interface; `System.controller is System.a3200_new`; golden command logs recorded before the merge are unchanged; maintainer decision: `.api` Z moves beyond zMax are refused. — commits: `f49d935`, `fdb0719`, `dcf80dc`, `5f8e203`
+
+- [x] T19: Identify each and every todo and note in all of the documents — 2026-09-29 — All 535 work markers (94 distinct) and the slicer roadmap are recorded in `todo_notes.md` with meaning, locations and 15 work packages (T26–T40), then removed from the active code; explanatory notes kept (maintainer decision). — commits: `b2d2f05`, `5f8af15`
+
+- [x] T18: Translate German identifiers and comments — 2026-09-29 — German comments/docstrings in the package and test modules translated, `run_testzweck_altesSystem` renamed to `send_with_simple_protocol`, one module per commit; `mains/` and `test/manual/` scripts left (see WORKLOG). — commits: `118a095` … `7d973e9` (15)
 

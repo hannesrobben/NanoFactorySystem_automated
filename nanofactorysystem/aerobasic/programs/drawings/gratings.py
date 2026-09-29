@@ -25,8 +25,6 @@ class StepGrating(DrawableObject):
                  ):
         super().__init__()
         self.center = center
-        # todo future - make the axis on which the grating is orientated parameterized
-        # todo: überlegen wie man es besser macht: gesamtbreite und periode oder breite von Berg & Tal sowie n_periode um gesamtbreite zu berechnen
         self.center = center
         self.full_width_grating = max_width
         self.length_grating = max_length  # max_length of grating - no
@@ -40,7 +38,7 @@ class StepGrating(DrawableObject):
         self.velocity = velocity
         self.acceleration = acceleration
 
-        self.need_stitching = False  # todo mit stitcher
+        self.need_stitching = False
 
     @property
     def center_point(self) -> Point2D:
@@ -101,7 +99,6 @@ class StepGrating(DrawableObject):
             assert self.width_phase < self.period_width, "max_width of period has to be bigger than the max_width of grating"
 
             x_offset = -self.full_width_grating / 2 + self.width_phase / 2 + step * self.period_width
-            # todo future: make sure that the structure doesnt exceed full_width! somehow to do with n_grating and number of periods + full max_width grating?
             step_rectangle = Rectangle3D(
                 center=self.center + Point3D(X=x_offset, Y=0, Z=0),
                 width=self.width_phase,
@@ -118,8 +115,8 @@ class StepGrating(DrawableObject):
         return program
 
     def stitching_program(self, program, coordinate_system):
-        fov = (150, 150)  # todo !!!!
-        usable_fov = 0.85  # todo !!!!
+        fov = (150, 150)
+        usable_fov = 0.85
         boundaries_structure = (-self.structure_width / 2, self.structure_width / 2,
                                 -self.structure_length / 2, self.structure_length / 2)
         tile_array = TileCalculator(fov_size=fov, usable_fov_fraction=usable_fov).get_tile_boundaries(
@@ -132,7 +129,7 @@ class StepGrating(DrawableObject):
             # printing base
             socket = Rectangle3D(
                 center=self.center,
-                width=fov[0] * usable_fov,  # todo change to usage with tile_boundaries
+                width=fov[0] * usable_fov,
                 length=fov[1] * usable_fov,
                 height=self.base_height,
                 hatch_size=self.hatch_size,
@@ -145,7 +142,7 @@ class StepGrating(DrawableObject):
             for z_height in np.arange(self.base_height + slicing_opt, self.height + self.base_height + slicing_opt,
                                       slicing_opt):
                 program.LINEAR(Z=z_height + self.center_point.Z)
-                # HatchingStrategy  # todo
+                # HatchingStrategy
                 points_structure = self.get_structure_points(z_height, tile_boundaries)
 
                 poly_lines = PolyLines(points_structure, F=self.velocity, E=self.acceleration)
@@ -172,8 +169,6 @@ class StepGrating(DrawableObject):
 #                  acceleration: float
 #                  ):
 #         super().__init__()
-#         # todo future - make the axis on which the grating is orientated parameterized
-#         # todo: überlegen wie man es besser macht: gesamtbreite und periode oder breite von Berg & Tal sowie n_periode um gesamtbreite zu berechnen
 #         self.center = center
 #         self.full_width_grating = max_width
 #         self.length_grating = max_length  # max_length of grating - no

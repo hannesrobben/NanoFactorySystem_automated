@@ -51,7 +51,6 @@ def main():
     }
 
     # Size of (oval) resin drop in micrometres
-    # TODO: Determine automatically
     edges = np.asarray([
         [0, 17400],  # right edge
         [450, 28050],  # left edge
@@ -99,7 +98,6 @@ def main():
         if ask_continue_box and not messagebox.askyesno(message="Run OPL motor scan?"): return
         experiment.opl_scan(m0=3847.0, force=False)
 
-        # TODO: Take image of whole scene
         # center = experiment.coordinate_system_grid_to_absolute.convert({"X": 0, "Y": 0, "Z": 0})
         # experiment.measure(coordinate=center, name="before")
 
@@ -265,7 +263,6 @@ def main():
         if ask_continue_box and not messagebox.askyesno(message="FINAL STEP: Print experiment?"): return
         experiment.print_experiment()
 
-        # TODO: Take image of whole scene
         # experiment.measure(coordinate=center, name="after")
 
 

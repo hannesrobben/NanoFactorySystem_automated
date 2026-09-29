@@ -34,3 +34,21 @@ def test_real_camera(lab_user):
     assert img.ndim == 2 and img.dtype == np.uint8
     assert abs(img.mean() - 127) < 10
     assert t > 0
+
+
+def test_product_and_device_id_select_the_camera(test_config, dummy_backend, monkeypatch):
+    import nanofactorysystem.devices.camera as camera_module
+    opened = []
+
+    def fake_camera_device(product, device_id):
+        opened.append((product, device_id))
+        return dummy_backend.camera_driver(product, device_id)
+
+    monkeypatch.setattr(camera_module, "CameraDevice", fake_camera_device)
+    camera_args = {"product": "mvBlueFOX3-2032aG", "deviceID": "0", "ExposureTime": 10000}
+
+    camera = Camera("Test", sysConfig.objective("Zeiss 20x"), camera=camera_args)
+
+    assert opened == [("mvBlueFOX3-2032aG", "0")]
+    assert camera["ExposureTime"] == 10000
+    assert camera_args == {"product": "mvBlueFOX3-2032aG", "deviceID": "0", "ExposureTime": 10000}

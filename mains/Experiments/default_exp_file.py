@@ -44,7 +44,6 @@ sys_args = {
 
 
 
-# ToDo(HR): how do i transfer a dict or other system arguments to this function?
 def binary_testprint(absolute_center: Point2D, resin_dimension: list, ask_continue_box=False, path=None,
                      objective="Zeiss 20x", user="Hannes", dhm_usage=False, substrate=None, setup="IFOV_off",
                      backend=None, plane=None):
@@ -63,16 +62,11 @@ def binary_testprint(absolute_center: Point2D, resin_dimension: list, ask_contin
         plane: Optional known substrate plane (ZFunction). If given, plane_fit() uses it instead of
                 measuring the substrate, e.g. DummyBackend().world.sample.plane() for a dry run.
     """
-    # ToDo: DropDirection noch mit übergeben und testen ob das funktioniert
 
-    # ToDo: Has to be changed in future in order to allow more prints of the same experiment on one substrate without
-    # deleting all the different data of previous prints
     if path is None:
-        # ToDo(HR) Adjust referencing to another more suitable path
         path = Path(mkdir(f".output/dhm_paper/testprint{datetime.datetime.now():%Y%m%d}", clean=False))
     else:
-        # ToDo(HR) make ist more controllable
-        assert (path, Path)
+        path = Path(path)  # accept str or Path
         path = Path(mkdir(os.path.join(path, "testprint_dhm"), clean=False))
     logger = getLogger(logfile=f"{path}/console.log")
 
@@ -155,8 +149,8 @@ def binary_testprint(absolute_center: Point2D, resin_dimension: list, ask_contin
             margin=margin,
             padding=padding,
             absolute_grid_center=absolute_grid_center,
-            grid=grid,  # ToDo: changing depending on experiment - e.g. (number of repetitions, number of structures)
-            n_mid_points=0,  # ToDo changing depending on experiment
+            grid=grid,
+            n_mid_points=0,
             drop_direction=drop_direction,
             corner_z=-2,
             corner_width=c_width,
@@ -168,6 +162,7 @@ def binary_testprint(absolute_center: Point2D, resin_dimension: list, ask_contin
             plane_fit_mode=1,
             skip_corner=False,
             setup = setup,
+            substrate_information=substrate,
             backend=backend) as experiment:
 
         # Visualize experiment
@@ -182,7 +177,6 @@ def binary_testprint(absolute_center: Point2D, resin_dimension: list, ask_contin
             if ask_continue_box and not messagebox.askyesno(message="Run OPL motor scan?"): return
             experiment.opl_scan(m0=350.0, force=False)
 
-        # TODO: Take image of whole scene
         # center = experiment.coordinate_system_grid_to_absolute.convert({"X": 0, "Y": 0, "Z": 0})
         # experiment.measure(coordinate=center, name="before")
 
@@ -223,7 +217,6 @@ def binary_testprint(absolute_center: Point2D, resin_dimension: list, ask_contin
         if ask_continue_box and not messagebox.askyesno(message="FINAL STEP: Print experiment?"): return
         experiment.print_experiment()
 
-        # TODO: Take image of whole scene
         # experiment.measure(coordinate=center, name="after")
 
 # if __name__ == '__main__':

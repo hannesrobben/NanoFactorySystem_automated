@@ -2,17 +2,17 @@ import numpy as np
 
 
 def create_direction_grid(n_x, n_y):
-    # x-Werte: +1 am Anfang, -1 am Ende, 0 dazwischen
+    # x values: +1 at the start, -1 at the end, 0 in between
     x_vals = np.zeros(n_x)
     x_vals[0] = 1
     x_vals[-1] = -1
 
-    # y-Werte: +1 oben, -1 unten, 0 dazwischen
+    # y values: +1 at the top, -1 at the bottom, 0 in between
     y_vals = np.zeros(n_y)
     y_vals[0] = 1
     y_vals[-1] = -1
 
-    # Broadcasting: x über alle Zeilen, y über alle Spalten
+    # Broadcasting: x over all rows, y over all columns
     x_grid = np.broadcast_to(x_vals, (n_y, n_x))
     y_grid = np.broadcast_to(y_vals[:, np.newaxis], (n_y, n_x))
 

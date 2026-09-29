@@ -5,14 +5,14 @@ from typing import Optional
 from tqdm import tqdm
 
 from nanofactorysystem.aerobasic import TaskStatusDataItem, WaitMode
-from nanofactorysystem.aerobasic.ascii import AerotechAsciiInterface
+from nanofactorysystem.aerobasic.ascii import AerotechAsciiInterface, TaskFailedError
 from nanofactorysystem.aerobasic.constants.tasks import TaskMode, TaskStatus0, TaskState, TaskStatus2, TaskStatus1
 
 """
-Task -> Aerobasic task -> Im Prinzip nur ein Getter für Informationen
-ExecutableProgram(ABC) -> Hat eine execute-Funktion und Callbacks für Vor- und Nach dem Task
--> SingleProgram(ExecutableProgram) -> Bekommt ein AeroBasic Programm
--> MultiStageProgram(ExecutableProgram) -> Bekommt eine LayerFactory und hat Callbacks für vor/nach jedem Layer
+Task -> Aerobasic task -> basically only a getter for information
+ExecutableProgram(ABC) -> has an execute function and callbacks before and after the task
+-> SingleProgram(ExecutableProgram) -> gets an AeroBasic program
+-> MultiStageProgram(ExecutableProgram) -> gets a LayerFactory and has callbacks before/after each layer
 
 LayerFactory -> Iterator[AerobasicProgram]
 
@@ -108,7 +108,23 @@ class Task:
     def wait_mode(self) -> WaitMode:
         return WaitMode.from_task_mode(self.task_mode)
 
-    def wait_to_finish(self, *, update_interval=0.5):
+    def wait_to_finish(self, *, update_interval=0.5, stall_timeout: float = 600.0):
+        """ Wait until the task is no longer running.
+
+        Parameters
+        ----------
+        update_interval : float
+            Seconds between status queries.
+        stall_timeout : float
+            Raise :class:`TaskFailedError` if the program line number does
+            not change for this many seconds while the task is running.
+            Long programs are fine as long as they progress.
+
+        Raises
+        ------
+        TaskFailedError
+            If the task does not end in ``program_complete`` or stalls.
+        """
         current_lines = self.api.STATUS(
             (self.task_id, TaskStatusDataItem.ProgramLineNumber),
         )
@@ -119,11 +135,23 @@ class Task:
         )
         pbar.update(int(current_lines))
 
+        last_line = None
+        stalled = 0.0
         while self.task_state == TaskState.program_running:
             time.sleep(update_interval)
             self.update()
             pbar.n = self.current_line
             pbar.refresh()
+            # Detect a stalled program; count the waiting time via the sleep intervals
+            if self.current_line == last_line:
+                stalled += update_interval
+                if stalled >= stall_timeout:
+                    pbar.close()
+                    raise TaskFailedError(f"Task {self.task_id} made no progress for {stall_timeout} s "
+                                          f"(line {self.current_line})")
+            else:
+                last_line = self.current_line
+                stalled = 0.0
 
         self.api.logger.info(f"Task {self.task_id} finished with task state {self.task_state}")
 
@@ -136,19 +164,35 @@ class Task:
                 ).split(" ")
                 error_string = self.api.ERROR_DECODE(int(error_code), int(error_location))
                 additional_info = f" {error_code}:{error_string}"
-            raise ValueError(
+            pbar.close()
+            raise TaskFailedError(
                 f"Program not finished! {self.task_state}.{additional_info}"
             )
 
         if int(self.current_line) != self.total_lines:
-            print(f"Task Mode: {self.task_mode}\nTask State: {self.task_state}\nTask Status 0: {self.task_status0}\nTask Status 1: {self.task_status1}\nTask Status 2: {self.task_status2}")
+            self.api.logger.warning(
+                f"Task {self.task_id} finished at line {self.current_line} of {self.total_lines}: "
+                f"mode {self.task_mode}, state {self.task_state}, status0 {self.task_status0}, "
+                f"status1 {self.task_status1}, status2 {self.task_status2}")
 
         pbar.close()
 
-    def finish(self):
+    def finish(self, *, timeout: float = 30.0, update_interval: float = 0.1):
+        """ Stop the task and wait until it is idle.
+
+        Raises
+        ------
+        TaskFailedError
+            If the task is not idle after ``timeout`` seconds.
+        """
         self.api.PROGRAM_STOP(self.task_id)
+        waited = 0.0
         while self.task_state != TaskState.idle:
-            time.sleep(0.1)
+            if waited >= timeout:
+                raise TaskFailedError(f"Task {self.task_id} not idle {timeout} s after PROGRAM STOP "
+                                      f"({self.task_state})")
+            time.sleep(update_interval)
+            waited += update_interval
             self.update()
         if self.file_path is not None:
             self.api.REMOVE_PROGRAM(self.file_path)

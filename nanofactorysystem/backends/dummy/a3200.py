@@ -68,6 +68,9 @@ class FakeA3200Transport:
     running_polls : int
         Number of ``TaskState`` queries after ``PROGRAM n START`` that are
         answered with ``program_running`` before the final state.
+    chunk_size : int, optional
+        Return at most this many bytes per ``recv`` call, splitting response
+        frames like a slow TCP connection.
 
     Attributes
     ----------
@@ -77,7 +80,7 @@ class FakeA3200Transport:
 
     def __init__(self, world: SimulatedWorld, *, strict: bool = False, decimal_comma: bool = False,
                  version: str = "4.9.0.0", acceleration: Optional[dict[str, float]] = None,
-                 refuse_connection: bool = False, running_polls: int = 0):
+                 refuse_connection: bool = False, running_polls: int = 0, chunk_size: Optional[int] = None):
         self.world = world
         self.strict = strict
         self.decimal_comma = decimal_comma
@@ -86,6 +89,8 @@ class FakeA3200Transport:
         self.acceleration.update(acceleration or {})
         self.refuse_connection = refuse_connection
         self.running_polls = int(running_polls)
+        self.chunk_size = chunk_size
+        self.timeouts: list[Optional[float]] = []
 
         self.connected = False
         self.address: Optional[tuple[str, int]] = None
@@ -111,9 +116,10 @@ class FakeA3200Transport:
         self.connected = True
 
     def settimeout(self, value: Optional[float]) -> None:
-        """ Store the timeout; the simulation never blocks. """
+        """ Store the timeout (all values are kept in :attr:`timeouts`); the simulation never blocks. """
 
         self.timeout = value
+        self.timeouts.append(value)
 
     def send(self, data: bytes) -> int:
         """ Receive bytes from the client and process every complete line.
@@ -159,7 +165,13 @@ class FakeA3200Transport:
         if not self._outq:
             raise RuntimeError("FakeA3200Transport.recv() called without pending response "
                                "(the real controller connection would block here)")
-        return self._outq.popleft().encode()[:bufsize]
+        frame = self._outq.popleft().encode()
+        size = min(bufsize, self.chunk_size or bufsize)
+        if len(frame) > size:
+            # Keep the rest of the frame for the next call
+            self._outq.appendleft(frame[size:].decode())
+            frame = frame[:size]
+        return frame
 
     def close(self) -> None:
         """ Simulate closing the connection. """

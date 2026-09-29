@@ -379,3 +379,406 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Follow-ups:** none new. The `testing-infrastructure` group (T1–T8, plus T12 and T15, which were done as
   prerequisites) is complete.
 
+### 2026-09-29 09:40 CEST — [T9] Fix packaging and pin a working environment
+- **Status:** done
+- **Changes:**
+  - `pyproject.toml`:
+    - `[tool.setuptools.packages.find] include = ["nanofactorysystem*"]` replaces the explicit list, which
+      installed only the top-level package.
+    - Dependencies now cover all imports of active modules (`scipy`, `qrcode`, `shapely`, `trimesh`, `h5py`
+      added) and pin `opencv-python>=4.10.0.84` for NumPy 2.
+    - The `test` extra adds `pytest`; `requires-python = ">=3.11"`; the build requirements are reduced to
+      `setuptools>=64`.
+    - The hardware-only packages that are not on PyPI are documented in a comment.
+  - `test/README.md`: environment setup via `pip install ".[test]"`, the OpenCV/NumPy note, and the Windows
+    path-length note for `shapely`.
+  - `CLAUDE.md`: install command and environment note in `## Commands`.
+  - `TODO.md`: T9 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:**
+  - A fresh venv (`python -m venv`, then `pip install ".[test]"`) installed numpy 2.5.3 and opencv-python
+    5.0.0.93.
+  - From outside the repository, `nanofactorysystem.backends.dummy`, `aerobasic.programs.drawings`,
+    `aerobasic.slicer` and `devices.aerotech` import from `site-packages`.
+  - `pytest` (the venv's executable, so the installed package is used) in the repo:
+    128 passed, 14 skipped, 1 xfailed.
+  - Build artefacts (`build/`, `*.egg-info`) and the stale ignored `.test/` directory from the T4 run were
+    removed.
+- **Commits:** `7aecd16` build: install all subpackages and declare the real dependencies [T9]
+- **Follow-ups:** The global interpreter on this PC still has `opencv-python 4.10.0.82` with NumPy 2.4.6.
+  I did not change it. Running `pip install --upgrade "opencv-python>=4.10.0.84"`, or reinstalling the
+  package with `pip install .`, fixes it; that is the maintainer's decision.
+
+### 2026-09-29 09:44 CEST — [T10] Fix defects in the experiment flow
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/experiment.py`:
+    - `opl_scan()` calls `Dhm.motorscan()` (the old `dhm.opl_scan()` does not exist).
+    - `print_structure()` stops a failed task (`_stop_failed_task`) and continues; `layer_id`/`layer_count`
+      are initialised, so an empty layer list does not raise.
+    - `update_print_progress()` records the name of a structure without layers.
+    - `_save_substrate_information()` merges into an existing file.
+    - Found during T10: the experiment dictionary stored the hard-coded objective "Zeiss 20x" and took the
+      log file from `handlers[1]`. It now stores `self.objective` and the path of the latest `FileHandler`
+      (`_log_file()`).
+  - `nanofactorysystem/aerobasic/ascii.py`: new `TaskFailedError(AerotechError, ValueError)`.
+  - `nanofactorysystem/devices/aerotech/task.py`: `wait_to_finish()` raises `TaskFailedError` and closes its
+    progress bar.
+  - `test/test_experiment.py` (new, 6 tests): the whole flow, a failed layer, an empty structure, the OPL
+    scan, the substrate merge and the experiment dictionary.
+  - `test/backends/test_dummy_controller.py`: expects `TaskFailedError`.
+  - `test/README.md`: row for `test_experiment.py`.
+  - `TODO.md`: T10 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest`: 134 passed, 14 skipped, 1 xfailed.
+- **Commits:** `b1d19a2` fix(experiment): repair OPL scan, failed layers and experiment metadata [T10];
+  `b0ed53e` test(experiment): cover the experiment flow on the dummy backend [T10]
+- **Behaviour change on hardware (intended):**
+  - After a failed layer, `PROGRAM 1 STOP` is sent before the next layer is loaded. Before, the exception
+    ended the whole print.
+  - `TaskFailedError` is still a `ValueError`, so existing handlers keep working.
+- **Follow-ups:**
+  - T25 (new): `mains/restart_experiment.py` passes the stored log *path* as `logger` to `Experiment`, which expects a
+    logger object. The script is outside T10; noted here.
+  - `default_exp_file.binary_testprint` accepts `substrate` but does not pass it to `Experiment`.
+
+### 2026-09-29 09:46 CEST — [T21] Stop `Parameter` from mutating the caller's argument dictionaries
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/parameter.py`: `__init__` pops from a copy of the section.
+  - `nanofactorysystem/devices/camera.py` (found during T21): `product`/`deviceID` were popped from the
+    wrong dictionary and never reached `CameraDevice`. They are now read from a copy of the camera section.
+  - `test/test_parameter.py` (new): two `System` objects from one `sys_args` dict. The test fails without
+    the fix ("Maximum z position is missing!").
+  - `test/devices/test_camera.py`: new test that `product`/`deviceID` reach `CameraDevice`.
+  - `CLAUDE.md`, `test/README.md`, `test/conftest.py`, `test/backends/test_dummy_system.py`: the "build a
+    fresh dict" caveat is removed.
+  - `TODO.md`: T21 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest`: 136 passed, 14 skipped, 1 xfailed.
+- **Commits:** `4911149` fix(parameter): do not modify the caller's argument dictionaries [T21];
+  `5af8e45` fix(devices): use the configured camera product and device ID [T21]
+- **Behaviour change on hardware (intended):** a `camera={"product": ..., "deviceID": ...}` argument now
+  selects that camera. No script in `mains/` passes these keys, so current lab runs are unaffected.
+- **Follow-ups:** none.
+
+### 2026-09-29 09:50 CEST — [T13] Add timeouts to hardware communication and wait loops
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/aerobasic/ascii.py`:
+    - New `recv_line()` reads until the terminating character and raises `ConnectionError` on a closed
+      connection.
+    - `AerotechAsciiInterface(connect_timeout=10.0, response_timeout=None)`; a connect timeout is handled
+      like a refused connection.
+  - `nanofactorysystem/devices/a3200.py`:
+    - New defaults `connectTimeout` (10 s), `responseTimeout` (None), `waitTimeout` (600 s) and
+      `zlineTimeout` (600 s).
+    - `run()` uses `recv_line` and sends `~LASTERROR` with its terminator.
+    - `drivestatus(wait=True)` and `zline()` raise `TimeoutError` when the bound is exceeded.
+  - `nanofactorysystem/devices/aerotech/task.py`: `wait_to_finish(stall_timeout=600)` fails only if the line
+    number stops advancing; `finish(timeout=30)`. Both count the sleep intervals (virtual clock).
+  - `nanofactorysystem/dhm/dhmclient.py`: `DhmClient(host, port, timeout=10.0)` applies the timeout to
+    connect only; the image transfer detects a closed connection.
+  - `nanofactorysystem/devices/dhm.py`: new default `connectTimeout`, passed to `DhmClient`.
+  - `nanofactorysystem/backends/dummy/a3200.py`: records `settimeout()` calls in `timeouts`; new
+    `chunk_size` option.
+  - `test/backends/test_timeouts.py` (new, 12 tests); `test/backends/test_dummy_system.py` expects the DHM
+    timeout; `test/README.md` gets a row.
+  - `TODO.md`: T13 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest`: 147 passed, 14 skipped, 1 xfailed.
+- **Commits:** `1ee7ef0` fix(devices): bound connects and waits to avoid hangs [T13];
+  `8d9d4dc` test(backends): cover timeouts and bounded waiting [T13]
+- **Design decision:** responses keep **no** default limit. A motion command may legitimately block for
+  minutes, so a default response timeout could abort a real print. The limit can be configured in the
+  `controller` section (`responseTimeout`). The polling bounds (600 s) are generous for the same reason;
+  `Task.wait_to_finish` measures stalling, not total duration.
+- **Behaviour change on hardware (intended):**
+  - Connects fail after 10 s.
+  - `~LASTERROR` now ends with `\n`. Before, a failing command could block forever while the controller
+    waited for the terminator.
+  - Waiting for axes and the z-line program stop after 600 s.
+  - A task that makes no progress for 600 s is reported as failed.
+- **Follow-ups:** none. The values should be checked on the lab PC during the first hardware test run.
+
+### 2026-09-29 09:54 CEST — [T14] Remove the hardcoded calibration path from `IFOV_Lines`
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/devices/power_calibration.py` (new):
+    - `PowerCalibration` implements the fits previously in `IFOV_Lines` (2nd order polynomial or quadratic
+      spline) and uses `reshape` instead of assigning `array.shape`.
+    - `from_file`, `from_config`, `to_json`.
+    - Context manager `power_calibration()`, plus the helpers `active_power_calibration()` and
+      `resolve_power_calibration()`.
+  - `nanofactorysystem/aerobasic/programs/drawings/lines.py`: `IFOV_Lines(calibration=None)`; the hardcoded
+    `calibrationFile` class attribute and `_load_calibration_file()` are removed.
+  - `nanofactorysystem/experiment.py`: `build_programs()` activates the calibration of
+    `self.system.controller.attenuator` (the actual work moved to `_build_programs()`).
+  - `test/test_aerobasic/test_power_calibration.py` (new, 8 tests).
+  - `test/test_aerobasic/test_golden_programs.py`: activates a synthetic calibration instead of patching the
+    class attribute.
+  - `CLAUDE.md` (architecture) and `test/README.md` (new row).
+  - `TODO.md`: T14 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest`: 155 passed, 14 skipped, 1 xfailed. The golden files are unchanged: the IFOV
+  programs are identical when the same calibration data is used. The NumPy deprecation warnings from
+  `lines.py` are gone.
+- **Commits:** `eb26199` refactor(drawings): take laser power calibration from outside [T14];
+  `69547ba` test(aerobasic): cover the power calibration of IFOV structures [T14]
+- **Behaviour on hardware:**
+  - Inside an `Experiment`, IFOV powers are converted with the calibration data the attenuator loaded,
+    that is `attenuator.calibrationFile` from `~/nanofactory.json`. On the lab PC this is the same file that
+    was hardcoded before.
+  - Outside an experiment, the configured file is used.
+- **Follow-ups:**
+  - `IFOV_Lines.to_json()` cannot serialise the `Point2D` objects in `lines`. This is pre-existing and not
+    reached by the experiment flow (IFOV_Lines is only used inside other structures).
+  - The `lines.py` half of T22 is done by this change.
+
+### 2026-09-29 09:55 CEST — [T11] Fix small defects in `System` and the `A3200` controller
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/system.py`: `object_pos`/`camera_pos` use `self.controller`.
+  - `nanofactorysystem/devices/a3200.py`: `home()` (`is None`); `container()` (`.items()`); `self.z` starts at
+    `zInit`.
+  - `nanofactorysystem/aerobasic/ascii.py`: `send_one()` calls `send()`.
+  - `test/devices/test_aerotech.py`, `test/test_system.py`, `test/backends/test_dummy_controller.py`: 6 new
+    dummy tests, one per fix (plus homing of a single axis).
+  - `TODO.md`: T11 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest`: 161 passed, 14 skipped, 1 xfailed.
+- **Commits:** `6ef8d37` fix(devices): repair small defects in System and A3200 [T11];
+  `b65b604` test: cover the System and A3200 fixes on the dummy backend [T11]
+- **Behaviour change on hardware (intended):** `moveinc()` and `zline()` now check `zMax` against the initial
+  z position if no absolute z move happened yet. Before, they raised `AttributeError` in that case.
+- **Follow-ups / note for the maintainer:** `send_one()` is used nowhere. Its fallback re-sends a command
+  that just failed, via the older `run_testzweck_altesSystem`, which could execute a motion command twice.
+  I only removed the infinite recursion. Consider deleting both methods when T20 merges the controllers;
+  the German method name is part of T18.
+
+### 2026-09-29 09:56 CEST — [T22] Fix NumPy 2.5 deprecation in `Attenuator`
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/devices/attenuator.py`: `reshape` instead of assigning `array.shape`.
+  - `nanofactorysystem/camera/camera.py` (found during T22): the same pattern in `CameraDevice.getimage()`.
+  - The `lines.py:82` occurrence was already removed in T14 (`PowerCalibration` uses `reshape`).
+  - `TODO.md`: T22 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest -W "error:Setting the shape:DeprecationWarning"`: 161 passed, 14 skipped,
+  1 xfailed. The warnings dropped from 63 to 16. The real camera path (`camera.py`) is not covered by the
+  dummy tests; the change is a mechanical `reshape` of a fresh copy.
+- **Commits:** `daa757e` fix(devices): replace deprecated array shape assignment [T22]
+- **Follow-ups:** none.
+
+### 2026-09-29 09:57 CEST — [T16] Fix always-true `assert (path, Path)` in experiment scripts
+- **Status:** done
+- **Changes:**
+  - `mains/**/*.py` (48 files, one line each): `assert (path, Path)` became `path = Path(path)  # accept str or
+    Path`. A strict `isinstance` check would reject the strings that `mains/main.py` passes; the conversion
+    keeps the following `os.path.join` working.
+  - `TODO.md`: T16 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:**
+  - Compiling every file in `mains/` reports no "assertion is always true" warning anymore.
+  - `python -m pytest`: 161 passed, 14 skipped, 1 xfailed. This includes the dry run of `default_exp_file.py`,
+    which passes a `Path`.
+- **Commits:** `d1f1f67` fix(mains): convert path arguments instead of always-true asserts [T16]
+- **Follow-ups:** `mains/debugging/test_plot.py` has a pre-existing `SyntaxError` (a parameter without default
+  after a parameter with default). It is a debugging script, not collected by pytest; it is left for T19.
+
+### 2026-09-29 09:59 CEST — [T17] Clean up logging
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/runtime.py`: `getLogger()` is idempotent. It keeps one console handler and at most one
+    log file (a new file replaces the old one, the same file is not added twice). Its handlers are marked,
+    so handlers added by others are left alone. The logger name `'dummy'` is kept for compatibility.
+  - `nanofactorysystem/aerobasic/ascii.py`: `print()` replaced by `self.logger.error(...)`. The old fallback
+    `run_testzweck_altesSystem` also sends `~LASTERROR` with its terminator and uses `recv_line` (same hang
+    as fixed in T13).
+  - `nanofactorysystem/devices/aerotech/task.py`: an incomplete program is logged as a warning instead of
+    printed.
+  - `test/test_runtime.py` (new, 4 tests); `test/README.md` gets a row.
+  - `TODO.md`: T17 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest`: 165 passed, 14 skipped, 1 xfailed.
+- **Commits:** `2da7be2` fix(runtime): stop duplicating log handlers and printing errors [T17];
+  `cdcee08` test(runtime): cover logger handlers and logged command errors [T17]
+- **Behaviour change (intended):** when a second experiment in the same process calls
+  `getLogger(logfile=...)`, the first experiment's log file no longer receives the second experiment's
+  messages.
+- **Follow-ups:** The logger is still called `'dummy'`, which can now be confused with the dummy backend.
+  Renaming it (e.g. to `'nanofactorysystem'`) would change which loggers external scripts configure, so I
+  left it for the maintainer.
+
+### 2026-09-29 10:02 CEST — [T24] Fix `utils.visualization.plot_movements`
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/utils/visualization.py`:
+    - Arcs return (n, 3) arrays.
+    - The clockwise arc uses the correct center (start + I/J) and decreasing angles.
+    - `plot_movements_fast` handles segments of different lengths, empty programs and zero-width axes, and
+      adds only non-empty collections.
+    - The reader parses `RAPID` and skips variables.
+  - `test/test_utils/test_visualization.py` (new, 5 tests): arc geometry, reader, empty program, filled
+    circle.
+  - `test/test_aerobasic/test_program.py`: plotting errors fail the test again (the warning fallback from T15
+    is removed).
+  - `test/README.md`: new row; warning note removed.
+  - `TODO.md`: T24 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:**
+  - `python -m pytest`: 170 passed, 14 skipped, 1 xfailed, and only 1 warning in the whole suite.
+  - No "Could not plot" warnings remain.
+  - The rendered filled ring (`test/_programs/TestCircles/test_filled_ring.png`) was checked by eye: a correct
+    ring.
+- **Commits:** `da404d1` fix(utils): make movement plots work for all generated programs [T24];
+  `e2df115` test(utils): assert that program movements can be plotted [T24]
+- **Follow-ups:** `read_text` still skips linear moves that start at a zero coordinate (`(x + a) != 0 and ...`),
+  which looks like a heuristic for the move from the origin. I left it unchanged.
+
+### 2026-09-29 10:05 CEST — [T25] Fix argument passing in experiment scripts
+- **Status:** done
+- **Correction of the finding (T10):** `mains/restart_experiment.py` did **not** pass a path string as logger;
+  its `load_experiment_parameter()` created a logger. The real problem was that the function is a
+  placeholder: it returns hardcoded values and ignores the stored `experiment_dictionary.json`. The fix
+  therefore addresses that.
+- **Changes:**
+  - `nanofactorysystem/experiment.py`: new `Experiment.parameters_from_dictionary(path)`. It rebuilds all
+    constructor arguments from `experiment_dictionary.json`, parsing the `str()`-encoded vectors, and creates
+    a logger for the stored log file.
+  - `mains/restart_experiment.py`: `restart(path, backend=None)` uses the stored parameters and runs only as
+    a script. The hardcoded placeholder values were removed; the maintainer's German notes are kept verbatim
+    (T18/T19).
+  - `mains/Experiments/default_exp_file.py`: `substrate` is passed to `Experiment` as
+    `substrate_information`.
+  - `test/test_experiment.py`: new restart test. An aborted print (after layer 2) is resumed through the
+    script with the dummy backend; exactly the remaining layers are printed.
+  - `test/integration/test_dry_run_default_experiment.py`: checks `substrate_information.json`.
+  - `TODO.md`: T25 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest`: 171 passed, 14 skipped, 1 xfailed.
+- **Commits:** `56e4d9a` feat(experiment): restart experiments from their stored parameters [T25];
+  `412c763` test(experiment): cover restart and substrate information [T25]
+- **Follow-ups (from the kept notes):** a restarted experiment gets a new UUID/QR text, and the maintainer
+  suspects a wrong resume position after a second abort. The test covers one abort; both notes are listed for
+  T19.
+
+### 2026-09-29 13:24 CEST — [T23] Decide and implement axis validation for `SingleAxis`
+- **Status:** done
+- **Decision (maintainer, 2026-09-29):** mixing stages stays allowed; `~`, `^` and an empty `&` raise `AxisError`.
+- **Changes:**
+  - `nanofactorysystem/aerobasic/constants/axes.py`: `SingleAxis.__invert__`, `__xor__`/`__rxor__` raise
+    `AxisError`; `__and__`/`__rand__` raise it when there is no common axis. No code in the package uses these
+    operators on axes; `|` and membership tests are unchanged.
+  - `test/test_aerobasic/test_constants.py`: the strict-xfail `test_prevent_mixed_axes` is replaced by
+    `test_axis_combinations`, which asserts the decided behaviour.
+  - `test/README.md`: description updated.
+  - `TODO.md`: T23 moved to In Progress (with the decision), then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest`: 172 passed, 14 skipped, no xfail left.
+- **Commits:** `6d4009a` feat(aerobasic): reject invalid axis combinations [T23]
+- **Follow-ups:** none.
+
+### 2026-09-29 13:34 CEST — [T20] Merge `A3200` and `Aerotech3200` into one controller class
+- **Status:** done
+- **Decision (maintainer, 2026-09-29):** the zMax limit also guards Z moves sent through `.api`.
+- **Changes:**
+  - `test/backends/test_command_logs.py`, `test/golden/commands_*.txt` (new, committed **before** the
+    refactor): golden command logs of System use and two complete experiments (DefaultSetup and SetupIFOV).
+    They are unchanged after the merge.
+  - `nanofactorysystem/aerobasic/ascii.py`:
+    - `AerotechError` derives from `RuntimeError`.
+    - New `z_limit` guard for immediate absolute Z moves; the mode is tracked from ABSOLUTE/INCREMENTAL.
+    - A refused connect leaves no socket behind (`is_opened` was wrongly True).
+  - `nanofactorysystem/devices/aerotech/__init__.py`: new base `AerotechController` (tasks, status, command
+    log). `Aerotech3200` builds on it, keeps `version`/`home()` and gets an optional `z_max`.
+  - `nanofactorysystem/devices/a3200.py`: `A3200(Parameter, AerotechController)`.
+    - It connects via `AerotechAsciiInterface` and `run()` = `api.send()`.
+    - `socket` is a read-only property; `z_limit` is set from `zMax`.
+    - The helpers are unchanged.
+  - `nanofactorysystem/system.py`: `a3200_new = controller`.
+  - `test/backends/test_controller_merge.py` (new, 9 tests); `test/backends/test_dummy_system.py` patches
+    `socket.socket` directly; `test/test_experiment.py` gets a `setup` parameter.
+  - `CLAUDE.md` (architecture) and `test/README.md` (2 rows).
+  - `TODO.md`: T20 moved to In Progress (with the decision), then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest`: 184 passed, 14 skipped. The 3 golden command logs match the pre-merge
+  recording.
+- **Commits:** `f49d935` test(backends): record golden controller command logs before the merge [T20];
+  `fdb0719` refactor(aerobasic): derive AerotechError from RuntimeError [T20];
+  `dcf80dc` refactor(devices): merge A3200 and Aerotech3200 into one controller [T20];
+  `5f8e203` test(backends): cover the merged controller and document it [T20]
+- **Behaviour changes on hardware:**
+  - Immediate absolute Z moves above `zMax` through `.api` are refused before sending (decision).
+  - `A3200.log` now contains all controller commands.
+  - A command rejected as INVALID no longer triggers a `~LASTERROR` query. Failures are `AerotechError`,
+    still a `RuntimeError`.
+  - Successful flows send exactly the same commands (golden logs).
+- **Follow-ups:**
+  - `send_one`/`run_testzweck_altesSystem` (T11 note) are still in `AerotechAsciiInterface` and unused; they
+    could be removed.
+  - The deprecated `DummyAsciiInterface` could be removed as well.
+
+### 2026-09-29 13:41 CEST — [T19] Identify each and every todo and note in all of the documents
+- **Status:** done
+- **Scope (maintainer, 2026-09-29):** remove work markers only (TODO/ToDo/FIXME/hotfix, including
+  multi-line todo blocks and docstring lines). Explanatory notes stay; legacy code (`old_to-delete/`,
+  `drawings/new/`, `*_old*.py`, `OLD_*.py`) is untouched.
+- **Changes:**
+  - `todo_notes.md` (new):
+    - 95 inventory entries: 94 distinct marker texts from 535 occurrences in 78 files, plus the slicer
+      roadmap. Each has the original text, its English meaning, all `file:line` locations and a work package.
+    - 15 work packages T26–T40 in `TODO.md` format.
+  - 78 code files in `nanofactorysystem/`, `mains/`, `test/`: markers removed with a tokenizer-based script.
+    Whole comment lines are removed with their continuation lines. After code or inside commented-out code
+    only the marker comment is cut. Docstring lines are removed, keeping any text before the marker.
+  - `nanofactorysystem/aerobasic/slicer/TODO.txt` (deleted): its roadmap is entry N095 / T40.
+  - `nanofactorysystem/aerobasic/programs/zline.py`: the class docstring, which was only a marker, now
+    describes the class.
+  - `TODO.md`: T19 moved to In Progress (with the scope decision), then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:**
+  - A rescan finds 0 markers.
+  - Every changed file still parses; the only syntax error in `mains/` is the pre-existing one in
+    `mains/debugging/test_plot.py`.
+  - `python -m pytest`: 184 passed, 14 skipped.
+- **Commits:** `b2d2f05` docs(todo): inventory all work markers in todo_notes.md [T19];
+  `5f8af15` chore: remove work markers from the code [T19]
+- **Notes:**
+  - The phrase "to do" in ordinary English ("Nothing to do for empty set") is not a marker and was kept.
+  - Commented-out asserts that belonged to "ToDo: Make sure center is within the edges" were removed with it
+    and are recorded in N022.
+  - `nanofactorysystem/aerobasic/slicer/tree_overview_slicer.txt` still lists `TODO.txt`. It describes the
+    layout of the original tpp_slicer project, so I left it unchanged.
+- **Follow-ups:** the work packages T26–T40 are in `todo_notes.md`; move them to `TODO.md` to schedule them.
+
+### 2026-09-29 13:46 CEST — [T18] Translate German identifiers and comments
+- **Status:** done
+- **Scope:** package modules in `nanofactorysystem/` and `test/`. Excluded: legacy code; the experiment scripts
+  in `mains/` (scripts, not modules); the manual scripts in `test/manual/`. Work markers had already been
+  removed in T19.
+- **Changes (one module per commit):**
+  - `nanofactorysystem/aerobasic/ascii.py`: identifier `run_testzweck_altesSystem` renamed to
+    `send_with_simple_protocol` (only used in `send_one()`).
+  - Comments and docstrings translated in:
+    - `nanofactorysystem/aerobasic/programs/drawings/`: `__init__.py`, `base.py`, `calc_polygons.py`,
+      `height_function_structures/structures.py`, `height_function_structures_fixed.py` (this also fixes
+      mis-encoded umlauts), `hollow_structure.py` (also the plot title and a stale docstring argument
+      `liste`), `ifov_gratings.py`, `lens.py`, `lines.py`, `test/test_factor_matrix.py`;
+    - `nanofactorysystem/aerobasic/programs/setups.py`;
+    - `nanofactorysystem/devices/aerotech/task.py`;
+    - `nanofactorysystem/experiment.py`;
+    - `test/slicer/model3d_checks.py`.
+  - `TODO.md`: T18 moved to In Progress (with the scope), then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:**
+  - Three detection passes over all comments, docstrings and identifiers (German function words, suffixes,
+    umlauts), reviewed by hand. The last pass finds only false positives such as the unit "um" and the
+    license header.
+  - `python -m pytest`: 184 passed, 14 skipped.
+- **Commits:** `118a095` refactor(aerobasic): rename German method run_testzweck_altesSystem [T18];
+  `1d39956`, `239ed54`, `fdfea3a`, `a705542`, `121d2f6`, `e0714bd`, `317f5a9`, `9a56aac`, `5b93e4e`, `179e504`,
+  `50e6a64`, `1c0e1ca`, `882011d`, `7d973e9` docs(...): translate German comments in <module> [T18]
+- **Follow-ups:** German comments remain in the experiment scripts (`mains/`) and in `test/manual/`. Those are
+  lab scripts; translating them can be scheduled together with T26 (parameterise the experiment scripts).
+

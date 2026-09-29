@@ -58,15 +58,15 @@ class SetupIFOV(AeroBasicProgram):
         self.send("GALVO ROTATION A -0.6")
         # self.send("GALVO ROTATION B -1.1")
         #
-        # # Muss im IFOV Programm geamcht werden
-        # power_aber_nicht_in_mW=2.4
-        # self.send(f"$A[0].A = {power_aber_nicht_in_mW}")
-        # # Speed einstellung in dem Program selbst, da es Strukturabhängig ist
+        # # Has to be done in the IFOV program
+        # power_not_in_mW=2.4
+        # self.send(f"$A[0].A = {power_not_in_mW}")
+        # # Set the speed in the program itself, because it depends on the structure
         # speed = 10
         # self.send(f"F {speed}")
         # self.send("RAPID A0 B0")
-        # # an die richtige stelle verfahren
-        # self.send("RAPID X0 Y0")  # ändern
+        # # move to the right position
+        # self.send("RAPID X0 Y0")  # change
         # self.send("IFOV ON")
 
 

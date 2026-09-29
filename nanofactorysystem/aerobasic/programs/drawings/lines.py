@@ -9,19 +9,20 @@ from nanofactorysystem.aerobasic import GalvoLaserOverrideMode, SingleAxis
 from nanofactorysystem.aerobasic.programs.drawings import DrawableAeroBasicProgram, DrawableObject
 from nanofactorysystem.aerobasic.programs.drawings.base import IFOV_AeroBasicProgram
 from nanofactorysystem.devices.coordinate_system import CoordinateSystem, Coordinate, Point3D, Point2D
+from nanofactorysystem.devices.power_calibration import PowerCalibration, resolve_power_calibration
 
 
 class IFOV_Lines(DrawableObject):
-    calibrationFile = "C:/Software/3DPoli Fabrication/Calibration/Calibration.dat"
-    # also saved in the experiment folder as "calibration_file.npy"
     fitKind = "polynomial"  # "polynomial" and "spline" possible
+
     def __init__(
             self,
             reference_point: Point2D | Point3D,
             lines: list[list[Tuple[float, float]]],  # correct? - not sure for Typing
             *,
             velocity: float,
-            power: float = None
+            power: float = None,
+            calibration: Optional[PowerCalibration] = None
     ):
         """
         Reference point: Point2D or Point3D.
@@ -30,19 +31,16 @@ class IFOV_Lines(DrawableObject):
         velocity: float in unit mm/s. If value is between 500 and 25000 it will be divided with 1000, because it will be
                 assumed that a wrong unit of µm/s was being chosen.
         power: Possible to set the power at each line/ layer individually.
+        calibration: Laser power calibration used to convert power (mW) into the attenuator value. Default: the
+                calibration activated with power_calibration(...) (Experiment.build_programs() activates the one of
+                the running system), otherwise attenuator.calibrationFile of the configuration.
 
         Note: Before each Line, the controller goes to the reference point.
         """
         super().__init__()
         self.reference_point = reference_point
         self.lines = lines
-        # todo
-        #   - velocity muss in mm/s sein
-        #   - muss übergeben werden können!
-        #   - kontrolle
-        #   - maximum speed 100*ifov size - das dann als default
-        #   - dynamic control of power - in the next class!
-        if 500 <= velocity <= 25000:  # komplett überarbeiten!
+        if 500 <= velocity <= 25000:  # to be reworked completely!
             self.velocity = velocity / 1000
         elif 50 <= velocity < 500:
             self.velocity = 5
@@ -52,11 +50,8 @@ class IFOV_Lines(DrawableObject):
         else:
             self.velocity = velocity
 
-        # todo change power to the corresponding value based on the calibration file - how to do it?
         self.power = power
-
-        self.atop = None
-        self.ptoa = None
+        self.calibration = calibration
 
     @property
     def center_point(self) -> Point3D:
@@ -64,43 +59,8 @@ class IFOV_Lines(DrawableObject):
                                                                                               Y=self.reference_point.Y,
                                                                                               Z=0)
 
-    def _load_calibration_file(self):
-        import struct
-        from scipy.interpolate import interp1d
-        # Read content of the binary calibration file
-        with open(self.calibrationFile, "rb") as fp:
-            raw = fp.read()
-        if len(raw) % 16:
-            raise RuntimeError("File size must be a multiple of 16!")
-
-        # Convert calibration data to numpy array. First column are
-        # attenuator values, second column is laser power in mW.
-        num = len(raw) // 16
-        fmt = "<" + 2 * num * "d"
-        data = struct.unpack(fmt, raw)
-        data = np.array(data)
-        data.shape = (num, 2)
-
-        # Either spline or polynomial interpolation.
-        # Warning: Polynomial interpolation (in contrast to spline
-        # interpolation) does not necessarily contain the original data
-        # points!
-        a = data[:, 0]
-        p = data[:, 1]
-        if self.fitKind == "polynomial":
-            order = 2
-            self.atop = np.poly1d(np.polyfit(a, p, order))
-            self.ptoa = np.poly1d(np.polyfit(p, a, order))
-        elif self.fitKind == "spline":
-            self.atop = interp1d(a, p, kind="quadratic")
-            self.ptoa = interp1d(p, a, kind="quadratic")
-        else:
-            raise NotImplementedError(f"Fit kind {self.fitKind} is not implemented.")
-
     def _get_power_val(self, power_mW):
-        if self.ptoa is None or self.atop is None:
-            self._load_calibration_file()
-        return self.ptoa(power_mW)
+        return resolve_power_calibration(self.calibration, self.fitKind).ptoa(power_mW)
 
     def iterate_layers(self, coordinate_system: CoordinateSystem,
                        objective="Zeiss 63x") -> Iterator[IFOV_AeroBasicProgram]:
@@ -112,10 +72,10 @@ class IFOV_Lines(DrawableObject):
             program.comment(f"Power set to {self.power} mW")
             program.SET_POWER(power=float(power_val))
         # set velocity - standard value ifov_size*100 -- has to be near maximum or low - bad results at middle values
-        # if self.velocity is None: # dann die normalen sachen hier:
+        # if self.velocity is None: # then the usual settings here:
         #     pass
         if objective == "Zeiss 63x":
-            program.SET_SPEED(F=5) # todo oben hier
+            program.SET_SPEED(F=5)
             program.SET_SPEED(F=5, ax="A")
             program.SET_SPEED(F=5, ax="B")
             program.SET_SPEED(F=1, ax="Z")
@@ -223,7 +183,6 @@ class XLines(_Lines):
     """
     As an input only a list of Tuple(x_start, x_end) necessary!
     Y and Z values are extra Parameters to be given. They do not change, because it is a Line on one Plane.
-    ToDo (HR): Create Functionalities for Vector printing.
     """
     line_axis = SingleAxis.X
 
@@ -627,7 +586,6 @@ class Rectangle3D(DrawableObject):
 
     def iterate_layers(self, coordinate_system: CoordinateSystem) -> Iterator[DrawableAeroBasicProgram]:
         program = DrawableAeroBasicProgram(coordinate_system)
-        # todo: i dont know exactly why i added Z==0 here. maybe rethink in future - 02.12 HOTFIX
         # if self.height == 0 and self.center.Z==0:
         if self.height == 0:
             yield program

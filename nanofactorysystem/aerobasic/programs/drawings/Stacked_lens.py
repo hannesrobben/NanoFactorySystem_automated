@@ -91,11 +91,11 @@ class StackedSphericalLens(DrawableObject):
             # slice_opt_lenses.append(opt_slicing)
 
             lens = SphericalLens(
-                center=self.center + Point3D(X=0, Y=0, Z=0),  # todo z value has to be assigned correctly
+                center=self.center + Point3D(X=0, Y=0, Z=0),
                 max_height=self.lenses_heights[i],
                 radius_of_curvature=self.radius_of_curvature[i],
                 slice_size=opt_slicing,
-                # circle_object_factory = FilledCircleFactory, #todo not ready yet
+                # circle_object_factory = FilledCircleFactory,
                 hatch_size=self.hatch_size,
                 velocity=self.velocity
             )
@@ -103,7 +103,7 @@ class StackedSphericalLens(DrawableObject):
             yield from lens.iterate_layers(coordinate_system)
 
             # add connection to next lens
-            current_height = self.structure_height + self.lenses_heights[i]  # todo prior space in between + lens height
+            current_height = self.structure_height + self.lenses_heights[i]
             rect = Rectangle3D(
                 center=self.center + Point3D(X=0, Y=0, Z=current_height),
                 width=self.structure_width,
@@ -233,8 +233,8 @@ class StackedAsphericalLens(DrawableObject):
             # add connection to next lens
             shift_x_1 = self.base_x/2 + 5
             overlap = 2
-            rect_positive = Rectangle3D(  # todo - check what is x and y in rectangle 3d
-                center=self.center + Point3D(X=shift_x_1, Y=0, Z=current_height-overlap),  # overlap for making sure that it is connected - ??? - todo better way
+            rect_positive = Rectangle3D(
+                center=self.center + Point3D(X=shift_x_1, Y=0, Z=current_height-overlap),
                 width=10,  # assumed x
                 length=self.base_y,  # assumed y
                 height=self.height_in_between+overlap*2,  # *2 overlap for overlap at the top as well
@@ -246,8 +246,8 @@ class StackedAsphericalLens(DrawableObject):
 
             yield from rect_positive.iterate_layers(coordinate_system)
 
-            rect_negative = Rectangle3D(  # todo - check what is x and y in rectangle 3d
-                center=self.center + Point3D(X=-shift_x_1, Y=0, Z=current_height-overlap),  # overlap for making sure that it is connected - ??? - todo better way
+            rect_negative = Rectangle3D(
+                center=self.center + Point3D(X=-shift_x_1, Y=0, Z=current_height-overlap),
                 width=10,  # assumed x
                 length=self.base_y,  # assumed y
                 height=self.height_in_between+overlap*2,  #
@@ -301,7 +301,7 @@ class StackedRectangle(DrawableObject):
     @property
     def structure_height(self) -> float:
         total_height = self.socket_height
-        total_height += (self.height + self.height_in_between) * self.n_rect  #todo change calculation of the iterate layer function is changed (-1 height in between)
+        total_height += (self.height + self.height_in_between) * self.n_rect
         return total_height
 
     @property
@@ -355,8 +355,8 @@ class StackedRectangle(DrawableObject):
             width_bridges = 15
             shift_x_1 = self.width/2 + 5
             overlap = 1
-            rect_positive = Rectangle3D(  # todo - check what is x and y in rectangle 3d
-                center=self.center + Point3D(X=shift_x_1, Y=0, Z=current_height-overlap),  # overlap for making sure that it is connected - ??? - todo better way
+            rect_positive = Rectangle3D(
+                center=self.center + Point3D(X=shift_x_1, Y=0, Z=current_height-overlap),
                 width=width_bridges,  # assumed x
                 length=self.length,  # assumed y
                 height=self.height_in_between+overlap*2,  # *2 overlap for overlap at the top as well
@@ -368,8 +368,8 @@ class StackedRectangle(DrawableObject):
 
             yield from rect_positive.iterate_layers(coordinate_system)
 
-            rect_negative = Rectangle3D(  # todo - check what is x and y in rectangle 3d
-                center=self.center + Point3D(X=-shift_x_1, Y=0, Z=current_height-overlap),  # overlap for making sure that it is connected - ??? - todo better way
+            rect_negative = Rectangle3D(
+                center=self.center + Point3D(X=-shift_x_1, Y=0, Z=current_height-overlap),
                 width=width_bridges,  # assumed x
                 length=self.length,  # assumed y
                 height=self.height_in_between+overlap*2,  #
@@ -435,8 +435,8 @@ class test_stack(DrawableAeroBasicProgram):
             # add connection to next lens
             shift_x_1 = self.base_x/2 + 5
             overlap = 2
-            rect_positive = Rectangle3D(  # todo - check what is x and y in rectangle 3d
-                center=self.center + Point3D(X=shift_x_1, Y=0, Z=current_height-overlap),  # overlap for making sure that it is connected - ??? - todo better way
+            rect_positive = Rectangle3D(
+                center=self.center + Point3D(X=shift_x_1, Y=0, Z=current_height-overlap),
                 width=10,  # assumed x
                 length=self.base_y,  # assumed y
                 height=self.height_in_between+overlap*2,  # *2 overlap for overlap at the top as well
@@ -448,8 +448,8 @@ class test_stack(DrawableAeroBasicProgram):
 
             yield from rect_positive.iterate_layers(coordinate_system)
 
-            rect_negative = Rectangle3D(  # todo - check what is x and y in rectangle 3d
-                center=self.center + Point3D(X=-shift_x_1, Y=0, Z=current_height-overlap),  # overlap for making sure that it is connected - ??? - todo better way
+            rect_negative = Rectangle3D(
+                center=self.center + Point3D(X=-shift_x_1, Y=0, Z=current_height-overlap),
                 width=10,  # assumed x
                 length=self.base_y,  # assumed y
                 height=self.height_in_between+overlap*2,  #

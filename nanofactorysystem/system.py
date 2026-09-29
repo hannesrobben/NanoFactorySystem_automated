@@ -50,8 +50,6 @@ class System(Parameter):
             Runtime configuration sections (``system``, ``sample``,
             ``camera``, ``dhm``, ``attenuator``, ``controller``).
         """
-        from nanofactorysystem.devices.aerotech import Aerotech3200
-
         # Not open now
         self.opened = False
 
@@ -107,9 +105,9 @@ class System(Parameter):
         self.controller = A3200(user, self.log, transport=self.backend.controller_transport(),
                                 program_dir=program_dir, **args)
         self.controller.init_zline()
-        self.a3200_new = Aerotech3200(program_dir=program_dir)
-        # self.a3200.connect()
-        self.a3200_new.api.socket = self.controller.socket
+        # One controller object for the um-based helpers and the program tasks
+        # (formerly a separate Aerotech3200 sharing the socket)
+        self.a3200_new = self.controller
 
         # Center the galvo scanner
         self.controller.moveabs(100, a=0, b=0)
@@ -175,7 +173,7 @@ class System(Parameter):
         centre. """
 
         if vs is None:
-            vs = self.system.controller.position("XYZ")
+            vs = self.controller.position("XYZ")
         return self.transform.object_pos(v_px, vs)
 
     def camera_pos(self, v_um, vs=None):
@@ -187,7 +185,7 @@ class System(Parameter):
         centre. """
 
         if vs is None:
-            vs = self.system.controller.position("XY")
+            vs = self.controller.position("XY")
         return self.transform.camera_pos(v_um, vs)
 
     def stage_pos(self, v_um, v_px):

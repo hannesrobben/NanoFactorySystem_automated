@@ -17,11 +17,11 @@ class SphericalLens(DrawableObject):
             center: Point2D | Point3D,
             max_height,  # maximum thickness of lens
             radius_of_curvature: float,  # Radius of Curvature
-            slice_size: float,  # ToDo(@all): einheiten müssen noch definiert werden
+            slice_size: float,
             *,
             circle_object_factory: FilledCircleFactory,
             hatch_size: float,
-            velocity: float  # ToDo(@all): Einheiten bestimmen
+            velocity: float
     ):
         super().__init__()
         self.circle_object_factory = circle_object_factory
@@ -36,7 +36,7 @@ class SphericalLens(DrawableObject):
         self.N = int(np.ceil(max_height / slice_size))
 
         # optimised hatching and slicing parameter
-        # self.hatch_size_opt = # TODO(Hannes) Implementierung von hatch size optimised mit abhängigkeit von max_height und RoC
+        # self.hatch_size_opt =
         self.slicing_height = self.max_height / self.N
 
     @property
@@ -56,7 +56,6 @@ class SphericalLens(DrawableObject):
                 r_i = np.sqrt(self.radius_of_curvature ** 2 - (z_i + self.offset) ** 2)
             else:
                 r_i = 0  # If height exceeds R, radius is zero
-                # TODO(dwoiwode): Müssen Kreise mit einem Radius = 0 gezeichnet werden? Oder kann dann abgebrochen werden?
 
             point = self.center + Point3D(X=0, Y=0, Z=z_i)
             layer = self.circle_object_factory(point, r_i, hatch_size=self.hatch_size)
@@ -94,7 +93,7 @@ class AsphericalLens(DrawableObject):
         self.velocity = velocity
         self.acceleration = acceleration
 
-        self.n_layer = round(self.height / self.slice_size + 0.95)  # woher kommt die 0.95?
+        self.n_layer = round(self.height / self.slice_size + 0.95)  # where does the 0.95 come from?
         self.slice_size_opt = self.height / (self.n_layer - 0.95)
 
     @property
@@ -227,7 +226,6 @@ class AsphericalLens(DrawableObject):
         ax.set_box_aspect((1, 1, 0.3))
 
         plt.tight_layout()
-        # todo save this
         plt.show()
 
 
@@ -235,13 +233,13 @@ class Cylinder(DrawableObject):
     def __init__(
             self,
             center: Point2D | Point3D,
-            radius: float,  # ToDO einheiten
+            radius: float,
             total_height: float,
-            slice_size: float,  # ToDo(@all): einheiten müssen noch definiert werden
+            slice_size: float,
             *,
             circle_object_factory: FilledCircleFactory,
             hatch_size: float,
-            velocity: float  # ToDo(@all): Einheiten bestimmen
+            velocity: float
     ):
         super().__init__()
         self.circle_object_factory = circle_object_factory

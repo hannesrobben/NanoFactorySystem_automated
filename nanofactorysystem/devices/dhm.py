@@ -33,6 +33,7 @@ class Dhm(Parameter):
         "oplOptImage": True,
         "oplInitPos": None,
         "oplOptPos": None,
+        "connectTimeout": 10.0,  # s
     })
 
     def __init__(self, user, objective, logger=None, *, driver=None, **kwargs):
@@ -69,7 +70,7 @@ class Dhm(Parameter):
         host = self["host"]
         port = self["port"]
         if driver is None:
-            self.device = DhmClient(host, port)
+            self.device = DhmClient(host, port, timeout=self["connectTimeout"])
         else:
             self.device = driver
         self.opened = True
@@ -163,7 +164,6 @@ class Dhm(Parameter):
         """ Return a HoloContainer with current hologram image. """
 
         # Hologram image
-        #todo: t2-t1 seems very high - dive into code to see if there are loops which causes this or if it actually the capture time
         t1 = datetime.datetime.now()
         holo, count = self.getimage(opt=opt)
         t2 = datetime.datetime.now()

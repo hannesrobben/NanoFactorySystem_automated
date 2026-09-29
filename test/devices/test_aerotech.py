@@ -94,3 +94,37 @@ def test_real_controller_position(lab_user):
         assert all(isinstance(v, float) for v in (x, y, z))
         assert z <= controller["zMax"]
         assert controller["softwareVersion"]
+
+
+def test_home_default_and_selected_axes(controller, dummy_backend):
+    dummy_backend.calllog.clear()
+
+    controller.home()
+    controller.home("z")
+
+    assert dummy_backend.calllog.commands() == ["HOME X", "HOME Y", "HOME Z", "HOME Z"]
+
+
+def test_container_with_registered_task(controller):
+    controller.init_zline()
+
+    dc = controller.container()
+
+    assert "LINEAR Z $dz F $slow" in dc["data/zline.pgm"]
+
+
+def test_moveinc_and_zline_before_absolute_z_move(controller, dummy_backend):
+    controller.moveinc(1000.0, z=10.0)
+    assert dummy_backend.world.stage["Z"] == pytest.approx(20.010)
+
+    with pytest.raises(RuntimeError, match="Maximum z position exceeded"):
+        controller.moveinc(1000.0, z=5000.0)
+
+
+def test_zline_before_absolute_z_move(test_config, dummy_backend):
+    a3200 = A3200("Test", transport=dummy_backend.transport, program_dir=dummy_backend.workdir,
+                  controller=dict(CONTROLLER_ARGS), attenuator=dummy_backend.attenuator_args())
+
+    a3200.zline(1.0, 100.0, 10.0, 10.0)
+
+    assert len(dummy_backend.world.exposures) == 1

@@ -323,7 +323,7 @@ class CameraDevice(object):
                 # print(f"Array length: {len(img)}, Expected: {height * width}")
 
 
-                img.shape = (height, width)
+                img = img.reshape((height, width))
 
             # Unlock the request object
             req.unlock()

@@ -12,8 +12,8 @@ and review the diff of test/golden/ before committing.
 import pytest
 
 from nanofactorysystem.aerobasic.programs import AeroBasicProgram
-from nanofactorysystem.aerobasic.programs.drawings.lines import IFOV_Lines
 from nanofactorysystem.backends.dummy import SimulatedWorld, write_calibration_file
+from nanofactorysystem.devices.power_calibration import PowerCalibration, power_calibration
 from nanofactorysystem.aerobasic.programs.drawings import (
     BinaryGrating_IFOV, Corner, Rectangle2D_IFOV, Rectangle3D, Stair)
 from nanofactorysystem.aerobasic.programs.drawings.circle import FilledCircle2D
@@ -41,11 +41,12 @@ def render(setup, structure=None, drop_direction=DropDirection.UP) -> str:
 
 
 @pytest.fixture(autouse=True)
-def synthetic_ifov_calibration(tmp_path, monkeypatch):
-    """ IFOV structures read the lab calibration file (hardcoded, see T14); use a synthetic one. """
+def synthetic_ifov_calibration(tmp_path):
+    """ IFOV structures convert laser power with the active calibration; use a synthetic one. """
 
     path = write_calibration_file(tmp_path / "calibration.dat", SimulatedWorld())
-    monkeypatch.setattr(IFOV_Lines, "calibrationFile", str(path))
+    with power_calibration(PowerCalibration.from_file(path)):
+        yield
 
 
 CASES = {

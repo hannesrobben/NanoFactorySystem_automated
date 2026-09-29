@@ -270,7 +270,6 @@ class HeightFunctionStructure(DrawableObject):
             #     tile_movement_program = self.create_move_tile_program(tile_x, tile_y, F=self.velocity)
             #     layer_program.add_programm(tile_movement_program)
             #     prev_tile_index = tile_result.tile_index
-            #     # todo include programm task number to know when new tiles are being printed
 
             layer_program.LINEAR(Z=slice_result.z_absolute)
 
@@ -306,7 +305,7 @@ class HeightFunctionStructure(DrawableObject):
                     yield (tile_result, tile_result.slices[layer_idx], layer_idx)
 
     def get_tile_center_for_layer(self, layer_id: int) -> Tuple[float, float]:
-        """Gibt tile_center für gegebene layer_id zurück."""
+        """Return the tile_center for the given layer_id."""
         if self._layer_to_tile_mapping is None:
             raise RuntimeError("iterate_layers() muss erst aufgerufen werden")
 
@@ -316,7 +315,7 @@ class HeightFunctionStructure(DrawableObject):
         return self._layer_to_tile_mapping[layer_id]['tile_center']
 
     def get_tile_info_for_layer(self, layer_id: int) -> Dict:
-        """Gibt vollständige Tile-Info für layer_id zurück."""
+        """Return the complete tile info for the given layer_id."""
         if self._layer_to_tile_mapping is None:
             raise RuntimeError("iterate_layers() muss erst aufgerufen werden")
 

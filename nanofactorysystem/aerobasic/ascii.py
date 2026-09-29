@@ -1,3 +1,4 @@
+import re
 import socket
 import time
 from typing import Callable, Optional
@@ -7,8 +8,54 @@ from nanofactorysystem.aerobasic.constants import ReturnCode, Version, DataItemE
 from nanofactorysystem.utils.typing import StatusQueryType
 
 
-class AerotechError(Exception):
-    pass
+class AerotechError(RuntimeError):
+    """ Error reported by the A3200 controller.
+
+    It is a ``RuntimeError``, the exception the older ``A3200`` controller
+    class raised, so existing handlers for both keep working.
+    """
+
+
+class TaskFailedError(AerotechError, ValueError):
+    """ A controller task (program) ended in a state other than ``program_complete``.
+
+    It is an :class:`AerotechError`, so callers handling controller errors
+    catch it, and a ``ValueError`` for code that caught the previous
+    exception type of ``Task.wait_to_finish``.
+    """
+
+
+def recv_line(sock, terminator: str = chr(10), bufsize: int = 4096) -> str:
+    """ Read from a socket until the terminating character arrives.
+
+    Parameters
+    ----------
+    sock : socket-like
+        Connected socket (or simulated transport).
+    terminator : str
+        Terminating character of a response.
+    bufsize : int
+        Maximum number of bytes per ``recv`` call.
+
+    Returns
+    -------
+    str
+        The decoded response including the terminating character.
+
+    Raises
+    ------
+    ConnectionError
+        If the connection is closed before the response is complete.
+    """
+
+    data = b""
+    end = terminator.encode()
+    while not data.endswith(end):
+        chunk = sock.recv(bufsize)
+        if not chunk:
+            raise ConnectionError(f"Connection closed while waiting for a response (received {data!r})")
+        data += chunk
+    return data.decode()
 
 
 class AsciiCommandResponse:
@@ -72,7 +119,8 @@ class AerotechAsciiInterface(AeroBasicAPI):
     COMMAND_TERMINATING_CHARACTER = 10  # \n
 
     def __init__(self, hostname: str = "127.0.0.1", port: int = 8000, *,
-                 transport_factory: Optional[Callable[[], "socket.socket"]] = None):
+                 transport_factory: Optional[Callable[[], "socket.socket"]] = None,
+                 connect_timeout: Optional[float] = 10.0, response_timeout: Optional[float] = None):
         """ ASCII command interface of the Aerotech A3200 controller.
 
         Parameters
@@ -85,11 +133,25 @@ class AerotechAsciiInterface(AeroBasicAPI):
             Returns a socket-like object that is used by :meth:`connect`
             instead of a new TCP socket, e.g. the simulated controller of the
             dummy backend.
+        connect_timeout : float or None
+            Timeout in seconds for establishing the connection.
+        response_timeout : float or None
+            Timeout in seconds for each response. Default None (no limit),
+            because motion commands may legitimately take long.
         """
         super().__init__()
         self.hostname = hostname
         self.port = port
         self.transport_factory = transport_factory
+        self.connect_timeout = connect_timeout
+        self.response_timeout = response_timeout
+
+        # Safety limit for immediate absolute z moves in mm (None: no limit).
+        # The programming mode is tracked from the ABSOLUTE/INCREMENTAL
+        # commands sent through this interface; the controller starts in
+        # ABSOLUTE mode.
+        self.z_limit: Optional[float] = None
+        self._absolute = True
         self.history: list[AsciiCommandResponse] = []
 
         # TCP socket to the A3200 system
@@ -129,8 +191,12 @@ class AerotechAsciiInterface(AeroBasicAPI):
                     self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 else:
                     self.socket = self.transport_factory()
+                self.socket.settimeout(self.connect_timeout)
                 self.socket.connect((self.hostname, self.port))
-            except ConnectionRefusedError:
+                self.socket.settimeout(self.response_timeout)
+            except (ConnectionRefusedError, TimeoutError):
+                self.socket.close()
+                self.socket = None
                 self.logger.error(f"Connection to A3200 controller failed! ({self.hostname}:{self.port})")
                 raise
         return self
@@ -140,7 +206,7 @@ class AerotechAsciiInterface(AeroBasicAPI):
             self.socket.close()
             self.socket = None
 
-    def run_testzweck_altesSystem(self, cmd: str):
+    def send_with_simple_protocol(self, cmd: str):
         """ Run the given AeroBasic command on the A3200 controller. """
 
         cmdTerminatingChar= 10
@@ -158,13 +224,12 @@ class AerotechAsciiInterface(AeroBasicAPI):
         self.socket.send(cmd.encode())
 
         # Read and return response
-        line = self.socket.recv(4096).decode().strip()
+        line = recv_line(self.socket, chr(cmdTerminatingChar)).strip()
         code, response = line[0], line[1:]
         if code != chr(cmdSuccessChar):
-            print(f"Command failed! {code}, {response} -> {line}")
-            self.socket.send("~LASTERROR".encode())
-            line = self.socket.recv(4096).decode().strip()
-            print(f"Command failed! {code}, {response} -> {line}")
+            self.socket.send(("~LASTERROR" + chr(cmdTerminatingChar)).encode())
+            line = recv_line(self.socket, chr(cmdTerminatingChar)).strip()
+            self.logger.error(f"Command failed! {code}, {response} -> {line}")
 
         data = "".join(response)
 
@@ -174,10 +239,11 @@ class AerotechAsciiInterface(AeroBasicAPI):
         return data
 
     def send_one(self, command: str) -> str:
+        """ Send a command; on an AerotechError retry it with the old, simpler protocol handling. """
         try:
-            return self.send_one(command)
+            return self.send(command)
         except AerotechError:
-            return self.run_testzweck_altesSystem(command)
+            return self.send_with_simple_protocol(command)
 
     def send(self, command: str) -> str:
 
@@ -185,6 +251,7 @@ class AerotechAsciiInterface(AeroBasicAPI):
 
         if not self.is_opened:
             raise RuntimeError("Not connected!")
+        self._check_z_limit(command)
 
         # Append terminal character
         if not command.endswith(chr(self.COMMAND_TERMINATING_CHARACTER)):
@@ -197,7 +264,7 @@ class AerotechAsciiInterface(AeroBasicAPI):
         self.socket.send(command.encode())
 
         # Read and return response
-        code, *data = self.socket.recv(4096).decode().strip()
+        code, *data = recv_line(self.socket, chr(self.COMMAND_TERMINATING_CHARACTER)).strip()
         cmd_resp.timestamp_received = time.time()
         data = "".join(data)
         cmd_resp.return_code = ReturnCode(ord(code))
@@ -210,7 +277,7 @@ class AerotechAsciiInterface(AeroBasicAPI):
 
         # Error handling -> Invalid Syntax
         if cmd_resp.return_code == ReturnCode.INVALID:
-            print(f"Command failed! {code}, {data}")
+            self.logger.error(str(cmd_resp))
             raise AerotechError(f"Command '{command.strip()}' has an invalid syntax!")
 
         # Error handling -> Code execution failed
@@ -222,11 +289,36 @@ class AerotechAsciiInterface(AeroBasicAPI):
 
             cmd_resp.error = error
             self.logger.error(str(cmd_resp))
-
-            print(f"Command failed! {code}, {data}")
             raise AerotechError(f"Execution failed for {command}. Reason: {error}")
 
         raise RuntimeError(f"Could not identify return code {code}")
+
+    def _check_z_limit(self, command: str) -> None:
+        """ Refuse an immediate absolute z move beyond :attr:`z_limit`.
+
+        Raises
+        ------
+        AerotechError
+            If the command moves z above the limit.
+        """
+
+        text = command.strip().upper()
+        if text == "ABSOLUTE":
+            self._absolute = True
+            return
+        if text == "INCREMENTAL":
+            self._absolute = False
+            return
+        if self.z_limit is None or not self._absolute:
+            return
+        match = re.match(r"(LINEAR|RAPID|G0|G1)\b(.*)", text)
+        if match:
+            z = re.search(r"(?<![A-Z$_])Z\s*(-?\d+\.?\d*(?:E[-+]?\d+)?)", match.group(2))
+        else:
+            z = re.match(r"MOVEABS\s+Z\s+(-?\d+\.?\d*(?:E[-+]?\d+)?)", text)
+        if z is not None and float(z.group(1)) > self.z_limit:
+            raise AerotechError(f"Refused '{command.strip()}': z {float(z.group(1))} mm exceeds the "
+                                f"maximum z position {self.z_limit} mm (zMax)")
 
     # SYSTEM COMMANDS
     def LAST_ERROR(self) -> str:

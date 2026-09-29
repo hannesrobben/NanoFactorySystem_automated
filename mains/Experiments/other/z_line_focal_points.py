@@ -55,7 +55,7 @@ def focal_point_matrix_maker(absolute_center: Point2D, resin_dimension: list, as
     if path is None:
         path = Path(mkdir(f".output/focal_point/{datetime.datetime.now():%Y%m%d}", clean=False))
     else:
-        assert (path, Path)
+        path = Path(path)  # accept str or Path
         path = Path(mkdir(os.path.join(path, "focal_point")))
     logger = getLogger(logfile=f"{path}/console.log")
 
@@ -113,8 +113,8 @@ def focal_point_matrix_maker(absolute_center: Point2D, resin_dimension: list, as
             margin=10,
             padding=10,
             absolute_grid_center=absolute_grid_center,
-            grid=(2, 3),  # ToDo: changing depending on experiment
-            n_mid_points=0,  # ToDo changing depending on experiment
+            grid=(2, 3),
+            n_mid_points=0,
             plane_fit_mode=1,  # only plane-fitting on the four edges
             drop_direction=DropDirection.DOWN,
             corner_z=-2,
@@ -135,7 +135,6 @@ def focal_point_matrix_maker(absolute_center: Point2D, resin_dimension: list, as
         if ask_continue_box and not messagebox.askyesno(message="Run OPL motor scan?"): return
         experiment.opl_scan(m0=3847.0, force=False)
 
-        # TODO: Take image of whole scene
         # center = experiment.coordinate_system_grid_to_absolute.convert({"X": 0, "Y": 0, "Z": 0})
         # experiment.measure(coordinate=center, name="before")
 
@@ -177,7 +176,6 @@ def focal_point_matrix_maker(absolute_center: Point2D, resin_dimension: list, as
         if ask_continue_box and not messagebox.askyesno(message="FINAL STEP: Print experiment?"): return
         experiment.print_experiment()
 
-        # TODO: Take image of whole scene
         # experiment.measure(coordinate=center, name="after")
 
 """
@@ -196,7 +194,6 @@ def focal_point_matrix_maker(absolute_center: Point2D, resin_dimension: list, as
     # laser off
     # take image (after)
 
-# ToDo Put this in front of the area where the zline matrix is executed
 
 from scidatacontainer import Container
 from nanofactorysystem.devices.coordinate_system import PlaneFit
@@ -236,7 +233,6 @@ def initiate_container(config, parameter, **kwargs):
 
 
 def make_dict(img_pre, img_post, exposure_dict, focal_point_number):
-    # ToDo add further information's to the dictionary
     """ Return results as SciDataContainer. """
 
     # Container dictionary
@@ -257,8 +253,6 @@ def z_line_exposure(system, x, y, z, z_camera_offset, fast, delay, speed, durati
     # move to correct z-position
     system.moveabs(fast, delay, z=z)
 
-    # ToDo : Check if dz will be split in half or if it will be printed continuously
-    # ToDo: probably recalculate z with dz/2
     # Expose axial line
     if dz != 0.0:
         v = min(speed, dz / duration)
@@ -298,11 +292,6 @@ def z_line_matrix(experiment,
                   boundary: Tuple[Tuple[float, float], Tuple[float, float]],
                   speed: float, power: float,
                   plane_fit_function, save_path, number_of_field=0):
-    # ToDo:
-    #   - define min_distance
-    #   - define different dz -- maybe also with an additional noise parameter so that it is always somewhat different
-    #   - define boundary -- important
-    #   - implement all the other variable etc above this methods in the script
 
     # Hint: could be that this will fail! - see focus.container self.config in parameter.py
     author = experiment.user.get("name", None),
@@ -343,14 +332,13 @@ def z_line_matrix(experiment,
     }
 
     z_line_zdc_path = f"{save_path}/z_line_matrix_{number_of_field}.zdc"
-    # todo check if z_line_zdc_path already exists
     dc = initiate_container(config, parameter_infos)  # Container for all results
     dc.write(z_line_zdc_path)
 
     for x, y in points_coords:
         current_index += 1
         z = plane_fit_function(x, y)
-        dz_exposure = dz  # ToDo : add noise here , so the dz's are all a little bit different
+        dz_exposure = dz
         img0, img1, exposure_dict = z_line_exposure(system, x, y, z, z_camera_offset, fast, delay, speed, duration,
                                                     power, dz_exposure)
         tmp = make_dict(img0, img1, exposure_dict, focal_point_number=current_index)

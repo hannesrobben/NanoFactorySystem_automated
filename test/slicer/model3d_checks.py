@@ -204,9 +204,9 @@ t3 = progs3[0].to_text(add_timestamp=False)
 check("two IFOV blocks per layer (contour + infill)",
       t3.count("IFOV ON") == 2 and t3.count("ENCODER OUT Y OFF") == 2,
       f"{t3.count('IFOV ON')} IFOV ON blocks")
-# Kontur-Block kommt VOR dem Infill-Block (docs/01 §6)
+# The contour block comes BEFORE the infill block (docs/01 §6)
 first_on = t3.index("IFOV ON")
-block1 = t3[first_on:t3.index("IFOV OFF", first_on)]  # bis Blockende, ohne Header von Block 2
+block1 = t3[first_on:t3.index("IFOV OFF", first_on)]  # until the end of the block, without the header of block 2
 second_on = t3.index("IFOV ON", first_on + 1)
 import re as _re
 b1_rapids = _re.findall(r"RAPID A(-?\d+\.?\d*) B(-?\d+\.?\d*)", block1)
@@ -214,11 +214,11 @@ b1_linears = _re.findall(r"LINEAR A(-?\d+\.?\d*) B(-?\d+\.?\d*)", block1)
 check("block 1 is the contour block (1 RAPID, ring of LINEARs)",
       len(b1_rapids) == 1 and len(b1_linears) >= 4,
       f"{len(b1_rapids)} RAPID / {len(b1_linears)} LINEAR")
-# geschlossener Ring: letzter LINEAR == erster RAPID (Rückkehr zum Start)
+# closed ring: last LINEAR == first RAPID (return to the start)
 check("ring closes back to its start vertex",
       b1_linears[-1] == b1_rapids[0],
       f"start={b1_rapids[0]} end={b1_linears[-1]}")
-# Ring liegt außen: |A| des Konturstarts >= max |A| des Infills
+# ring lies outside: |A| of the contour start >= max |A| of the infill
 block2 = t3[second_on:]
 b2_all = _re.findall(r"(?:RAPID|LINEAR) A(-?\d+\.?\d*) B", block2)
 check("contour ring lies outside the (inset) infill",

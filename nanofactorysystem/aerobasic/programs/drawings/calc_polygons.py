@@ -1,8 +1,8 @@
 """
-Vollständig funktionierendes Beispiel für:
-- Analytische Funktion → Binärmaske → Hatch-Segmente
+Complete working example for:
+- analytic function → binary mask → hatch segments
 
-Für 2PP-Anwendungen mit DOEs (Diffractive Optical Elements)
+For 2PP applications with DOEs (diffractive optical elements)
 """
 
 import numpy as np
@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 
 def intersect_line_with_segment(p0, d, a, b):
-    """Schnittpunkt Linie p0 + t*d mit Segment a→b"""
+    """Intersection of the line p0 + t*d with the segment a→b"""
     v = b - a
     det = d[0] * (-v[1]) - d[1] * (-v[0])
 
@@ -28,7 +28,7 @@ def intersect_line_with_segment(p0, d, a, b):
 
 
 def hatch_segments_for_polygon(polygon, hatch_angle_deg, hatch_dist, z):
-    """Erzeugt Hatch-Linien für ein GESCHLOSSENES Polygon"""
+    """Create hatch lines for a CLOSED polygon"""
     poly = np.array(polygon)
     if len(poly) < 3:
         return []
@@ -37,7 +37,7 @@ def hatch_segments_for_polygon(polygon, hatch_angle_deg, hatch_dist, z):
     d = np.array([np.cos(theta), np.sin(theta)])
     n = np.array([-d[1], d[0]])
 
-    # KORREKTUR: Alle Punkte projizieren
+    # CORRECTION: project all points
     projections = poly @ n
     proj_min = projections.min()
     proj_max = projections.max()
@@ -82,8 +82,8 @@ def hatch_segments_for_polygon(polygon, hatch_angle_deg, hatch_dist, z):
 
 def binary_mask_to_closed_polygons(mask, xs, ys, min_area=10):
     """
-    Konvertiert eine Binärmaske in GESCHLOSSENE Polygone.
-    Verwendet Connected Components für echte geschlossene Regionen.
+    Convert a binary mask into CLOSED polygons.
+    Uses connected components for truly closed regions.
     """
     from skimage.measure import label, regionprops, find_contours
 
@@ -95,7 +95,7 @@ def binary_mask_to_closed_polygons(mask, xs, ys, min_area=10):
         if region.area < min_area:
             continue
 
-        # Maske nur für diese Region
+        # Mask of this region only
         region_mask = (labels == region.label).astype(float)
 
         # Kontur finden
@@ -110,7 +110,7 @@ def binary_mask_to_closed_polygons(mask, xs, ys, min_area=10):
 
             poly = np.array(poly)
 
-            # Schließen wenn nötig
+            # Close if necessary
             if len(poly) > 2 and not np.allclose(poly[0], poly[-1]):
                 poly = np.vstack([poly, poly[0]])
 
@@ -123,25 +123,25 @@ def binary_mask_to_closed_polygons(mask, xs, ys, min_area=10):
 def create_grating_with_boundary(x_range, y_range, res, grating_angle_deg,
                                  period, duty_cycle, boundary_func=None):
     """
-    Erstellt ein Gitter mit optionaler Begrenzung.
+    Create a grating with an optional boundary.
 
-    boundary_func: Funktion f(x,y) die True/False zurückgibt (innerhalb/außerhalb)
+    boundary_func: function f(x,y) returning True/False (inside/outside)
     """
     xs = np.linspace(x_range[0], x_range[1], res)
     ys = np.linspace(y_range[0], y_range[1], res)
     X, Y = np.meshgrid(xs, ys)
 
-    # Gitter-Richtung
+    # Grating direction
     theta = np.deg2rad(grating_angle_deg)
 
-    # Projektion auf Gitter-Normal
+    # Projection onto the grating normal
     S = X * np.cos(theta) + Y * np.sin(theta)
 
     # Rechteckwelle
     frac = np.mod(S, period) / period
     grating = (frac < duty_cycle).astype(float)
 
-    # Begrenzung anwenden
+    # Apply the boundary
     if boundary_func is not None:
         boundary = boundary_func(X, Y)
         grating = grating * boundary
@@ -150,12 +150,12 @@ def create_grating_with_boundary(x_range, y_range, res, grating_angle_deg,
 
 
 def circular_boundary(x, y, radius, cx=0, cy=0):
-    """Kreisförmige Begrenzung"""
+    """Circular boundary"""
     return (x - cx) ** 2 + (y - cy) ** 2 <= radius ** 2
 
 
 def rectangular_boundary(x, y, width, height, cx=0, cy=0):
-    """Rechteckige Begrenzung"""
+    """Rectangular boundary"""
     return (np.abs(x - cx) <= width / 2) & (np.abs(y - cy) <= height / 2)
 
 
@@ -163,7 +163,7 @@ def workflow_example(grating_angle=0,  # degree
                      period=1.5,  # µm
                      duty_cycle=0.5,
                      radius=4.0,
-                     hatch_angle=grating_angle,  # Hatching entlang der Streifen
+                     hatch_angle=grating_angle,  # Hatching along the stripes
                      hatch_dist=0.2):
     pass
 
@@ -180,10 +180,10 @@ if __name__ == '__main__':
     period = 1.5
     duty_cycle = 0.5
     radius = 4.0
-    hatch_angle = grating_angle  # Hatching entlang der Streifen
+    hatch_angle = grating_angle  # Hatching along the stripes
     hatch_dist = 0.2
 
-    # Gitter mit Kreis-Begrenzung erstellen
+    # Create a grating with circular boundary
     xs, ys, mask = create_grating_with_boundary(
         x_range=(-5, 5),
         y_range=(-5, 5),
@@ -194,11 +194,11 @@ if __name__ == '__main__':
         boundary_func=lambda x, y: circular_boundary(x, y, radius)
     )
 
-    # Polygone extrahieren
+    # Extract the polygons
     polygons = binary_mask_to_closed_polygons(mask, xs, ys, min_area=50)
     print(f"Gefundene geschlossene Polygone: {len(polygons)}")
 
-    # Prüfe ob Polygone geschlossen sind
+    # Check whether the polygons are closed
     for i, poly in enumerate(polygons):
         is_closed = np.allclose(poly[0], poly[-1])
         area = 0.5 * np.abs(np.sum(poly[:-1, 0] * poly[1:, 1] - poly[1:, 0] * poly[:-1, 1]))
@@ -215,7 +215,7 @@ if __name__ == '__main__':
     # ========== VISUALISIERUNG ==========
     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
 
-    # 1) Binärmaske
+    # 1) Binary mask
     ax = axes[0]
     ax.imshow(mask, extent=[xs[0], xs[-1], ys[0], ys[-1]],
               origin='lower', cmap='viridis')
@@ -241,11 +241,11 @@ if __name__ == '__main__':
     ax = axes[2]
     ax.set_aspect('equal')
 
-    # Polygone als Umriss
+    # Polygons as outline
     for poly in polygons:
         ax.plot(poly[:, 0], poly[:, 1], 'gray', linewidth=0.5, alpha=0.5)
 
-    # Hatch-Linien
+    # Hatch lines
     for seg in all_segments:
         p1, p2 = seg
         ax.plot([p1[0], p2[0]], [p1[1], p2[1]], 'b-', linewidth=0.3)
@@ -259,16 +259,16 @@ if __name__ == '__main__':
     plt.savefig('complete_example.png', dpi=150)
     print("\nGespeichert: complete_example.png")
 
-    # ========== ZWEITES BEISPIEL: Ohne Begrenzung (Streifenstruktur) ==========
+    # ========== SECOND EXAMPLE: without boundary (stripe structure) ==========
     print("\n" + "=" * 60)
     print("Beispiel 2: Streifenstruktur ohne Begrenzung")
     print("=" * 60)
 
-    # Hier: Das ursprüngliche Problem
-    # Lösung: Die Streifen müssen auf einen Bereich "geclippt" werden
+    # Here: the original problem
+    # Solution: the stripes have to be clipped to an area
 
     xs2, ys2, mask2 = create_grating_with_boundary(
-        x_range=(-4, 4),  # Kleinerer Bereich als das Gitter
+        x_range=(-4, 4),  # Smaller area than the grating
         y_range=(-4, 4),
         res=400,
         grating_angle_deg=0,
@@ -287,7 +287,7 @@ if __name__ == '__main__':
 
     print(f"Hatch-Segmente: {len(segments2)}")
 
-    # Visualisierung
+    # Visualisation
     fig2, ax2 = plt.subplots(figsize=(8, 8))
     ax2.set_aspect('equal')
 
