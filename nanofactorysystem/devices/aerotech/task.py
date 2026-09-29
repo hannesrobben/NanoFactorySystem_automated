@@ -108,7 +108,23 @@ class Task:
     def wait_mode(self) -> WaitMode:
         return WaitMode.from_task_mode(self.task_mode)
 
-    def wait_to_finish(self, *, update_interval=0.5):
+    def wait_to_finish(self, *, update_interval=0.5, stall_timeout: float = 600.0):
+        """ Wait until the task is no longer running.
+
+        Parameters
+        ----------
+        update_interval : float
+            Seconds between status queries.
+        stall_timeout : float
+            Raise :class:`TaskFailedError` if the program line number does
+            not change for this many seconds while the task is running.
+            Long programs are fine as long as they progress.
+
+        Raises
+        ------
+        TaskFailedError
+            If the task does not end in ``program_complete`` or stalls.
+        """
         current_lines = self.api.STATUS(
             (self.task_id, TaskStatusDataItem.ProgramLineNumber),
         )
@@ -119,11 +135,23 @@ class Task:
         )
         pbar.update(int(current_lines))
 
+        last_line = None
+        stalled = 0.0
         while self.task_state == TaskState.program_running:
             time.sleep(update_interval)
             self.update()
             pbar.n = self.current_line
             pbar.refresh()
+            # Detect a stalled program; count the waiting time via the sleep intervals
+            if self.current_line == last_line:
+                stalled += update_interval
+                if stalled >= stall_timeout:
+                    pbar.close()
+                    raise TaskFailedError(f"Task {self.task_id} made no progress for {stall_timeout} s "
+                                          f"(line {self.current_line})")
+            else:
+                last_line = self.current_line
+                stalled = 0.0
 
         self.api.logger.info(f"Task {self.task_id} finished with task state {self.task_state}")
 
@@ -146,10 +174,22 @@ class Task:
 
         pbar.close()
 
-    def finish(self):
+    def finish(self, *, timeout: float = 30.0, update_interval: float = 0.1):
+        """ Stop the task and wait until it is idle.
+
+        Raises
+        ------
+        TaskFailedError
+            If the task is not idle after ``timeout`` seconds.
+        """
         self.api.PROGRAM_STOP(self.task_id)
+        waited = 0.0
         while self.task_state != TaskState.idle:
-            time.sleep(0.1)
+            if waited >= timeout:
+                raise TaskFailedError(f"Task {self.task_id} not idle {timeout} s after PROGRAM STOP "
+                                      f"({self.task_state})")
+            time.sleep(update_interval)
+            waited += update_interval
             self.update()
         if self.file_path is not None:
             self.api.REMOVE_PROGRAM(self.file_path)

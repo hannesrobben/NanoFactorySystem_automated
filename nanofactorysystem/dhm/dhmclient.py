@@ -88,10 +88,24 @@ class DhmClient(object):
         "StartCameraGrabTime": [C_StartCameraGrabTime, "h", "i"],
     }
 
-    def __init__(self, host, port):
+    def __init__(self, host, port, timeout=10.0):
+        """ Connect to the DHM server.
+
+        Parameters
+        ----------
+        host : str
+            Host of the DHM server (HoloServ).
+        port : int
+            TCP port of the DHM server.
+        timeout : float or None
+            Timeout in seconds for establishing the connection. Responses
+            have no time limit, as before.
+        """
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.settimeout(timeout)
         self.sock.connect((host, port))
+        self.sock.settimeout(None)
 
         if self.ServerVersion < 3:
             raise RuntimeError("HoloServ is outdated!")
@@ -183,7 +197,10 @@ class DhmClient(object):
                 size = stride * height
                 data = b""
                 while len(data) < size:
-                    data += self.sock.recv(size - len(data))
+                    chunk = self.sock.recv(size - len(data))
+                    if not chunk:
+                        raise ConnectionError("DHM server closed the connection during an image transfer")
+                    data += chunk
                 data = struct.unpack(f"{size:d}s", data)[0]
                 if stride // width == 2:
                     value = np.frombuffer(data, np.uint16).reshape((height, width))

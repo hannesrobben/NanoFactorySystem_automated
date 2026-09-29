@@ -33,6 +33,7 @@ class Dhm(Parameter):
         "oplOptImage": True,
         "oplInitPos": None,
         "oplOptPos": None,
+        "connectTimeout": 10.0,  # s
     })
 
     def __init__(self, user, objective, logger=None, *, driver=None, **kwargs):
@@ -69,7 +70,7 @@ class Dhm(Parameter):
         host = self["host"]
         port = self["port"]
         if driver is None:
-            self.device = DhmClient(host, port)
+            self.device = DhmClient(host, port, timeout=self["connectTimeout"])
         else:
             self.device = driver
         self.opened = True

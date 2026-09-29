@@ -24,6 +24,7 @@ from typing import Any, Optional
 from scidatacontainer import Container
 
 from .attenuator import Attenuator
+from ..aerobasic.ascii import recv_line
 from ..config import sysConfig, popargs, ConfigDefaults
 from ..parameter import Parameter
 
@@ -103,6 +104,10 @@ class A3200(Parameter):
         "zMax": None,
         "tasks": {},
         "softwareVersion": None,
+        "connectTimeout": 10.0,  # s
+        "responseTimeout": None,  # s, None: no limit (motion commands may take long)
+        "waitTimeout": 600.0,  # s, upper bound for waiting until axes are in position
+        "zlineTimeout": 600.0,  # s, upper bound for a z-line program
     })
 
     def __init__(self, user, logger=None, *, transport=None, program_dir=None, **kwargs):
@@ -147,8 +152,10 @@ class A3200(Parameter):
 
         # Connect to the A3200 system
         try:
+            self.socket.settimeout(self["connectTimeout"])
             self.socket.connect((self["host"], self["port"]))
-        except ConnectionRefusedError:
+            self.socket.settimeout(self["responseTimeout"])
+        except (ConnectionRefusedError, TimeoutError):
             self.log.error("Connection to A3200 controller failed!")
             return
         self.opened = True
@@ -223,11 +230,12 @@ class A3200(Parameter):
         self.socket.send(cmd.encode())
 
         # Read and return response
-        line = self.socket.recv(4096).decode().strip()
+        terminator = chr(self["cmdTerminatingChar"])
+        line = recv_line(self.socket, terminator).strip()
         code, response = line[0], line[1:]
         if code != chr(self["cmdSuccessChar"]):
-            self.socket.send("~LASTERROR".encode())
-            line = self.socket.recv(4096).decode().strip()
+            self.socket.send(("~LASTERROR" + terminator).encode())
+            line = recv_line(self.socket, terminator).strip()
             raise RuntimeError(f"Command failed! {code}, {response} -> {line}")
         return response
 
@@ -351,8 +359,10 @@ class A3200(Parameter):
         if not wait:
             return all((int(self.run(c)) & bitmask) != 0 for c in cmd)
 
+        t_end = time.monotonic() + self["waitTimeout"]
         while not all((int(self.run(c)) & bitmask) != 0 for c in cmd):
-            pass
+            if time.monotonic() > t_end:
+                raise TimeoutError(f"Axes {axes} not in position after {self['waitTimeout']} s!")
         return True
 
     def wait(self, axes, pause: Optional[float] = None):
@@ -497,7 +507,11 @@ class A3200(Parameter):
         # Run zline program
         self.start(task)
         state = TaskState.program_running
+        t_end = time.monotonic() + self["zlineTimeout"]
         while state == TaskState.program_running:
+            if time.monotonic() > t_end:
+                self.close()
+                raise TimeoutError(f"z-line program still running after {self['zlineTimeout']} s!")
             state = self.state(task)
 
         # Program failure

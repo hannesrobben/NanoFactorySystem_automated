@@ -20,6 +20,39 @@ class TaskFailedError(AerotechError, ValueError):
     """
 
 
+def recv_line(sock, terminator: str = chr(10), bufsize: int = 4096) -> str:
+    """ Read from a socket until the terminating character arrives.
+
+    Parameters
+    ----------
+    sock : socket-like
+        Connected socket (or simulated transport).
+    terminator : str
+        Terminating character of a response.
+    bufsize : int
+        Maximum number of bytes per ``recv`` call.
+
+    Returns
+    -------
+    str
+        The decoded response including the terminating character.
+
+    Raises
+    ------
+    ConnectionError
+        If the connection is closed before the response is complete.
+    """
+
+    data = b""
+    end = terminator.encode()
+    while not data.endswith(end):
+        chunk = sock.recv(bufsize)
+        if not chunk:
+            raise ConnectionError(f"Connection closed while waiting for a response (received {data!r})")
+        data += chunk
+    return data.decode()
+
+
 class AsciiCommandResponse:
     def __init__(self, command: str):
         self.command = command
@@ -81,7 +114,8 @@ class AerotechAsciiInterface(AeroBasicAPI):
     COMMAND_TERMINATING_CHARACTER = 10  # \n
 
     def __init__(self, hostname: str = "127.0.0.1", port: int = 8000, *,
-                 transport_factory: Optional[Callable[[], "socket.socket"]] = None):
+                 transport_factory: Optional[Callable[[], "socket.socket"]] = None,
+                 connect_timeout: Optional[float] = 10.0, response_timeout: Optional[float] = None):
         """ ASCII command interface of the Aerotech A3200 controller.
 
         Parameters
@@ -94,11 +128,18 @@ class AerotechAsciiInterface(AeroBasicAPI):
             Returns a socket-like object that is used by :meth:`connect`
             instead of a new TCP socket, e.g. the simulated controller of the
             dummy backend.
+        connect_timeout : float or None
+            Timeout in seconds for establishing the connection.
+        response_timeout : float or None
+            Timeout in seconds for each response. Default None (no limit),
+            because motion commands may legitimately take long.
         """
         super().__init__()
         self.hostname = hostname
         self.port = port
         self.transport_factory = transport_factory
+        self.connect_timeout = connect_timeout
+        self.response_timeout = response_timeout
         self.history: list[AsciiCommandResponse] = []
 
         # TCP socket to the A3200 system
@@ -138,8 +179,10 @@ class AerotechAsciiInterface(AeroBasicAPI):
                     self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 else:
                     self.socket = self.transport_factory()
+                self.socket.settimeout(self.connect_timeout)
                 self.socket.connect((self.hostname, self.port))
-            except ConnectionRefusedError:
+                self.socket.settimeout(self.response_timeout)
+            except (ConnectionRefusedError, TimeoutError):
                 self.logger.error(f"Connection to A3200 controller failed! ({self.hostname}:{self.port})")
                 raise
         return self
@@ -206,7 +249,7 @@ class AerotechAsciiInterface(AeroBasicAPI):
         self.socket.send(command.encode())
 
         # Read and return response
-        code, *data = self.socket.recv(4096).decode().strip()
+        code, *data = recv_line(self.socket, chr(self.COMMAND_TERMINATING_CHARACTER)).strip()
         cmd_resp.timestamp_received = time.time()
         data = "".join(data)
         cmd_resp.return_code = ReturnCode(ord(code))
