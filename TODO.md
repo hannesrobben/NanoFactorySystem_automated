@@ -11,22 +11,6 @@ Format rules (for humans and Claude):
 -->
 
 ## Open
-- [ ] T20: Merge `A3200` and `Aerotech3200` into one controller class (follow-up of T12)
-      Goal: One controller class owns the socket, the ASCII protocol, the motion/laser helpers and the program tasks.
-      Priority: medium | Depends on: T12, T3, T5, T7
-      Done when:
-        - A single class, built on `AerotechAsciiInterface`, provides the µm-based methods of the old
-          `A3200` (`moveabs`, `position`, `wait`, `power`, `pulse`, `laseron/off`, `zline`, …) and the
-          task features of `Aerotech3200` (`run_program_as_task`, `xyz`, `save_log`, `.api`).
-        - `System.controller` and `System.a3200_new` refer to the same object; `Aerotech3200` remains
-          importable as a compatible alias or thin subclass (also constructible without user/config).
-        - For the same flows (System start-up, z-line, `print_structure`), the command log recorded by the
-          dummy transport is identical before and after the merge (the recorded logs are committed as
-          golden files).
-        - `AerotechError` subclasses `RuntimeError`, so existing `except` clauses for both keep working.
-        - Whether `zMax` also guards `.api.LINEAR` moves is decided by the maintainer and documented.
-      Notes: Maintainer decision 2026-09-28. Refactor only after the dummy backend and tests exist.
-
 - [ ] T18: Translate German identifiers and comments (found during T1)
       Goal: The code base follows the English-only language rule.
       Priority: low | Depends on: –
@@ -91,4 +75,6 @@ Format rules (for humans and Claude):
 - [x] T25: Fix argument passing in experiment scripts — 2026-09-29 — The restart script now rebuilds the experiment from `experiment_dictionary.json` via the new `Experiment.parameters_from_dictionary()` (the original finding about the logger was inaccurate, see WORKLOG), and the template passes substrate information; dummy restart test added. — commits: `56e4d9a`, `412c763`
 
 - [x] T23: Decide and implement axis validation for `SingleAxis` — 2026-09-29 — Maintainer decision: mixing stages allowed; `~`, `^` and an empty `&` raise `AxisError`; the xfail test is replaced by `test_axis_combinations`. — commits: `6d4009a`
+
+- [x] T20: Merge `A3200` and `Aerotech3200` into one controller class — 2026-09-29 — `A3200` builds on the new `AerotechController` and one ASCII interface; `System.controller is System.a3200_new`; golden command logs recorded before the merge are unchanged; maintainer decision: `.api` Z moves beyond zMax are refused. — commits: `f49d935`, `fdb0719`, `dcf80dc`, `5f8e203`
 

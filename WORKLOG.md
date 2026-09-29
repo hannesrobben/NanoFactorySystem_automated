@@ -679,3 +679,43 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Commits:** `6d4009a` feat(aerobasic): reject invalid axis combinations [T23]
 - **Follow-ups:** none.
 
+### 2026-09-29 13:34 CEST — [T20] Merge `A3200` and `Aerotech3200` into one controller class
+- **Status:** done
+- **Decision (maintainer, 2026-09-29):** the zMax limit also guards Z moves sent through `.api`.
+- **Changes:**
+  - `test/backends/test_command_logs.py`, `test/golden/commands_*.txt` (new, committed **before** the
+    refactor): golden command logs of System use and two complete experiments (DefaultSetup and SetupIFOV).
+    They are unchanged after the merge.
+  - `nanofactorysystem/aerobasic/ascii.py`:
+    - `AerotechError` derives from `RuntimeError`.
+    - New `z_limit` guard for immediate absolute Z moves; the mode is tracked from ABSOLUTE/INCREMENTAL.
+    - A refused connect leaves no socket behind (`is_opened` was wrongly True).
+  - `nanofactorysystem/devices/aerotech/__init__.py`: new base `AerotechController` (tasks, status, command
+    log). `Aerotech3200` builds on it, keeps `version`/`home()` and gets an optional `z_max`.
+  - `nanofactorysystem/devices/a3200.py`: `A3200(Parameter, AerotechController)`.
+    - It connects via `AerotechAsciiInterface` and `run()` = `api.send()`.
+    - `socket` is a read-only property; `z_limit` is set from `zMax`.
+    - The helpers are unchanged.
+  - `nanofactorysystem/system.py`: `a3200_new = controller`.
+  - `test/backends/test_controller_merge.py` (new, 9 tests); `test/backends/test_dummy_system.py` patches
+    `socket.socket` directly; `test/test_experiment.py` gets a `setup` parameter.
+  - `CLAUDE.md` (architecture) and `test/README.md` (2 rows).
+  - `TODO.md`: T20 moved to In Progress (with the decision), then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest`: 184 passed, 14 skipped. The 3 golden command logs match the pre-merge
+  recording.
+- **Commits:** `f49d935` test(backends): record golden controller command logs before the merge [T20];
+  `fdb0719` refactor(aerobasic): derive AerotechError from RuntimeError [T20];
+  `dcf80dc` refactor(devices): merge A3200 and Aerotech3200 into one controller [T20];
+  `5f8e203` test(backends): cover the merged controller and document it [T20]
+- **Behaviour changes on hardware:**
+  - Immediate absolute Z moves above `zMax` through `.api` are refused before sending (decision).
+  - `A3200.log` now contains all controller commands.
+  - A command rejected as INVALID no longer triggers a `~LASTERROR` query. Failures are `AerotechError`,
+    still a `RuntimeError`.
+  - Successful flows send exactly the same commands (golden logs).
+- **Follow-ups:**
+  - `send_one`/`run_testzweck_altesSystem` (T11 note) are still in `AerotechAsciiInterface` and unused; they
+    could be removed.
+  - The deprecated `DummyAsciiInterface` could be removed as well.
+
