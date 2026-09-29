@@ -82,12 +82,12 @@ class HeightFunctions:
         """
         Sinusoidal grating
 
-        period: Gitterperiode (z.B. in Âµm)
-        height: GesamthÃ¶he (z0 bis z0 + height)
-        phase_deg: Phasenverschiebung in Grad [0, 360)
-        z0: Minimaler z-Wert
+        period: grating period (e.g. in µm)
+        height: total height (z0 to z0 + height)
+        phase_deg: phase shift in degrees [0, 360)
+        z0: minimum z value
 
-        angle_deg: Rotation des gratings
+        angle_deg: rotation of the grating
         """
         theta = np.deg2rad(angle_deg)
         phase_frac = phase_deg / 360.0
@@ -117,13 +117,13 @@ class HeightFunctions:
                        angle_deg: float = 0, z0: float = 0, phase_deg: float = 0) -> Callable:
         """Binary (step) grating
 
-        period: Gitterperiode (z.B. in Âµm)
-        duty_cycle: Breite des Plateaus in gleicher Einheit wie period
-        phase_deg: Phasenverschiebung in Grad [0, 360)
+        period: grating period (e.g. in µm)
+        duty_cycle: width of the plateau in the same unit as period
+        phase_deg: phase shift in degrees [0, 360)
 
-        angle_deg: Rotation des gratings
-        z0: Offset der HÃ¶he
-        height: HÃ¶he des Gratingplateaus
+        angle_deg: rotation of the grating
+        z0: height offset
+        height: height of the grating plateau
         """
         theta = np.deg2rad(angle_deg)
         dc_frac = duty_cycle / period
