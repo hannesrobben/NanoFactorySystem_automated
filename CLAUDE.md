@@ -12,7 +12,7 @@ Comments, docs and TODOs are often in German. `TODO.md` is the task list with th
 ## Commands
 
 ```bash
-python -m pip install .        # build/install package (pyproject.toml, setuptools; subpackages not yet included, see T9)
+python -m pip install ".[test]"   # install package with all subpackages and test dependencies (pyproject.toml)
 python clean.py                # remove build/, dist/, *.egg-info, __pycache__
 python -m pytest               # all tests without hardware (unit + dummy backend); hardware tests are skipped
 python -m pytest test/devices/test_aerotech.py::test_zmax_safety   # a single test
@@ -23,7 +23,7 @@ python -m pytest test/test_aerobasic/test_golden_programs.py --update-golden   #
 
 - `test/README.md` describes every test module, the categories (unit, dummy integration, hardware, manual), the fixtures and how to use the dummy backend. Keep it up to date when adding, moving or removing tests.
 - pytest configuration is in `pyproject.toml` (`testpaths = ["test"]`; `test/manual/`, `_programs` and legacy directories are excluded). Markers: `hardware` (skipped without `--run-hardware`), `slow`. Shared fixtures are in `test/conftest.py`: `test_config`, `dummy_backend`, `dummy_controller`, `dummy_system`, `no_sleep`, `tmp_program_dir`, `golden`, `lab_user`.
-- `python -m pytest` must pass without hardware, without `~/nanofactory.json` and without `mvIMPACT`/`OffAxisHolo`. The environment needs NumPy-2-compatible builds (`opencv-python>=4.10.0.84`); the global interpreter on the lab PC currently fails with `numpy.core.multiarray failed to import` (T9).
+- `python -m pytest` must pass without hardware, without `~/nanofactory.json` and without `mvIMPACT`/`OffAxisHolo`. The environment needs NumPy-2-compatible builds (`opencv-python>=4.10.0.84`, pinned in `pyproject.toml`); an older OpenCV fails with `numpy.core.multiarray failed to import`.
 - Generated program references for golden tests are `test/golden/*.txt`; other test output goes to `tmp_path`, or `test/_programs/` (gitignored) for manual inspection.
 - Experiment entry scripts in `mains/` import siblings as `from Experiments.… import …`, so run them with `mains/` as the working directory (e.g. `cd mains && python main.py`).
 - Optional hardware and local dependencies (`mvIMPACT`, `OffAxisHolo`, `PlotFont`) are not installable from PyPI; `mvIMPACT` is imported on first use of the real camera. The slicer also uses `trimesh`, `shapely` and `h5py`.

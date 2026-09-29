@@ -32,11 +32,17 @@ The configuration is in `[tool.pytest.ini_options]` in `pyproject.toml`: `testpa
   lab configuration (`lab_user` fixture, the first `user:` entry in `~/nanofactory.json`).
 - `slow`: the test takes more than a few seconds. It still runs by default; deselect it with `-m "not slow"`.
 
-**Environment.** The package needs a NumPy-2-compatible set of `opencv-python` (≥ 4.10.0.84) and
-`SciDataContainer`. With older builds, `import nanofactorysystem` fails with
-`numpy.core.multiarray failed to import` (see T9). A clean virtual environment with `numpy`, `scipy`,
-`matplotlib`, `scikit-image`, `opencv-python`, `SciDataContainer`, `shapely`, `trimesh`, `qrcode`, `h5py`,
-`tqdm` and `pytest` is enough to run the suite from the repository root.
+**Environment.** Set up a virtual environment and install the package with the test extra:
+
+```bash
+python -m venv .venv            # outside a synced folder, if possible
+.venv/Scripts/python -m pip install ".[test]"      # Windows; use .venv/bin/python elsewhere
+```
+
+`pyproject.toml` requires `opencv-python>=4.10.0.84`, the first release built for NumPy 2. With an older
+OpenCV next to NumPy 2, `import nanofactorysystem` fails with `numpy.core.multiarray failed to import`.
+On Windows, keep the path of the virtual environment short: `shapely` fails to load its DLL when the path
+is longer than 260 characters.
 
 ## Unit tests
 

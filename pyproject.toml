@@ -1,20 +1,15 @@
 # pyproject.toml
 [build-system]
-requires = [
-    "setuptools",
-	"NumPy",
-	"SciPy",
-	"SciDataContainer",
-#    "OffAxisHolo", #  Currently only exists locally (https://github.com/reincas/OffAxisHolo.git)
-#    "PlotFont", # Currently only exists locally (https://github.com/reincas/PlotFont)
-#    "mvImpact", # Installation guide: https://assets.balluff.com/documents/DRF_957356_AA_000/Building_page.html
-]
+requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-packages = [
-    "nanofactorysystem",
-]
+# Hardware-only packages that are not on PyPI (install them manually on the lab PC):
+#   mvIMPACT    camera driver, https://assets.balluff.com/documents/DRF_957356_AA_000/Building_page.html
+#   OffAxisHolo hologram reconstruction for test/manual scripts, https://github.com/reincas/OffAxisHolo.git
+#   PlotFont    https://github.com/reincas/PlotFont
+
+[tool.setuptools.packages.find]
+include = ["nanofactorysystem*"]
 
 [project]
 name = "NanoFactorySystem"
@@ -24,20 +19,30 @@ authors = [
 ]
 description = "Python 3 package to use the Laser Nanofactory system from Femtika as 3D printer."
 readme = "README.md"
+requires-python = ">=3.11"
 dependencies = [
-    'NumPy>=1.15',
-    'SciDataContainer>=1.1',
-	"Scikit-Image",
-	"tqdm",
-	"matplotlib",  # Extra?
-	"opencv-python",  # Extra?
+    "numpy>=1.23",
+    "scipy",
+    "scikit-image",
+    "opencv-python>=4.10.0.84",  # first release built for NumPy 2
+    "SciDataContainer>=1.1",
+    "matplotlib",
+    "tqdm",
+    "qrcode",
+    "shapely>=2.0",
+    "trimesh",
+    "h5py",
 ]
+
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent"
 ]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
 
 [tool.pytest.ini_options]
 testpaths = ["test"]
