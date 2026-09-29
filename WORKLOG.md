@@ -811,3 +811,35 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   - `.claude/settings.local.json` (gitignored, not committed): `Bash` added to the allowed tools, as the
     maintainer requested.
 - **Follow-ups:** T42 (design of the experiment storage) is next. It ends at a maintainer approval gate.
+
+### 2026-09-29 20:31 CEST — [T42] Design the experiment storage and substrate model
+- **Status:** blocked (draft written; waiting for maintainer approval)
+- **Changes:**
+  - `docs/design/EXPERIMENT_STORAGE.md` (new): the design draft. It covers:
+    - hierarchy, folder layout below `~/Documents/Femtika_Experiment/<user>/`, explicit `path` override
+      and the check against synchronised folders;
+    - IDs: substrate label `<initials>-<yy>-<nnn>`, substrate UUID, experiment label `<substrate>-A`,
+      experiment UUID = QR text;
+    - the HDF5 schema (metadata, calibration, plane fit, OPL scan, layout with corners and the double
+      corner, structures with layer programs, progress and captures, DHM products, slicer outputs,
+      summary, logs), with `schema_version`;
+    - write strategy (open/write/close per event, state after a crash, recovery, lock file, one writing
+      process);
+    - the JSON copies, the substrate record and experiment search, the legacy reader and restart of old
+      folders, the summary content, and an API sketch (`ExperimentStore`, `SubstrateStore`) mapped to
+      every `Experiment` method named in T42.
+  - `TODO.md`: T42 moved to In Progress, then to Blocked ("waiting for maintainer approval").
+  - `WORKLOG.md`: this entry.
+- **Tests:** none; this is a design document only.
+- **Commits:** `ef2ff63` docs(design): draft the experiment storage and substrate model [T42];
+  the TODO/WORKLOG commit docs(todo): block T42 on maintainer approval [T42]
+- **Open decisions (§12 of the document):**
+  - D1: default root, and a hard error for synced folders;
+  - D2: label scheme and counter reset;
+  - D3: folder name;
+  - D4: copy or link slicer outputs;
+  - D5: which power counts as authoritative;
+  - D6: stop writing `.zdc` files;
+  - D7: importing old folders on restart;
+  - D8: console log inside the file.
+- **Follow-ups:** T47–T50 start after the approval. Phase 1 (T43–T46, T58) can proceed meanwhile.

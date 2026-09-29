@@ -49,21 +49,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 
 ### Phase 0 — Concept
 
-- [ ] T42: Design the experiment storage and substrate model [phase: 0]
-      Goal: An approved design document `docs/design/EXPERIMENT_STORAGE.md` that defines how substrates, experiments and their data are stored.
-      Priority: high | Depends on: T41
-      Done when the document defines:
-        - Hierarchy substrate → experiments → structures → layers and captures; one HDF5 file per experiment; the folder layout below the default root `~/Documents/Femtika_Experiment/<user>/` (user = the `user` argument that is always passed); an explicit `path` still overrides the default.
-        - Self-contained experiment file: all metadata lives inside the experiment HDF5 file (attributes/datasets), so that a later user interface can load and save an experiment from this file alone. The JSON files (`structures.json`, `experiment_dictionary.json`, the summary of T49) are redundant, human-readable copies written from the same data. `structures.json` stays the entry point of an experiment.
-        - Write strategy: open, write, close per event (per layer, per capture); no file handle stays open while printing; state of the file after a crash; exactly one writing process (the DHM PC later delivers data through the storage interface and never writes the file itself); experiment data is not written into synchronised folders (Seafile).
-        - Metadata schema based on T41, including experiment center, all corner positions, position and orientation of the double corner, plane-fit mode and plane, drop direction, setup, objective, user, calibration, software version.
-        - Data groups: camera images, DHM products (hologram and derived data such as phase or amplitude, each with metadata incl. stage XYZ position), slicer outputs (reuse or link the layout of `aerobasic/slicer/storage.py`), AeroBasic layer programs, print progress.
-        - Substrate identification: label written by hand on the substrate (proposal `<initials>-<yy>-<nnn>`, experiments on it `<nnn>-A`, `<nnn>-B`, …), an internal substrate UUID, and the experiment UUID = QR-code UUID as the main ID of an experiment.
-        - Content of the experiment summary (T49).
-        - `schema_version` attribute, and how old JSON-only experiment folders are read (at least for restarts).
-        - API sketch: class names (e.g. `ExperimentStore`, `SubstrateStore`), methods, and which `Experiment` methods use them (`_save_experimental_data`, `_save_exp_dict`, `_save_calibration`, `_save_substrate_information`, `measure`, `_build_programs`, `update_print_progress`, `restart_experiment`).
-        - The maintainer's approval is recorded in the document.
-      Notes: Covers T27 (N003–N005, N011, N024, N025, N077). After writing, move to "Blocked" (waiting for maintainer approval).
 
 ### Phase 1 — Consistent execution parameters
 
@@ -316,9 +301,24 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
-
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
+- [ ] T42: Design the experiment storage and substrate model [phase: 0]
+      Goal: An approved design document `docs/design/EXPERIMENT_STORAGE.md` that defines how substrates, experiments and their data are stored.
+      Priority: high | Depends on: T41
+      Done when the document defines:
+        - Hierarchy substrate → experiments → structures → layers and captures; one HDF5 file per experiment; the folder layout below the default root `~/Documents/Femtika_Experiment/<user>/` (user = the `user` argument that is always passed); an explicit `path` still overrides the default.
+        - Self-contained experiment file: all metadata lives inside the experiment HDF5 file (attributes/datasets), so that a later user interface can load and save an experiment from this file alone. The JSON files (`structures.json`, `experiment_dictionary.json`, the summary of T49) are redundant, human-readable copies written from the same data. `structures.json` stays the entry point of an experiment.
+        - Write strategy: open, write, close per event (per layer, per capture); no file handle stays open while printing; state of the file after a crash; exactly one writing process (the DHM PC later delivers data through the storage interface and never writes the file itself); experiment data is not written into synchronised folders (Seafile).
+        - Metadata schema based on T41, including experiment center, all corner positions, position and orientation of the double corner, plane-fit mode and plane, drop direction, setup, objective, user, calibration, software version.
+        - Data groups: camera images, DHM products (hologram and derived data such as phase or amplitude, each with metadata incl. stage XYZ position), slicer outputs (reuse or link the layout of `aerobasic/slicer/storage.py`), AeroBasic layer programs, print progress.
+        - Substrate identification: label written by hand on the substrate (proposal `<initials>-<yy>-<nnn>`, experiments on it `<nnn>-A`, `<nnn>-B`, …), an internal substrate UUID, and the experiment UUID = QR-code UUID as the main ID of an experiment.
+        - Content of the experiment summary (T49).
+        - `schema_version` attribute, and how old JSON-only experiment folders are read (at least for restarts).
+        - API sketch: class names (e.g. `ExperimentStore`, `SubstrateStore`), methods, and which `Experiment` methods use them (`_save_experimental_data`, `_save_exp_dict`, `_save_calibration`, `_save_substrate_information`, `measure`, `_build_programs`, `update_print_progress`, `restart_experiment`).
+        - The maintainer's approval is recorded in the document.
+      Notes: Covers T27 (N003–N005, N011, N024, N025, N077). After writing, move to "Blocked" (waiting for maintainer approval).
+      Blocked by: waiting for maintainer approval of `docs/design/EXPERIMENT_STORAGE.md` (draft written 2026-09-29; decisions D1–D8 in §12 need an answer).
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
