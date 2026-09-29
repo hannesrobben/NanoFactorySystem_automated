@@ -93,7 +93,7 @@ class AsphericalLens(DrawableObject):
         self.velocity = velocity
         self.acceleration = acceleration
 
-        self.n_layer = round(self.height / self.slice_size + 0.95)  # woher kommt die 0.95?
+        self.n_layer = round(self.height / self.slice_size + 0.95)  # where does the 0.95 come from?
         self.slice_size_opt = self.height / (self.n_layer - 0.95)
 
     @property
