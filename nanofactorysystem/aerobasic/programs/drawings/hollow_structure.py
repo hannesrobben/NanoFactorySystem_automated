@@ -114,12 +114,12 @@ class HollowRectangle(DrawableObject):
 
     def visualize_hollow_part(self, ax=None, color_by_index=True, close_polygon=False):
         """
-        Plottet eine Liste von Punkt-Gruppen als verbundene Linien.
+        Plot the point groups of the hollow part (``lines_hollow_part``) as connected lines.
 
         Args:
-            liste: [[p1, p2, p3, p4], ...]  – jeder Punkt hat .X und .Y
-            color_by_index: Färbt die Pfade von blau (früh) bis rot (spät)
-            close_polygon: Verbindet letzten Punkt wieder mit erstem
+            ax: Axes to plot into; a new figure is created if omitted.
+            color_by_index: colour the paths from blue (early) to red (late)
+            close_polygon: connect the last point with the first
         """
         fig = None
         if ax is None:
@@ -129,13 +129,13 @@ class HollowRectangle(DrawableObject):
         for group in self.lines_hollow_part():
             coords = [(p.X, p.Y) for p in group]
             if close_polygon:
-                coords.append(coords[0])  # Polygon schließen
-            # LineCollection erwartet Liste von (start, end) Paaren
+                coords.append(coords[0])  # Close the polygon
+            # LineCollection expects a list of (start, end) pairs
             seg = list(zip(coords[:-1], coords[1:]))
             segments.extend(seg)
 
         if color_by_index:
-            # Farb-Gradient über alle Segmente (zeitlicher Verlauf)
+            # Colour gradient over all segments (time order)
             n = len(segments)
             colors = plt.cm.coolwarm(np.linspace(0, 1, n))
             lc = LineCollection(segments, colors=colors, linewidths=0.8)
@@ -147,9 +147,9 @@ class HollowRectangle(DrawableObject):
         ax.set_aspect('equal')
         ax.set_xlabel('X [µm]')
         ax.set_ylabel('Y [µm]')
-        ax.set_title(f'Toolpath — {len(self.lines_hollow_part)} Gruppen')
+        ax.set_title(f'Toolpath — {len(self.lines_hollow_part)} groups')
 
-        # Colorbar als Zeitachse
+        # Colour bar as time axis
         if color_by_index:
             sm = plt.cm.ScalarMappable(cmap='coolwarm', norm=plt.Normalize(0, len(self.lines_hollow_part)))
             plt.colorbar(sm, ax=ax, label='Gruppen-Index (Zeit →)')
@@ -193,8 +193,8 @@ class HollowRectangle(DrawableObject):
             -o-----------------o
             x------------------x
             
-            Erste Drucklinie x markiert
-            zweite Drucklinie o markiert
+            first print line marked with x
+            second print line marked with o
             """
             program.LINEAR(Z=z_height)
 
