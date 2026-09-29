@@ -84,27 +84,29 @@ class LinearMovement(Movement):
 class ClockwiseMovement(Movement):
     def __init__(self, center: Point3D, start: Point3D, end: Point3D, *, laser_on: bool):
         super().__init__(laser_on=laser_on)
-        self.relative_center = center
+        self.relative_center = center  # I, J: center relative to the start point
+        self.center = center + start
         self.start = start
         self.end = end
 
     def as_line_segment(self) -> np.ndarray:
-        radius = np.sqrt((self.relative_center.X) ** 2 + (self.relative_center.Y) ** 2)
+        # Compute the radius from the center to the start point
+        radius = np.sqrt((self.start.X - self.center.X) ** 2 + (self.start.Y - self.center.Y) ** 2)
 
         # Compute angles for start and end points relative to the center
-        start_angle = np.arctan2(self.start.Y + self.relative_center.Y, self.start.X + self.relative_center.X)
-        end_angle = np.arctan2(self.end.Y + self.relative_center.Y, self.end.X + self.relative_center.X)
+        start_angle = np.arctan2(self.start.Y - self.center.Y, self.start.X - self.center.X)
+        end_angle = np.arctan2(self.end.Y - self.center.Y, self.end.X - self.center.X)
 
-        # Ensure that the angles are in a clockwise direction
-        if start_angle <= end_angle:
-            start_angle += 2 * np.pi
+        # Ensure that the angles are in a clockwise (decreasing) direction; equal angles give a full circle
+        if end_angle >= start_angle:
+            end_angle -= 2 * np.pi
 
         # Generate points on the arc
         theta = np.linspace(start_angle, end_angle, 100)
-        arc_x = self.start.X + self.relative_center.X + radius * np.cos(theta)
-        arc_y = self.start.Y + self.relative_center.Y + radius * np.sin(theta)
+        arc_x = self.center.X + radius * np.cos(theta)
+        arc_y = self.center.Y + radius * np.sin(theta)
         arc_z = np.linspace(self.start.Z, self.end.Z, len(arc_x))
-        return np.stack([arc_x, arc_y, arc_z], axis=0)
+        return np.stack([arc_x, arc_y, arc_z], axis=1)
 
 
 class CounterclockwiseMovement(Movement):
@@ -131,7 +133,7 @@ class CounterclockwiseMovement(Movement):
         arc_x = self.center.X + radius * np.cos(theta)
         arc_y = self.center.Y + radius * np.sin(theta)
         arc_z = np.linspace(self.start.Z, self.end.Z, len(arc_x))
-        return np.stack([arc_x, arc_y, arc_z], axis=0)
+        return np.stack([arc_x, arc_y, arc_z], axis=1)
 
 
 def read_file(path) -> list[Movement]:
@@ -154,12 +156,15 @@ def read_text(text: str) -> list[Movement]:
             laser_on = True
         elif "GALVO LASEROVERRIDE A OFF" in line:
             laser_on = False
-        elif line.startswith("LINEAR"):
+        elif line.startswith("LINEAR") or line.startswith("RAPID"):
             op, *args = line.strip().split(" ")
 
             for arg in args:
-                pos = float(arg[1:])
                 ax = arg[0]
+                try:
+                    pos = float(arg[1:])
+                except ValueError:
+                    continue  # variables (e.g. "$dz") are not evaluated
 
                 if ax == "X":
                     new_x = pos
@@ -190,8 +195,11 @@ def read_text(text: str) -> list[Movement]:
             circle_center = Point3D(0, 0, 0)
             axes = []
             for arg in args:
-                pos = float(arg[1:])
                 ax = arg[0]
+                try:
+                    pos = float(arg[1:])
+                except ValueError:
+                    continue  # variables (e.g. "$r") are not evaluated
 
                 if ax == "X":
                     new_x = pos
@@ -319,15 +327,22 @@ def plot_movements_fast(movements, *, use_mu_m=True):
         else:
             lines_laser_off.append(movement.as_line_segment())
 
-    all_lines = np.concatenate([lines_laser_on, lines_laser_off])
-    xs, ys, zs = np.stack((all_lines.min(axis=(0, 1)), all_lines.max(axis=(0, 1)))).T
+    # Axis limits from all points; segments have different numbers of points
+    if lines_laser_on or lines_laser_off:
+        all_points = np.vstack(lines_laser_on + lines_laser_off)
+        lower, upper = all_points.min(axis=0), all_points.max(axis=0)
+    else:
+        lower, upper = np.zeros(3), np.zeros(3)  # program without movement
+    # Avoid zero-width axes, which matplotlib cannot project
+    pad = np.where(upper - lower > 0, 0.0, 0.5e-3)
+    xs, ys, zs = np.stack((lower - pad, upper + pad)).T
 
     mm_to_um_formatter = FuncFormatter(lambda x, pos: f"{x * 1000:.1f}")
     for ax in [ax1, ax2]:
-        plt_lines_on = Line3DCollection(lines_laser_on, linewidths=1, **LASER_ON_COLLECTION_STYLE)
-        plt_lines_off = Line3DCollection(lines_laser_off, linewidths=1, **LASER_OFF_COLLECTION_STYLE)
-        ax.add_collection3d(plt_lines_on)
-        ax.add_collection3d(plt_lines_off)
+        if lines_laser_on:
+            ax.add_collection3d(Line3DCollection(lines_laser_on, linewidths=1, **LASER_ON_COLLECTION_STYLE))
+        if lines_laser_off:
+            ax.add_collection3d(Line3DCollection(lines_laser_off, linewidths=1, **LASER_OFF_COLLECTION_STYLE))
         ax.set_xlim(*xs)
         ax.set_ylim(*ys)
         ax.set_zlim(*zs)
