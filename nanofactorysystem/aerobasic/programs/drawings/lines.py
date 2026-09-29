@@ -40,7 +40,7 @@ class IFOV_Lines(DrawableObject):
         super().__init__()
         self.reference_point = reference_point
         self.lines = lines
-        if 500 <= velocity <= 25000:  # komplett überarbeiten!
+        if 500 <= velocity <= 25000:  # to be reworked completely!
             self.velocity = velocity / 1000
         elif 50 <= velocity < 500:
             self.velocity = 5
@@ -72,7 +72,7 @@ class IFOV_Lines(DrawableObject):
             program.comment(f"Power set to {self.power} mW")
             program.SET_POWER(power=float(power_val))
         # set velocity - standard value ifov_size*100 -- has to be near maximum or low - bad results at middle values
-        # if self.velocity is None: # dann die normalen sachen hier:
+        # if self.velocity is None: # then the usual settings here:
         #     pass
         if objective == "Zeiss 63x":
             program.SET_SPEED(F=5)
