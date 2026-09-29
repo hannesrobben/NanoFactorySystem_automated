@@ -27,17 +27,6 @@ Format rules (for humans and Claude):
         - Whether `zMax` also guards `.api.LINEAR` moves is decided by the maintainer and documented.
       Notes: Maintainer decision 2026-09-28. Refactor only after the dummy backend and tests exist.
 
-- [ ] T13: Add timeouts to hardware communication and wait loops (found during T1)
-      Goal: A missing or unresponsive device leads to a clear error instead of a hang.
-      Priority: medium | Depends on: T3
-      Done when:
-        - TCP connects (A3200, DHM) and receives use configurable timeouts; `send()` reads until the
-          terminating character.
-        - The polling loops in `aerotech_old.py` (`drivestatus`, `zline`) and `task.py`
-          (`wait_to_finish`, `finish`) have an upper time bound.
-        - Dummy-backend tests cover the timeout paths.
-      Notes: Details: `docs/reviews/CODE_REVIEW_2026-09-28.md` §1, §4.
-
 - [ ] T14: Remove the hardcoded calibration path from `IFOV_Lines` (found during T1)
       Goal: Drawing classes do not read lab files.
       Priority: medium | Depends on: T3
@@ -153,4 +142,6 @@ Format rules (for humans and Claude):
 - [x] T10: Fix defects in the experiment flow — 2026-09-29 — `opl_scan` uses `motorscan`, a failed layer is logged (task stopped, printing continues) via the new `TaskFailedError`, substrate information is merged, empty structures work, and the experiment dictionary stores the right objective and log file; 6 new dummy tests. — commits: `b1d19a2`, `b0ed53e`
 
 - [x] T21: Stop `Parameter` from mutating the caller's argument dictionaries — 2026-09-29 — `Parameter` works on a copy of each section, so `sys_args` can be reused; also fixed `Camera` ignoring `product`/`deviceID`. — commits: `4911149`, `5af8e45`
+
+- [x] T13: Add timeouts to hardware communication and wait loops — 2026-09-29 — Configurable connect timeouts (10 s), optional response timeouts, responses read until the terminator, bounded axis/z-line waits and stall/stop bounds for tasks; terminated `~LASTERROR`; 12 dummy tests. — commits: `1ee7ef0`, `8d9d4dc`
 

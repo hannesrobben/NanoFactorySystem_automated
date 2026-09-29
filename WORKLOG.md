@@ -462,3 +462,42 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   selects that camera. No script in `mains/` passes these keys, so current lab runs are unaffected.
 - **Follow-ups:** none.
 
+### 2026-09-29 09:50 CEST — [T13] Add timeouts to hardware communication and wait loops
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/aerobasic/ascii.py`:
+    - New `recv_line()` reads until the terminating character and raises `ConnectionError` on a closed
+      connection.
+    - `AerotechAsciiInterface(connect_timeout=10.0, response_timeout=None)`; a connect timeout is handled
+      like a refused connection.
+  - `nanofactorysystem/devices/a3200.py`:
+    - New defaults `connectTimeout` (10 s), `responseTimeout` (None), `waitTimeout` (600 s) and
+      `zlineTimeout` (600 s).
+    - `run()` uses `recv_line` and sends `~LASTERROR` with its terminator.
+    - `drivestatus(wait=True)` and `zline()` raise `TimeoutError` when the bound is exceeded.
+  - `nanofactorysystem/devices/aerotech/task.py`: `wait_to_finish(stall_timeout=600)` fails only if the line
+    number stops advancing; `finish(timeout=30)`. Both count the sleep intervals (virtual clock).
+  - `nanofactorysystem/dhm/dhmclient.py`: `DhmClient(host, port, timeout=10.0)` applies the timeout to
+    connect only; the image transfer detects a closed connection.
+  - `nanofactorysystem/devices/dhm.py`: new default `connectTimeout`, passed to `DhmClient`.
+  - `nanofactorysystem/backends/dummy/a3200.py`: records `settimeout()` calls in `timeouts`; new
+    `chunk_size` option.
+  - `test/backends/test_timeouts.py` (new, 12 tests); `test/backends/test_dummy_system.py` expects the DHM
+    timeout; `test/README.md` gets a row.
+  - `TODO.md`: T13 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest`: 147 passed, 14 skipped, 1 xfailed.
+- **Commits:** `1ee7ef0` fix(devices): bound connects and waits to avoid hangs [T13];
+  `8d9d4dc` test(backends): cover timeouts and bounded waiting [T13]
+- **Design decision:** responses keep **no** default limit. A motion command may legitimately block for
+  minutes, so a default response timeout could abort a real print. The limit can be configured in the
+  `controller` section (`responseTimeout`). The polling bounds (600 s) are generous for the same reason;
+  `Task.wait_to_finish` measures stalling, not total duration.
+- **Behaviour change on hardware (intended):**
+  - Connects fail after 10 s.
+  - `~LASTERROR` now ends with `\n`. Before, a failing command could block forever while the controller
+    waited for the terminator.
+  - Waiting for axes and the z-line program stop after 600 s.
+  - A task that makes no progress for 600 s is reported as failed.
+- **Follow-ups:** none. The values should be checked on the lab PC during the first hardware test run.
+
