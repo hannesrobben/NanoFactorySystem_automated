@@ -48,7 +48,7 @@ is longer than 260 characters.
 
 | Module | What it tests | Why it matters (failure it catches) | Requirements |
 |---|---|---|---|
-| `test_aerobasic/test_constants.py` | Parsing and combining axes (`Axis`, `SingleAxis`, `Stages`) | Wrong axis names in `ENABLE`/`HOME`/`LINEAR` commands. `test_prevent_mixed_axes` is a strict `xfail` until the decision in T23. | – |
+| `test_aerobasic/test_constants.py` | Parsing and combining axes (`Axis`, `SingleAxis`, `Stages`) | Wrong axis names in `ENABLE`/`HOME`/`LINEAR` commands; invalid axis combinations (`~`, `^`, empty `&`). | – |
 | `test_aerobasic/test_coordinate_system.py` | Plane fit and the local → stage coordinate transformation | Structures written at the wrong height or position on a tilted substrate | – |
 | `test_aerobasic/test_program.py` | `AeroBasicProgram` text output and writing `.pgm` files | Broken program files that the controller rejects | – |
 | `test_aerobasic/test_power_calibration.py` | Power (mW) → attenuator conversion for IFOV structures: explicit, active and configured calibration; `Experiment` uses its attenuator | Wrong laser power in IFOV programs; programs depending on a lab-only file | – |

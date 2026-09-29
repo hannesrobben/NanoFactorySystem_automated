@@ -1,7 +1,5 @@
 from unittest import TestCase
 
-import pytest
-
 from nanofactorysystem.aerobasic.constants import Axis, Stages, SingleAxis, AxisError
 
 
@@ -90,19 +88,20 @@ class TestConstants(TestCase):
         # Axis lists are space-separated in AeroBasic commands, e.g. "ENABLE X Y"
         self.assertEqual("X Y", Axis.XY.parameter_name)
 
-    @pytest.mark.xfail(strict=True, raises=AssertionError,
-                       reason="Axis validation (mixed stages, ~, ^, empty &) is not implemented; "
-                              "Aerotech3200.home() mixes stages on purpose. Decision pending, see T23.")
-    def test_prevent_mixed_axes(self):
+    def test_axis_combinations(self):
+        # Maintainer decision (T23): mixing stages is allowed, e.g. Aerotech3200.home() homes Y Z A B at once
         x = SingleAxis.X
         y = SingleAxis.Y
         b = SingleAxis.B
 
         xy = x | y
 
-        # Mixing axes
-        self.assertRaises(AxisError, lambda: xy | b)
-        self.assertRaises(AxisError, lambda: x | b)
+        # Mixing axes of different stages is allowed
+        self.assertEqual("X Y B", (xy | b).parameter_name)
+        self.assertEqual("X B", (x | b).parameter_name)
+
+        # Common axes with '&'
+        self.assertEqual(x, xy & x)
 
         # Inverting axis should never work
         self.assertRaises(AxisError, lambda: ~x)
