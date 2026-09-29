@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 from nanofactorysystem.aerobasic import AxisStatusDataItem, SingleAxis, SystemStatusDataItem, WaitMode, Axis
-from nanofactorysystem.aerobasic.ascii import AerotechAsciiInterface, DummyAsciiInterface
+from nanofactorysystem.aerobasic.ascii import AerotechAsciiInterface
 from nanofactorysystem.aerobasic.constants import AxisStatus
 from nanofactorysystem.aerobasic.constants.tasks import ProgrammingMode, TaskState, VelocityMode
 from nanofactorysystem.aerobasic.programs import AeroBasicProgram
@@ -20,11 +20,37 @@ from nanofactorysystem.devices.coordinate_system import Point3D
 class Aerotech3200:
     MAX_NUMBER_OF_TASKS = 32
 
-    def __init__(self, hostname: str = "127.0.0.1", port: int = 8000, *, dummy=False):
+    def __init__(self, hostname: str = "127.0.0.1", port: int = 8000, *, dummy=False,
+                 transport_factory=None, program_dir: Optional[PathLike | str] = None):
+        """ Aerotech A3200 controller with program task handling.
+
+        Parameters
+        ----------
+        hostname : str
+            Host of the ASCII command interface.
+        port : int
+            TCP port of the ASCII command interface.
+        dummy : bool
+            Deprecated. Connects to a new simulated controller
+            (``FakeA3200Transport``) instead of the hardware. Prefer the
+            dummy backend (``System(..., backend="dummy")``) or
+            ``transport_factory``.
+        transport_factory : callable, optional
+            Returns a socket-like object used instead of a new TCP socket,
+            see :class:`AerotechAsciiInterface`.
+        program_dir : str or Path, optional
+            Directory for temporary program files and the uniform execution
+            copy. Default: temporary programs in the current working
+            directory and the execution copy in the home directory.
+        """
         if dummy:
-            self.api = DummyAsciiInterface()
+            from nanofactorysystem.backends.dummy import FakeA3200Transport, SimulatedWorld
+            transport = FakeA3200Transport(SimulatedWorld())
+            self.api = AerotechAsciiInterface(hostname=hostname, port=port, transport_factory=lambda: transport)
+            self.api.connect()
         else:
-            self.api = AerotechAsciiInterface(hostname=hostname, port=port)
+            self.api = AerotechAsciiInterface(hostname=hostname, port=port, transport_factory=transport_factory)
+        self.program_dir = Path(program_dir) if program_dir is not None else None
 
         # Own state
         self.programming_mode: Optional[ProgrammingMode] = None
@@ -148,13 +174,16 @@ class Aerotech3200:
             now = datetime.datetime.now()
             hash_str = hashlib.sha256(str(random.random()).encode()).hexdigest()
             path = Path(f"{now :%Y%m%d_%H%M%S}_automatic_program_{hash_str[:5]}.pgm")
+            if self.program_dir is not None:
+                path = self.program_dir / path
             path.parent.mkdir(exist_ok=True, parents=True)
             program.write(path)
         else:
             path = Path(program)
 
         # Copy program to uniform name for execution to avoid loading too many programs on controller.
-        exec_path = Path.home() / "python_aerobasic_program.pgm"    # todo (hr 26.2.26 - Bugfixing) here maybe deletion of prior program?
+        exec_dir = self.program_dir if self.program_dir is not None else Path.home()
+        exec_path = exec_dir / "python_aerobasic_program.pgm"    # todo (hr 26.2.26 - Bugfixing) here maybe deletion of prior program?
         exec_path.write_bytes(path.read_bytes())
 
         # Load program

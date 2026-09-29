@@ -1,12 +1,28 @@
+"""Manual laser tests: run on the lab PC and watch whether the laser is visible.
+
+Moved from test/test_femtika: the outcome can only be judged by looking at the laser, so there is
+nothing to assert. Run explicitly on the lab PC:
+    python -m pytest test/manual/femtika/test_device_WITH_laser.py
+"""
 import time
 import unittest
 
-from aerobasic import Axis, GalvoLaserOverrideMode, SingleAxis
-from aerobasic.ascii import AerotechError
-from . import FemtikaTest
+from nanofactorysystem.aerobasic import Axis, GalvoLaserOverrideMode, SingleAxis
+from nanofactorysystem.aerobasic.ascii import AerotechError
+from nanofactorysystem.aerobasic.programs import AeroBasicProgram
+from nanofactorysystem.devices.aerotech import Aerotech3200
 
 
-class TestFemtikaNoLaser(FemtikaTest):
+class TestFemtikaWithLaser(unittest.TestCase):
+    def setUp(self):
+        self.a3200 = Aerotech3200()
+        self.api = self.a3200.api
+        self.api.connect()
+
+    def tearDown(self):
+        self.api.close()
+        for cmd in self.api.history:
+            print(cmd)
 
     def test_laser_override_commands_manual(self):
         self.api.GALVO_LASER_OVERRIDE(GalvoLaserOverrideMode.ON)

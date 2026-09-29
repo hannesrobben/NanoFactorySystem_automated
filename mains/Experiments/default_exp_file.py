@@ -46,7 +46,8 @@ sys_args = {
 
 # ToDo(HR): how do i transfer a dict or other system arguments to this function?
 def binary_testprint(absolute_center: Point2D, resin_dimension: list, ask_continue_box=False, path=None,
-                     objective="Zeiss 20x", user="Hannes", dhm_usage=False, substrate=None, setup="IFOV_off"):
+                     objective="Zeiss 20x", user="Hannes", dhm_usage=False, substrate=None, setup="IFOV_off",
+                     backend=None, plane=None):
     """
         absolute_center: Point2D with x- and y-coordinate of the center of this experiment
         resin_dimension: list of the coordinates of the edges of the resin
@@ -57,6 +58,10 @@ def binary_testprint(absolute_center: Point2D, resin_dimension: list, ask_contin
         ask_continue_box: bool -> controls the asking box
         path: Path argument for root directory where the experimental data will be safe in a subdirectory called ...
                 If nothing is given, the export_path will be in the subdirectory .output
+        backend: Hardware backend passed to Experiment/System. None (default) uses the lab hardware;
+                "dummy" or a DummyBackend object runs the experiment on simulated devices (dry run).
+        plane: Optional known substrate plane (ZFunction). If given, plane_fit() uses it instead of
+                measuring the substrate, e.g. DummyBackend().world.sample.plane() for a dry run.
     """
     # ToDo: DropDirection noch mit übergeben und testen ob das funktioniert
 
@@ -133,7 +138,7 @@ def binary_testprint(absolute_center: Point2D, resin_dimension: list, ask_contin
     else:
         sys_args.update({"dhm": {"usage": dhm_usage}})
 
-    structure_size = fov,  # because structure is smaller than fov
+    structure_size = fov  # because structure is smaller than fov
     grid=(2, 3)
     with Experiment(
             path=path,
@@ -162,14 +167,15 @@ def binary_testprint(absolute_center: Point2D, resin_dimension: list, ask_contin
             fov_dim = (fov, fov),
             plane_fit_mode=1,
             skip_corner=False,
-            setup = setup) as experiment:
+            setup = setup,
+            backend=backend) as experiment:
 
         # Visualize experiment
         experiment.plot_experiment(show=True)
 
         # Get substrate surface plane
         if ask_continue_box and not messagebox.askyesno(message="Run plane fitting?"): return
-        experiment.plane_fit(force=False)
+        experiment.plane_fit(force=False, plane=plane)
 
         # Optical path length for DHM
         if dhm_usage:

@@ -18,12 +18,13 @@ import os
 import socket
 import time
 from enum import Enum
+from pathlib import Path
 from typing import Any, Optional
 
 from scidatacontainer import Container
 
 from .attenuator import Attenuator
-from ..config import sysConfig, popargs
+from ..config import sysConfig, popargs, ConfigDefaults
 from ..parameter import Parameter
 
 # Task states
@@ -95,16 +96,38 @@ END PROGRAM
 class A3200(Parameter):
     """ Class for controlling an Aerotech A3200 system."""
 
-    _defaults = sysConfig.controller | {
+    _defaults = ConfigDefaults("controller", {
         "xInit": None,
         "yInit": None,
         "zInit": None,
         "zMax": None,
         "tasks": {},
         "softwareVersion": None,
-    }
+    })
 
-    def __init__(self, user, logger=None, **kwargs):
+    def __init__(self, user, logger=None, *, transport=None, program_dir=None, **kwargs):
+
+        """ Connect to the A3200 controller.
+
+        Parameters
+        ----------
+        user : str
+            User key in the configuration.
+        logger : logging.Logger, optional
+            Logger object.
+        transport : ControllerTransport, optional
+            Socket-like object to use instead of a new TCP socket, e.g. the
+            simulated controller of the dummy backend.
+        program_dir : str or Path, optional
+            Directory for program files written by this class (the z-line
+            program). Default is the current working directory.
+        **kwargs
+            Runtime configuration with the optional sections ``controller``
+            and ``attenuator``.
+        """
+
+        # Directory for program files (None: current working directory)
+        self.program_dir = Path(program_dir) if program_dir is not None else None
 
         # Initialize parameter class
         args = popargs(kwargs, "controller")
@@ -116,7 +139,10 @@ class A3200(Parameter):
             raise RuntimeError("Maximum z position is missing!")
 
         # TCP socket to the A3200 system
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if transport is None:
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        else:
+            self.socket = transport
         self.opened = False
 
         # Connect to the A3200 system
@@ -417,6 +443,8 @@ class A3200(Parameter):
         # Default file name
         if fn is None:
             fn = "__zline__.pgm"
+            if self.program_dir is not None:
+                fn = str(self.program_dir / fn)
 
         # First free task number
         tasks = self["tasks"].values()

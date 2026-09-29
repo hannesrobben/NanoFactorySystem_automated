@@ -1,4 +1,5 @@
-import threading
+import tempfile
+import warnings
 from pathlib import Path
 from unittest import TestCase
 
@@ -30,30 +31,47 @@ class AeroBasicProgramTest(TestCase):
         self.program = AeroBasicProgram()
 
     def tearDown(self):
-        # Check content
+        # Check content. The timestamp header is not deterministic, and the
+        # expected texts describe the compact program body.
         if self.desired_content is not None:
-            content = self.program.to_text()
+            content = self.program.to_text(add_timestamp=False, compact=True)
             self.assertEqual(self.desired_content, content)
 
+        # Keep the program and a plot of its movements in test/_programs for manual inspection
         path = FOLDER / self.__class__.__name__ / f"{self._testMethodName}.txt"
         path.parent.mkdir(exist_ok=True, parents=True)
         content = self.program.write(path)
         print(f"{len(content.splitlines())} lines written")
-
-        thread = threading.Thread(target=lambda: _write_plot(path), daemon=False)
-        thread.start()
+        _write_plot(path)
 
 
 def _write_plot(path: Path):
-    print(f"Creating plot for {path}")
+    """ Save a plot of the program movements next to the program.
+
+    The plot is only an artefact for manual inspection. Plotting errors are
+    reported as warnings and do not fail the test (``plot_movements``
+    fails for most programs, see T24); before, the plot ran in a
+    background thread whose errors were never reported.
+    """
+    import matplotlib.pyplot as plt
+
     try:
         movements = read_file(path)
         fig = plot_movements(movements)
         fig.tight_layout()
         fig.savefig(path.with_suffix(".png"))
-    except:
-        print(f"Failed to create plot for {path}!")
-        raise
+        plt.close(fig)
+    except Exception as error:
+        plt.close("all")
+        warnings.warn(f"Could not plot {path.name}: {type(error).__name__}: {error}")
+
+
+def _strip_timestamp(text: str) -> str:
+    """ Remove the "' Created on ..." header line written by AeroBasicProgram.write(). """
+
+    first, rest = text.split("\n", 1)
+    assert first.startswith("' Created on "), first
+    return rest
 
 
 class TestSimpleAeroBasicProgram(AeroBasicProgramTest):
@@ -67,21 +85,21 @@ class TestSimpleAeroBasicProgram(AeroBasicProgramTest):
 
     def test_write_simple_program_str(self):
         self.test_simple_program()
-        path = f"{FOLDER}/{self._testMethodName}.pgm"
-        Path(path).parent.mkdir()
-        self.program.write(path)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = f"{tmp}/sub/{self._testMethodName}.pgm"
+            self.program.write(path)  # creates the missing folder
 
-        # Check content
-        self.assertEqual(self.desired_content, Path(path).read_text())
+            # Check content
+            self.assertEqual(self.desired_content, _strip_timestamp(Path(path).read_text()))
 
     def test_write_simple_program_pathlib(self):
         self.test_simple_program()
-        path = Path(f"{FOLDER}/{self._testMethodName}.pgm")
-        Path(path).parent.mkdir()
-        self.program.write(path)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "sub" / f"{self._testMethodName}.pgm"
+            self.program.write(path)  # creates the missing folder
 
-        # Check content
-        self.assertEqual(self.desired_content, Path(path).read_text())
+            # Check content
+            self.assertEqual(self.desired_content, _strip_timestamp(path.read_text()))
 
     def test_simple_variable(self):
         my_var = self.program.create_variable("my_var")

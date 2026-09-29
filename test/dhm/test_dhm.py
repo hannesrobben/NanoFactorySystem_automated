@@ -1,60 +1,47 @@
-##########################################################################
-# Copyright (c) 2024 Reinhard Caspary                                    #
-# <reinhard.caspary@phoenixd.uni-hannover.de>                            #
-# This program is free software under the terms of the MIT license.      #
-##########################################################################
-import os
-from datetime import datetime
-from unittest import TestCase
+"""Tests for the DHM client (dhm/dhmclient.py).
 
+Converted: the hardware test used a hardcoded address and only logged
+values; it now takes the address from the configuration and asserts the
+answers. The dummy test checks the same sequence on the simulated DHM.
+"""
 import numpy as np
-import cv2 as cv
-from nanofactorysystem import getLogger, mkdir
+import pytest
+
+from nanofactorysystem.backends.dummy import DummyDhmClient, SimulatedWorld
+from nanofactorysystem.config import sysConfig
 from nanofactorysystem.dhm import DhmClient
 
-
-class TestDHM(TestCase):
-    HOST = "192.168.22.2"
-    PORT = 27182
-
-    def test_dhm(self):
-
-        path = mkdir(".test/dhm")
-        logger = getLogger(logfile=f"{path}/console.log")
-
-        with DhmClient(host=self.HOST, port=self.PORT) as client:
-
-            logger.info("Select objective.")
-            cid = 178
-            configs = client.ConfigList
-            name = dict(configs)[cid]
-            client.Config = cid
-            logger.info(f"Objective: {name} [{cid:d}]")
-
-            logger.info(f"Motor pos: {client.MotorPos:.1f} µm")
-
-            logger.info("Test camera shutter.")
-            shutter = client.CameraShutter
-            shutterus = client.CameraShutterUs
-            logger.info(f"Shutter: {shutterus:.1f} us [{shutter:d}]")
-
-            logger.info("Get hologram image.")
-            img = client.CameraImage
-            fn = f"{path}/hologram.png"
-            logger.info(f"Store hologram image file '{fn}'")
-            cv.imwrite(fn, img)
-
-            # doesnt work
-            # img1 = client.OptCameraImage
-            # fn = f"{path}/hologram_opt.png"
-            # logger.info(f"Store hologram_opt image file '{fn}'")
-            # cv.imwrite(fn, img1)
+OBJECTIVE_20X = 178
 
 
-            imin = np.min(img)
-            imax = np.max(img)
-            iavg = np.average(img)
-            logger.info(f"Pixel values: {imin:d} - {imax:d} (avg: {iavg:.1f})")
+def check_client(client, config_id):
+    """ Select the objective configuration and check the basic answers of a DHM client. """
 
-            logger.info("Done.")
+    configs = dict(client.ConfigList)
+    assert config_id in configs
+    client.Config = config_id
+    assert client.Config == config_id
 
+    assert client.MotorMinPos <= client.MotorPos <= client.MotorMaxPos
+
+    shutter = client.CameraShutter
+    assert client.CameraMinShutter <= shutter <= client.CameraMaxShutter
+    assert client.CameraShutterUs > 0
+
+    img = client.CameraImage
+    assert img.ndim == 2 and img.size > 0
+    assert img.dtype in (np.uint8, np.uint16)
+    assert img.max() > img.min(), "hologram image has no contrast"
+
+
+def test_dummy_client():
+    with DummyDhmClient(SimulatedWorld(seed=0), width=64, height=64) as client:
+        check_client(client, OBJECTIVE_20X)
+
+
+@pytest.mark.hardware
+def test_real_client():
+    dhm = sysConfig.section("dhm")
+    with DhmClient(host=dhm["host"], port=dhm["port"]) as client:
+        assert client.ServerVersion >= 3
+        check_client(client, OBJECTIVE_20X)
