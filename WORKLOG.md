@@ -586,3 +586,27 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Follow-ups:** `mains/debugging/test_plot.py` has a pre-existing `SyntaxError` (a parameter without default
   after a parameter with default). It is a debugging script, not collected by pytest; it is left for T19.
 
+### 2026-09-29 09:59 CEST — [T17] Clean up logging
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/runtime.py`: `getLogger()` is idempotent. It keeps one console handler and at most one
+    log file (a new file replaces the old one, the same file is not added twice). Its handlers are marked,
+    so handlers added by others are left alone. The logger name `'dummy'` is kept for compatibility.
+  - `nanofactorysystem/aerobasic/ascii.py`: `print()` replaced by `self.logger.error(...)`. The old fallback
+    `run_testzweck_altesSystem` also sends `~LASTERROR` with its terminator and uses `recv_line` (same hang
+    as fixed in T13).
+  - `nanofactorysystem/devices/aerotech/task.py`: an incomplete program is logged as a warning instead of
+    printed.
+  - `test/test_runtime.py` (new, 4 tests); `test/README.md` gets a row.
+  - `TODO.md`: T17 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest`: 165 passed, 14 skipped, 1 xfailed.
+- **Commits:** `2da7be2` fix(runtime): stop duplicating log handlers and printing errors [T17];
+  `cdcee08` test(runtime): cover logger handlers and logged command errors [T17]
+- **Behaviour change (intended):** when a second experiment in the same process calls
+  `getLogger(logfile=...)`, the first experiment's log file no longer receives the second experiment's
+  messages.
+- **Follow-ups:** The logger is still called `'dummy'`, which can now be confused with the dummy backend.
+  Renaming it (e.g. to `'nanofactorysystem'`) would change which loggers external scripts configure, so I
+  left it for the maintainer.
+

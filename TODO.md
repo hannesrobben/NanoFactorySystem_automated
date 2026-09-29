@@ -27,13 +27,6 @@ Format rules (for humans and Claude):
         - Whether `zMax` also guards `.api.LINEAR` moves is decided by the maintainer and documented.
       Notes: Maintainer decision 2026-09-28. Refactor only after the dummy backend and tests exist.
 
-- [ ] T17: Clean up logging (found during T1)
-      Goal: Log output is neither duplicated nor mixed with `print`.
-      Priority: low | Depends on: –
-      Done when:
-        - `runtime.getLogger` does not add duplicate handlers on repeated calls.
-        - `print()` calls in `aerobasic/ascii.py` and `devices/aerotech/task.py` use the logger.
-
 - [ ] T18: Translate German identifiers and comments (found during T1)
       Goal: The code base follows the English-only language rule.
       Priority: low | Depends on: –
@@ -116,4 +109,6 @@ Format rules (for humans and Claude):
 - [x] T22: Fix NumPy 2.5 deprecation in `Attenuator` — 2026-09-29 — `reshape` instead of assigning `array.shape` in `Attenuator` and `CameraDevice` (the `IFOV_Lines` case went away in T14); the suite passes with the deprecation as error. — commits: `daa757e`
 
 - [x] T16: Fix always-true `assert (path, Path)` in experiment scripts — 2026-09-29 — The 48 always-true asserts in `mains/` are replaced by `path = Path(path)`, which accepts the str paths the callers pass; no warnings remain. — commits: `d1f1f67`
+
+- [x] T17: Clean up logging — 2026-09-29 — `getLogger()` no longer duplicates handlers (one console handler, one log file that is replaced for a new file); command failures are logged instead of printed. — commits: `2da7be2`, `cdcee08`
 
