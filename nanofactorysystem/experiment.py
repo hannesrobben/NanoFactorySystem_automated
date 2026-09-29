@@ -18,7 +18,7 @@ import numpy as np
 from matplotlib.patches import Ellipse, Rectangle
 from scidatacontainer import Container
 
-from nanofactorysystem import System, ImageContainer, Plane, mkdir
+from nanofactorysystem import System, ImageContainer, Plane, mkdir, getLogger
 from nanofactorysystem.aerobasic import SingleAxis, AxisStatusDataItem
 from nanofactorysystem.aerobasic.ascii import AerotechError
 from nanofactorysystem.aerobasic.programs import AeroBasicProgram
@@ -271,6 +271,64 @@ class Experiment(object):
                          "plane_fit_mode": self.plane_fit_mode,
                          "setup": setup
                          }
+
+    @staticmethod
+    def parameters_from_dictionary(path) -> dict:
+        """ Rebuild the constructor arguments of a stored experiment.
+
+        Reads ``experiment_dictionary.json``, which every experiment writes into
+        its folder, e.g. to restart an aborted print with
+        ``Experiment(**Experiment.parameters_from_dictionary(path))``.
+
+        Parameters
+        ----------
+        path : str or Path
+            Experiment folder.
+
+        Returns
+        -------
+        dict
+            Keyword arguments for :class:`Experiment`. ``logger`` writes to the
+            stored log file (or ``console.log`` in the folder).
+        """
+
+        path = Path(path)
+        data = json.loads((path / "experiment_dictionary.json").read_text())
+
+        def vector(text) -> list[float]:
+            # Stored with str(): "[5720. 27190.]" or "(500, 500)"
+            return [float(v) for v in str(text).strip("[]() ").replace(",", " ").split()]
+
+        logfile = data.get("logger") or path / "console.log"
+        return {
+            "path": Path(data["path"]),
+            "user": data["user"],
+            "objective": data["objective"],
+            "logger": getLogger(logfile=logfile),
+            "sys_args": data["sys_args"],
+            "default_power": data["default_power"],
+            "low_speed_um": data["low_speed_um"],
+            "high_speed_um": data["high_speed_um"],
+            "resin_corner_tr": Point2D(*vector(data["resin_corner_tr"])),
+            "resin_corner_bl": Point2D(*vector(data["resin_corner_bl"])),
+            "structure_size": data["structure_size"],
+            "margin": data["margin"],
+            "padding": data["padding"],
+            "absolute_grid_center": Point2D(*vector(data["absolute_grid_center"])),
+            "grid": tuple(int(v) for v in vector(data["grid_size"])),
+            "n_mid_points": data["n_mid_points"],
+            "drop_direction": DropDirection(data["drop_direction"]),
+            "corner_z": data["corner_z"],
+            "corner_width": data["corner_width"],
+            "corner_length": data["corner_length"],
+            "corner_height": data["corner_height"],
+            "corner_hatch": data["corner_hatch"],
+            "corner_slice": data["corner_slice"],
+            "fov_dim": tuple(vector(data["fov_dim"])),
+            "skip_corner": bool(data["skip_corner"]),
+            "plane_fit_mode": data["plane_fit_mode"],
+            "setup": data["setup"] or "IFOV_off",
+        }
 
     def iter_experiment_locations(self) -> Iterator[tuple[float, float]]:
         """ Return experiment locations in um """

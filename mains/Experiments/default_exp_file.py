@@ -168,6 +168,7 @@ def binary_testprint(absolute_center: Point2D, resin_dimension: list, ask_contin
             plane_fit_mode=1,
             skip_corner=False,
             setup = setup,
+            substrate_information=substrate,
             backend=backend) as experiment:
 
         # Visualize experiment
