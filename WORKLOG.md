@@ -409,3 +409,36 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   I did not change it. Running `pip install --upgrade "opencv-python>=4.10.0.84"`, or reinstalling the
   package with `pip install .`, fixes it; that is the maintainer's decision.
 
+### 2026-09-29 09:44 CEST — [T10] Fix defects in the experiment flow
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/experiment.py`:
+    - `opl_scan()` calls `Dhm.motorscan()` (the old `dhm.opl_scan()` does not exist).
+    - `print_structure()` stops a failed task (`_stop_failed_task`) and continues; `layer_id`/`layer_count`
+      are initialised, so an empty layer list does not raise.
+    - `update_print_progress()` records the name of a structure without layers.
+    - `_save_substrate_information()` merges into an existing file.
+    - Found during T10: the experiment dictionary stored the hard-coded objective "Zeiss 20x" and took the
+      log file from `handlers[1]`. It now stores `self.objective` and the path of the latest `FileHandler`
+      (`_log_file()`).
+  - `nanofactorysystem/aerobasic/ascii.py`: new `TaskFailedError(AerotechError, ValueError)`.
+  - `nanofactorysystem/devices/aerotech/task.py`: `wait_to_finish()` raises `TaskFailedError` and closes its
+    progress bar.
+  - `test/test_experiment.py` (new, 6 tests): the whole flow, a failed layer, an empty structure, the OPL
+    scan, the substrate merge and the experiment dictionary.
+  - `test/backends/test_dummy_controller.py`: expects `TaskFailedError`.
+  - `test/README.md`: row for `test_experiment.py`.
+  - `TODO.md`: T10 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest`: 134 passed, 14 skipped, 1 xfailed.
+- **Commits:** `b1d19a2` fix(experiment): repair OPL scan, failed layers and experiment metadata [T10];
+  `b0ed53e` test(experiment): cover the experiment flow on the dummy backend [T10]
+- **Behaviour change on hardware (intended):**
+  - After a failed layer, `PROGRAM 1 STOP` is sent before the next layer is loaded. Before, the exception
+    ended the whole print.
+  - `TaskFailedError` is still a `ValueError`, so existing handlers keep working.
+- **Follow-ups:**
+  - T25 (new): `mains/restart_experiment.py` passes the stored log *path* as `logger` to `Experiment`, which expects a
+    logger object. The script is outside T10; noted here.
+  - `default_exp_file.binary_testprint` accepts `substrate` but does not pass it to `Experiment`.
+
