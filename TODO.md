@@ -87,16 +87,6 @@ Format rules (for humans and Claude):
       Done when:
         - every todo and note section is identified and summerized in a new file 'todo_notes.md' . delete notes and todos in documentation and document the meaning of it in the file. Create workpackages from this in the same style as 'TODO.md' but save them on the bottom of 'todo_notes.md'.  
 
-- [ ] T21: Stop `Parameter` from mutating the caller's argument dictionaries (found during T3)
-      Goal: Runtime arguments such as `sys_args` can be reused for several `System`/`Experiment` objects.
-      Priority: medium | Depends on: –
-      Done when:
-        - `Parameter.__init__` no longer pops keys from the section dicts it receives (e.g. `sys_args["controller"]["zMax"]`
-          is still present after `System(...)`).
-        - A test creates two `System` objects on the dummy backend from the same `sys_args` dict.
-      Notes: Today the second `System` built from a module-level `sys_args` (the pattern used in the experiment scripts)
-      fails with "Maximum z position is missing!".
-
 - [ ] T22: Fix NumPy 2.5 deprecation in `Attenuator` (found during T3)
       Goal: The attenuator keeps working with future NumPy versions.
       Priority: low | Depends on: –
@@ -161,4 +151,6 @@ Format rules (for humans and Claude):
 - [x] T9: Fix packaging and pin a working environment — 2026-09-29 — `pyproject.toml` discovers all subpackages, declares all runtime dependencies (OpenCV pinned for NumPy 2) and a `test` extra; a fresh venv with `pip install ".[test]"` passes the suite. — commits: `7aecd16`
 
 - [x] T10: Fix defects in the experiment flow — 2026-09-29 — `opl_scan` uses `motorscan`, a failed layer is logged (task stopped, printing continues) via the new `TaskFailedError`, substrate information is merged, empty structures work, and the experiment dictionary stores the right objective and log file; 6 new dummy tests. — commits: `b1d19a2`, `b0ed53e`
+
+- [x] T21: Stop `Parameter` from mutating the caller's argument dictionaries — 2026-09-29 — `Parameter` works on a copy of each section, so `sys_args` can be reused; also fixed `Camera` ignoring `product`/`deviceID`. — commits: `4911149`, `5af8e45`
 

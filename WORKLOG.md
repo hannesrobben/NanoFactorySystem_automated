@@ -442,3 +442,23 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
     logger object. The script is outside T10; noted here.
   - `default_exp_file.binary_testprint` accepts `substrate` but does not pass it to `Experiment`.
 
+### 2026-09-29 09:46 CEST — [T21] Stop `Parameter` from mutating the caller's argument dictionaries
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/parameter.py`: `__init__` pops from a copy of the section.
+  - `nanofactorysystem/devices/camera.py` (found during T21): `product`/`deviceID` were popped from the
+    wrong dictionary and never reached `CameraDevice`. They are now read from a copy of the camera section.
+  - `test/test_parameter.py` (new): two `System` objects from one `sys_args` dict. The test fails without
+    the fix ("Maximum z position is missing!").
+  - `test/devices/test_camera.py`: new test that `product`/`deviceID` reach `CameraDevice`.
+  - `CLAUDE.md`, `test/README.md`, `test/conftest.py`, `test/backends/test_dummy_system.py`: the "build a
+    fresh dict" caveat is removed.
+  - `TODO.md`: T21 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest`: 136 passed, 14 skipped, 1 xfailed.
+- **Commits:** `4911149` fix(parameter): do not modify the caller's argument dictionaries [T21];
+  `5af8e45` fix(devices): use the configured camera product and device ID [T21]
+- **Behaviour change on hardware (intended):** a `camera={"product": ..., "deviceID": ...}` argument now
+  selects that camera. No script in `mains/` passes these keys, so current lab runs are unaffected.
+- **Follow-ups:** none.
+
