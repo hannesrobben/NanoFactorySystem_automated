@@ -1613,3 +1613,13 @@ In the style of `TODO.md`. IDs continue the numbering of `TODO.md`; move a packa
       Priority: low | Depends on: –
       Done when:
         - Contour as polyline, tilted slicing, shell strategy, experiment hierarchy, study framework and translator are implemented or explicitly dropped (N095).
+
+
+
+## Notes of Claude Code 
+
+Where I deviated or you should check
+T25: my original finding (a logger path being passed as a logger) was wrong. The real problem was the placeholder values; the log entry says so.
+T18: I translated the package and test modules only. The experiment scripts in mains/ and the scripts in test/manual/ still contain German.
+Safety: with --run-hardware, test_move_home moves the real stage to X=Y=Z=0, as it did before. Please check whether Z=0 is safe with the objective mounted.
+Logger name: the logger is still called 'dummy'; renaming it is your call.
