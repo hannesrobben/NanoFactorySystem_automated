@@ -17,39 +17,28 @@ from nanofactorysystem.devices.aerotech.task import Task
 from nanofactorysystem.devices.coordinate_system import Point3D
 
 
-class Aerotech3200:
+class AerotechController:
+    """ Program tasks, status queries and command log of an Aerotech A3200 controller.
+
+    Shared base class of :class:`Aerotech3200` and ``devices.A3200``. A
+    subclass creates the :class:`AerotechAsciiInterface` and calls
+    :meth:`_init_controller`.
+    """
+
     MAX_NUMBER_OF_TASKS = 32
 
-    def __init__(self, hostname: str = "127.0.0.1", port: int = 8000, *, dummy=False,
-                 transport_factory=None, program_dir: Optional[PathLike | str] = None):
-        """ Aerotech A3200 controller with program task handling.
+    def _init_controller(self, api: AerotechAsciiInterface, program_dir: Optional[PathLike | str] = None):
+        """ Initialise the controller state.
 
         Parameters
         ----------
-        hostname : str
-            Host of the ASCII command interface.
-        port : int
-            TCP port of the ASCII command interface.
-        dummy : bool
-            Deprecated. Connects to a new simulated controller
-            (``FakeA3200Transport``) instead of the hardware. Prefer the
-            dummy backend (``System(..., backend="dummy")``) or
-            ``transport_factory``.
-        transport_factory : callable, optional
-            Returns a socket-like object used instead of a new TCP socket,
-            see :class:`AerotechAsciiInterface`.
+        api : AerotechAsciiInterface
+            ASCII command interface (connected or not).
         program_dir : str or Path, optional
             Directory for temporary program files and the uniform execution
-            copy. Default: temporary programs in the current working
-            directory and the execution copy in the home directory.
+            copy, see :meth:`run_program_as_task`.
         """
-        if dummy:
-            from nanofactorysystem.backends.dummy import FakeA3200Transport, SimulatedWorld
-            transport = FakeA3200Transport(SimulatedWorld())
-            self.api = AerotechAsciiInterface(hostname=hostname, port=port, transport_factory=lambda: transport)
-            self.api.connect()
-        else:
-            self.api = AerotechAsciiInterface(hostname=hostname, port=port, transport_factory=transport_factory)
+        self.api = api
         self.program_dir = Path(program_dir) if program_dir is not None else None
 
         # Own state
@@ -57,14 +46,17 @@ class Aerotech3200:
         self.velocity_mode: Optional[VelocityMode] = None
         self.wait_mode: Optional[WaitMode] = None
         self.enabled_axes = SingleAxis._NO_AXIS
-        self.tasks = tuple([Task(self.api, i) for i in range(Aerotech3200.MAX_NUMBER_OF_TASKS)])
+        self.tasks = tuple([Task(self.api, i) for i in range(self.MAX_NUMBER_OF_TASKS)])
 
         self.init_time = datetime.datetime.now()
         self.connect_time: Optional[datetime.datetime] = None
         self.close_time: Optional[datetime.datetime] = None
 
     def __del__(self):
-        self.close()
+        try:
+            self.close()
+        except AttributeError:
+            pass  # not completely initialised
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
         self.close()
@@ -102,10 +94,6 @@ class Aerotech3200:
     def sync_internal_state(self):
         for task in self.tasks:
             task.update()
-
-    @cached_property
-    def version(self):
-        return self.api.VERSION()
 
     @property
     def system_time(self) -> datetime.datetime:
@@ -226,6 +214,58 @@ class Aerotech3200:
     def enable_axes(self, axes: SingleAxis):
         self.api.ENABLE(axes)
         self.enabled_axes |= axes
+
+
+class Aerotech3200(AerotechController):
+    """ Aerotech A3200 controller with program task handling, without configuration.
+
+    Can be used on its own; ``System`` uses ``devices.A3200``, which offers
+    the same task handling plus the µm-based helpers.
+    """
+
+    def __init__(self, hostname: str = "127.0.0.1", port: int = 8000, *, dummy=False,
+                 transport_factory=None, program_dir: Optional[PathLike | str] = None,
+                 z_max: Optional[float] = None):
+        """ Aerotech A3200 controller with program task handling.
+
+        Parameters
+        ----------
+        hostname : str
+            Host of the ASCII command interface.
+        port : int
+            TCP port of the ASCII command interface.
+        dummy : bool
+            Deprecated. Connects to a new simulated controller
+            (``FakeA3200Transport``) instead of the hardware. Prefer the
+            dummy backend (``System(..., backend="dummy")``) or
+            ``transport_factory``.
+        transport_factory : callable, optional
+            Returns a socket-like object used instead of a new TCP socket,
+            see :class:`AerotechAsciiInterface`.
+        program_dir : str or Path, optional
+            Directory for temporary program files and the uniform execution
+            copy. Default: temporary programs in the current working
+            directory and the execution copy in the home directory.
+        z_max : float, optional
+            Maximum z position in µm. Immediate absolute z moves beyond it are
+            refused (see :attr:`AerotechAsciiInterface.z_limit`).
+        """
+        if dummy:
+            from nanofactorysystem.backends.dummy import FakeA3200Transport, SimulatedWorld
+            transport = FakeA3200Transport(SimulatedWorld())
+            self.api = AerotechAsciiInterface(hostname=hostname, port=port, transport_factory=lambda: transport)
+        else:
+            self.api = AerotechAsciiInterface(hostname=hostname, port=port, transport_factory=transport_factory)
+        if z_max is not None:
+            self.api.z_limit = z_max / 1000
+        self._init_controller(self.api, program_dir)
+
+        if dummy:
+            self.connect()
+
+    @cached_property
+    def version(self):
+        return self.api.VERSION()
 
     def home(self):
         self.api.HOME(Axis.YZ | Axis.AB)

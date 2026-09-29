@@ -1,3 +1,4 @@
+import re
 import socket
 import time
 from typing import Callable, Optional
@@ -144,6 +145,13 @@ class AerotechAsciiInterface(AeroBasicAPI):
         self.transport_factory = transport_factory
         self.connect_timeout = connect_timeout
         self.response_timeout = response_timeout
+
+        # Safety limit for immediate absolute z moves in mm (None: no limit).
+        # The programming mode is tracked from the ABSOLUTE/INCREMENTAL
+        # commands sent through this interface; the controller starts in
+        # ABSOLUTE mode.
+        self.z_limit: Optional[float] = None
+        self._absolute = True
         self.history: list[AsciiCommandResponse] = []
 
         # TCP socket to the A3200 system
@@ -187,6 +195,8 @@ class AerotechAsciiInterface(AeroBasicAPI):
                 self.socket.connect((self.hostname, self.port))
                 self.socket.settimeout(self.response_timeout)
             except (ConnectionRefusedError, TimeoutError):
+                self.socket.close()
+                self.socket = None
                 self.logger.error(f"Connection to A3200 controller failed! ({self.hostname}:{self.port})")
                 raise
         return self
@@ -241,6 +251,7 @@ class AerotechAsciiInterface(AeroBasicAPI):
 
         if not self.is_opened:
             raise RuntimeError("Not connected!")
+        self._check_z_limit(command)
 
         # Append terminal character
         if not command.endswith(chr(self.COMMAND_TERMINATING_CHARACTER)):
@@ -281,6 +292,33 @@ class AerotechAsciiInterface(AeroBasicAPI):
             raise AerotechError(f"Execution failed for {command}. Reason: {error}")
 
         raise RuntimeError(f"Could not identify return code {code}")
+
+    def _check_z_limit(self, command: str) -> None:
+        """ Refuse an immediate absolute z move beyond :attr:`z_limit`.
+
+        Raises
+        ------
+        AerotechError
+            If the command moves z above the limit.
+        """
+
+        text = command.strip().upper()
+        if text == "ABSOLUTE":
+            self._absolute = True
+            return
+        if text == "INCREMENTAL":
+            self._absolute = False
+            return
+        if self.z_limit is None or not self._absolute:
+            return
+        match = re.match(r"(LINEAR|RAPID|G0|G1)\b(.*)", text)
+        if match:
+            z = re.search(r"(?<![A-Z$_])Z\s*(-?\d+\.?\d*(?:E[-+]?\d+)?)", match.group(2))
+        else:
+            z = re.match(r"MOVEABS\s+Z\s+(-?\d+\.?\d*(?:E[-+]?\d+)?)", text)
+        if z is not None and float(z.group(1)) > self.z_limit:
+            raise AerotechError(f"Refused '{command.strip()}': z {float(z.group(1))} mm exceeds the "
+                                f"maximum z position {self.z_limit} mm (zMax)")
 
     # SYSTEM COMMANDS
     def LAST_ERROR(self) -> str:

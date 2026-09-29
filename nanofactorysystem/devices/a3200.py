@@ -15,16 +15,15 @@
 ##########################################################################
 
 import os
-import socket
 import time
 from enum import Enum
-from pathlib import Path
 from typing import Any, Optional
 
 from scidatacontainer import Container
 
+from .aerotech import AerotechController
 from .attenuator import Attenuator
-from ..aerobasic.ascii import recv_line
+from ..aerobasic.ascii import AerotechAsciiInterface
 from ..config import sysConfig, popargs, ConfigDefaults
 from ..parameter import Parameter
 
@@ -94,8 +93,14 @@ END PROGRAM
 
 
 ##########################################################################
-class A3200(Parameter):
-    """ Class for controlling an Aerotech A3200 system."""
+class A3200(Parameter, AerotechController):
+    """ Aerotech A3200 controller of the Laser Nanofactory.
+
+    Combines the configuration-based controller with µm-based motion, laser
+    and z-line helpers (used by ``System`` and ``tools``) and the program
+    task handling of :class:`AerotechController` (used by ``Experiment``).
+    All commands go through one :class:`AerotechAsciiInterface` (``api``).
+    """
 
     _defaults = ConfigDefaults("controller", {
         "xInit": None,
@@ -125,14 +130,13 @@ class A3200(Parameter):
             simulated controller of the dummy backend.
         program_dir : str or Path, optional
             Directory for program files written by this class (the z-line
-            program). Default is the current working directory.
+            program, temporary programs and the execution copy of
+            :meth:`run_program_as_task`). Default: as before, the current
+            working directory and the home directory.
         **kwargs
             Runtime configuration with the optional sections ``controller``
             and ``attenuator``.
         """
-
-        # Directory for program files (None: current working directory)
-        self.program_dir = Path(program_dir) if program_dir is not None else None
 
         # Initialize parameter class
         args = popargs(kwargs, "controller")
@@ -143,18 +147,19 @@ class A3200(Parameter):
         if self["zMax"] is None:
             raise RuntimeError("Maximum z position is missing!")
 
-        # TCP socket to the A3200 system
-        if transport is None:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        else:
-            self.socket = transport
+        # ASCII command interface to the A3200 system; immediate absolute z
+        # moves beyond zMax are refused
+        api = AerotechAsciiInterface(
+            self["host"], self["port"],
+            transport_factory=(lambda: transport) if transport is not None else None,
+            connect_timeout=self["connectTimeout"], response_timeout=self["responseTimeout"])
+        api.z_limit = self["zMax"] / 1000
+        self._init_controller(api, program_dir)
         self.opened = False
 
         # Connect to the A3200 system
         try:
-            self.socket.settimeout(self["connectTimeout"])
-            self.socket.connect((self["host"], self["port"]))
-            self.socket.settimeout(self["responseTimeout"])
+            self.connect()
         except (ConnectionRefusedError, TimeoutError):
             self.log.error("Connection to A3200 controller failed!")
             return
@@ -212,36 +217,32 @@ class A3200(Parameter):
         # print("".join(traceback.format_exception(errtype, value, tb)))
         self.close()
 
+    @property
+    def socket(self):
+        """ Socket (or simulated transport) of the ASCII command interface. """
+
+        return self.api.socket
+
     def close(self):
 
         """ Close connection to the A3200 system. """
 
-        self.socket.close()
+        AerotechController.close(self)
         self.opened = False
 
     def run(self, cmd: str) -> str:
 
-        """ Run the given AeroBasic command on the A3200 controller. """
+        """ Run the given AeroBasic command on the A3200 controller.
+
+        Raises
+        ------
+        AerotechError
+            (a ``RuntimeError``) if the controller rejects the command.
+        """
 
         if not self.opened:
             raise RuntimeError("Not connected!")
-
-        # Append terminal character
-        if cmd[-1] != chr(self["cmdTerminatingChar"]):
-            cmd += chr(self["cmdTerminatingChar"])
-
-        # Send command
-        self.socket.send(cmd.encode())
-
-        # Read and return response
-        terminator = chr(self["cmdTerminatingChar"])
-        line = recv_line(self.socket, terminator).strip()
-        code, response = line[0], line[1:]
-        if code != chr(self["cmdSuccessChar"]):
-            self.socket.send(("~LASTERROR" + terminator).encode())
-            line = recv_line(self.socket, terminator).strip()
-            raise RuntimeError(f"Command failed! {code}, {response} -> {line}")
-        return response
+        return self.api.send(cmd)
 
     def version(self) -> str:
 
