@@ -57,6 +57,7 @@ is longer than 260 characters.
 | `test_aerobasic/test_golden_programs.py` | Generated text of 11 representative programs (DefaultSetup and SetupIFOV) against `test/golden/*.txt` | **Any unintended change** of the commands sent to the machine, e.g. after refactoring the drawing classes | – |
 | `test_utils/test_units.py` | Prototype unit conversion (`UnitFloat`, defined in the test) with `Unit` | Wrong mm/µm/cm factors | – |
 | `test_config_sources.py` | Config lookup order, built-in default, `use_config`, lazy class defaults | The package failing to import without `~/nanofactory.json`; the config not being switchable in tests | – |
+| `test_runtime.py` | `getLogger()` does not duplicate handlers and switches log files; failed controller commands are logged, not printed | Duplicated or misrouted log lines when several experiments run in one process | – |
 | `test_conftest.py` | The `--run-hardware` handling and the shared fixtures | Hardware tests running (or silently not running) on the wrong machine | – |
 | `slicer/test_model3d.py` | `Model3D_Slicer`: STL → toolpath → layer programs, JSON and HDF5 export (checks in `slicer/model3d_checks.py`) | Regressions in the 3D-model slicing pipeline | `trimesh`, `shapely`, `h5py` (skipped if missing) |
 
