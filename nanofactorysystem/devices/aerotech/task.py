@@ -9,10 +9,10 @@ from nanofactorysystem.aerobasic.ascii import AerotechAsciiInterface, TaskFailed
 from nanofactorysystem.aerobasic.constants.tasks import TaskMode, TaskStatus0, TaskState, TaskStatus2, TaskStatus1
 
 """
-Task -> Aerobasic task -> Im Prinzip nur ein Getter für Informationen
-ExecutableProgram(ABC) -> Hat eine execute-Funktion und Callbacks für Vor- und Nach dem Task
--> SingleProgram(ExecutableProgram) -> Bekommt ein AeroBasic Programm
--> MultiStageProgram(ExecutableProgram) -> Bekommt eine LayerFactory und hat Callbacks für vor/nach jedem Layer
+Task -> Aerobasic task -> basically only a getter for information
+ExecutableProgram(ABC) -> has an execute function and callbacks before and after the task
+-> SingleProgram(ExecutableProgram) -> gets an AeroBasic program
+-> MultiStageProgram(ExecutableProgram) -> gets a LayerFactory and has callbacks before/after each layer
 
 LayerFactory -> Iterator[AerobasicProgram]
 
