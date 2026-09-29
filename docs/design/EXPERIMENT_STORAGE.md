@@ -1,6 +1,9 @@
 # Design: Experiment storage and substrate model
 
-Status: **draft, waiting for maintainer approval.** The decisions in §12 need an answer first.
+Status: approved 2026-09-29
+
+Approved by the maintainer on 2026-09-29 in the Claude Code session, with every proposal in §12
+accepted as written.
 Date: 2026-09-29. Todo: T42. Basis: `docs/reviews/METADATA_AUDIT.md` (T41).
 Implemented by: T47 (experiment store), T48 (substrates, default location, index), T49 (summary),
 T50 (restart); related: T46 (capture positions), T55–T59 (defects from the audit).
@@ -473,9 +476,10 @@ Use by `Experiment`:
 | `System.close()` → `save_log()` | `append_command_log()` at the end of the session (T55) |
 | `Experiment.parameters_from_dictionary` | `ExperimentStore.open(folder).read()` → constructor arguments; the JSON form stays supported |
 
-## 12. Decisions for the maintainer
+## 12. Decisions
 
-Each has a proposal; implementation that depends on it waits for the answer.
+All proposals below were accepted by the maintainer on 2026-09-29. The questions after each
+proposal are answered by the proposal itself (D1: hard error; D2: `nnn` restarts every year).
 
 - **D1 – Default root and sync check.** Proposal: `~/Documents/Femtika_Experiment/<user>/`, per-user
   `dataRoot` in `nanofactory.json`, and a hard error if the root lies in a Seafile/OneDrive/Dropbox folder
@@ -514,4 +518,5 @@ Each has a proposal; implementation that depends on it waits for the answer.
 
 ## 14. Approval
 
-Maintainer: write `Status: approved <date>` at the top of this document, with the answers to §12.
+Approved by the maintainer on 2026-09-29 (all proposals in §12 accepted); recorded in the status line
+at the top.
