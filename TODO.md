@@ -49,15 +49,6 @@ Format rules (for humans and Claude):
         - Either the validation is implemented and the `xfail` on `test_prevent_mixed_axes` is removed, or the
           test is rewritten to the decided behaviour.
 
-- [ ] T25: Fix argument passing in experiment scripts (found during T10)
-      Goal: Restarting an experiment and passing substrate information work as intended.
-      Priority: medium | Depends on: –
-      Done when:
-        - `mains/restart_experiment.py` creates a logger from the stored log file path instead of passing the path
-          string as `logger`.
-        - `default_exp_file.binary_testprint(substrate=...)` passes the substrate information to `Experiment`.
-        - A dummy-backend test restarts an experiment from its stored `experiment_dictionary.json`.
-
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
 
@@ -105,4 +96,6 @@ Format rules (for humans and Claude):
 - [x] T17: Clean up logging — 2026-09-29 — `getLogger()` no longer duplicates handlers (one console handler, one log file that is replaced for a new file); command failures are logged instead of printed. — commits: `2da7be2`, `cdcee08`
 
 - [x] T24: Fix `utils.visualization.plot_movements` — 2026-09-29 — Arcs, ragged segments, empty programs, degenerate axes and RAPID/variables are handled; all program plots work and plotting errors fail the tests again; 5 new tests. — commits: `da404d1`, `e2df115`
+
+- [x] T25: Fix argument passing in experiment scripts — 2026-09-29 — The restart script now rebuilds the experiment from `experiment_dictionary.json` via the new `Experiment.parameters_from_dictionary()` (the original finding about the logger was inaccurate, see WORKLOG), and the template passes substrate information; dummy restart test added. — commits: `56e4d9a`, `412c763`
 

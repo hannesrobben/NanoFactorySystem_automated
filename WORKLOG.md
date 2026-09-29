@@ -636,3 +636,30 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Follow-ups:** `read_text` still skips linear moves that start at a zero coordinate (`(x + a) != 0 and ...`),
   which looks like a heuristic for the move from the origin. I left it unchanged.
 
+### 2026-09-29 10:05 CEST — [T25] Fix argument passing in experiment scripts
+- **Status:** done
+- **Correction of the finding (T10):** `mains/restart_experiment.py` did **not** pass a path string as logger;
+  its `load_experiment_parameter()` created a logger. The real problem was that the function is a
+  placeholder: it returns hardcoded values and ignores the stored `experiment_dictionary.json`. The fix
+  therefore addresses that.
+- **Changes:**
+  - `nanofactorysystem/experiment.py`: new `Experiment.parameters_from_dictionary(path)`. It rebuilds all
+    constructor arguments from `experiment_dictionary.json`, parsing the `str()`-encoded vectors, and creates
+    a logger for the stored log file.
+  - `mains/restart_experiment.py`: `restart(path, backend=None)` uses the stored parameters and runs only as
+    a script. The hardcoded placeholder values were removed; the maintainer's German notes are kept verbatim
+    (T18/T19).
+  - `mains/Experiments/default_exp_file.py`: `substrate` is passed to `Experiment` as
+    `substrate_information`.
+  - `test/test_experiment.py`: new restart test. An aborted print (after layer 2) is resumed through the
+    script with the dummy backend; exactly the remaining layers are printed.
+  - `test/integration/test_dry_run_default_experiment.py`: checks `substrate_information.json`.
+  - `TODO.md`: T25 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest`: 171 passed, 14 skipped, 1 xfailed.
+- **Commits:** `56e4d9a` feat(experiment): restart experiments from their stored parameters [T25];
+  `412c763` test(experiment): cover restart and substrate information [T25]
+- **Follow-ups (from the kept notes):** a restarted experiment gets a new UUID/QR text, and the maintainer
+  suspects a wrong resume position after a second abort. The test covers one abort; both notes are listed for
+  T19.
+
