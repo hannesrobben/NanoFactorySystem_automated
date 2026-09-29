@@ -206,7 +206,7 @@ class AerotechAsciiInterface(AeroBasicAPI):
             self.socket.close()
             self.socket = None
 
-    def run_testzweck_altesSystem(self, cmd: str):
+    def send_with_simple_protocol(self, cmd: str):
         """ Run the given AeroBasic command on the A3200 controller. """
 
         cmdTerminatingChar= 10
@@ -243,7 +243,7 @@ class AerotechAsciiInterface(AeroBasicAPI):
         try:
             return self.send(command)
         except AerotechError:
-            return self.run_testzweck_altesSystem(command)
+            return self.send_with_simple_protocol(command)
 
     def send(self, command: str) -> str:
 
