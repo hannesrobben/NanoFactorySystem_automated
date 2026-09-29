@@ -782,3 +782,32 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Follow-ups:** German comments remain in the experiment scripts (`mains/`) and in `test/manual/`. Those are
   lab scripts; translating them can be scheduled together with T26 (parameterise the experiment scripts).
 
+
+### 2026-09-29 20:28 CEST — [T41] Audit the experiment metadata
+- **Status:** done
+- **Branch:** `docs/t41-metadata-audit` (new, from `refactor/dummy-backend-and-tests` at `8ece0f4`)
+- **Changes:**
+  - `docs/reviews/METADATA_AUDIT.md` (new): every file an experiment writes (method, time, content,
+    location), the content of the JSON files and `.zdc` containers, a rating of each metadata item
+    (complete / incomplete / wrong / missing, with the todo that covers it), and the input for T42.
+  - `TODO.md`:
+    - T41 moved to Done.
+    - New todos "(found during T41)": T55 (command log into the experiment), T56 (reversible structure
+      serialisation), T57 (relative paths), T58 (defined capture position, phase 1), T59 (print-progress
+      counts and timestamps), T60 (experiment plots, phase B). The phase table lists them.
+  - `WORKLOG.md`: this entry.
+- **Tests:** no code changed, so the suite was not run. Two dummy dry runs of
+  `default_exp_file.binary_testprint` were run with a scratch script outside the repository:
+  - A: the template as it is (20x, IFOV off, no DHM);
+  - B: 63x, IFOV on, DHM on, plus one `Stair` structure.
+  Both finished. Their files are the basis of the ratings.
+- **Commits:** `bf5565a` docs(reviews): audit the experiment metadata [T41];
+  `<this commit>` docs(todo): close T41 and add its follow-up todos [T41]
+- **Notes:**
+  - The global Python still fails on the OpenCV/NumPy mismatch (T9 note). I used the venv from an earlier
+    session with `PYTHONPATH` set to the repository.
+  - `TZ=Europe/Berlin date` in Git Bash prints GMT here (no time-zone data). The timestamp of this entry
+    comes from Windows (`W. Europe Standard Time`).
+  - `.claude/settings.local.json` (gitignored, not committed): `Bash` added to the allowed tools, as the
+    maintainer requested.
+- **Follow-ups:** T42 (design of the experiment storage) is next. It ends at a maintainer approval gate.

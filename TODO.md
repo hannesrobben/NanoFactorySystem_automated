@@ -22,11 +22,11 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 | Phase | Topic | Todos | Gate before the dependent todos start |
 |---|---|---|---|
 | 0 | Concept: metadata audit, storage and substrate design | T41, T42 | T42 approved by the maintainer |
-| 1 | Consistent execution parameters (independent of phase 0) | T43, T44, T45, T46 | – |
-| 2 | Experiment storage | T47, T48, T49, T50 | – |
+| 1 | Consistent execution parameters (independent of phase 0) | T43, T44, T45, T46, T58 | – |
+| 2 | Experiment storage | T47, T48, T49, T50, T55, T56, T57, T59 | – |
 | 3 | Experiment scripts and substrate main | T51, T52 | – |
 | 4 | Voxel database and voxel-aware slicing (independent of phases 2–3) | T53, T54, T31 | T53 design approved by the maintainer |
-| B | Backlog from T19 (`todo_notes.md`) | T32, T37, T28, T35, T36, T38, T39 | – |
+| B | Backlog from T19 (`todo_notes.md`) | T32, T37, T28, T35, T36, T38, T39, T60 | – |
 
 ### Working rules for Claude Code (in addition to CLAUDE.md)
 1. Pick the first open todo of the lowest unfinished phase whose dependencies are done. Phase 1 may be
@@ -48,16 +48,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 ## Open
 
 ### Phase 0 — Concept
-
-- [ ] T41: Audit the experiment metadata [phase: 0]
-      Goal: A documented list of all data an experiment writes today, where it is written, and what is missing or wrong, as input for T42.
-      Priority: high | Depends on: –
-      Done when:
-        - `docs/reviews/METADATA_AUDIT.md` lists every file an experiment writes (at least `experiment_dictionary.json`, `structures.json`, `substrate_information.json`, `calibration_file.npy`, `experiment.png`, `qr_code_image.png`, `plot_<name>.png`, the per-layer `.pgm` files, `A3200.log`, the camera and DHM `.zdc` files from `Experiment.measure()`, the log file) with the writing method, the content and the location.
-        - Each metadata item is rated complete / incomplete / wrong / missing, checked against the files written by a dummy dry run of `default_exp_file.binary_testprint`.
-        - Missing items are listed, at least checked: slicing and hatching parameters, power and velocity per structure, setup (IFOV on/off) per structure, DHM usage, camera usage, plane-fit mode, sample points and fitted plane, drop direction, stage position of every capture, positions of all corners incl. the double corner, user, objective, git commit of the software, timestamps.
-        - Defects that T42–T50 do not cover are added as todos "(found during T41)".
-      Notes: Analysis only, no code changes.
 
 - [ ] T42: Design the experiment storage and substrate model [phase: 0]
       Goal: An approved design document `docs/design/EXPERIMENT_STORAGE.md` that defines how substrates, experiments and their data are stored.
@@ -119,6 +109,15 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
         - `measure()` accepts an optional list of offsets relative to the structure center (default: one capture at the center); every capture is stored with its own position. This is only the extension point for speckle averaging (F5) and DHM stitching (F6).
         - Dummy test with two capture positions checks the stored positions.
 
+- [ ] T58: Define the capture position of `measure()` (found during T41) [phase: 1]
+      Goal: Camera and DHM captures are taken at a defined Z and galvo position, not wherever the last layer left the axes.
+      Priority: medium | Depends on: T46
+      Done when:
+        - Decision: capture Z (e.g. plane height at the structure center plus an offset, per drop direction) and whether A/B are reset to 0 before a capture; documented in the `measure()` docstring.
+        - `measure()` moves to that position before every capture; the commanded position is what T46 stores.
+        - Dummy test: after a layer with galvo offsets, the capture is taken at the defined Z and A = B = 0 (or the decided values).
+      Notes: Today `measure()` sends only `LINEAR X Y`; in the T41 dry run captures were taken at A = 30 µm, B = 225 µm and the Z of the last layer.
+
 ### Phase 2 — Experiment storage
 
 - [ ] T47: Implement the HDF5 experiment store [phase: 2]
@@ -131,6 +130,41 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
         - Slicer outputs (`aerobasic/slicer/storage.py`) are stored in, or linked from, the experiment file.
         - A load function reconstructs all experiment metadata from the HDF5 file alone.
         - Tests: a dummy dry run writes the file and reading it back matches the JSON copies; an exception in the middle of printing leaves a readable file.
+
+- [ ] T55: Store the controller command log with the experiment (found during T41) [phase: 2]
+      Goal: The record of every command sent to the A3200 belongs to the experiment and survives the next run and an abort.
+      Priority: medium | Depends on: T47
+      Done when:
+        - `A3200.log` (or its content in the experiment file) is written into the experiment, not into the working directory, and is not overwritten by a later experiment.
+        - It is also written when the experiment ends with an exception.
+        - Dummy test: two experiments in a row keep two separate command logs; an aborted run still has one.
+      Notes: Today `System.close()` writes `A3200.log` to `backend.program_dir()`, i.e. the working directory on the lab PC.
+
+- [ ] T56: Make structure serialisation complete and reversible (found during T41) [phase: 2]
+      Goal: A structure can be rebuilt from its stored configuration.
+      Priority: medium | Depends on: T47
+      Done when:
+        - `DrawableObject._init_args` uses only the `__init__` parameters (not local variables) and fails loudly or warns when a parameter cannot be recovered, instead of dropping it silently.
+        - Enums and nested objects are stored in a form that can be read back; the class is identified by module and name.
+        - A `from_json` (or equivalent) rebuilds every active structure class; a test round-trips each class used in the golden tests.
+        - Golden files unchanged.
+      Notes: The skipped height data (`data`, `height_profile`, N046) stays in T37 and can build on this.
+
+- [ ] T57: Store paths relative to the experiment folder (found during T41) [phase: 2]
+      Goal: A copied or moved experiment folder can be read and restarted from its new location.
+      Priority: medium | Depends on: T47
+      Done when:
+        - `path`, `logger`, `program_file` and `layer_files` are stored relative to the experiment root (old absolute entries are still read).
+        - Dummy test: build an experiment, move the folder, restart it from the new location.
+
+- [ ] T59: Correct the print-progress record (found during T41) [phase: 2]
+      Goal: The progress record states correctly how many layers were printed and when.
+      Priority: low | Depends on: T47
+      Done when:
+        - The number of printed layers is a count (not the loop index), for UP and DOWN.
+        - Every layer and structure entry has a start and end timestamp; the repeated explanatory text is replaced by a documented schema.
+        - Dummy test for UP and DOWN checks the counts after a complete and an aborted structure.
+      Notes: Can be done as part of T47/T50 if the progress record moves into the experiment file.
 
 - [ ] T48: Substrate model, default location and experiment index [phase: 2]
       Goal: Several experiments on one substrate are stored side by side under a default location and can be found again.
@@ -272,6 +306,14 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
       Done when:
         - `test/manual/dhm/DHMUserBackend.py` implements its reset method (N094).
 
+- [ ] T60: Experiment plots: corners, QR code and structure plots (found during T41) [phase: B]
+      Goal: The overview plot shows everything that is printed, and structure plots can be switched on.
+      Priority: low | Depends on: –
+      Done when:
+        - `plot_experiment()` draws the corners (marking the double corner) and the QR code, and shows the experiment UUID.
+        - The hard-coded `plotting_structure = False` in `structure_program` is replaced by a parameter (default off) or removed.
+        - Test: the plot is written for the dry-run experiment.
+
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
 
@@ -329,4 +371,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T19: Identify each and every todo and note in all of the documents — 2026-09-29 — All 535 work markers (94 distinct) and the slicer roadmap are recorded in `todo_notes.md` with meaning, locations and 15 work packages (T26–T40), then removed from the active code; explanatory notes kept (maintainer decision). — commits: `b2d2f05`, `5f8af15`
 
 - [x] T18: Translate German identifiers and comments — 2026-09-29 — German comments/docstrings in the package and test modules translated, `run_testzweck_altesSystem` renamed to `send_with_simple_protocol`, one module per commit; `mains/` and `test/manual/` scripts left (see WORKLOG). — commits: `118a095` … `7d973e9` (15)
+
+- [x] T41: Audit the experiment metadata — 2026-09-29 — `docs/reviews/METADATA_AUDIT.md` lists every file an experiment writes and rates each metadata item, checked against two dummy dry runs of the template; defects outside T42–T50 were added as T55–T60. — commits: `bf5565a`
 
