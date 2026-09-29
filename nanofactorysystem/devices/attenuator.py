@@ -58,8 +58,7 @@ class Attenuator(Parameter):
         self.num = len(self.raw) // 16
         fmt = "<" + 2 * self.num * "d"
         self.data = struct.unpack(fmt, self.raw)
-        self.data = numpy.array(self.data)
-        self.data.shape = (self.num, 2)
+        self.data = numpy.array(self.data).reshape(self.num, 2)
 
         # Either spline or polynomial interpolation.
         # Warning: Polynomial interpolation (in contrast to spline
