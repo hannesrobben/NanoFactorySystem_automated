@@ -226,8 +226,9 @@ class AerotechAsciiInterface(AeroBasicAPI):
         return data
 
     def send_one(self, command: str) -> str:
+        """ Send a command; on an AerotechError retry it with the old, simpler protocol handling. """
         try:
-            return self.send_one(command)
+            return self.send(command)
         except AerotechError:
             return self.run_testzweck_altesSystem(command)
 

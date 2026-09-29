@@ -176,6 +176,10 @@ class A3200(Parameter):
         # Store current xyz position
         self["xInit"], self["yInit"], self["zInit"] = self.position("XYZ")
 
+        # Last commanded z position, used by the zMax safety checks of
+        # moveinc() and zline() (before, it was only set by moveabs())
+        self.z = self["zInit"]
+
         # No program tasks loaded yet
         self.task_pgms = {}
 
@@ -258,7 +262,7 @@ class A3200(Parameter):
 
         """ Run a home cycle on the given axes. """
 
-        if axes in None:
+        if axes is None:
             axes = "XYZ"
         axes = self.normaxes(axes, "XYZ")
         for axis in axes:
@@ -555,7 +559,7 @@ class A3200(Parameter):
         }
 
         # Add program files
-        for name, task in self["tasks"]:
+        for name, task in self["tasks"].items():
             item = f"data/{name}.pgm"
             items[item] = self.task_pgms[name]
 

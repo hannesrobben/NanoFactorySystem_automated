@@ -175,7 +175,7 @@ class System(Parameter):
         centre. """
 
         if vs is None:
-            vs = self.system.controller.position("XYZ")
+            vs = self.controller.position("XYZ")
         return self.transform.object_pos(v_px, vs)
 
     def camera_pos(self, v_um, vs=None):
@@ -187,7 +187,7 @@ class System(Parameter):
         centre. """
 
         if vs is None:
-            vs = self.system.controller.position("XY")
+            vs = self.controller.position("XY")
         return self.transform.camera_pos(v_um, vs)
 
     def stage_pos(self, v_um, v_px):
