@@ -170,7 +170,10 @@ class Task:
             )
 
         if int(self.current_line) != self.total_lines:
-            print(f"Task Mode: {self.task_mode}\nTask State: {self.task_state}\nTask Status 0: {self.task_status0}\nTask Status 1: {self.task_status1}\nTask Status 2: {self.task_status2}")
+            self.api.logger.warning(
+                f"Task {self.task_id} finished at line {self.current_line} of {self.total_lines}: "
+                f"mode {self.task_mode}, state {self.task_state}, status0 {self.task_status0}, "
+                f"status1 {self.task_status1}, status2 {self.task_status2}")
 
         pbar.close()
 

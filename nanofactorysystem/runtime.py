@@ -18,24 +18,50 @@ LOGFMT = logging.Formatter(fmt="%(asctime)s / %(levelname)s / %(message)s",
 
 
 def getLogger(logfile=None):
-    """ Configure and return a logger object. """
+    """ Configure and return the package logger.
+
+    The logger is shared, so repeated calls do not add handlers again:
+    there is one console handler, and at most one log file. A call with a
+    different ``logfile`` replaces the previous log file (e.g. for the next
+    experiment in the same process); a call without ``logfile`` keeps it.
+
+    Parameters
+    ----------
+    logfile : str or Path, optional
+        File to which all messages are written.
+
+    Returns
+    -------
+    logging.Logger
+        The configured logger.
+    """
 
     # Initialize logger object
     logger = logging.getLogger('dummy')
     logger.setLevel(logging.DEBUG)
+    own = [h for h in logger.handlers if getattr(h, "_nanofactory", False)]
 
     # Console output
-    consolehandler = logging.StreamHandler()
-    consolehandler.setLevel(logging.DEBUG)
-    consolehandler.setFormatter(LOGFMT)
-    logger.addHandler(consolehandler)
+    if not any(not isinstance(h, logging.FileHandler) for h in own):
+        consolehandler = logging.StreamHandler()
+        consolehandler.setLevel(logging.DEBUG)
+        consolehandler.setFormatter(LOGFMT)
+        consolehandler._nanofactory = True
+        logger.addHandler(consolehandler)
 
     # Optional file output
     if logfile:
-        filehandler = logging.FileHandler(logfile)
-        filehandler.setLevel(logging.DEBUG)
-        filehandler.setFormatter(LOGFMT)
-        logger.addHandler(filehandler)
+        path = str(Path(logfile).resolve())
+        for handler in own:
+            if isinstance(handler, logging.FileHandler) and handler.baseFilename != path:
+                logger.removeHandler(handler)
+                handler.close()
+        if not any(isinstance(h, logging.FileHandler) and h.baseFilename == path for h in logger.handlers):
+            filehandler = logging.FileHandler(logfile)
+            filehandler.setLevel(logging.DEBUG)
+            filehandler.setFormatter(LOGFMT)
+            filehandler._nanofactory = True
+            logger.addHandler(filehandler)
 
     # Return logger object
     return logger

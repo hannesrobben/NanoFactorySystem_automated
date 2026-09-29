@@ -210,13 +210,12 @@ class AerotechAsciiInterface(AeroBasicAPI):
         self.socket.send(cmd.encode())
 
         # Read and return response
-        line = self.socket.recv(4096).decode().strip()
+        line = recv_line(self.socket, chr(cmdTerminatingChar)).strip()
         code, response = line[0], line[1:]
         if code != chr(cmdSuccessChar):
-            print(f"Command failed! {code}, {response} -> {line}")
-            self.socket.send("~LASTERROR".encode())
-            line = self.socket.recv(4096).decode().strip()
-            print(f"Command failed! {code}, {response} -> {line}")
+            self.socket.send(("~LASTERROR" + chr(cmdTerminatingChar)).encode())
+            line = recv_line(self.socket, chr(cmdTerminatingChar)).strip()
+            self.logger.error(f"Command failed! {code}, {response} -> {line}")
 
         data = "".join(response)
 
@@ -263,7 +262,7 @@ class AerotechAsciiInterface(AeroBasicAPI):
 
         # Error handling -> Invalid Syntax
         if cmd_resp.return_code == ReturnCode.INVALID:
-            print(f"Command failed! {code}, {data}")
+            self.logger.error(str(cmd_resp))
             raise AerotechError(f"Command '{command.strip()}' has an invalid syntax!")
 
         # Error handling -> Code execution failed
@@ -275,8 +274,6 @@ class AerotechAsciiInterface(AeroBasicAPI):
 
             cmd_resp.error = error
             self.logger.error(str(cmd_resp))
-
-            print(f"Command failed! {code}, {data}")
             raise AerotechError(f"Execution failed for {command}. Reason: {error}")
 
         raise RuntimeError(f"Could not identify return code {code}")
