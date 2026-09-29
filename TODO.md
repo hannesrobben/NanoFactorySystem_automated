@@ -27,17 +27,6 @@ Format rules (for humans and Claude):
         - Whether `zMax` also guards `.api.LINEAR` moves is decided by the maintainer and documented.
       Notes: Maintainer decision 2026-09-28. Refactor only after the dummy backend and tests exist.
 
-- [ ] T9: Fix packaging and pin a working environment (found during T1)
-      Goal: `pip install .` installs a complete, importable package on a fresh machine.
-      Priority: high | Depends on: –
-      Done when:
-        - `pyproject.toml` uses package discovery, so all subpackages are installed.
-        - All dependencies imported by active modules (`scipy`, `shapely`, `trimesh`, `qrcode`, `h5py`, …)
-          are declared, hardware-only packages are optional extras, and the versions are compatible with
-          NumPy 2 (e.g. `opencv-python>=4.10.0.84`).
-        - A fresh virtual environment with `pip install .[test]` can run `python -m pytest`.
-      Notes: The global interpreter on the lab PC currently fails to import the package (NumPy ABI). Details: `docs/reviews/CODE_REVIEW_2026-09-28.md` §2.
-
 - [ ] T10: Fix defects in the experiment flow (found during T1)
       Goal: The experiment flow handles the DHM OPL scan and failed layers correctly.
       Priority: high | Depends on: T3
@@ -170,4 +159,6 @@ Format rules (for humans and Claude):
 - [x] T7: Golden-file tests for AeroBasic generation — 2026-09-28 — 11 representative programs (DefaultSetup and SetupIFOV, incl. corners, stair, QR code, IFOV grating) are compared against `test/golden/*.txt`; `--update-golden` regenerates them deliberately. — commits: `175af6b`
 
 - [x] T8: Write `test/README.md` and update the documentation — 2026-09-28 — `test/README.md` documents the four test categories with per-module tables, run commands, markers, dummy backend usage and artefact locations; CLAUDE.md Commands, Architecture (and the outdated Configuration) sections updated. — commits: `1705ca4`
+
+- [x] T9: Fix packaging and pin a working environment — 2026-09-29 — `pyproject.toml` discovers all subpackages, declares all runtime dependencies (OpenCV pinned for NumPy 2) and a `test` extra; a fresh venv with `pip install ".[test]"` passes the suite. — commits: `7aecd16`
 

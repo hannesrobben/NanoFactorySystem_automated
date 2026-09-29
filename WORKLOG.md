@@ -379,3 +379,33 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Follow-ups:** none new. The `testing-infrastructure` group (T1–T8, plus T12 and T15, which were done as
   prerequisites) is complete.
 
+### 2026-09-29 09:40 CEST — [T9] Fix packaging and pin a working environment
+- **Status:** done
+- **Changes:**
+  - `pyproject.toml`:
+    - `[tool.setuptools.packages.find] include = ["nanofactorysystem*"]` replaces the explicit list, which
+      installed only the top-level package.
+    - Dependencies now cover all imports of active modules (`scipy`, `qrcode`, `shapely`, `trimesh`, `h5py`
+      added) and pin `opencv-python>=4.10.0.84` for NumPy 2.
+    - The `test` extra adds `pytest`; `requires-python = ">=3.11"`; the build requirements are reduced to
+      `setuptools>=64`.
+    - The hardware-only packages that are not on PyPI are documented in a comment.
+  - `test/README.md`: environment setup via `pip install ".[test]"`, the OpenCV/NumPy note, and the Windows
+    path-length note for `shapely`.
+  - `CLAUDE.md`: install command and environment note in `## Commands`.
+  - `TODO.md`: T9 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:**
+  - A fresh venv (`python -m venv`, then `pip install ".[test]"`) installed numpy 2.5.3 and opencv-python
+    5.0.0.93.
+  - From outside the repository, `nanofactorysystem.backends.dummy`, `aerobasic.programs.drawings`,
+    `aerobasic.slicer` and `devices.aerotech` import from `site-packages`.
+  - `pytest` (the venv's executable, so the installed package is used) in the repo:
+    128 passed, 14 skipped, 1 xfailed.
+  - Build artefacts (`build/`, `*.egg-info`) and the stale ignored `.test/` directory from the T4 run were
+    removed.
+- **Commits:** `7aecd16` build: install all subpackages and declare the real dependencies [T9]
+- **Follow-ups:** The global interpreter on this PC still has `opencv-python 4.10.0.82` with NumPy 2.4.6.
+  I did not change it. Running `pip install --upgrade "opencv-python>=4.10.0.84"`, or reinstalling the
+  package with `pip install .`, fixes it; that is the maintainer's decision.
+
