@@ -51,6 +51,7 @@ is longer than 260 characters.
 | `test_aerobasic/test_constants.py` | Parsing and combining axes (`Axis`, `SingleAxis`, `Stages`) | Wrong axis names in `ENABLE`/`HOME`/`LINEAR` commands. `test_prevent_mixed_axes` is a strict `xfail` until the decision in T23. | – |
 | `test_aerobasic/test_coordinate_system.py` | Plane fit and the local → stage coordinate transformation | Structures written at the wrong height or position on a tilted substrate | – |
 | `test_aerobasic/test_program.py` | `AeroBasicProgram` text output and writing `.pgm` files | Broken program files that the controller rejects | – |
+| `test_aerobasic/test_power_calibration.py` | Power (mW) → attenuator conversion for IFOV structures: explicit, active and configured calibration; `Experiment` uses its attenuator | Wrong laser power in IFOV programs; programs depending on a lab-only file | – |
 | `test_aerobasic/test_variables.py` | `create_variable`, `DVAR` declarations | Invalid variable declarations in generated programs | – |
 | `test_aerobasic/test_drawings/test_circles.py`, `test_corners.py` | Circle and corner structures generate programs | Exceptions in drawing code; the program content is checked by the golden tests | – |
 | `test_aerobasic/test_golden_programs.py` | Generated text of 11 representative programs (DefaultSetup and SetupIFOV) against `test/golden/*.txt` | **Any unintended change** of the commands sent to the machine, e.g. after refactoring the drawing classes | – |
