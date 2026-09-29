@@ -51,49 +51,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 
 ### Phase 1 — Consistent execution parameters
 
-- [ ] T43: Make the drop direction consistent everywhere [phase: 1]
-      Goal: The drop direction is one explicit parameter that flows from the experiment script through `Experiment`, `System`, the tools and the structures; no orientation hotfixes remain.
-      Priority: high | Depends on: –
-      Done when:
-        - Every active experiment script in `mains/` passes `drop_direction` explicitly (N002); no script sets a z sign by hand.
-        - `tools/layer.py` and `tools/detector.py` derive their orientation from `DropDirection` instead of the separate `Orientation` value and the "Top" hotfix; the drop direction is part of `sys_args` where the tools need it (N087, N089). Decision: merge `Orientation` into `DropDirection` or map one to the other.
-        - `QRCode` takes the drop direction into account (N070).
-        - Every place that depends on the sign is listed in the `DropDirection` docstring (coordinate system, layer order in `print_structure`, start z in `plane_fit`, restart, detector) and checked.
-        - The `DropDirection` docstring states that dip-in needs a different computation and is planned (future_todo.md F8); no `DIP_IN` member is added yet.
-        - Dummy tests: UP and DOWN give mirrored z values in the layer programs; existing golden files are unchanged.
-      Notes: Covers N002, N070, N087, N089 (parts of T35 and T37).
-
-- [ ] T44: Restructure how plane fitting is run [phase: 1]
-      Goal: Plane-fit modes are named, documented and selectable per experiment, and a single plane fit can run outside `Experiment`. The fitting algorithms stay unchanged.
-      Priority: high | Depends on: T43
-      Done when:
-        - `plane_fit_mode: int` is replaced by an enum with descriptive names for the current modes 0 and 1; the old integers are still accepted when an `experiment_dictionary.json` is read.
-        - A "border only" mode exists (N026).
-        - A single plane fit can be run outside `experiment.py` (N079).
-        - The `+1` in the sample points for mode 0 is checked (N078); the experiment center is validated against the resin drop edges (N022); for big structures the z deviation between the corners is checked and a warning is logged above a configurable threshold (N082).
-        - Mode, sample points and the fitted plane are stored in the experiment dictionary.
-        - A dummy test per mode checks number and positions of the sample points.
-      Notes: Replaces T29.
-
-- [ ] T45: Take camera images only on request [phase: 1]
-      Goal: `Experiment.measure()` takes a camera image only when this is explicitly enabled.
-      Priority: medium | Depends on: –
-      Done when:
-        - A parameter `camera_capture: bool = False` exists (Decision: `sys_args["camera"]` or `Experiment` argument; document the choice) and is stored in the experiment dictionary.
-        - `measure()` skips `System.getimage()` when it is False and returns `None` for the camera container; `restart_experiment()` uses the stored value.
-        - Experiment scripts that need camera images set it to True explicitly (listed in WORKLOG.md).
-        - Dummy tests for both values.
-      Notes: Video recording in a thread is future_todo.md F3.
-
-- [ ] T58: Define the capture position of `measure()` (found during T41) [phase: 1]
-      Goal: Camera and DHM captures are taken at a defined Z and galvo position, not wherever the last layer left the axes.
-      Priority: medium | Depends on: T46
-      Done when:
-        - Decision: capture Z (e.g. plane height at the structure center plus an offset, per drop direction) and whether A/B are reset to 0 before a capture; documented in the `measure()` docstring.
-        - `measure()` moves to that position before every capture; the commanded position is what T46 stores.
-        - Dummy test: after a layer with galvo offsets, the capture is taken at the defined Z and A = B = 0 (or the decided values).
-      Notes: Today `measure()` sends only `LINEAR X Y`; in the T41 dry run captures were taken at A = 30 µm, B = 225 µm and the Z of the last layer.
-
 ### Phase 2 — Experiment storage
 
 - [ ] T47: Implement the HDF5 experiment store [phase: 2]
@@ -294,6 +251,49 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 <!-- Claude Code moves a todo here when starting work. -->
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
+- [ ] T58: Define the capture position of `measure()` (found during T41) [phase: 1]
+      Goal: Camera and DHM captures are taken at a defined Z and galvo position, not wherever the last layer left the axes.
+      Priority: medium | Depends on: T46
+      Done when:
+        - Decision: capture Z (e.g. plane height at the structure center plus an offset, per drop direction) and whether A/B are reset to 0 before a capture; documented in the `measure()` docstring.
+        - `measure()` moves to that position before every capture; the commanded position is what T46 stores.
+        - Dummy test: after a layer with galvo offsets, the capture is taken at the defined Z and A = B = 0 (or the decided values).
+      Notes: Today `measure()` sends only `LINEAR X Y`; in the T41 dry run captures were taken at A = 30 µm, B = 225 µm and the Z of the last layer.
+      Blocked by: Decision. Proposal: before every capture move to Z = plane height at the capture position plus an objective-specific offset `captureZOffset` (new key of the objective section, default 0 µm), and set A = B = 0. Asked 2026-09-29.
+- [ ] T45: Take camera images only on request [phase: 1]
+      Goal: `Experiment.measure()` takes a camera image only when this is explicitly enabled.
+      Priority: medium | Depends on: –
+      Done when:
+        - A parameter `camera_capture: bool = False` exists (Decision: `sys_args["camera"]` or `Experiment` argument; document the choice) and is stored in the experiment dictionary.
+        - `measure()` skips `System.getimage()` when it is False and returns `None` for the camera container; `restart_experiment()` uses the stored value.
+        - Experiment scripts that need camera images set it to True explicitly (listed in WORKLOG.md).
+        - Dummy tests for both values.
+      Notes: Video recording in a thread is future_todo.md F3.
+      Blocked by: Decision. Proposal: an `Experiment` keyword argument `camera_capture: bool = False` (an experiment choice, not a camera device setting, so not in `sys_args["camera"]`), stored in the experiment metadata. Question: which experiment scripts in `mains/Experiments/` need camera images (they get `camera_capture=True`)? Asked 2026-09-29.
+- [ ] T44: Restructure how plane fitting is run [phase: 1]
+      Goal: Plane-fit modes are named, documented and selectable per experiment, and a single plane fit can run outside `Experiment`. The fitting algorithms stay unchanged.
+      Priority: high | Depends on: T43
+      Done when:
+        - `plane_fit_mode: int` is replaced by an enum with descriptive names for the current modes 0 and 1; the old integers are still accepted when an `experiment_dictionary.json` is read.
+        - A "border only" mode exists (N026).
+        - A single plane fit can be run outside `experiment.py` (N079).
+        - The `+1` in the sample points for mode 0 is checked (N078); the experiment center is validated against the resin drop edges (N022); for big structures the z deviation between the corners is checked and a warning is logged above a configurable threshold (N082).
+        - Mode, sample points and the fitted plane are stored in the experiment dictionary.
+        - A dummy test per mode checks number and positions of the sample points.
+      Notes: Replaces T29.
+      Blocked by: T43.
+- [ ] T43: Make the drop direction consistent everywhere [phase: 1]
+      Goal: The drop direction is one explicit parameter that flows from the experiment script through `Experiment`, `System`, the tools and the structures; no orientation hotfixes remain.
+      Priority: high | Depends on: –
+      Done when:
+        - Every active experiment script in `mains/` passes `drop_direction` explicitly (N002); no script sets a z sign by hand.
+        - `tools/layer.py` and `tools/detector.py` derive their orientation from `DropDirection` instead of the separate `Orientation` value and the "Top" hotfix; the drop direction is part of `sys_args` where the tools need it (N087, N089). Decision: merge `Orientation` into `DropDirection` or map one to the other.
+        - `QRCode` takes the drop direction into account (N070).
+        - Every place that depends on the sign is listed in the `DropDirection` docstring (coordinate system, layer order in `print_structure`, start z in `plane_fit`, restart, detector) and checked.
+        - The `DropDirection` docstring states that dip-in needs a different computation and is planned (future_todo.md F8); no `DIP_IN` member is added yet.
+        - Dummy tests: UP and DOWN give mirrored z values in the layer programs; existing golden files are unchanged.
+      Notes: Covers N002, N070, N087, N089 (parts of T35 and T37).
+      Blocked by: Decision (Orientation vs. DropDirection). Proposal: remove `parameter.Orientation` and let `Scanner`/`Layer` take a `DropDirection` from `sys_args["layer"]["dropDirection"]` (set by `Experiment`). Open physics question for the maintainer: today `Layer` hard-codes `Orientation.UP` for both objectives, and the scanner removes the second layer (immersion oil) above the interface for UP and below for DOWN. Must DOWN (63x) really map to the "below" rule, or should both drop directions keep the current UP behaviour? Asked 2026-09-29.
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
