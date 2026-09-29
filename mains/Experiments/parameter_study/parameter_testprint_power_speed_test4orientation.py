@@ -67,7 +67,7 @@ def testprint(absolute_center: Point2D, resin_dimension: list, ask_continue_box=
             f".output/parameter_study/Orientation_test_TL_MARK_{datetime.datetime.now():%Y%m%d}_{objective}",
             clean=False))
     else:
-        assert (path, Path)
+        path = Path(path)  # accept str or Path
         path = Path(mkdir(os.path.join(path, "parameter_testprint")))
     logger = getLogger(logfile=f"{path}/console.log")
 

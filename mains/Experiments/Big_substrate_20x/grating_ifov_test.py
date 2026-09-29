@@ -66,7 +66,7 @@ def print_file(absolute_center: Point2D, resin_dimension: list, ask_continue_box
         path = Path(mkdir(f".output/ifov/binary_grating1{datetime.datetime.now():%Y%m%d}", clean=False))
     else:
         # ToDo(HR) make ist more controllable
-        assert (path, Path)
+        path = Path(path)  # accept str or Path
         path = Path(mkdir(os.path.join(path, "grating_nach_debuggen"), clean=False))
     logger = getLogger(logfile=f"{path}/console.log")
 

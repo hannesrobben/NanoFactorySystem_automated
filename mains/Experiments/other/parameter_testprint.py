@@ -61,7 +61,7 @@ def testprint(absolute_center: Point2D, resin_dimension: list, ask_continue_box=
         # ToDo(HR) Adjust referencing to another more suitable path
         path = Path(mkdir(f".output/parameter_study/{datetime.datetime.now():%Y%m%d}_parameter_testprint_{objective}", clean=False))
     else:
-        assert (path, Path)
+        path = Path(path)  # accept str or Path
         path = Path(mkdir(os.path.join(path, "parameter_testprint")))
     logger = getLogger(logfile=f"{path}/console.log")
 

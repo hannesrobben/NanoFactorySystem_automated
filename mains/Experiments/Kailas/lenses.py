@@ -65,7 +65,7 @@ def print_file(absolute_center: Point2D, resin_dimension: list, ask_continue_box
         # ToDo(HR) Adjust referencing to another more suitable path
         path = Path(mkdir(f".output/dhm_paper/DHM_Justage_{datetime.datetime.now():%Y%m%d}_{objective}", clean=False))
     else:
-        assert (path, Path)
+        path = Path(path)  # accept str or Path
         path = Path(mkdir(os.path.join(path, f"lenses_test_{datetime.datetime.now():%Y%m%d}1234"), clean=False))
     logger = getLogger(logfile=f"{path}/console.log")
 

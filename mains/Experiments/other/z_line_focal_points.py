@@ -55,7 +55,7 @@ def focal_point_matrix_maker(absolute_center: Point2D, resin_dimension: list, as
     if path is None:
         path = Path(mkdir(f".output/focal_point/{datetime.datetime.now():%Y%m%d}", clean=False))
     else:
-        assert (path, Path)
+        path = Path(path)  # accept str or Path
         path = Path(mkdir(os.path.join(path, "focal_point")))
     logger = getLogger(logfile=f"{path}/console.log")
 

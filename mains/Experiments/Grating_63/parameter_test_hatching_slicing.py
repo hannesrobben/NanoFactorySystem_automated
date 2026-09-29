@@ -67,7 +67,7 @@ def binary_testprint(absolute_center: Point2D, resin_dimension: list, ask_contin
         path = Path(mkdir(f".output/grating/binary_grating1{datetime.datetime.now():%Y%m%d}", clean=False))
     else:
         # ToDo(HR) make ist more controllable
-        assert (path, Path)
+        path = Path(path)  # accept str or Path
         path = Path(mkdir(os.path.join(path, "parameter_test_hatching_slicing"), clean=False))
     logger = getLogger(logfile=f"{path}/console.log")
 

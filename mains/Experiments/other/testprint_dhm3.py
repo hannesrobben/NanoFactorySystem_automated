@@ -67,7 +67,7 @@ def dhm_testprint(absolute_center: Point2D, resin_dimension: list, ask_continue_
             mkdir(f".output/dhm_paper/paperprint_{datetime.datetime.now():%Y%m%d}_dhm_{objective}_DOE_lowPowerLens",
                   clean=False))
     else:
-        assert (path, Path)
+        path = Path(path)  # accept str or Path
         path = Path(mkdir(os.path.join(path, "testprint_dhm")))
     logger = getLogger(logfile=f"{path}/console.log")
 

@@ -64,7 +64,7 @@ def dhm_testprint(absolute_center: Point2D, resin_dimension: list, ask_continue_
         # ToDo(HR) Adjust referencing to another more suitable path
         path = Path(mkdir(f".output/dhm_paper/print4paper_{datetime.datetime.now():%Y%m%d}_dhm_{objective}", clean=False))
     else:
-        assert (path, Path)
+        path = Path(path)  # accept str or Path
         path = Path(mkdir(os.path.join(path, "testprint_dhm")))
     logger = getLogger(logfile=f"{path}/console.log")
 

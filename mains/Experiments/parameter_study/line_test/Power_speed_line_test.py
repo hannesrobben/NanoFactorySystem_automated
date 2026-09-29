@@ -67,7 +67,7 @@ def print_file(absolute_center: Point2D, resin_dimension: list, ask_continue_box
         path = Path(mkdir(f".output/dhm_paper/testprintline_{datetime.datetime.now():%Y%m%d}", clean=False))
     else:
         # ToDo(HR) make ist more controllable
-        assert (path, Path)
+        path = Path(path)  # accept str or Path
         path = Path(mkdir(os.path.join(path, "y_axis_line_resolution_63x"), clean=False))
     logger = getLogger(logfile=f"{path}/console.log")
 

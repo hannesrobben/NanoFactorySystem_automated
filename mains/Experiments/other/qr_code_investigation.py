@@ -63,7 +63,7 @@ def qr_code_test(absolute_center: Point2D, resin_dimension: list, ask_continue_b
         path = Path(mkdir(f".output/qr_code_test/height_pitch_test{datetime.datetime.now():%Y%m%d}", clean=False))
     else:
         # ToDo(HR) make ist more controllable
-        assert (path, Path)
+        path = Path(path)  # accept str or Path
         path = Path(mkdir(os.path.join(path, "testprint_qr_code")))
     logger = getLogger(logfile=f"{path}/console.log")
 

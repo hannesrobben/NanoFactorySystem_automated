@@ -68,7 +68,7 @@ def stacked_lens_testprint(absolute_center: Point2D, resin_dimension: list, ask_
         path = Path(mkdir(f".output/test/print_{datetime.datetime.now():%Y%m%d}", clean=False))
     else:
         # ToDo(HR) make ist more controllable
-        assert (path, Path)
+        path = Path(path)  # accept str or Path
         path = Path(mkdir(os.path.join(path, "testing"), clean=False))
     logger = getLogger(logfile=f"{path}/console.log")
 

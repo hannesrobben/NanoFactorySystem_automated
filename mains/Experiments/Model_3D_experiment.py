@@ -82,7 +82,7 @@ def print_2pp(
         )
     else:
         # ToDo(HR) make ist more controllable
-        assert (path, Path)
+        path = Path(path)  # accept str or Path
         path = Path(mkdir(os.path.join(path, "testprint2"), clean=False))
     logger = getLogger(logfile=f"{path}/console.log")
 
