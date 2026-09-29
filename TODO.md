@@ -11,13 +11,6 @@ Format rules (for humans and Claude):
 -->
 
 ## Open
-- [ ] T18: Translate German identifiers and comments (found during T1)
-      Goal: The code base follows the English-only language rule.
-      Priority: low | Depends on: –
-      Done when:
-        - German identifiers (e.g. `run_testzweck_altesSystem`) and comments in active, non-legacy modules are
-          translated, one module per commit.
-
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
 
@@ -73,4 +66,6 @@ Format rules (for humans and Claude):
 - [x] T20: Merge `A3200` and `Aerotech3200` into one controller class — 2026-09-29 — `A3200` builds on the new `AerotechController` and one ASCII interface; `System.controller is System.a3200_new`; golden command logs recorded before the merge are unchanged; maintainer decision: `.api` Z moves beyond zMax are refused. — commits: `f49d935`, `fdb0719`, `dcf80dc`, `5f8e203`
 
 - [x] T19: Identify each and every todo and note in all of the documents — 2026-09-29 — All 535 work markers (94 distinct) and the slicer roadmap are recorded in `todo_notes.md` with meaning, locations and 15 work packages (T26–T40), then removed from the active code; explanatory notes kept (maintainer decision). — commits: `b2d2f05`, `5f8af15`
+
+- [x] T18: Translate German identifiers and comments — 2026-09-29 — German comments/docstrings in the package and test modules translated, `run_testzweck_altesSystem` renamed to `send_with_simple_protocol`, one module per commit; `mains/` and `test/manual/` scripts left (see WORKLOG). — commits: `118a095` … `7d973e9` (15)
 

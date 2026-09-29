@@ -752,3 +752,33 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
     layout of the original tpp_slicer project, so I left it unchanged.
 - **Follow-ups:** the work packages T26–T40 are in `todo_notes.md`; move them to `TODO.md` to schedule them.
 
+### 2026-09-29 13:46 CEST — [T18] Translate German identifiers and comments
+- **Status:** done
+- **Scope:** package modules in `nanofactorysystem/` and `test/`. Excluded: legacy code; the experiment scripts
+  in `mains/` (scripts, not modules); the manual scripts in `test/manual/`. Work markers had already been
+  removed in T19.
+- **Changes (one module per commit):**
+  - `nanofactorysystem/aerobasic/ascii.py`: identifier `run_testzweck_altesSystem` renamed to
+    `send_with_simple_protocol` (only used in `send_one()`).
+  - Comments and docstrings translated in:
+    - `nanofactorysystem/aerobasic/programs/drawings/`: `__init__.py`, `base.py`, `calc_polygons.py`,
+      `height_function_structures/structures.py`, `height_function_structures_fixed.py` (this also fixes
+      mis-encoded umlauts), `hollow_structure.py` (also the plot title and a stale docstring argument
+      `liste`), `ifov_gratings.py`, `lens.py`, `lines.py`, `test/test_factor_matrix.py`;
+    - `nanofactorysystem/aerobasic/programs/setups.py`;
+    - `nanofactorysystem/devices/aerotech/task.py`;
+    - `nanofactorysystem/experiment.py`;
+    - `test/slicer/model3d_checks.py`.
+  - `TODO.md`: T18 moved to In Progress (with the scope), then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:**
+  - Three detection passes over all comments, docstrings and identifiers (German function words, suffixes,
+    umlauts), reviewed by hand. The last pass finds only false positives such as the unit "um" and the
+    license header.
+  - `python -m pytest`: 184 passed, 14 skipped.
+- **Commits:** `118a095` refactor(aerobasic): rename German method run_testzweck_altesSystem [T18];
+  `1d39956`, `239ed54`, `fdfea3a`, `a705542`, `121d2f6`, `e0714bd`, `317f5a9`, `9a56aac`, `5b93e4e`, `179e504`,
+  `50e6a64`, `1c0e1ca`, `882011d`, `7d973e9` docs(...): translate German comments in <module> [T18]
+- **Follow-ups:** German comments remain in the experiment scripts (`mains/`) and in `test/manual/`. Those are
+  lab scripts; translating them can be scheduled together with T26 (parameterise the experiment scripts).
+
