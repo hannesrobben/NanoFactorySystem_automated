@@ -128,7 +128,7 @@ __all__ = [
     "TilePlotter",
     "PlotSettings",
 
-    # Standalone Modules (für Rectangle3D, etc.)
+    # Standalone Modules (for Rectangle3D, etc.)
     "Apertures",
     "LaserSegment",
     "LaserSegments",
