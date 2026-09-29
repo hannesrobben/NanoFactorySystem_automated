@@ -4,6 +4,7 @@
 # This program is free software under the terms of the MIT license.      #
 ##########################################################################
 import json
+import logging
 import os.path
 import time
 import uuid
@@ -223,22 +224,27 @@ class Experiment(object):
         assert isinstance(file, dict), "Substrate information must be a dictionary!"
         file_path = Path(os.path.join(path, "substrate_information.json"))
 
-        # if a file is already existing, then we have to update the file
+        # If the file already exists (several experiments on one substrate), merge the new
+        # information into it; new values replace old values with the same key.
         if file_path.exists():
-            # read the file
             data = json.loads(file_path.read_text())
-            # update information
-            #todo something something data+file bla
+            data.update(file)
         else:
             data = file
 
         file_path.write_text(json.dumps(data, indent=4))
 
+    def _log_file(self) -> Optional[str]:
+        """ Return the file of the most recently added file handler of the logger, or None. """
+
+        files = [h.baseFilename for h in self.log.handlers if isinstance(h, logging.FileHandler)]
+        return files[-1] if files else None
+
     def _create_experiment_dictionary(self, *, skip_corner, setup):
         self.exp_dict = {"path": str(self.path),
                          "user": self.user,
-                         "objective": "Zeiss 20x",
-                         "logger": self.log.handlers[1].baseFilename,
+                         "objective": self.objective,
+                         "logger": self._log_file(),
                          "sys_args": self.sys_args,
                          "default_power": self.default_power,
                          "low_speed_um": self.low_speed_um,
@@ -516,7 +522,7 @@ class Experiment(object):
             # Dummy call to avoid low intensity images on motorscan.
             optImageMedian(dhm=self.system.dhm, vmedian=127, logger=self.log)
 
-            m0 = self.system.dhm.opl_scan(m0)
+            m0 = self.system.dhm.motorscan(m0)
             self.log.info(
                 f"OPL motor pos at {image_center}: {self.system.dhm.device.MotorPos:.1f} µm (set: {m0:.1f} µm)")
             with open(opl_dc_path, "w") as fp:
@@ -986,6 +992,7 @@ class Experiment(object):
             raise ValueError(f"Unknown drop direction {self.drop_direction}!")
 
         # Write all layers of the structure
+        layer_id = layer_count = None  # stay None if the structure has no layers
         t1 = time.time()
         for layer_count in range(len(pgm_files_list))[::order]:
             layer_pgm_path = pgm_files_list[layer_count]
@@ -1005,6 +1012,7 @@ class Experiment(object):
                                            drop_direction=self.drop_direction)
             except AerotechError as e:
                 self.log.error(f"Program failed for {name}: {e}")
+                self._stop_failed_task(task_id=1)
                 self.update_print_progress(name, layer_id=layer_id, layer_count=layer_count, order=order, error=e,
                                            drop_direction=self.drop_direction, error_log=True)
         t2 = time.time()
@@ -1019,6 +1027,14 @@ class Experiment(object):
             dhm_image_count=dhm_image_count + 10)
         self.update_print_progress(name, layer_id=layer_id, layer_count=layer_count, order=order,
                                    drop_direction=self.drop_direction, finished=True)
+
+    def _stop_failed_task(self, task_id: int) -> None:
+        """ Stop a task after a failed program, so that the next program can be loaded. """
+
+        try:
+            self.a3200.api.PROGRAM_STOP(task_id)
+        except AerotechError as error:
+            self.log.error(f"Could not stop task {task_id}: {error}")
 
     def print_experiment(self):
         if self.structure_configs is None:
@@ -1068,7 +1084,8 @@ class Experiment(object):
             if error_log:
                 data["error log"].append(data["current_structure"])
         else:
-            completed_structure = data["current_structure"]
+            # Without any printed layer there is no current structure yet; record at least its name
+            completed_structure = data["current_structure"] or {"name": name, "finished layer": layer_id}
             data["finished_structures"].append(completed_structure)
             if error_log:
                 data["error log"].append(data["current_structure"])

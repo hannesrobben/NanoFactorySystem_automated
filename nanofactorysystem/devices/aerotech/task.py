@@ -5,7 +5,7 @@ from typing import Optional
 from tqdm import tqdm
 
 from nanofactorysystem.aerobasic import TaskStatusDataItem, WaitMode
-from nanofactorysystem.aerobasic.ascii import AerotechAsciiInterface
+from nanofactorysystem.aerobasic.ascii import AerotechAsciiInterface, TaskFailedError
 from nanofactorysystem.aerobasic.constants.tasks import TaskMode, TaskStatus0, TaskState, TaskStatus2, TaskStatus1
 
 """
@@ -136,7 +136,8 @@ class Task:
                 ).split(" ")
                 error_string = self.api.ERROR_DECODE(int(error_code), int(error_location))
                 additional_info = f" {error_code}:{error_string}"
-            raise ValueError(
+            pbar.close()
+            raise TaskFailedError(
                 f"Program not finished! {self.task_state}.{additional_info}"
             )
 

@@ -11,6 +11,15 @@ class AerotechError(Exception):
     pass
 
 
+class TaskFailedError(AerotechError, ValueError):
+    """ A controller task (program) ended in a state other than ``program_complete``.
+
+    It is an :class:`AerotechError`, so callers handling controller errors
+    catch it, and a ``ValueError`` for code that caught the previous
+    exception type of ``Task.wait_to_finish``.
+    """
+
+
 class AsciiCommandResponse:
     def __init__(self, command: str):
         self.command = command
