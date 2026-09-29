@@ -843,3 +843,53 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   - D7: importing old folders on restart;
   - D8: console log inside the file.
 - **Follow-ups:** T47–T50 start after the approval. Phase 1 (T43–T46, T58) can proceed meanwhile.
+
+### 2026-09-29 23:04 CEST — [T42] Design the experiment storage and substrate model (approval)
+- **Status:** done
+- **Decision (maintainer, 2026-09-29):** "approve your suggestions at t42". The design is approved, and all
+  proposals D1–D8 in §12 are accepted as written:
+  - D1: a synced root is a hard error;
+  - D2: the substrate counter restarts each year;
+  - D3: the folder name is the label plus the start time;
+  - D4: slicer jobs are copied into the file;
+  - D5: the written power is authoritative;
+  - D6: no more `.zdc` files;
+  - D7: old folders are imported on restart;
+  - D8: the console log is copied into the file.
+- **Changes:**
+  - `docs/design/EXPERIMENT_STORAGE.md`:
+    - status line `Status: approved 2026-09-29`; §12 and §14 record the accepted decisions;
+    - the approval was given in the session, and I wrote it into the document on the maintainer's
+      instruction.
+  - `TODO.md`: T42 moved from Blocked to Done.
+  - `WORKLOG.md`: this entry and the phase 0 summary below.
+- **Tests:** see the phase summary.
+- **Commits:** `3f75e0a` docs(design): record the approval of the experiment storage design [T42];
+  the TODO/WORKLOG commit docs(todo): close T42 and summarise phase 0 [Phase 0]
+- **Follow-ups:** T47–T50 may start; they depend on T42 (done) and the phase order.
+
+### 2026-09-29 23:04 CEST — [Phase 0] Phase summary
+- **Finished todos:**
+  - T41: metadata audit, `docs/reviews/METADATA_AUDIT.md`;
+  - T42: storage design, `docs/design/EXPERIMENT_STORAGE.md`, approved 2026-09-29.
+- **New todos from phase 0 (found during T41):**
+  - T55: command log into the experiment;
+  - T56: reversible structure serialisation;
+  - T57: relative paths;
+  - T58: defined capture position (phase 1);
+  - T59: print-progress counts and timestamps;
+  - T60: experiment plots (phase B).
+- **Tests:** `python -m pytest` in a fresh venv (`pip install ".[test]"`), including the dry run in
+  `test/integration/`: 184 passed, 14 skipped.
+  - The one warning is `plt.show()` under the Agg backend in the dry run of the template. It is harmless.
+  - Environment note: a venv inside the Claude scratchpad folder fails `test_model3d_checks`. The error is
+    "DLL load failed … Der Dateiname oder die Erweiterung ist zu lang": the shapely DLL path exceeds the
+    Windows 260-character limit. A venv at a short path (`%LOCALAPPDATA%\Temp\nfsv`) passes, so this is not
+    a code defect.
+- **Open follow-ups:** T58 is added to phase 1. T55–T57 and T59 are added to phase 2 and follow the approved
+  design.
+- **To check on the lab PC:** nothing yet; phase 0 changed documentation only.
+  - Before T48 is implemented, confirm that `~/Documents` on the lab PC is not inside a Seafile library.
+    If it is, set a `dataRoot` for each user.
+- **Next:** phase 1, starting with T43 (drop direction). T43 contains the decision "merge `Orientation`
+  into `DropDirection` or map one to the other".
