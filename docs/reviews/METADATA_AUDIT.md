@@ -1,6 +1,6 @@
 # Experiment metadata audit (T41)
 
-Date: 2026-09-29. Code state: branch `docs/t41-metadata-audit`, based on `8ece0f4`.
+Date: 2026-09-29. Code state: branch `docs/t41-metadata-audit`, based on `main_HR` at `d2dbd66`.
 
 This audit lists everything an experiment writes today, where and by which method, and rates each
 metadata item. It is the input for the storage design in T42. Analysis only; no code was changed.

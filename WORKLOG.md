@@ -785,7 +785,7 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 
 ### 2026-09-29 20:28 CEST — [T41] Audit the experiment metadata
 - **Status:** done
-- **Branch:** `docs/t41-metadata-audit` (new, from `refactor/dummy-backend-and-tests` at `8ece0f4`)
+- **Branch:** `docs/t41-metadata-audit` (new, from `main_HR` at `d2dbd66`)
 - **Changes:**
   - `docs/reviews/METADATA_AUDIT.md` (new): every file an experiment writes (method, time, content,
     location), the content of the JSON files and `.zdc` containers, a rating of each metadata item
@@ -802,7 +802,7 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   - B: 63x, IFOV on, DHM on, plus one `Stair` structure.
   Both finished. Their files are the basis of the ratings.
 - **Commits:** `bf5565a` docs(reviews): audit the experiment metadata [T41];
-  `<this commit>` docs(todo): close T41 and add its follow-up todos [T41]
+  `3754290` docs(todo): close T41 and add its follow-up todos [T41]
 - **Notes:**
   - The global Python still fails on the OpenCV/NumPy mismatch (T9 note). I used the venv from an earlier
     session with `PYTHONPATH` set to the repository.
