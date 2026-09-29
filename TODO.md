@@ -49,14 +49,6 @@ Format rules (for humans and Claude):
         - Either the validation is implemented and the `xfail` on `test_prevent_mixed_axes` is removed, or the
           test is rewritten to the decided behaviour.
 
-- [ ] T24: Fix `utils.visualization.plot_movements` (found during T15)
-      Goal: Generated programs can be plotted for manual inspection.
-      Priority: low | Depends on: –
-      Done when:
-        - `read_file`/`plot_movements` handle programs without movement, arcs (`CW`/`CCW`) and filled circles
-          without exceptions (today they raise `ValueError`, `LinAlgError` or `AxisError`).
-        - The "Could not plot" warnings in `test/test_aerobasic` are gone, and a test asserts that plotting works.
-
 - [ ] T25: Fix argument passing in experiment scripts (found during T10)
       Goal: Restarting an experiment and passing substrate information work as intended.
       Priority: medium | Depends on: –
@@ -111,4 +103,6 @@ Format rules (for humans and Claude):
 - [x] T16: Fix always-true `assert (path, Path)` in experiment scripts — 2026-09-29 — The 48 always-true asserts in `mains/` are replaced by `path = Path(path)`, which accepts the str paths the callers pass; no warnings remain. — commits: `d1f1f67`
 
 - [x] T17: Clean up logging — 2026-09-29 — `getLogger()` no longer duplicates handlers (one console handler, one log file that is replaced for a new file); command failures are logged instead of printed. — commits: `2da7be2`, `cdcee08`
+
+- [x] T24: Fix `utils.visualization.plot_movements` — 2026-09-29 — Arcs, ragged segments, empty programs, degenerate axes and RAPID/variables are handled; all program plots work and plotting errors fail the tests again; 5 new tests. — commits: `da404d1`, `e2df115`
 

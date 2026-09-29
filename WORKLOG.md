@@ -610,3 +610,29 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   Renaming it (e.g. to `'nanofactorysystem'`) would change which loggers external scripts configure, so I
   left it for the maintainer.
 
+### 2026-09-29 10:02 CEST — [T24] Fix `utils.visualization.plot_movements`
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/utils/visualization.py`:
+    - Arcs return (n, 3) arrays.
+    - The clockwise arc uses the correct center (start + I/J) and decreasing angles.
+    - `plot_movements_fast` handles segments of different lengths, empty programs and zero-width axes, and
+      adds only non-empty collections.
+    - The reader parses `RAPID` and skips variables.
+  - `test/test_utils/test_visualization.py` (new, 5 tests): arc geometry, reader, empty program, filled
+    circle.
+  - `test/test_aerobasic/test_program.py`: plotting errors fail the test again (the warning fallback from T15
+    is removed).
+  - `test/README.md`: new row; warning note removed.
+  - `TODO.md`: T24 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:**
+  - `python -m pytest`: 170 passed, 14 skipped, 1 xfailed, and only 1 warning in the whole suite.
+  - No "Could not plot" warnings remain.
+  - The rendered filled ring (`test/_programs/TestCircles/test_filled_ring.png`) was checked by eye: a correct
+    ring.
+- **Commits:** `da404d1` fix(utils): make movement plots work for all generated programs [T24];
+  `e2df115` test(utils): assert that program movements can be plotted [T24]
+- **Follow-ups:** `read_text` still skips linear moves that start at a zero coordinate (`(x + a) != 0 and ...`),
+  which looks like a heuristic for the move from the origin. I left it unchanged.
+
