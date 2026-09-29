@@ -116,7 +116,6 @@ class MultiStageTask(ExecutableObject):
 
         # Load program
         if task_id is None:
-            # TODO: Better algorithm to determine task_id
             task_id = 2
         self.api.PROGRAM_LOAD(task_id, path)
 

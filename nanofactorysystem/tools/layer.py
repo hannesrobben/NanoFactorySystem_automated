@@ -116,9 +116,6 @@ class Layer(Parameter):
         # Store system object
         self.system = system
         user = self.system.user["key"]
-        # ToDo(HR) self.device in parameter is not existing. So this line throws an error
-        # ToDo 2 (HR) check if there is an error or a wrong implementation of dictionary sample (dict in dict atm)
-        # ToDo 3 (HR) Orientation MUST be "UP" or "DOWN", but it is 'Top'
         # self["sampleOrientation"] = self.system.sample['sample']["orientation"]
         
         # Initialize parameter class
@@ -142,7 +139,6 @@ class Layer(Parameter):
 
         """ Return focus result as either Result.HIT, Result.MISS or Result.AMBIGUOUS. """
 
-        ## TODO(RC): Merge with Dominik's result object
         status = self.focus.result["status"]
         if status == focusStatus.focus:
             result = Result.HIT
@@ -208,7 +204,6 @@ class Layer(Parameter):
             if dz is None:
                 dz = self["dzCoarseDefault"]
 
-            # ToDo (HR) Hotfix beseitigen! Orientation in dieser Datei ändern und in Scanner ändern und abhängig von DropDirection machen. dazu dropdirection ins system dict rein
             # orientation = Orientation[self["sampleOrientation"].upper()]
             # orientation = Orientation["DOWN"]
             orientation = Orientation["UP"]

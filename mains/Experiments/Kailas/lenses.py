@@ -57,12 +57,8 @@ def print_file(absolute_center: Point2D, resin_dimension: list, ask_continue_box
         path: Path argument for root directory where the experimental data will be safe in a subdirectory called ...
                 If nothing is given, the export_path will be in the subdirectory .output
     """
-    # ToDo: DropDirection noch mit übergeben und testen ob das funktioniert
 
-    # ToDo: Has to be changed in future in order to allow more prints of the same experiment on one substrate without
-    # deleting all the different data of previous prints
     if path is None:
-        # ToDo(HR) Adjust referencing to another more suitable path
         path = Path(mkdir(f".output/dhm_paper/DHM_Justage_{datetime.datetime.now():%Y%m%d}_{objective}", clean=False))
     else:
         path = Path(path)  # accept str or Path
@@ -154,13 +150,12 @@ def print_file(absolute_center: Point2D, resin_dimension: list, ask_continue_box
             high_speed_um=10_000,
             resin_corner_tr=resin_corner_tr,
             resin_corner_bl=resin_corner_bl,
-            structure_size=structure_size,  # ToDo change fov to structure size and add fov to real
+            structure_size=structure_size,
             margin=margin * 2,  # note extra big margin and padding
             padding=padding * 2,
             absolute_grid_center=absolute_grid_center,
             grid=grid_size,
-            # ToDo: changing depending on experiment - e.g. (number of repetitions, number of structures)
-            n_mid_points=0,  # ToDo changing depending on experiment
+            n_mid_points=0,
             drop_direction=drop_direction,
             corner_z=-2,
             corner_width=c_width,
@@ -185,7 +180,6 @@ def print_file(absolute_center: Point2D, resin_dimension: list, ask_continue_box
             if ask_continue_box and not messagebox.askyesno(message="Run OPL motor scan?"): return
             experiment.opl_scan(m0=350.0, force=False)
 
-        # TODO: Take image of whole scene
         # center = experiment.coordinate_system_grid_to_absolute.convert({"X": 0, "Y": 0, "Z": 0})
         # experiment.measure(coordinate=center, name="before")
 
@@ -228,7 +222,6 @@ def print_file(absolute_center: Point2D, resin_dimension: list, ask_continue_box
         if ask_continue_box and not messagebox.askyesno(message="FINAL STEP: Print experiment?"): return
         experiment.print_experiment()
 
-        # TODO: Take image of whole scene
         # experiment.measure(coordinate=center, name="after")
 
 # if __name__ == '__main__':

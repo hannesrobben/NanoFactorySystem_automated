@@ -270,7 +270,6 @@ class HeightFunctionStructure(DrawableObject):
             #     tile_movement_program = self.create_move_tile_program(tile_x, tile_y, F=self.velocity)
             #     layer_program.add_programm(tile_movement_program)
             #     prev_tile_index = tile_result.tile_index
-            #     # todo include programm task number to know when new tiles are being printed
 
             layer_program.LINEAR(Z=slice_result.z_absolute)
 

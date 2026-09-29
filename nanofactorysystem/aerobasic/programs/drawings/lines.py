@@ -40,12 +40,6 @@ class IFOV_Lines(DrawableObject):
         super().__init__()
         self.reference_point = reference_point
         self.lines = lines
-        # todo
-        #   - velocity muss in mm/s sein
-        #   - muss übergeben werden können!
-        #   - kontrolle
-        #   - maximum speed 100*ifov size - das dann als default
-        #   - dynamic control of power - in the next class!
         if 500 <= velocity <= 25000:  # komplett überarbeiten!
             self.velocity = velocity / 1000
         elif 50 <= velocity < 500:
@@ -56,7 +50,6 @@ class IFOV_Lines(DrawableObject):
         else:
             self.velocity = velocity
 
-        # todo change power to the corresponding value based on the calibration file - how to do it?
         self.power = power
         self.calibration = calibration
 
@@ -82,7 +75,7 @@ class IFOV_Lines(DrawableObject):
         # if self.velocity is None: # dann die normalen sachen hier:
         #     pass
         if objective == "Zeiss 63x":
-            program.SET_SPEED(F=5) # todo oben hier
+            program.SET_SPEED(F=5)
             program.SET_SPEED(F=5, ax="A")
             program.SET_SPEED(F=5, ax="B")
             program.SET_SPEED(F=1, ax="Z")
@@ -190,7 +183,6 @@ class XLines(_Lines):
     """
     As an input only a list of Tuple(x_start, x_end) necessary!
     Y and Z values are extra Parameters to be given. They do not change, because it is a Line on one Plane.
-    ToDo (HR): Create Functionalities for Vector printing.
     """
     line_axis = SingleAxis.X
 
@@ -594,7 +586,6 @@ class Rectangle3D(DrawableObject):
 
     def iterate_layers(self, coordinate_system: CoordinateSystem) -> Iterator[DrawableAeroBasicProgram]:
         program = DrawableAeroBasicProgram(coordinate_system)
-        # todo: i dont know exactly why i added Z==0 here. maybe rethink in future - 02.12 HOTFIX
         # if self.height == 0 and self.center.Z==0:
         if self.height == 0:
             yield program

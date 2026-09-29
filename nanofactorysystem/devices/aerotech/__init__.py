@@ -156,7 +156,6 @@ class AerotechController:
             program_ready_timeout=10,  # Seconds
             program_start_running_timeout=10,  # Seconds
     ) -> Task:
-        # TODO(dwoiwode): Delete function
         # Either use path as program or convert AeroBasicProgram to temporary file
         if isinstance(program, AeroBasicProgram):
             now = datetime.datetime.now()
@@ -171,12 +170,11 @@ class AerotechController:
 
         # Copy program to uniform name for execution to avoid loading too many programs on controller.
         exec_dir = self.program_dir if self.program_dir is not None else Path.home()
-        exec_path = exec_dir / "python_aerobasic_program.pgm"    # todo (hr 26.2.26 - Bugfixing) here maybe deletion of prior program?
+        exec_path = exec_dir / "python_aerobasic_program.pgm"
         exec_path.write_bytes(path.read_bytes())
 
         # Load program
         if task_id is None:
-            # TODO: Better algorithm to determine task_id
             task_id = 2
 # here error occurs - HR - 20x objective - binary program loading
         self.api.PROGRAM_LOAD(task_id, exec_path)

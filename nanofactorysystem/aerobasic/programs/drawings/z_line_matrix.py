@@ -20,7 +20,6 @@ def z_line_copy(self, x, y, z, dz, power, speed, duration):
 
     # Delay time after stages reached their destination
     delay = self.system["delay"]
-    # ToDo(HR+RC) Offset in system.zline für Aerotech integrieren
     # Move to center position
     self.system.moveabs(fast, delay, x=x, y=y, z=z + self["zCameraOffset"])
 

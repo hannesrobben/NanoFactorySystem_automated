@@ -109,7 +109,6 @@ class QRCode(DrawableObject):
 
         program = DrawableAeroBasicProgram(coordinate_system)
 
-        # TODO(RC) Take DropDirection into account
         # Note: z is relative to substrate surface
         z_start = self.base_height + self.pixel_height
         z_end = self.base_height - self.anchor_height

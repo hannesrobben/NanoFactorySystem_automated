@@ -147,7 +147,6 @@ def read_text(text: str) -> list[Movement]:
     laser_on = False
     x, y, z, a, b = 0, 0, 0, 0, 0
     for line in text.split("\n"):
-        # TODO: Laser power auslesen
         new_x, new_y, new_z, new_a, new_b = x, y, z, a, b
         if line.startswith("'"):
             # Skip comments
@@ -265,7 +264,6 @@ def plot_movements(movements, *, use_mu_m=True):
 
 
 def plot_movements_slow(movements, *, use_mu_m=True):
-    # TODO: Laser power als Farbe
     fig = plt.figure(dpi=400)
     ax1 = fig.add_subplot(121, projection='3d')
     ax2 = fig.add_subplot(122, projection='3d')
@@ -287,7 +285,6 @@ def plot_movements_slow(movements, *, use_mu_m=True):
         ax.set_xlabel(f"X [{unit}]")
         ax.set_ylabel(f"Y [{unit}]")
         ax.set_zlabel(f"Z [{unit}]")
-        # TODO: Does not work
         # ax.xaxis.get_major_formatter().set_scientific(False)
         # ax.yaxis.get_major_formatter().set_scientific(False)
         # ax.zaxis.get_major_formatter().set_scientific(False)
@@ -314,7 +311,6 @@ def plot_movements_slow(movements, *, use_mu_m=True):
 
 
 def plot_movements_fast(movements, *, use_mu_m=True):
-    # TODO: Laser power als Farbe
     fig = plt.figure(dpi=400)
     ax1 = fig.add_subplot(121, projection='3d')
     ax2 = fig.add_subplot(122, projection='3d')
@@ -357,7 +353,6 @@ def plot_movements_fast(movements, *, use_mu_m=True):
         ax.set_xlabel(f"X [{unit}]")
         ax.set_ylabel(f"Y [{unit}]")
         ax.set_zlabel(f"Z [{unit}]")
-        # TODO: Does not work
         # ax.xaxis.get_major_formatter().set_scientific(False)
         # ax.yaxis.get_major_formatter().set_scientific(False)
         # ax.zaxis.get_major_formatter().set_scientific(False)

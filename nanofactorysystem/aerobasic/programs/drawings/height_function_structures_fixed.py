@@ -403,7 +403,6 @@ def _clip_segments_to_bounds(segments: List[Tuple],
                 x_min <= x2 <= x_max and y_min <= y2 <= y_max):
             clipped.append(((x1, y1), (x2, y2)))
         else:
-            # TODO: Implement proper Cohen-Sutherland line clipping
             # For now, skip segments that extend outside bounds
             pass
 
@@ -698,7 +697,7 @@ class HeightFunctionStructure(DrawableObject):
         # stitching process
         if self.needs_stitching:
             # subdivide structure into tiles
-            tiles = self._tile_manager #note todo
+            tiles = self._tile_manager
 
             for tile in tiles:
                 x_min, x_max, y_min, y_max = tile["tile_dimension"]  # get dimensions of tile
@@ -708,7 +707,6 @@ class HeightFunctionStructure(DrawableObject):
                 #move to center - absolut coordinate system with LINEAR movement
 
                 if self.center.Z <= self.base_height:
-                    # create program for base (rectangle) - todo think about aperture in the future
                     socket = Rectangle3D(
                         center=self.center,
                         width=x_max-x_min,

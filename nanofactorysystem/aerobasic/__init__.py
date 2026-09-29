@@ -118,7 +118,6 @@ class AeroBasicAPI(abc.ABC):
 
         return self.send(f"PROGRAM {task_id} LOAD \"{program_path}\"")
 
-    # ToDo(hrobben): programm associate muss überarbeitet werden, da die Syntax des befehls nicht korrekt ist
     def PROGRAM_ASSOCIATE(self, task_id: int, program_path: Path | str) -> str:
         program_name = Path(program_path).name
         return self.send(f"PROGRAM {task_id} ASSOCIATE \"{program_name}\"")
@@ -449,6 +448,6 @@ class AeroBasicAPI(abc.ABC):
         """
         if search_time % 5 != 0:
             raise ValueError(f"Search time is not divisible by 5ms ({search_time=})")
-        # if search_time > IFOVMaximumTime:  # TODO: How to get system parameters?
+        # if search_time > IFOVMaximumTime:
 
         return self.send(f"IFOV TIME {search_time}")

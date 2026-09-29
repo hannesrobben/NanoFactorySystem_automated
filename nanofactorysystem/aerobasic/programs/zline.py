@@ -3,7 +3,7 @@ from nanofactorysystem.aerobasic.programs import AeroBasicProgram
 
 
 class ZLine(AeroBasicProgram):
-    """ TODO: Reimplement using global variables as before so it does not have to be recompiled every time """
+    """ Program for an axial line (z-line) exposure of length ``dz`` around the current position. """
 
     def __init__(self, dz: float, fast_speed: float, slow_speed: float):
         super().__init__()

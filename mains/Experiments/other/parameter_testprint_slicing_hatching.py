@@ -39,7 +39,6 @@ sys_args = {
 }
 
 
-# ToDo(HR): how do i transfer a dict or other system arguments to this function?
 def testprint(absolute_center: Point2D, resin_dimension: list, ask_continue_box=False, path=None,
               objective="Zeiss 20x", user="Hannes"):
     """
@@ -53,12 +52,8 @@ def testprint(absolute_center: Point2D, resin_dimension: list, ask_continue_box=
         path: Path argument for root directory where the experimental data will be safe in a subdirectory called ...
                 If nothing is given, the export_path will be in the subdirectory .output
     """
-    # ToDo: DropDirection noch mit übergeben und testen ob das funktioniert
 
-    # ToDo: Has to be changed in future in order to allow more prints of the same experiment on one substrate without
-    # deleting all the different data of previous prints
     if path is None:
-        # ToDo(HR) Adjust referencing to another more suitable path
         path = Path(mkdir(
             f".output/parameter_study/Parameter_hatch_slice_SZ2080_yellow_{datetime.datetime.now():%Y%m%d}_{objective}",
             clean=False))
@@ -110,7 +105,7 @@ def testprint(absolute_center: Point2D, resin_dimension: list, ask_continue_box=
         parameterset = {
             "hatch size": [0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5],  # hatch size
             "slice size": [0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5],  # slice size/ layer height
-            "power": 0.3,  # ToDo implmentieren, dass auch power gewechselt werden kann
+            "power": 0.3,
             "velocity": 10_000
         }
 
@@ -139,7 +134,7 @@ def testprint(absolute_center: Point2D, resin_dimension: list, ask_continue_box=
             padding=padding,
             absolute_grid_center=absolute_grid_center,
             grid=grid_size,
-            n_mid_points=0,  # ToDo changing depending on experiment
+            n_mid_points=0,
             drop_direction=DropDirection.DOWN,
             corner_z=-2,
             corner_width=c_width,
@@ -159,7 +154,6 @@ def testprint(absolute_center: Point2D, resin_dimension: list, ask_continue_box=
         if ask_continue_box and not messagebox.askyesno(message="Run OPL motor scan?"): return
         experiment.opl_scan(m0=350.0, force=False)
 
-        # TODO: Take image of whole scene
         # center = experiment.coordinate_system_grid_to_absolute.convert({"X": 0, "Y": 0, "Z": 0})
         # experiment.measure(coordinate=center, name="before")
 
@@ -250,7 +244,6 @@ def testprint(absolute_center: Point2D, resin_dimension: list, ask_continue_box=
         if ask_continue_box and not messagebox.askyesno(message="FINAL STEP: Print experiment?"): return
         experiment.print_experiment()
 
-        # TODO: Take image of whole scene
         # experiment.measure(coordinate=center, name="after")
 
 # if __name__ == '__main__':

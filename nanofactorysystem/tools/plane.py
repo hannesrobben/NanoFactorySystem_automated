@@ -59,7 +59,6 @@ class PlaneFit(object):
         # Azimuthal angle
         self.phi = np.arctan2(y, x) * 180.0 / np.pi
         self.phi = (self.phi % 360) - 180
-        # TODO: With modulo slightly different edge cases (-180 vs 180)
         # while self.phi > 180.0:
         #     self.phi -= 360.0
         # while self.phi <= -180.0:

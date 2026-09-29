@@ -70,7 +70,7 @@ class DHMBackend:
 
     def reset(self):
         """
-        Resets all necessary variables. ToDo: To be done and implemented!
+        Resets all necessary variables.
         """
         self.client = None
         self.objective_name = None

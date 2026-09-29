@@ -243,7 +243,6 @@ class Focus(Parameter):
 
         # Delay time after stages reached their destination
         delay = self.system["delay"]
-        # ToDo(HR+RC) Offset in system.zline für Aerotech integrieren
         # Move to center position
         self.system.moveabs(fast, delay, x=x, y=y, z=z + self["zCameraOffset"])
 
@@ -413,7 +412,6 @@ class Focus(Parameter):
             result["status"] = focusStatus.noncircular
             return
 
-        # new (HR) 23.02.2026 -> HOTFIX because wrong detection of foci - noise was detected as focus
         # 10 is a random number atm. nofocus(noise) was mostly in the region 1.7-2.5
         if result["diffMax"] <= self["minDiffMax"]:
             result["status"] = focusStatus.nofocus

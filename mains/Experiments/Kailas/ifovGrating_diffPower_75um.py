@@ -43,7 +43,6 @@ sys_args = {
 }
 
 
-# ToDo(HR): how do i transfer a dict or other system arguments to this function?
 def print_file(absolute_center: Point2D, resin_dimension: list, ask_continue_box=False, path=None,
                      objective="Zeiss 63x", user="Hannes", dhm_usage=False, substrate=None, setup="IFOV_on"):
     """
@@ -57,15 +56,10 @@ def print_file(absolute_center: Point2D, resin_dimension: list, ask_continue_box
         path: Path argument for root directory where the experimental data will be safe in a subdirectory called ...
                 If nothing is given, the export_path will be in the subdirectory .output
     """
-    # ToDo: DropDirection noch mit übergeben und testen ob das funktioniert
 
-    # ToDo: Has to be changed in future in order to allow more prints of the same experiment on one substrate without
-    # deleting all the different data of previous prints
     if path is None:
-        # ToDo(HR) Adjust referencing to another more suitable path
         path = Path(mkdir(f".output/ifov/binary_grating1{datetime.datetime.now():%Y%m%d}", clean=False))
     else:
-        # ToDo(HR) make ist more controllable
         path = Path(path)  # accept str or Path
         path = Path(mkdir(os.path.join(path, "ifov_different_powers_2ndTry_small"), clean=False))
     logger = getLogger(logfile=f"{path}/console.log")
@@ -137,7 +131,6 @@ def print_file(absolute_center: Point2D, resin_dimension: list, ask_continue_box
     grid_size = (2, len(parameterset["power"]))
 
     substrate.update({"structure sizes": structure_size})
-    # todo save substrate
     
     with Experiment(
             path=path,
@@ -150,13 +143,12 @@ def print_file(absolute_center: Point2D, resin_dimension: list, ask_continue_box
             high_speed_um=10_000,
             resin_corner_tr=resin_corner_tr,
             resin_corner_bl=resin_corner_bl,
-            structure_size=structure_size,  # ToDo change fov to structure size and add fov to real
+            structure_size=structure_size,
             margin=margin,
             padding=padding,
             absolute_grid_center=absolute_grid_center,
             grid=grid_size,
-            # ToDo: changing depending on experiment - e.g. (number of repetitions, number of structures)
-            n_mid_points=0,  # ToDo changing depending on experiment
+            n_mid_points=0,
             drop_direction=drop_direction,
             corner_z=-2,
             corner_width=c_width,
@@ -181,7 +173,6 @@ def print_file(absolute_center: Point2D, resin_dimension: list, ask_continue_box
             if ask_continue_box and not messagebox.askyesno(message="Run OPL motor scan?"): return
             experiment.opl_scan(m0=350.0, force=False)
 
-        # TODO: Take image of whole scene
         # center = experiment.coordinate_system_grid_to_absolute.convert({"X": 0, "Y": 0, "Z": 0})
         # experiment.measure(coordinate=center, name="before")
 
@@ -230,7 +221,6 @@ def print_file(absolute_center: Point2D, resin_dimension: list, ask_continue_box
         if ask_continue_box and not messagebox.askyesno(message="FINAL STEP: Print experiment?"): return
         experiment.print_experiment()
 
-        # TODO: Take image of whole scene
         # experiment.measure(coordinate=center, name="after")
 
 # if __name__ == '__main__':

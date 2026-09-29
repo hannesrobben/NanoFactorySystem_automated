@@ -49,7 +49,7 @@ class IFOV_AeroBasicProgram(AeroBasicProgram):
 
         # RAMP Rates
         self.comment("\nSetting Ramp rates and Type")
-        self.send("RAMP MODE RATE")  # todo investigate ramp types --- available LINEAR SINE SCURVE
+        self.send("RAMP MODE RATE")
         self.send("RAMP RATE 0")    # either 0 or high value between 40000 and 50000
         self.send("RAMP RATE A 0")
         self.send("RAMP RATE B 0")
@@ -134,7 +134,7 @@ class IFOV_AeroBasicProgram(AeroBasicProgram):
                   F: float=None,
                   ax: Literal["A","B"]=None):
         """ default speed is 10 mm/s"""
-        if F is not None and F >= 15:  # todo(HR) find a good and relatable value
+        if F is not None and F >= 15:
             raise ValueError(f"Speed has to be in mm(!) per seconds. {F} mm/s is too high.")
         return super().CONNECTED_SPEED(speed_in_mm_per_sec=F, axis=ax)
 
@@ -431,7 +431,7 @@ class DrawableObject(abc.ABC):
     #     for name in code.co_names[start_idx:]:
     #         attr = getattr(self, name, "[NOT FOUND]")
     #         if name == "data" or name == "height_profile":
-    #             continue        # ToDo(HR) Delete Hotfix and change this - if not attr == "data": if attr == "[NOT FOUND]": continue else: irgendwie die daten abspeichern
+    #             continue
     #         if attr == "[NOT FOUND]":
     #             continue
     #         if hasattr(attr, "to_json"):

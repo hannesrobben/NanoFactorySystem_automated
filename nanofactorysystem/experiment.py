@@ -218,9 +218,6 @@ class Experiment(object):
 
     def _save_substrate_information(self, path, file):
         if file is None:
-            # todo - maybe create empty file?
-            #   at least information about corner of experiment are important
-            #   as well as whole substrate drop boundaries
             return
         assert isinstance(file, dict), "Substrate information must be a dictionary!"
         file_path = Path(os.path.join(path, "substrate_information.json"))
@@ -403,7 +400,7 @@ class Experiment(object):
 
     def sample_points_for_plane_fitting(self) -> list[tuple[float, float]]:
         n_rows = self.grid[0]  # + 1
-        n_cols = self.grid[1]  # + 1 todo check if +1 is necessary for planefit_mode=0
+        n_cols = self.grid[1]
         points = []
         if self.plane_fit_mode == 0:  # plane fitting points also in between structures
             for i in range(n_rows + 1):
@@ -521,7 +518,6 @@ class Experiment(object):
 
         else:
             # Plane needs micrometer coordinates
-            # ToDo(HR): Implement a controllable variable to access single plane fit outside of experiment.py
             if self.system.objective['magnification'] == 63.0:
                 zlo = self.system.z0
                 zup = None
@@ -767,9 +763,6 @@ class Experiment(object):
             structure = s_2_repeat["structure"]
             axes = s_2_repeat["axes"]
             power = s_2_repeat["power"]
-            # todo
-            #   - add structure is finished -- building program is next - how to differentiate between same name(adding (1)) and repition (adding (number repition))
-            #   - repition der programm funktioniert gar nicht weil in den layer programmen absolut verfahren wird und nicht relativ
 
         # Unknown structure type
         else:
@@ -805,7 +798,7 @@ class Experiment(object):
                           n_dhm_img: int = 0,
                           stitching: bool = False):
         plotting_structure = False
-        # if not stitching:  # todo doesnt work with ifov !
+        # if not stitching:
         #     plotting_structure = True
         self.log.info(f"Creating layer programs for {name}: {structure}")
         assert isinstance(structure, DrawableObject)
@@ -818,7 +811,6 @@ class Experiment(object):
         # Make sure that power is not None
         power = float(power)
 
-        # todo check for big structures maximal deviation between corners z should be on the lowest/ highest z value depending on drop orientation
         # Absolute center coordinates
         offset_x = structure.center_point.X
         offset_y = structure.center_point.Y
@@ -1032,7 +1024,6 @@ class Experiment(object):
         # allgmein power
 
         # Set laser power
-        # todo (HR) - improvement of printing process by adjustable power (between layers or even between lines)
         self.system.controller.power(power)
 
         # Absolute coordinates of structure center

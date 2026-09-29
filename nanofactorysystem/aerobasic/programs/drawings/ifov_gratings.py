@@ -321,8 +321,6 @@ class Rectangle2D_IFOV(DrawableObject):
 
     def iterate_layer_contur(self, coordinate_system: CoordinateSystem):
         raise NotImplementedError("iterate_layer_contur not yet implemented")
-        # todo - mit polyline auf ifov umschreiben und dann neue berechnung der punkte wie bei hollow structure
-        #   dient dazu eine andere hatching taktik auszuprobieren-vielleicht möglich die Sachen an den Seiten umzustellen
 
     def iterate_layers_line_hatching(self, coordinate_system: CoordinateSystem, plot_name=None) -> Iterator[IFOV_AeroBasicProgram]:
         program = DrawableAeroBasicProgram(coordinate_system)
@@ -455,11 +453,10 @@ class Rectangle3D_IFOV(DrawableObject):
                 hatching_direction=self.hatching_direction,
                 angle=self.angle
             )
-            program = DrawableAeroBasicProgram(coordinate_system)  # todo ist das notwendig
+            program = DrawableAeroBasicProgram(coordinate_system)
 
             # FEEEEEHLLLLLEEEERRRR  -- das ist nicht die korrekt z-ccord - sie ist RELATIV und NICHT absolut
             # program.RAPID(Z=z_offset + self.center.Z)
-            # todo (HR) check if it has an influence if LINEAR is used - out of the scope of IFOV should be working
             if plot_progress:
                 program.add_programm(rectangle.draw_on(coordinate_system, plot_name=f"3D_layer_{i}_"))
             else:

@@ -349,7 +349,6 @@ def motorScan(
     if result is None:
         raise RuntimeError("Long OPL scan detected no interference!")
 
-    # ToDo(RC) Hotfix: for oder while Schleife einbauen, minpos und maxpos prüfen, eigene Exception
     m0, m1, m2 = result
     dm0 = m1 - m0
     dm2 = m2 - m1

@@ -13,16 +13,8 @@ def restart(path, backend=None):
         experiment.restart_experiment()
 
 
-# todo
-#       create dictionary for restarting experiment  - alles was am anfang dem Experiment übergeben wird
-#       übergabe von restart sollte eigentlich nur die ordner struktur sein
-#       zusätzlich muss außerdem noch die substrat informationen im hauptordner gegeben werden
-#       !!! Experiment bekommt immer eine neue UUID - das sollte nicht sein!
-
 exp_path = r"C:\Users\Nanofactory\Desktop\Hannes\Experiment data\test2_program\TEST_aerotech_1"
 
 if __name__ == "__main__":
     restart(exp_path)
 
-# todo nochmal kontrollieren, wenn er bereits eine oder zwis schichten gedruckt hat - sieht so aus, dass es nicht an der richtigen stelle wieder startet!
-# wahrscheinlich liegt es daran, wenn das abbricht nachdem man bereits einmal wieder aufgestartete hat, dann wird die anzahl der layer geändert
