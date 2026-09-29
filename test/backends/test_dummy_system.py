@@ -3,7 +3,6 @@ import socket
 
 import pytest
 
-import nanofactorysystem.devices.a3200 as a3200_module
 import nanofactorysystem.devices.camera as camera_module
 import nanofactorysystem.devices.dhm as dhm_module
 from nanofactorysystem import System
@@ -140,7 +139,7 @@ def test_real_backend_constructs_the_same_objects(test_config, tmp_path, monkeyp
         calls["dhm"] = (host, port, timeout)
         return DummyDhmClient(world, config_id=178)
 
-    monkeypatch.setattr(a3200_module.socket, "socket", fake_socket)
+    monkeypatch.setattr(socket, "socket", fake_socket)
     monkeypatch.setattr(camera_module, "CameraDevice", fake_camera_device)
     monkeypatch.setattr(dhm_module, "DhmClient", fake_dhm_client)
     calibration = backend.attenuator_args()

@@ -38,10 +38,14 @@ python -m pytest test/test_aerobasic/test_golden_programs.py --update-golden   #
 ## Architecture
 
 **Hardware layer**
-- `system.py` `System` aggregates `Camera`, `Dhm` (skipped when `sys_args["dhm"]["usage"]` is False) and `A3200` controller + attenuator (`devices/`). It also holds `a3200_new`, an `Aerotech3200` instance from `devices/aerotech/`, which shares the controller socket of `A3200`.
-- There are two controller interfaces (to be merged in T20):
-  - `devices/a3200.py` `A3200` is the older interface from Reinhard Caspary (renamed from `aerotech_old.py`; not legacy). It handles power/attenuator, z-line and the µm-based motion used by `System` and `tools/`.
-  - `devices/aerotech.Aerotech3200` is the newer ASCII-protocol interface (`aerobasic/ascii.py`, TCP 127.0.0.1:8000). It sends AeroBasic commands through `.api` and runs `.pgm` files as controller tasks (`run_program_as_task`).
+- `system.py` `System` aggregates `Camera`, `Dhm` (skipped when `sys_args["dhm"]["usage"]` is False) and the `A3200` controller + attenuator (`devices/`). `System.controller` and `System.a3200_new` are the same object.
+- One controller class since T20: `devices/a3200.py` `A3200(Parameter, AerotechController)`.
+  - All commands go through one `aerobasic/ascii.py` `AerotechAsciiInterface` (`.api`, TCP 127.0.0.1:8000), which records the command history (`save_log()` → `A3200.log`).
+  - Config-based µm helpers used by `System` and `tools/`: `moveabs`, `moveinc`, `position`, `wait`, `power`, `pulse`, `laseron/off`, `zline`, `home(axes)`, `container`; `run()` sends a raw command.
+  - Program tasks from `devices/aerotech.AerotechController` used by `Experiment`: `run_program_as_task` (loads `.pgm` files as controller tasks), `xyz`, `axis_status`, `save_log`.
+  - Safety: the helpers check `zMax` (and close the connection when exceeded); in addition, `api.z_limit` refuses immediate absolute Z moves beyond `zMax` sent through `.api` (maintainer decision). Programs run as tasks are not checked.
+  - `devices/aerotech.Aerotech3200` is the same task handling without user/config (e.g. for scripts and `test_femtika`), with an optional `z_max` and its own `home()` sequence.
+  - `AerotechError` is a `RuntimeError`; `TaskFailedError` (a failed or stalled task) is also a `ValueError`.
 - `tools/` holds measurement algorithms built on the camera and DHM: `Focus`, `Layer` (resin interface detection), `Plane`, `Grid`, `Stitch`, and `Transform` (camera↔stage pixel/µm transforms).
 
 **Hardware backends** (`backends/`, design in `docs/design/DUMMY_BACKEND.md`)
