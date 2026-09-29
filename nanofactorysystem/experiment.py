@@ -29,6 +29,7 @@ from nanofactorysystem.aerobasic.programs.setups import DefaultSetup, SetupIFOV
 from nanofactorysystem.backends import BackendLike
 from nanofactorysystem.devices.coordinate_system import CoordinateSystem, PlaneFit, DropDirection, Unit, \
     Point2D, Point3D, Coordinate, ZFunction
+from nanofactorysystem.devices.power_calibration import PowerCalibration, power_calibration
 from nanofactorysystem.dhm.optimage import optImageMedian
 from nanofactorysystem.utils.visualization import read_file, plot_movements
 
@@ -867,6 +868,11 @@ class Experiment(object):
         return layer_pgm_paths, structure_config
 
     def build_programs(self):
+        # Structures that set the laser power (IFOV) use the calibration of this system's attenuator
+        with power_calibration(PowerCalibration(self.system.controller.attenuator.data)):
+            self._build_programs()
+
+    def _build_programs(self):
 
         path = self.path / "structures"
         mkdir(path, clean=False)

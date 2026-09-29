@@ -54,6 +54,7 @@ python -m pytest test/test_aerobasic/test_golden_programs.py --update-golden   #
 - `programs/setups.py` provides `DefaultSetup` (stages plus galvo, IFOV off) and `SetupIFOV` (Aerotech IFOV mode, objective-specific). The chosen setup changes which axes (`"XYZ"` vs `"ABZ"`) and accelerations are valid.
 - `programs/drawings/` defines `DrawableObject`, the abstract base of every printable structure. A structure implements `iterate_layers(coordinate_system)`, which yields one `DrawableAeroBasicProgram` per layer. Each layer's coordinates pass through `devices/coordinate_system.CoordinateSystem`, which maps local µm coordinates to stage coordinates using an offset, a `ZFunction` (`StaticOffset`/`Plane`/`PlaneFit` from plane fitting) and `DropDirection` (the z sign, which differs per objective).
 - `DrawableObject.to_json()` serializes the constructor arguments, which lets experiments be saved and restarted.
+- Structures that set the laser power in mW (`IFOV_Lines` and the IFOV structures built on it) convert it with a `devices/power_calibration.PowerCalibration`: an explicit `calibration=` argument, else the one activated with `power_calibration(...)` (`Experiment.build_programs()` activates the running system's attenuator calibration), else `attenuator.calibrationFile` from the config.
 - Structure families:
   - `lines.py` (`Rectangle3D`, `Stair`, `Corner`, …)
   - `height_function_structures/` (gratings, lenses, DOEs built from `HeightFunctions` + slicer)
