@@ -54,13 +54,6 @@ Format rules (for humans and Claude):
       Done when:
         - every todo and note section is identified and summerized in a new file 'todo_notes.md' . delete notes and todos in documentation and document the meaning of it in the file. Create workpackages from this in the same style as 'TODO.md' but save them on the bottom of 'todo_notes.md'.  
 
-- [ ] T22: Fix NumPy 2.5 deprecation in `Attenuator` (found during T3)
-      Goal: The attenuator keeps working with future NumPy versions.
-      Priority: low | Depends on: –
-      Done when:
-        - `devices/attenuator.py:62` and `aerobasic/programs/drawings/lines.py:82` (`IFOV_Lines`, found during T7) use
-          `reshape` instead of assigning `array.shape`, and the tests run without the `DeprecationWarning`.
-
 - [ ] T23: Decide and implement axis validation for `SingleAxis` (found during T15)
       Goal: It is clear whether combining axes of different stages (and `~`, `^`, empty `&`) is an error.
       Priority: low | Depends on: –
@@ -126,4 +119,6 @@ Format rules (for humans and Claude):
 - [x] T14: Remove the hardcoded calibration path from `IFOV_Lines` — 2026-09-29 — `IFOV_Lines` takes a `PowerCalibration` (explicit, active context, or configured file); `Experiment.build_programs()` uses its attenuator calibration; golden files unchanged; 8 new tests. — commits: `eb26199`, `69547ba`
 
 - [x] T11: Fix small defects in `System` and the `A3200` controller — 2026-09-29 — Fixed `object_pos`/`camera_pos`, `A3200.home`, `A3200.container`, `self.z` before an absolute z move and the recursive `send_one`; a dummy test per fix. — commits: `6ef8d37`, `b65b604`
+
+- [x] T22: Fix NumPy 2.5 deprecation in `Attenuator` — 2026-09-29 — `reshape` instead of assigning `array.shape` in `Attenuator` and `CameraDevice` (the `IFOV_Lines` case went away in T14); the suite passes with the deprecation as error. — commits: `daa757e`
 

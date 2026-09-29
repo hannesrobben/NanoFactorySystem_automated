@@ -556,3 +556,17 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   I only removed the infinite recursion. Consider deleting both methods when T20 merges the controllers;
   the German method name is part of T18.
 
+### 2026-09-29 09:56 CEST — [T22] Fix NumPy 2.5 deprecation in `Attenuator`
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/devices/attenuator.py`: `reshape` instead of assigning `array.shape`.
+  - `nanofactorysystem/camera/camera.py` (found during T22): the same pattern in `CameraDevice.getimage()`.
+  - The `lines.py:82` occurrence was already removed in T14 (`PowerCalibration` uses `reshape`).
+  - `TODO.md`: T22 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest -W "error:Setting the shape:DeprecationWarning"`: 161 passed, 14 skipped,
+  1 xfailed. The warnings dropped from 63 to 16. The real camera path (`camera.py`) is not covered by the
+  dummy tests; the change is a mechanical `reshape` of a fresh copy.
+- **Commits:** `daa757e` fix(devices): replace deprecated array shape assignment [T22]
+- **Follow-ups:** none.
+
