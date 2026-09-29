@@ -33,7 +33,7 @@ python -m pytest test/test_aerobasic/test_golden_programs.py --update-golden   #
 - `nanofactorysystem/config.py` loads `sysConfig`, which has `user:<name>` and `objective:<name>` sections (e.g. `"Zeiss 20x"`, `"Zeiss 63x"`). Lookup order: `use_config(path_or_dict)` (context manager, swaps the content in place), `$NANOFACTORY_CONFIG`, `~/nanofactory.json`, then the built-in `DEFAULT_CONFIG` (devices and both objectives, no users, no calibration file) with a warning.
 - Class defaults of `System`, `A3200`, `Attenuator`, `Camera`, `Dhm` are `ConfigDefaults(section, {...})` descriptors, resolved on access (deep copy), so importing the package never reads config sections.
 - The YAML files in `config/` (Hydra layout) describe the same data but are not currently read by any Python code.
-- Runtime parameters are passed as nested dicts (`sys_args` with sections `attenuator`, `controller`, `sample`, `focus`, `layer`, `plane`, `dhm`, `camera`). Each component takes its own section via `popargs`, and `Parameter` subclasses merge these into their `_defaults`. `Parameter` pops the keys from the caller's dicts, so build a fresh `sys_args` for every `System` (T21).
+- Runtime parameters are passed as nested dicts (`sys_args` with sections `attenuator`, `controller`, `sample`, `focus`, `layer`, `plane`, `dhm`, `camera`). Each component takes its own section via `popargs`, and `Parameter` subclasses merge these into their `_defaults`. `Parameter` works on a copy of each section, so a `sys_args` dict can be reused.
 
 ## Architecture
 

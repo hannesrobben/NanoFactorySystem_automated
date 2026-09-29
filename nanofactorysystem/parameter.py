@@ -71,7 +71,9 @@ class Parameter(abc.ABC):
         # Store parameters
         if len(kwargs) != 1:
             raise RuntimeError("Unknown arguments section!")
-        kwargs = list(kwargs.values())[0]
+        # Copy the section, so that the caller's dictionary is not modified
+        # and can be reused for further objects
+        kwargs = dict(list(kwargs.values())[0])
         for key, value in self._defaults.items():
             if key in kwargs:
                 value = kwargs.pop(key)

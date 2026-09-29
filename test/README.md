@@ -165,9 +165,6 @@ backend = DummyBackend()
 binary_testprint(..., path=Path("dry_run"), backend=backend, plane=backend.world.sample.plane())
 ```
 
-Remember that the parameter classes pop keys from the `sys_args` dictionaries they receive (T21): build a
-new dictionary for every `System`/`Experiment`.
-
 ## Where generated files go
 
 - `tmp_path` (pytest's per-test temporary directory): everything the unit and dummy tests write. This

@@ -13,7 +13,7 @@ from nanofactorysystem.backends.dummy import DummyCameraDriver, DummyDhmClient, 
 
 
 def sys_args():
-    """ Fresh runtime arguments; Parameter pops keys from the caller's dicts. """
+    """ Runtime arguments for System on the dummy backend. """
 
     return {"controller": {"zMax": 25000.0}}
 
