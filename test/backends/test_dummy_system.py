@@ -136,8 +136,8 @@ def test_real_backend_constructs_the_same_objects(test_config, tmp_path, monkeyp
         calls["camera"] = (product, device_id)
         return DummyCameraDriver(world)
 
-    def fake_dhm_client(host, port):
-        calls["dhm"] = (host, port)
+    def fake_dhm_client(host, port, timeout):
+        calls["dhm"] = (host, port, timeout)
         return DummyDhmClient(world, config_id=178)
 
     monkeypatch.setattr(a3200_module.socket, "socket", fake_socket)
@@ -151,7 +151,7 @@ def test_real_backend_constructs_the_same_objects(test_config, tmp_path, monkeyp
     assert calls == {
         "socket": (socket.AF_INET, socket.SOCK_STREAM),
         "camera": (None, None),
-        "dhm": ("192.168.22.2", 27182),
+        "dhm": ("192.168.22.2", 27182, 10.0),  # connect timeout added in T13
     }
     commands = world.calllog.commands()
     assert _without_load(commands)[:len(STARTUP_COMMANDS)] == STARTUP_COMMANDS

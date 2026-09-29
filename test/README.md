@@ -69,6 +69,7 @@ level, so the exact command strings are checked.
 |---|---|---|---|
 | `backends/test_dummy_controller.py` | The fake A3200: protocol frames, motion, laser and exposures, program tasks, fault injection, call log | The simulation itself being wrong, which would make all other dummy tests meaningless | – |
 | `backends/test_dummy_devices.py` | Camera, DHM and attenuator facades on the simulated devices; determinism; protocol conformance | Exposure/OPL optimisation or calibration conversion breaking | – |
+| `backends/test_timeouts.py` | Connect/response timeouts, reading split responses, bounded waiting for axes, z-line, stalled tasks and `PROGRAM STOP` | A missing or hung device freezing the program instead of failing with an error | – |
 | `backends/test_dummy_system.py` | `System` start-up command sequence, z-line, backend switch; the real backend still opens the same devices | `System` sending different commands to the machine; the default backend changing | – |
 | `devices/test_aerotech.py` | The old `A3200` controller: commands, µm parsing, `zMax` safety, power, z-line, errors | Moving outside the safe z range; wrong units | – (plus 1 hardware test) |
 | `devices/test_attenuator.py` | Power ↔ attenuator conversion | Wrong laser power | – (plus 1 hardware test) |
