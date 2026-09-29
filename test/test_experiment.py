@@ -122,6 +122,54 @@ def test_substrate_information_is_merged(test_config, dummy_backend, no_sleep, t
     assert data == {"name": "S1", "drops": 2, "used drop": "center"}
 
 
+def test_measure_stores_position_of_every_capture(test_config, dummy_backend, no_sleep, tmp_path):
+    from scidatacontainer import Container
+
+    path = tmp_path / "experiment"
+    path.mkdir()
+    with make_experiment(path, dummy_backend, dhm_usage=True) as experiment:
+        experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+
+        results = experiment.measure({"X": 1.31, "Y": 19.5}, name="rect.2", camera_path=path, dhm_path=path,
+                                     dhm_image_count=2, structure="rect", layer_id=2,
+                                     offsets_um=[(0.0, 0.0), (20.0, -10.0)])
+
+    assert len(results) == 2
+    captures = json.loads((path / "captures.json").read_text())
+    assert [(c["kind"], c["image_index"]) for c in captures] == [("dhm", 0), ("camera", 0), ("dhm", 1), ("camera", 1)]
+    for capture in captures:
+        dx, dy = capture["offset_um"]
+        assert capture["commanded_um"] == pytest.approx([1310.0 + dx, 19500.0 + dy, None])
+        # The dummy stage reaches the target, so the actual position equals the commanded one
+        assert capture["actual_um"]["X"] == pytest.approx(1310.0 + dx)
+        assert capture["actual_um"]["Y"] == pytest.approx(19500.0 + dy)
+        assert set(capture["actual_um"]) == set("XYZAB")
+        assert capture["structure"] == "rect" and capture["layer_id"] == 2 and capture["phase"] == "layer"
+        assert capture["image_count"] == (2 if capture["kind"] == "dhm" else 1)
+        assert capture["time"].endswith("Z")
+    # Every container carries its own record, and the DHM container its location
+    assert [c["file"] for c in captures] == ["dhm_rect.2_p0.zdc", "camera_rect.2_p0.zdc",
+                                             "dhm_rect.2_p1.zdc", "camera_rect.2_p1.zdc"]
+    dc = Container(file=str(path / "dhm_rect.2_p1.zdc"))
+    assert dc["data/capture.json"] == captures[2]
+    assert dc["data/location.json"]["X"] == pytest.approx(1330.0)
+    assert Container(file=str(path / "camera_rect.2_p1.zdc"))["data/capture.json"] == captures[3]
+
+
+def test_print_structure_records_captures(experiment):
+    add_rectangle(experiment)
+    experiment.build_programs()
+
+    experiment.print_experiment()
+
+    captures = json.loads((experiment.path / "captures.json").read_text())
+    n_layers = len(experiment.structure_configs[0]["layer_files"])
+    assert [c["phase"] for c in captures] == ["before"] + ["layer"] * n_layers + ["after"]
+    assert [c["layer_id"] for c in captures if c["phase"] == "layer"] == list(range(n_layers))
+    assert {c["structure"] for c in captures} == {"rect"}
+    assert captures[1]["file"] == "structures/rect/camera/camera_rect.0.zdc"
+
+
 def test_restart_from_stored_dictionary(test_config, dummy_backend, no_sleep, tmp_path):
     import importlib.util
     from pathlib import Path

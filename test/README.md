@@ -81,7 +81,7 @@ level, so the exact command strings are checked.
 | `devices/test_camera.py` | Exposure optimisation, image container | Unusable camera images | – (plus 1 hardware test) |
 | `dhm/test_dhm.py` | DHM client: objective selection, shutter, motor, hologram | DHM communication errors | – (plus 1 hardware test) |
 | `test_femtika/test_device_no_laser.py` | `Aerotech3200` status, positions, tasks, homing on the simulated controller | Parsing errors in the status answers of the controller | – (the same tests also run as hardware tests) |
-| `test_experiment.py` | `Experiment`: printing all layers, a failed layer (logged, printing continues), empty structures, OPL scan, substrate information, experiment dictionary | A single failed layer aborting a whole print; wrong metadata for restarts | – |
+| `test_experiment.py` | `Experiment`: printing all layers, a failed layer (logged, printing continues), empty structures, OPL scan, substrate information, experiment dictionary, restart, capture records (commanded and actual position per capture, several positions) | A single failed layer aborting a whole print; wrong metadata for restarts; captures that cannot be traced to a stage position | – |
 | `test_system.py` | `System` data container, homing | Missing metadata in stored experiments | – (plus 1 hardware test) |
 | `tools/test_focus_dummy.py` | `Focus` runs end to end on `System`; the z-line exposure reaches the controller | The tools breaking on API changes of `System` | – |
 | `integration/test_dry_run_default_experiment.py` | `mains/Experiments/default_exp_file.py` end to end: start-up, `plane_fit` (known plane), `build_programs`, `print_experiment` | An experiment script failing on the lab PC halfway through a print | – (marked `slow`) |

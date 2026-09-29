@@ -30,6 +30,7 @@ from nanofactorysystem.backends import BackendLike
 from nanofactorysystem.devices.coordinate_system import CoordinateSystem, PlaneFit, DropDirection, Unit, \
     Point2D, Point3D, Coordinate, ZFunction
 from nanofactorysystem.devices.power_calibration import PowerCalibration, power_calibration
+from nanofactorysystem.storage import CaptureRecord
 from nanofactorysystem.dhm.optimage import optImageMedian
 from nanofactorysystem.utils.visualization import read_file, plot_movements
 
@@ -1036,7 +1037,9 @@ class Experiment(object):
                 name=f"{name}_before",
                 camera_path=structure_path,
                 dhm_path=structure_path,
-                dhm_image_count=dhm_image_count)
+                dhm_image_count=dhm_image_count,
+                structure=name,
+                phase="before")
 
         # Prepare order of layer writing
         if self.drop_direction == DropDirection.UP:
@@ -1062,7 +1065,10 @@ class Experiment(object):
                     name=f"{name}.{layer_id}",
                     camera_path=camera_path,
                     dhm_path=dhm_path,
-                    dhm_image_count=dhm_image_count)
+                    dhm_image_count=dhm_image_count,
+                    structure=name,
+                    phase="layer",
+                    layer_id=layer_id)
                 self.update_print_progress(name, layer_id=layer_id, layer_count=layer_count, order=order,
                                            drop_direction=self.drop_direction)
             except AerotechError as e:
@@ -1079,7 +1085,9 @@ class Experiment(object):
             name=f"{name}_after",
             camera_path=structure_path,
             dhm_path=structure_path,
-            dhm_image_count=dhm_image_count + 10)
+            dhm_image_count=dhm_image_count + 10,
+            structure=name,
+            phase="after")
         self.update_print_progress(name, layer_id=layer_id, layer_count=layer_count, order=order,
                                    drop_direction=self.drop_direction, finished=True)
 
@@ -1251,32 +1259,107 @@ class Experiment(object):
                 camera_path: Path,
                 dhm_path: Path,
                 dhm_image_count: int = 0,
-                ) -> tuple[Container, ImageContainer]:
+                *,
+                structure: Optional[str] = None,
+                phase: Literal["before", "layer", "after"] = "layer",
+                layer_id: int = -1,
+                offsets_um: Optional[list[tuple[float, float]]] = None,
+                ) -> list[tuple[Optional[Container], ImageContainer]]:
+        """ Take DHM and camera captures at one or more positions.
+
+        For every capture a :class:`CaptureRecord` with the commanded and the
+        actual stage position is stored in the container (``data/capture.json``)
+        and appended to ``captures.json`` in the experiment folder.
+
+        Parameters
+        ----------
+        coordinate : dict
+            Absolute X and Y of the structure center in mm.
+        name : str
+            Name used in the file names (e.g. ``"rect.3"``).
+        camera_path, dhm_path : Path
+            Folders for the camera and DHM containers.
+        dhm_image_count : int
+            Number of holograms per DHM capture.
+        structure : str, optional
+            Structure the captures belong to; default: ``name``.
+        phase : {"before", "layer", "after"}
+            When the capture is taken.
+        layer_id : int
+            Layer after which the capture is taken; -1 for before/after.
+        offsets_um : list of (float, float), optional
+            Capture positions as (x, y) offsets in µm from ``coordinate``.
+            Default: one capture at ``coordinate``. With more than one
+            position, ``_p<i>`` is appended to the file names.
+
+        Returns
+        -------
+        list of tuple
+            ``(dhm_container, camera_container)`` per position;
+            ``dhm_container`` is None without DHM.
         """
-        Coordinate in mm in absolute coordinates
-        """
 
-        # Move to given absolute coordinate
-        self.a3200.api.LINEAR(**coordinate, F=20)
+        structure = name if structure is None else structure
+        offsets = [(0.0, 0.0)] if offsets_um is None else [(float(x), float(y)) for x, y in offsets_um]
+        results = []
+        for index, (dx, dy) in enumerate(offsets):
+            suffix = f"_p{index}" if len(offsets) > 1 else ""
+            target = dict(coordinate)
+            target["X"] += dx / 1000
+            target["Y"] += dy / 1000
+            commanded = tuple(1000 * target[axis] if axis in target else None for axis in "XYZ")
 
-        # Take DHM image
-        if self.system.dhm is not None:
-            dhm_container = self.system.dhm.container(opt=False, image_count=dhm_image_count)
-            fn = dhm_path / f"dhm_{name}.zdc"
-            dhm_container.write(fn)
-            self.log.info(f"DHM image: '{fn}'")
-        else:
-            self.log.info(f"DHM images was not captured!")
-            dhm_container = None
+            # Move to given absolute coordinate and read back where the stages are
+            self.a3200.api.LINEAR(**target, F=20)
+            actual = self.system.current_pos()
 
-        # Take camera image
-        camera_container = self.system.getimage()
-        fn = camera_path / f"camera_{name}.zdc"
-        camera_container.write(fn)
-        self.log.info(f"Camera image: '{fn}'")
+            def record(kind, image_count, file):
+                return CaptureRecord(
+                    kind=kind, structure=structure, phase=phase, layer_id=int(layer_id),
+                    image_index=index, image_count=int(image_count), offset_um=(dx, dy),
+                    commanded_um=commanded, actual_um=actual, file=self._relative(file))
 
-        # Return DHM image and camera image
-        return dhm_container, camera_container
+            # Take DHM image
+            if self.system.dhm is not None:
+                fn = dhm_path / f"dhm_{name}{suffix}.zdc"
+                capture = record("dhm", dhm_image_count, fn)
+                dhm_container = self.system.dhm.container(opt=False, loc=actual, image_count=dhm_image_count)
+                dhm_container["data/capture.json"] = capture.to_dict()
+                dhm_container.write(fn)
+                self._append_capture(capture)
+                self.log.info(f"DHM image: '{fn}'")
+            else:
+                self.log.info(f"DHM images was not captured!")
+                dhm_container = None
+
+            # Take camera image
+            fn = camera_path / f"camera_{name}{suffix}.zdc"
+            capture = record("camera", 1, fn)
+            camera_container = self.system.camera.container(loc=actual)
+            camera_container["data/capture.json"] = capture.to_dict()
+            camera_container.write(fn)
+            self._append_capture(capture)
+            self.log.info(f"Camera image: '{fn}'")
+
+            results.append((dhm_container, camera_container))
+
+        return results
+
+    def _relative(self, file: Path) -> str:
+        """ Return ``file`` relative to the experiment folder if it is inside it. """
+
+        try:
+            return Path(file).relative_to(self.path).as_posix()
+        except ValueError:
+            return str(file)
+
+    def _append_capture(self, capture: CaptureRecord) -> None:
+        """ Append a capture record to ``captures.json`` in the experiment folder. """
+
+        file_path = self.path / "captures.json"
+        data = json.loads(file_path.read_text()) if file_path.exists() else []
+        data.append(capture.to_dict())
+        file_path.write_text(json.dumps(data, indent=4))
 
     # def measurement_factory(self,
     #         #system: System,
