@@ -55,6 +55,7 @@ is longer than 260 characters.
 | `test_aerobasic/test_variables.py` | `create_variable`, `DVAR` declarations | Invalid variable declarations in generated programs | – |
 | `test_aerobasic/test_drawings/test_circles.py`, `test_corners.py` | Circle and corner structures generate programs | Exceptions in drawing code; the program content is checked by the golden tests | – |
 | `test_aerobasic/test_golden_programs.py` | Generated text of 11 representative programs (DefaultSetup and SetupIFOV) against `test/golden/*.txt` | **Any unintended change** of the commands sent to the machine, e.g. after refactoring the drawing classes | – |
+| `test_utils/test_visualization.py` | Reading programs into movements and plotting them (arcs, variables, empty programs) | Broken movement plots used for manual inspection of generated programs | – |
 | `test_utils/test_units.py` | Prototype unit conversion (`UnitFloat`, defined in the test) with `Unit` | Wrong mm/µm/cm factors | – |
 | `test_config_sources.py` | Config lookup order, built-in default, `use_config`, lazy class defaults | The package failing to import without `~/nanofactory.json`; the config not being switchable in tests | – |
 | `test_runtime.py` | `getLogger()` does not duplicate handlers and switches log files; failed controller commands are logged, not printed | Duplicated or misrouted log lines when several experiments run in one process | – |
@@ -174,7 +175,7 @@ binary_testprint(..., path=Path("dry_run"), backend=backend, plane=backend.world
   includes experiment output, the backend workdir (calibration file, `__zline__.pgm`, `A3200.log`) and
   programs.
 - `test/_programs/` (gitignored): programs and movement plots written by `test_program.py` and the drawing
-  tests, kept for manual inspection. Plotting failures appear as warnings (T24).
+  tests, kept for manual inspection.
 - `test/golden/`: the committed reference programs. Change them only with `--update-golden`, and review the
   diff.
 - Hardware and manual scripts may write into the current working directory, as they always did (for example

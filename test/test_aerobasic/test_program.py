@@ -1,5 +1,4 @@
 import tempfile
-import warnings
 from pathlib import Path
 from unittest import TestCase
 
@@ -46,24 +45,14 @@ class AeroBasicProgramTest(TestCase):
 
 
 def _write_plot(path: Path):
-    """ Save a plot of the program movements next to the program.
-
-    The plot is only an artefact for manual inspection. Plotting errors are
-    reported as warnings and do not fail the test (``plot_movements``
-    fails for most programs, see T24); before, the plot ran in a
-    background thread whose errors were never reported.
-    """
+    """ Save a plot of the program movements next to the program, for manual inspection. """
     import matplotlib.pyplot as plt
 
-    try:
-        movements = read_file(path)
-        fig = plot_movements(movements)
-        fig.tight_layout()
-        fig.savefig(path.with_suffix(".png"))
-        plt.close(fig)
-    except Exception as error:
-        plt.close("all")
-        warnings.warn(f"Could not plot {path.name}: {type(error).__name__}: {error}")
+    movements = read_file(path)
+    fig = plot_movements(movements)
+    fig.tight_layout()
+    fig.savefig(path.with_suffix(".png"))
+    plt.close(fig)
 
 
 def _strip_timestamp(text: str) -> str:
