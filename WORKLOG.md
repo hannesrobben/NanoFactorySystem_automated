@@ -663,3 +663,19 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   suspects a wrong resume position after a second abort. The test covers one abort; both notes are listed for
   T19.
 
+### 2026-09-29 13:24 CEST — [T23] Decide and implement axis validation for `SingleAxis`
+- **Status:** done
+- **Decision (maintainer, 2026-09-29):** mixing stages stays allowed; `~`, `^` and an empty `&` raise `AxisError`.
+- **Changes:**
+  - `nanofactorysystem/aerobasic/constants/axes.py`: `SingleAxis.__invert__`, `__xor__`/`__rxor__` raise
+    `AxisError`; `__and__`/`__rand__` raise it when there is no common axis. No code in the package uses these
+    operators on axes; `|` and membership tests are unchanged.
+  - `test/test_aerobasic/test_constants.py`: the strict-xfail `test_prevent_mixed_axes` is replaced by
+    `test_axis_combinations`, which asserts the decided behaviour.
+  - `test/README.md`: description updated.
+  - `TODO.md`: T23 moved to In Progress (with the decision), then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest`: 172 passed, 14 skipped, no xfail left.
+- **Commits:** `6d4009a` feat(aerobasic): reject invalid axis combinations [T23]
+- **Follow-ups:** none.
+

@@ -40,15 +40,6 @@ Format rules (for humans and Claude):
       Done when:
         - every todo and note section is identified and summerized in a new file 'todo_notes.md' . delete notes and todos in documentation and document the meaning of it in the file. Create workpackages from this in the same style as 'TODO.md' but save them on the bottom of 'todo_notes.md'.  
 
-- [ ] T23: Decide and implement axis validation for `SingleAxis` (found during T15)
-      Goal: It is clear whether combining axes of different stages (and `~`, `^`, empty `&`) is an error.
-      Priority: low | Depends on: –
-      Done when:
-        - The maintainer has decided whether mixed-stage combinations must raise `AxisError`. Note that
-          `Aerotech3200.home()` uses `Axis.YZ | Axis.AB` on purpose.
-        - Either the validation is implemented and the `xfail` on `test_prevent_mixed_axes` is removed, or the
-          test is rewritten to the decided behaviour.
-
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
 
@@ -98,4 +89,6 @@ Format rules (for humans and Claude):
 - [x] T24: Fix `utils.visualization.plot_movements` — 2026-09-29 — Arcs, ragged segments, empty programs, degenerate axes and RAPID/variables are handled; all program plots work and plotting errors fail the tests again; 5 new tests. — commits: `da404d1`, `e2df115`
 
 - [x] T25: Fix argument passing in experiment scripts — 2026-09-29 — The restart script now rebuilds the experiment from `experiment_dictionary.json` via the new `Experiment.parameters_from_dictionary()` (the original finding about the logger was inaccurate, see WORKLOG), and the template passes substrate information; dummy restart test added. — commits: `56e4d9a`, `412c763`
+
+- [x] T23: Decide and implement axis validation for `SingleAxis` — 2026-09-29 — Maintainer decision: mixing stages allowed; `~`, `^` and an empty `&` raise `AxisError`; the xfail test is replaced by `test_axis_combinations`. — commits: `6d4009a`
 
