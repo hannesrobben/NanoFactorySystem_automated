@@ -371,13 +371,13 @@ class DrawableObject(abc.ABC):
 
         code = self.__init__.__code__
 
-        # ÄNDERUNG 1: Verwende co_varnames statt co_names
-        # co_varnames = lokale Variablen/Parameter im __init__
+        # CHANGE 1: use co_varnames instead of co_names
+        # co_varnames = local variables/parameters of __init__
         # [1:] = skip 'self'
         param_names = code.co_varnames[1:]
 
-        # ÄNDERUNG 2: Entferne die problematische Prüfung
-        # (Die alte Zeile: if "__init__" not in code.co_names: return {})
+        # CHANGE 2: remove the problematic check
+        # (The old line: if "__init__" not in code.co_names: return {})
 
         kwargs = {}
         for name in param_names:
