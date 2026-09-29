@@ -46,3 +46,11 @@ def test_real_system_opens(lab_user):
         dc = system.container()
         assert dc["data/controller.json"]["zMax"] == 25700.0
     assert not system.opened
+
+
+def test_object_and_camera_position_use_current_stage_position(dummy_system):
+    stage = dummy_system.position("XYZ")
+
+    assert dummy_system.object_pos([10.0, -5.0]) == pytest.approx(dummy_system.object_pos([10.0, -5.0], stage))
+    assert dummy_system.camera_pos([1.0, 2.0, 3.0]) == pytest.approx(
+        dummy_system.camera_pos([1.0, 2.0, 3.0], stage[:2]))

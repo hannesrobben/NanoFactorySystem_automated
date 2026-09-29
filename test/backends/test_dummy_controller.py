@@ -197,3 +197,10 @@ def test_deprecated_dummy_flag_answers_queries():
 
     assert a3200.xyz.Z == 20.0
     assert a3200.version.major == "4"
+
+
+def test_send_one_falls_back_without_recursion(api, transport):
+    assert api.send_one("~VERSION") == "4.9.0.0"
+
+    transport.fail_next(r"^ABSOLUTE$")
+    assert api.send_one("ABSOLUTE") == ""  # retried with the fallback
