@@ -18,12 +18,6 @@ Format rules (for humans and Claude):
         - German identifiers (e.g. `run_testzweck_altesSystem`) and comments in active, non-legacy modules are
           translated, one module per commit.
 
-- [ ] T19: Identify each and every todo and note in all of the documents
-      Goal: Code should be free von notes and todo markers to enhance consistency in code structure. 
-      Priority: low | Depends on: –
-      Done when:
-        - every todo and note section is identified and summerized in a new file 'todo_notes.md' . delete notes and todos in documentation and document the meaning of it in the file. Create workpackages from this in the same style as 'TODO.md' but save them on the bottom of 'todo_notes.md'.  
-
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
 
@@ -77,4 +71,6 @@ Format rules (for humans and Claude):
 - [x] T23: Decide and implement axis validation for `SingleAxis` — 2026-09-29 — Maintainer decision: mixing stages allowed; `~`, `^` and an empty `&` raise `AxisError`; the xfail test is replaced by `test_axis_combinations`. — commits: `6d4009a`
 
 - [x] T20: Merge `A3200` and `Aerotech3200` into one controller class — 2026-09-29 — `A3200` builds on the new `AerotechController` and one ASCII interface; `System.controller is System.a3200_new`; golden command logs recorded before the merge are unchanged; maintainer decision: `.api` Z moves beyond zMax are refused. — commits: `f49d935`, `fdb0719`, `dcf80dc`, `5f8e203`
+
+- [x] T19: Identify each and every todo and note in all of the documents — 2026-09-29 — All 535 work markers (94 distinct) and the slicer roadmap are recorded in `todo_notes.md` with meaning, locations and 15 work packages (T26–T40), then removed from the active code; explanatory notes kept (maintainer decision). — commits: `b2d2f05`, `5f8af15`
 

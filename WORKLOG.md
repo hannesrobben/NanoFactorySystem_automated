@@ -719,3 +719,36 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
     could be removed.
   - The deprecated `DummyAsciiInterface` could be removed as well.
 
+### 2026-09-29 13:41 CEST — [T19] Identify each and every todo and note in all of the documents
+- **Status:** done
+- **Scope (maintainer, 2026-09-29):** remove work markers only (TODO/ToDo/FIXME/hotfix, including
+  multi-line todo blocks and docstring lines). Explanatory notes stay; legacy code (`old_to-delete/`,
+  `drawings/new/`, `*_old*.py`, `OLD_*.py`) is untouched.
+- **Changes:**
+  - `todo_notes.md` (new):
+    - 95 inventory entries: 94 distinct marker texts from 535 occurrences in 78 files, plus the slicer
+      roadmap. Each has the original text, its English meaning, all `file:line` locations and a work package.
+    - 15 work packages T26–T40 in `TODO.md` format.
+  - 78 code files in `nanofactorysystem/`, `mains/`, `test/`: markers removed with a tokenizer-based script.
+    Whole comment lines are removed with their continuation lines. After code or inside commented-out code
+    only the marker comment is cut. Docstring lines are removed, keeping any text before the marker.
+  - `nanofactorysystem/aerobasic/slicer/TODO.txt` (deleted): its roadmap is entry N095 / T40.
+  - `nanofactorysystem/aerobasic/programs/zline.py`: the class docstring, which was only a marker, now
+    describes the class.
+  - `TODO.md`: T19 moved to In Progress (with the scope decision), then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:**
+  - A rescan finds 0 markers.
+  - Every changed file still parses; the only syntax error in `mains/` is the pre-existing one in
+    `mains/debugging/test_plot.py`.
+  - `python -m pytest`: 184 passed, 14 skipped.
+- **Commits:** `b2d2f05` docs(todo): inventory all work markers in todo_notes.md [T19];
+  `5f8af15` chore: remove work markers from the code [T19]
+- **Notes:**
+  - The phrase "to do" in ordinary English ("Nothing to do for empty set") is not a marker and was kept.
+  - Commented-out asserts that belonged to "ToDo: Make sure center is within the edges" were removed with it
+    and are recorded in N022.
+  - `nanofactorysystem/aerobasic/slicer/tree_overview_slicer.txt` still lists `TODO.txt`. It describes the
+    layout of the original tpp_slicer project, so I left it unchanged.
+- **Follow-ups:** the work packages T26–T40 are in `todo_notes.md`; move them to `TODO.md` to schedule them.
+
