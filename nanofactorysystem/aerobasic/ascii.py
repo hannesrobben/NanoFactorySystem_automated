@@ -7,8 +7,12 @@ from nanofactorysystem.aerobasic.constants import ReturnCode, Version, DataItemE
 from nanofactorysystem.utils.typing import StatusQueryType
 
 
-class AerotechError(Exception):
-    pass
+class AerotechError(RuntimeError):
+    """ Error reported by the A3200 controller.
+
+    It is a ``RuntimeError``, the exception the older ``A3200`` controller
+    class raised, so existing handlers for both keep working.
+    """
 
 
 class TaskFailedError(AerotechError, ValueError):
