@@ -41,7 +41,7 @@ class CornerPosition(Enum):
     BL = 3
 
 
-# test für merge
+# test for merge
 
 class StructureType(Enum):
     DUMMY = 0
@@ -155,7 +155,7 @@ class Experiment(object):
         elif setup == "IFOV_on":
             self.a3200.api(SetupIFOV(objective=self.objective))
             # raise NotImplementedError(
-            #     "Es muss nochmal das IFOV Setup angepasst werden")
+            #     "The IFOV setup has to be adjusted again")
         else:
             raise NotImplementedError("Please use an existing setup!")
 
@@ -868,7 +868,7 @@ class Experiment(object):
         for layer_id, layer in enumerate(structure.iterate_layers(coordinate_system)):
             layer_pgm = AeroBasicProgram()
 
-            if stitching:  # funktioniert anscheinend!
+            if stitching:  # apparently works!
                 x_offset, y_offset = structure.get_tile_center_for_layer(layer_id)
                 x_value = x_structure_center + x_offset / 1000
                 y_value = y_structure_center + y_offset / 1000
@@ -1052,7 +1052,7 @@ class Experiment(object):
         for layer_count in range(len(pgm_files_list))[::order]:
             layer_pgm_path = pgm_files_list[layer_count]
             layer_id = int(str(layer_pgm_path).split('.')[-2])
-            # Einzelheiten über das Programm. Wenn das Programm bestimmte Größe überschreiten sollte, dann sollte man überdenken ob man das nicht vielleicht aufsplittet
+            # Details about the program: if a program exceeds a certain size, consider splitting it
             try:
                 task = self.a3200.run_program_as_task(layer_pgm_path, task_id=1)
                 task.wait_to_finish()
@@ -1204,7 +1204,7 @@ class Experiment(object):
                 #     else:
                 #         raise ValueError("Invalid resume order")
                 # NEW--------------------------------------------------------------
-                # lange version für den kurzen for block unten
+                # long version of the short for block below
                 # for f in layer_files:
                 #     layer_id = extract_layer_id(f)
                 #
