@@ -49,7 +49,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 
 ### Phase 0 — Concept
 
-
 ### Phase 1 — Consistent execution parameters
 
 - [ ] T43: Make the drop direction consistent everywhere [phase: 1]
@@ -85,14 +84,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
         - Experiment scripts that need camera images set it to True explicitly (listed in WORKLOG.md).
         - Dummy tests for both values.
       Notes: Video recording in a thread is future_todo.md F3.
-
-- [ ] T46: Record the stage position of every capture [phase: 1]
-      Goal: Every hologram and camera image can be traced to the exact XYZ stage position at which it was taken.
-      Priority: medium | Depends on: –
-      Done when:
-        - `measure()` stores the commanded and the actual position (read from the controller after the move) with each capture, together with structure name, layer id, image index, `image_count` and timestamp.
-        - `measure()` accepts an optional list of offsets relative to the structure center (default: one capture at the center); every capture is stored with its own position. This is only the extension point for speckle averaging (F5) and DHM stitching (F6).
-        - Dummy test with two capture positions checks the stored positions.
 
 - [ ] T58: Define the capture position of `measure()` (found during T41) [phase: 1]
       Goal: Camera and DHM captures are taken at a defined Z and galvo position, not wherever the last layer left the axes.
@@ -359,3 +350,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T41: Audit the experiment metadata — 2026-09-29 — `docs/reviews/METADATA_AUDIT.md` lists every file an experiment writes and rates each metadata item, checked against two dummy dry runs of the template; defects outside T42–T50 were added as T55–T60. — commits: `bf5565a`
 
 - [x] T42: Design the experiment storage and substrate model — 2026-09-29 — `docs/design/EXPERIMENT_STORAGE.md` defines one self-contained HDF5 file per experiment below the per-user default root, substrate/experiment labels and UUIDs, write strategy, JSON copies, legacy reading and the store API; approved by the maintainer with all proposals D1–D8. — commits: `ef2ff63`, `3f75e0a`
+
+- [x] T46: Record the stage position of every capture — 2026-09-29 — `measure()` stores a `CaptureRecord` (commanded and actual XYZAB position, structure, phase, layer, image index/count, UTC time) in every camera/DHM container and in `captures.json`, and accepts a list of capture offsets; golden command logs unchanged. — commits: `c16f5ae`

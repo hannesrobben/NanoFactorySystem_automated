@@ -893,3 +893,38 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
     If it is, set a `dataRoot` for each user.
 - **Next:** phase 1, starting with T43 (drop direction). T43 contains the decision "merge `Orientation`
   into `DropDirection` or map one to the other".
+
+### 2026-09-29 23:19 CEST — [T46] Record the stage position of every capture
+- **Status:** done
+- **Branch:** `feat/phase1-capture-positions`, based on `docs/t41-metadata-audit`
+- **Changes:**
+  - `nanofactorysystem/storage/__init__.py` (new): the storage package of the approved design. T47 adds the
+    store to it.
+  - `nanofactorysystem/storage/records.py` (new):
+    - `CaptureRecord` (kind, structure, phase, layer id, image index, image count, offset, commanded
+      X/Y/Z, actual X/Y/Z/A/B, UTC time, relative file);
+    - `utc_timestamp()`.
+  - `nanofactorysystem/experiment.py`:
+    - `measure()` has new keyword arguments `structure`, `phase`, `layer_id` and `offsets_um`.
+    - The actual position is read after every move. It is passed to the camera container, as
+      `System.getimage()` did before, and now also to the DHM container (`data/location.json`).
+    - Each capture record is written to the container (`data/capture.json`) and appended to
+      `captures.json` in the experiment folder.
+    - `print_structure()` passes structure, phase and layer id.
+    - Return value: one `(dhm, camera)` tuple per position; the old version returned one tuple. The only
+      callers are in `print_structure()`, which ignores the return value; the calls in `mains/` are
+      commented out.
+  - `test/test_experiment.py`: two tests. One takes two capture positions with DHM on and checks commanded
+    and actual positions, the records inside the containers and the file names. The other checks the
+    before/layer/after records of a printed structure.
+  - `test/README.md`: `test_experiment.py` row.
+  - `TODO.md`: T46 moved to In Progress, then to Done.
+- **Tests:** `python -m pytest` (short-path venv): 186 passed, 14 skipped. The golden command logs
+  (`test_command_logs.py`) are unchanged: without DHM the controller receives exactly the same commands.
+- **Commits:** `c16f5ae` feat(experiment): record the stage position of every capture [T46];
+  docs(todo): close T46 [T46]
+- **Behaviour change on hardware:** with DHM on, the stage position is read before the DHM capture instead of
+  just before the camera capture. It is the same number of queries, in a different order.
+- **Follow-ups:**
+  - The commanded Z is None because `measure()` does not move Z; T58 defines it.
+  - `captures.json` is the interim storage until T47 moves the records into `experiment.h5`.
