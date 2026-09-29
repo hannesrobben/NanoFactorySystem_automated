@@ -1623,3 +1623,22 @@ T25: my original finding (a logger path being passed as a logger) was wrong. The
 T18: I translated the package and test modules only. The experiment scripts in mains/ and the scripts in test/manual/ still contain German.
 Safety: with --run-hardware, test_move_home moves the real stage to X=Y=Z=0, as it did before. Please check whether Z=0 is safe with the objective mounted.
 Logger name: the logger is still called 'dummy'; renaming it is your call.
+## Planning status (2026-09-29)
+
+After the planning of the phases in `TODO.md` the work packages above are handled as follows:
+
+| Package | Where it went |
+|---|---|
+| T26 | Replaced by T51 (new experiment-script template) |
+| T27 | Replaced by T42, T47, T48 (storage design, HDF5 store, substrate model and index) |
+| T28 | `TODO.md`, phase B |
+| T29 | Replaced by T44 (plane-fitting execution) |
+| T30 | Replaced by T50 (restart and repetitions on the new storage) |
+| T31 | `TODO.md`, phase 4 (enabler for adaptive slicing and printing strategies, `future_todo.md` F7) |
+| T32 | `TODO.md`, phase B |
+| T33, T34 | Stay here only (special printable structures, lower priority); not scheduled |
+| T35 | `TODO.md`, phase B; N070 moved to T43 |
+| T36 | `TODO.md`, phase B |
+| T37 | `TODO.md`, phase B; N087 and N089 moved to T43 |
+| T38, T39 | `TODO.md`, phase B |
+| T40 | `future_todo.md` F7 |
