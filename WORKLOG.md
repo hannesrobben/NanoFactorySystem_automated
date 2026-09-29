@@ -570,3 +570,19 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Commits:** `daa757e` fix(devices): replace deprecated array shape assignment [T22]
 - **Follow-ups:** none.
 
+### 2026-09-29 09:57 CEST — [T16] Fix always-true `assert (path, Path)` in experiment scripts
+- **Status:** done
+- **Changes:**
+  - `mains/**/*.py` (48 files, one line each): `assert (path, Path)` became `path = Path(path)  # accept str or
+    Path`. A strict `isinstance` check would reject the strings that `mains/main.py` passes; the conversion
+    keeps the following `os.path.join` working.
+  - `TODO.md`: T16 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:**
+  - Compiling every file in `mains/` reports no "assertion is always true" warning anymore.
+  - `python -m pytest`: 161 passed, 14 skipped, 1 xfailed. This includes the dry run of `default_exp_file.py`,
+    which passes a `Path`.
+- **Commits:** `d1f1f67` fix(mains): convert path arguments instead of always-true asserts [T16]
+- **Follow-ups:** `mains/debugging/test_plot.py` has a pre-existing `SyntaxError` (a parameter without default
+  after a parameter with default). It is a debugging script, not collected by pytest; it is left for T19.
+

@@ -27,13 +27,6 @@ Format rules (for humans and Claude):
         - Whether `zMax` also guards `.api.LINEAR` moves is decided by the maintainer and documented.
       Notes: Maintainer decision 2026-09-28. Refactor only after the dummy backend and tests exist.
 
-- [ ] T16: Fix always-true `assert (path, Path)` in experiment scripts (found during T1)
-      Goal: Path arguments of experiment scripts are actually checked.
-      Priority: low | Depends on: –
-      Done when:
-        - The 48 occurrences in `mains/**` are replaced by a working check or conversion, and pytest no longer
-          emits `PytestAssertRewriteWarning` for them.
-
 - [ ] T17: Clean up logging (found during T1)
       Goal: Log output is neither duplicated nor mixed with `print`.
       Priority: low | Depends on: –
@@ -121,4 +114,6 @@ Format rules (for humans and Claude):
 - [x] T11: Fix small defects in `System` and the `A3200` controller — 2026-09-29 — Fixed `object_pos`/`camera_pos`, `A3200.home`, `A3200.container`, `self.z` before an absolute z move and the recursive `send_one`; a dummy test per fix. — commits: `6ef8d37`, `b65b604`
 
 - [x] T22: Fix NumPy 2.5 deprecation in `Attenuator` — 2026-09-29 — `reshape` instead of assigning `array.shape` in `Attenuator` and `CameraDevice` (the `IFOV_Lines` case went away in T14); the suite passes with the deprecation as error. — commits: `daa757e`
+
+- [x] T16: Fix always-true `assert (path, Path)` in experiment scripts — 2026-09-29 — The 48 always-true asserts in `mains/` are replaced by `path = Path(path)`, which accepts the str paths the callers pass; no warnings remain. — commits: `d1f1f67`
 
