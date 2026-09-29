@@ -27,17 +27,6 @@ Format rules (for humans and Claude):
         - Whether `zMax` also guards `.api.LINEAR` moves is decided by the maintainer and documented.
       Notes: Maintainer decision 2026-09-28. Refactor only after the dummy backend and tests exist.
 
-- [ ] T11: Fix small defects in `System` and the `A3200` controller (found during T1)
-      Goal: Rarely used helpers of `System` and `A3200` work as documented.
-      Priority: medium | Depends on: T12, T3
-      Done when:
-        - `System.object_pos`/`camera_pos` use `self.controller`.
-        - `A3200.home` (`in None`), `A3200.container` (dict iteration) and the use of `self.z` before
-          assignment are fixed.
-        - `AerotechAsciiInterface.send_one` no longer recurses infinitely.
-        - Each fix has a dummy-backend test.
-      Notes: Details: `docs/reviews/CODE_REVIEW_2026-09-28.md` §4.
-
 - [ ] T16: Fix always-true `assert (path, Path)` in experiment scripts (found during T1)
       Goal: Path arguments of experiment scripts are actually checked.
       Priority: low | Depends on: –
@@ -135,4 +124,6 @@ Format rules (for humans and Claude):
 - [x] T13: Add timeouts to hardware communication and wait loops — 2026-09-29 — Configurable connect timeouts (10 s), optional response timeouts, responses read until the terminator, bounded axis/z-line waits and stall/stop bounds for tasks; terminated `~LASTERROR`; 12 dummy tests. — commits: `1ee7ef0`, `8d9d4dc`
 
 - [x] T14: Remove the hardcoded calibration path from `IFOV_Lines` — 2026-09-29 — `IFOV_Lines` takes a `PowerCalibration` (explicit, active context, or configured file); `Experiment.build_programs()` uses its attenuator calibration; golden files unchanged; 8 new tests. — commits: `eb26199`, `69547ba`
+
+- [x] T11: Fix small defects in `System` and the `A3200` controller — 2026-09-29 — Fixed `object_pos`/`camera_pos`, `A3200.home`, `A3200.container`, `self.z` before an absolute z move and the recursive `send_one`; a dummy test per fix. — commits: `6ef8d37`, `b65b604`
 

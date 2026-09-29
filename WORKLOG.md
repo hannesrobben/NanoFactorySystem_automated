@@ -535,3 +535,24 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
     reached by the experiment flow (IFOV_Lines is only used inside other structures).
   - The `lines.py` half of T22 is done by this change.
 
+### 2026-09-29 09:55 CEST — [T11] Fix small defects in `System` and the `A3200` controller
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/system.py`: `object_pos`/`camera_pos` use `self.controller`.
+  - `nanofactorysystem/devices/a3200.py`: `home()` (`is None`); `container()` (`.items()`); `self.z` starts at
+    `zInit`.
+  - `nanofactorysystem/aerobasic/ascii.py`: `send_one()` calls `send()`.
+  - `test/devices/test_aerotech.py`, `test/test_system.py`, `test/backends/test_dummy_controller.py`: 6 new
+    dummy tests, one per fix (plus homing of a single axis).
+  - `TODO.md`: T11 moved to In Progress, then to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest`: 161 passed, 14 skipped, 1 xfailed.
+- **Commits:** `6ef8d37` fix(devices): repair small defects in System and A3200 [T11];
+  `b65b604` test: cover the System and A3200 fixes on the dummy backend [T11]
+- **Behaviour change on hardware (intended):** `moveinc()` and `zline()` now check `zMax` against the initial
+  z position if no absolute z move happened yet. Before, they raised `AttributeError` in that case.
+- **Follow-ups / note for the maintainer:** `send_one()` is used nowhere. Its fallback re-sends a command
+  that just failed, via the older `run_testzweck_altesSystem`, which could execute a motion command twice.
+  I only removed the infinite recursion. Consider deleting both methods when T20 merges the controllers;
+  the German method name is part of T18.
+
