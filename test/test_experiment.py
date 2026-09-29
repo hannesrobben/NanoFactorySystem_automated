@@ -10,7 +10,7 @@ from nanofactorysystem.experiment import Experiment, StructureType
 from nanofactorysystem.runtime import getLogger
 
 
-def make_experiment(path, backend, *, dhm_usage=False, skip_corner=True, substrate=None):
+def make_experiment(path, backend, *, dhm_usage=False, skip_corner=True, substrate=None, setup="IFOV_off"):
     """ Small 20x experiment with one grid cell, as in the experiment template. """
 
     matplotlib.use("Agg")
@@ -27,7 +27,8 @@ def make_experiment(path, backend, *, dhm_usage=False, skip_corner=True, substra
         structure_size=500, margin=200, padding=100, absolute_grid_center=Point2D(1310, 19500),
         grid=(1, 1), n_mid_points=0, drop_direction=DropDirection.UP,
         corner_z=-2, corner_width=50, corner_length=300, corner_height=7, corner_hatch=0.5, corner_slice=0.75,
-        fov_dim=(500, 500), skip_corner=skip_corner, backend=backend, substrate_information=substrate)
+        fov_dim=(500, 500), skip_corner=skip_corner, setup=setup, backend=backend,
+        substrate_information=substrate)
 
 
 @pytest.fixture
