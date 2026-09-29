@@ -44,6 +44,7 @@ def test_default_experiment_dry_run(test_config, dummy_backend, no_sleep, tmp_pa
         objective="Zeiss 20x",
         user="Test",
         dhm_usage=False,
+        substrate={"Name": "dry-run substrate", "Number of drops": 1},
         backend=dummy_backend,
         plane=world.sample.plane(),
     )
@@ -73,6 +74,9 @@ def test_default_experiment_dry_run(test_config, dummy_backend, no_sleep, tmp_pa
     for exposure in world.exposures:
         x_um, y_um, z_um = (1000 * v for v in exposure.end)
         assert abs(z_um - plane(x_um, y_um)) < 20.0
+
+    # Substrate information is passed on to the experiment
+    assert json.loads((tmp_path / "out" / "substrate_information.json").read_text())["Name"] == "dry-run substrate"
 
     # Camera images before, during and after writing
     assert list((out / "structures").rglob("camera_*.zdc"))

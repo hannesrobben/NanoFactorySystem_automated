@@ -119,3 +119,38 @@ def test_substrate_information_is_merged(test_config, dummy_backend, no_sleep, t
 
     data = json.loads((tmp_path / "substrate_information.json").read_text())
     assert data == {"name": "S1", "drops": 2, "used drop": "center"}
+
+
+def test_restart_from_stored_dictionary(test_config, dummy_backend, no_sleep, tmp_path):
+    import importlib.util
+    from pathlib import Path
+
+    path = tmp_path / "experiment"
+    path.mkdir()
+    with make_experiment(path, dummy_backend) as experiment:
+        experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+        add_rectangle(experiment)
+        experiment.build_programs()
+        layers = experiment.structure_configs[0]["layer_files"]
+    layer_ids = sorted(int(str(f).split(".")[-2]) for f in layers)
+    # Simulate a print aborted after the second layer (drop direction up: ascending order)
+    (path / "print_progress.json").write_text(json.dumps({
+        "current_structure": {"name": "rect", "finished layer": layer_ids[1], "order": 1},
+        "finished_structures": [], "error log": []}))
+
+    params = Experiment.parameters_from_dictionary(path)
+    assert params["objective"] == "Zeiss 20x" and params["grid"] == (1, 1)
+    assert params["drop_direction"] == DropDirection.UP
+    assert params["resin_corner_tr"].as_tuple() == (5720.0, 27190.0)
+    assert params["sys_args"]["controller"]["zMax"] == 24550.0
+
+    script = Path(__file__).parents[1] / "mains" / "restart_experiment.py"
+    spec = importlib.util.spec_from_file_location("restart_experiment", script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)  # does not start a restart on import
+    dummy_backend.calllog.clear()
+
+    module.restart(path, backend=dummy_backend)
+
+    assert len(dummy_backend.calllog.filter(device="program")) == len(layers) - 2
+    assert [s["name"] for s in progress(experiment)["finished_structures"]] == ["rect"]
