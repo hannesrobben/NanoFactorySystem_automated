@@ -45,6 +45,7 @@ PARAMETERS = (
     ("plane_fit_mode", "plane_fit_mode", "plane_fit_mode", "enum"),
     ("setup", "setup", "setup", "str"),
     ("tilt_warning_um", "tilt_warning_um", "tilt_warning_um", "float"),
+    ("camera_capture", "camera_capture", "camera_capture", "bool"),
 )
 
 

@@ -102,7 +102,8 @@ class Experiment(object):
                  substrate: Optional[str] = None,
                  data_root: Optional[Path] = None,
                  allow_synced_root: bool = False,
-                 tilt_warning_um: float = 1.0):
+                 tilt_warning_um: float = 1.0,
+                 camera_capture: bool = False):
         """ Experiment on one substrate.
 
         Only the newer parameters are documented here; see the class
@@ -136,6 +137,10 @@ class Experiment(object):
         tilt_warning_um : float
             After the plane fit, a warning is logged if the substrate height
             under a structure varies by more than this value.
+        camera_capture : bool
+            Take camera images before, during and after printing (in
+            ``measure()``). Off by default; it is an experiment choice and
+            therefore an argument here, not a camera setting in ``sys_args``.
         backend : {"real", "dummy"}, Backend or None
             Hardware backend passed to :class:`System`. None or ``"real"``
             (default) uses the lab hardware, ``"dummy"`` or a
@@ -215,6 +220,7 @@ class Experiment(object):
         self.drop_direction = drop_direction
         self.plane_fit_mode = PlaneFitMode.parse(plane_fit_mode)
         self.tilt_warning_um = float(tilt_warning_um)
+        self.camera_capture = bool(camera_capture)
 
         # Corner dimensions
         self.corner_z = float(corner_z)
@@ -408,7 +414,7 @@ class Experiment(object):
             "corner_height": self.corner_height, "corner_hatch": self.corner_hatch,
             "corner_slice": self.corner_slice, "fov_dim": self.fov_dimensions, "skip_corner": self.skip_corner,
             "plane_fit_mode": self.plane_fit_mode.name, "setup": self.setup,
-            "tilt_warning_um": self.tilt_warning_um,
+            "tilt_warning_um": self.tilt_warning_um, "camera_capture": self.camera_capture,
         }
         converters = {"float": float, "int": int, "bool": bool, "str": str, "enum": str,
                       "vector": lambda v: np.asarray(v, dtype=float), "ivector": lambda v: np.asarray(v, dtype=int)}
@@ -633,7 +639,7 @@ class Experiment(object):
             "fov_dim": tuple(vector(data["fov_dim"])),
             "skip_corner": bool(data["skip_corner"]),
             "plane_fit_mode": PlaneFitMode.parse(data["plane_fit_mode"]),
-            **({"tilt_warning_um": data["tilt_warning_um"]} if "tilt_warning_um" in data else {}),
+            **{key: data[key] for key in ("tilt_warning_um", "camera_capture") if key in data},
             "setup": data["setup"] or "IFOV_off",
             "resume": True,
             **substrate,
@@ -1588,7 +1594,7 @@ class Experiment(object):
                 layer_id: int = -1,
                 dhm_image_count: int = 0,
                 offsets_um: Optional[list[tuple[float, float]]] = None,
-                ) -> list[tuple[Optional[Container], ImageContainer]]:
+                ) -> list[tuple[Optional[Container], Optional[ImageContainer]]]:
         """ Take DHM and camera captures at one or more positions.
 
         Every capture is stored in the experiment file with a
@@ -1617,7 +1623,8 @@ class Experiment(object):
         -------
         list of tuple
             ``(dhm_container, camera_container)`` per position;
-            ``dhm_container`` is None without DHM.
+            ``dhm_container`` is None without DHM, ``camera_container`` is
+            None unless ``camera_capture`` is set.
         """
 
         offsets = [(0.0, 0.0)] if offsets_um is None else [(float(x), float(y)) for x, y in offsets_um]
@@ -1652,13 +1659,16 @@ class Experiment(object):
                 self.log.info(f"DHM images was not captured!")
                 dhm_container = None
 
-            # Take camera image
-            capture = record("camera", 1)
-            camera_container = self.system.camera.container(loc=actual)
-            self.store.add_capture(capture, camera_container["meas/image.png"],
-                                   device=camera_container["data/camera.json"])
-            camera_container["data/capture.json"] = capture.to_dict()
-            self.log.info(f"Camera image: capture {capture.capture_id} of {structure} ({phase} {layer_id})")
+            # Take camera image (only on request, camera_capture)
+            if self.camera_capture:
+                capture = record("camera", 1)
+                camera_container = self.system.camera.container(loc=actual)
+                self.store.add_capture(capture, camera_container["meas/image.png"],
+                                       device=camera_container["data/camera.json"])
+                camera_container["data/capture.json"] = capture.to_dict()
+                self.log.info(f"Camera image: capture {capture.capture_id} of {structure} ({phase} {layer_id})")
+            else:
+                camera_container = None
 
             results.append((dhm_container, camera_container))
 

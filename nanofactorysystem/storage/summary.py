@@ -84,7 +84,7 @@ def summary(record: ExperimentRecord) -> dict[str, Any]:
 
     parameters = record.parameters
     dhm = bool(parameters.get("dhm_usage", False))
-    camera = bool(parameters.get("camera_capture", True))
+    camera = bool(parameters.get("camera_capture", True))  # files before T45 always took camera images
     rows = []
     for structure in record.structures:
         if structure.type in MARKER_TYPES:

@@ -13,10 +13,12 @@ from nanofactorysystem.storage import ExperimentStore
 
 
 def make_experiment(path, backend, *, dhm_usage=False, skip_corner=True, substrate=None, setup="IFOV_off",
-                    grid=(1, 1), drop_direction=DropDirection.UP, center=Point2D(1310, 19500), **kwargs):
+                    grid=(1, 1), drop_direction=DropDirection.UP, center=Point2D(1310, 19500), camera_capture=True,
+                    **kwargs):
     """ Small 20x experiment with one grid cell, as in the experiment template.
 
-    path=None uses the default location of a substrate (pass substrate_label and data_root).
+    path=None uses the default location of a substrate (pass substrate_label and data_root). Camera
+    images are on by default here, as in the tests written before T45; Experiment's default is off.
     """
 
     matplotlib.use("Agg")
@@ -34,7 +36,7 @@ def make_experiment(path, backend, *, dhm_usage=False, skip_corner=True, substra
         structure_size=500, margin=200, padding=100, absolute_grid_center=center,
         grid=grid, n_mid_points=0, drop_direction=drop_direction,
         corner_z=-2, corner_width=50, corner_length=300, corner_height=7, corner_hatch=0.5, corner_slice=0.75,
-        fov_dim=(500, 500), skip_corner=skip_corner, setup=setup, backend=backend,
+        fov_dim=(500, 500), skip_corner=skip_corner, setup=setup, backend=backend, camera_capture=camera_capture,
         substrate_information=substrate, substrate=kwargs.pop("substrate_label", None), **kwargs)
 
 
@@ -445,6 +447,34 @@ def test_structure_plots_on_request(experiment):
     experiment.build_programs(plot_structures=True)
 
     assert (experiment.path / "structures" / "rect" / "plot_rect.png").is_file()
+
+
+@pytest.mark.parametrize("camera_capture", [False, True])
+def test_camera_images_only_on_request(camera_capture, test_config, dummy_backend, no_sleep, tmp_path):
+    path = tmp_path / "experiment"
+    path.mkdir()
+    with make_experiment(path, dummy_backend, camera_capture=camera_capture) as experiment:
+        experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+        add_rectangle(experiment)
+        experiment.build_programs()
+        dummy_backend.calllog.clear()
+        results = experiment.measure({"X": 1.31, "Y": 19.5}, structure="rect")
+        experiment.print_experiment()
+
+    assert (results[0][1] is not None) == camera_capture
+    record = ExperimentStore.open(path).read()
+    cameras = [c for c in record.captures if c.kind == "camera"]
+    assert bool(cameras) == camera_capture
+    assert bool(dummy_backend.calllog.filter(device="camera", call="getimage")) == camera_capture
+    assert record.parameters["camera_capture"] is camera_capture
+    assert json.loads((path / "experiment_summary.json").read_text())["camera_capture"] is camera_capture
+    # A restart uses the stored value
+    assert Experiment.parameters_from_dictionary(path)["camera_capture"] is camera_capture
+
+
+def test_experiment_default_takes_no_camera_images(test_config, dummy_backend, no_sleep, tmp_path):
+    import inspect
+    assert inspect.signature(Experiment).parameters["camera_capture"].default is False
 
 
 def test_existing_experiment_is_not_overwritten(test_config, dummy_backend, no_sleep, tmp_path):
