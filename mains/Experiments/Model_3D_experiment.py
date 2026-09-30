@@ -167,6 +167,7 @@ def print_2pp(
         absolute_grid_center=absolute_grid_center,
         grid=grid,
         n_mid_points=0,
+        camera_capture=True,
         drop_direction=drop_direction,
         corner_z=-2,
         corner_width=c_width,

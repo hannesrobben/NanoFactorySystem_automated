@@ -182,6 +182,7 @@ def gratings_testprint(absolute_center: Point2D, resin_dimension: list, ask_cont
             absolute_grid_center=absolute_grid_center,
             grid=(2, 2),  # 4 structures: BlazedGrating, BinaryGrating, SinusoidalGrating, FresnelLens
             n_mid_points=0,
+            camera_capture=True,
             drop_direction=DropDirection.DOWN,
             corner_z=-2,
             corner_width=c_width,

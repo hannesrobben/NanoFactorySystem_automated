@@ -116,6 +116,7 @@ def focal_point_matrix_maker(absolute_center: Point2D, resin_dimension: list, as
             grid=(2, 3),
             n_mid_points=0,
             plane_fit_mode=1,  # only plane-fitting on the four edges
+            camera_capture=True,
             drop_direction=DropDirection.DOWN,
             corner_z=-2,
             corner_width=c_width,

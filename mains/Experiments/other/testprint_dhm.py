@@ -123,6 +123,7 @@ def dhm_testprint(absolute_center: Point2D, resin_dimension: list, ask_continue_
             absolute_grid_center=absolute_grid_center,
             grid=(3, 5),
             n_mid_points=0,
+            camera_capture=True,
             drop_direction=DropDirection.DOWN,
             corner_z=-2,
             corner_width=c_width,

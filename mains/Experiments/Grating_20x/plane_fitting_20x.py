@@ -148,6 +148,7 @@ def binary_testprint(absolute_center: Point2D, resin_dimension: list, ask_contin
             absolute_grid_center=absolute_grid_center,
             grid=grid_size,
             n_mid_points=0,
+            camera_capture=True,
             drop_direction=drop_direction,
             corner_z=-2,
             corner_width=c_width,

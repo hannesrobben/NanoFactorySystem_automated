@@ -132,6 +132,7 @@ def qr_code_test(absolute_center: Point2D, resin_dimension: list, ask_continue_b
             absolute_grid_center=absolute_grid_center,
             grid=(5, 2),
             n_mid_points=0,
+            camera_capture=True,
             drop_direction=DropDirection.DOWN,
             corner_z=-2,
             corner_width=c_width,
