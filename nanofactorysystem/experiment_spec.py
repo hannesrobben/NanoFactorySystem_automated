@@ -286,7 +286,8 @@ class ExperimentSpec:
 def run_experiment(spec: ExperimentSpec, *, user: str, resin_edges, path: Optional[Path] = None,
                    substrate: Optional[str] = None, data_root: Optional[Path] = None, backend=None,
                    plane: Optional[ZFunction] = None, confirm: Optional[Callable[[str], bool]] = None,
-                   show_plot: bool = False, substrate_information: Optional[dict] = None) -> Path:
+                   show_plot: bool = False, substrate_information: Optional[dict] = None,
+                   allow_synced_root: bool = False) -> Path:
     """ Run an experiment: plot, plane fit, OPL scan (DHM), structures, build and print.
 
     Parameters
@@ -313,6 +314,8 @@ def run_experiment(spec: ExperimentSpec, *, user: str, resin_edges, path: Option
         Show the experiment plot window.
     substrate_information : dict, optional
         Free substrate information of older scripts, stored in the experiment file.
+    allow_synced_root : bool
+        Accept a data root inside a synchronised folder.
 
     Returns
     -------
@@ -330,6 +333,7 @@ def run_experiment(spec: ExperimentSpec, *, user: str, resin_edges, path: Option
     arguments = spec.experiment_arguments(user=user, resin_edges=resin_edges, logger=logger, backend=backend,
                                           path=folder, substrate=substrate, data_root=data_root)
     arguments["substrate_information"] = substrate_information
+    arguments["allow_synced_root"] = allow_synced_root
 
     def ask(question: str) -> bool:
         return confirm is None or confirm(question)
