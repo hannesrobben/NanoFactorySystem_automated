@@ -3,6 +3,7 @@
 # <reinhard.caspary@phoenixd.uni-hannover.de>                            #
 # This program is free software under the terms of the MIT license.      #
 ##########################################################################
+import datetime
 import json
 import logging
 import os.path
@@ -34,6 +35,8 @@ from nanofactorysystem.storage import (CaptureRecord, CornerRecord, ExperimentRe
                                        LayoutRecord, PlaneFitRecord, StructureRecord, export_json,
                                        software_info, utc_timestamp, z_function_to_json)
 from nanofactorysystem.storage.json_copies import structures_list
+from nanofactorysystem.storage.substrate_store import (SubstrateRecord, SubstrateStore, check_not_synced,
+                                                       default_root)
 from nanofactorysystem.storage import schema
 from nanofactorysystem.dhm.optimage import optImageMedian
 from nanofactorysystem.utils.visualization import read_file, plot_movements
@@ -60,7 +63,7 @@ class StructureType(Enum):
 
 class Experiment(object):
     def __init__(self,
-                 path: Path,
+                 path: Optional[Path],
                  user: str,
                  objective: str,
                  logger: Logger,
@@ -90,7 +93,10 @@ class Experiment(object):
                  setup: Literal["IFOV_off", "IFOV_on"] = "IFOV_off",
                  substrate_information: dict=None,
                  backend: BackendLike = None,
-                 resume: bool = False):
+                 resume: bool = False,
+                 substrate: Optional[str] = None,
+                 data_root: Optional[Path] = None,
+                 allow_synced_root: bool = False):
         """ Experiment on one substrate.
 
         Only the newer parameters are documented here; see the class
@@ -100,6 +106,24 @@ class Experiment(object):
 
         Parameters
         ----------
+        path : Path or None
+            Experiment folder. None: a new folder
+            ``<data root>/<substrate>/<experiment label>_<YYYYMMDD-HHMM>``
+            below the default location (requires ``substrate``); the log
+            file ``console.log`` is added in that folder.
+        substrate_information : dict, optional
+            Free information about the substrate (older scripts); stored in
+            the experiment file. Use ``substrate`` for substrate records.
+        substrate : str, optional
+            Label or UUID of a substrate created with
+            :class:`SubstrateStore`. The experiment gets the next experiment
+            label of the substrate and is entered into its index.
+        data_root : Path, optional
+            Data root with the substrates; default: :func:`default_root` of
+            the user (``dataRoot`` in the config or
+            ``~/Documents/Femtika_Experiment/<user>``).
+        allow_synced_root : bool
+            Accept a data root inside a synchronised folder (Seafile, …).
         backend : {"real", "dummy"}, Backend or None
             Hardware backend passed to :class:`System`. None or ``"real"``
             (default) uses the lab hardware, ``"dummy"`` or a
@@ -114,12 +138,41 @@ class Experiment(object):
         ------
         FileExistsError
             If ``path`` contains an experiment file and ``resume`` is False.
+        ValueError
+            If neither ``path`` nor ``substrate`` is given.
+        SyncedFolderError
+            If the data root lies in a synchronised folder.
         """
 
-        self.path = Path(path)
         self.user = str(user)
         self.objective = str(objective)
         self.log = logger
+
+        # Substrate record and experiment folder
+        self.substrate: Optional[SubstrateRecord] = None
+        self.substrates: Optional[SubstrateStore] = None
+        self.experiment_label = ""
+        if substrate is not None:
+            if data_root is None:
+                root = default_root(self.user, allow_synced_root=allow_synced_root)
+            else:
+                root = Path(data_root)
+                if not allow_synced_root:
+                    check_not_synced(root)
+            self.substrates = SubstrateStore(root)
+            self.substrate = self.substrates.get(substrate)
+        if path is None:
+            if self.substrate is None:
+                raise ValueError("Either an experiment folder (path) or a substrate is needed.")
+            if resume:
+                raise ValueError("resume=True needs the folder of the stored experiment as path.")
+            self.experiment_label = self.substrates.next_experiment_label(self.substrate.label)
+            path = self.substrates.experiment_folder(self.substrate.label, self.experiment_label,
+                                                     datetime.datetime.now())
+            Path(path).mkdir(parents=True)
+            self.log = getLogger(logfile=Path(path) / "console.log")
+        self.path = Path(path)
+        self.substrate_information = substrate_information
         log_file = self._log_file()
         self._log_offset = Path(log_file).stat().st_size if log_file and Path(log_file).exists() else 0
         self.sys_args = sys_args
@@ -158,7 +211,12 @@ class Experiment(object):
         if stored and not resume:
             raise FileExistsError(f"{self.path} contains an experiment already. Use a new folder, "
                                   f"or resume=True to continue that experiment.")
-        self.qr_text = ExperimentStore.open(self.path, self.log).read_uuid() if stored else str(uuid.uuid4())
+        if stored:
+            identification = ExperimentStore.open(self.path, self.log).read_identification()
+            self.qr_text = identification["experiment_uuid"]
+            self.experiment_label = identification["experiment_label"]
+        else:
+            self.qr_text = str(uuid.uuid4())
         self.log.info(f"Experiment {self.qr_text}")
 
         # No plane fitting data yet
@@ -213,8 +271,8 @@ class Experiment(object):
         self._stored_structures = set()  # names known to be in the experiment file
         self.store = self._open_store(stored)
         try:
+            self._register_experiment()
             self._save_exp_dict()
-            self._save_substrate_information(path=self.path.parent, file=substrate_information)
         except BaseException:
             self.store.end_session("exception")
             raise
@@ -247,6 +305,7 @@ class Experiment(object):
         finally:
             self.store.end_session(reason)
             self._save_exp_dict()
+            self._update_substrate_index()
 
     def _open_store(self, stored: bool) -> ExperimentStore:
         """ Open or create the experiment file and start a session. """
@@ -288,8 +347,15 @@ class Experiment(object):
         parameters["dhm_usage"] = self.system.dhm is not None
 
         devices = {key: value for key, value in self.system.items().items() if key != "data/objective.json"}
+        substrate = {"information": self.substrate_information or {}}
+        if self.substrate is not None:
+            substrate |= {k: v for k, v in self.substrate.to_dict().items() if k != "experiments"}
         return ExperimentRecord(
             uuid=self.qr_text,
+            label=self.experiment_label,
+            substrate_uuid=self.substrate.uuid if self.substrate is not None else "",
+            substrate_label=self.substrate.label if self.substrate is not None else "",
+            substrate=substrate,
             parameters=parameters,
             user={"key": self.user, **self.system.user},
             objective={"key": self.objective, **self.system.objective},
@@ -327,21 +393,34 @@ class Experiment(object):
 
         export_json(self.store.read(), self.path)
 
-    def _save_substrate_information(self, path, file):
-        if file is None:
+    def _register_experiment(self) -> None:
+        """ Enter the experiment into the index of its substrate (not again on a restart). """
+
+        if self.substrate is None:
             return
-        assert isinstance(file, dict), "Substrate information must be a dictionary!"
-        file_path = Path(os.path.join(path, "substrate_information.json"))
+        uuid_text = self.qr_text
+        if any(e["uuid"] == uuid_text for e in self.substrates.get(self.substrate.label).experiments):
+            return
+        layout = self._layout()
+        double = layout.double_corner
+        folder = self.substrates.folder(self.substrate.label)
+        try:
+            path = self.path.resolve().relative_to(folder.resolve()).as_posix()
+        except ValueError:
+            path = str(self.path.resolve())
+        self.substrates.register_experiment(self.substrate.label, {
+            "uuid": uuid_text, "label": self.experiment_label, "path": path,
+            "started": utc_timestamp(), "objective": self.objective, "status": schema.STATUS_CREATED,
+            "center_um": [float(v) for v in self.absolute_grid_center],
+            "double_corner_um": list(double.center_um) if double is not None else None,
+            "double_corner_rotation_deg": double.rotation_deg if double is not None else None,
+        })
 
-        # If the file already exists (several experiments on one substrate), merge the new
-        # information into it; new values replace old values with the same key.
-        if file_path.exists():
-            data = json.loads(file_path.read_text())
-            data.update(file)
-        else:
-            data = file
+    def _update_substrate_index(self) -> None:
+        """ Copy the experiment status into the index of its substrate. """
 
-        file_path.write_text(json.dumps(data, indent=4))
+        if self.substrate is not None:
+            self.substrates.update_experiment(self.substrate.label, self.qr_text, status=self.store.read_status())
 
     def _relative(self, file) -> str:
         """ Return ``file`` relative to the experiment folder (POSIX form), or unchanged if outside it. """
@@ -396,6 +475,12 @@ class Experiment(object):
                 return [float(v) for v in text]
             return [float(v) for v in str(text).strip("[]() ").replace(",", " ").split()]
 
+        # An experiment in a substrate folder is continued with its substrate record
+        substrate = {}
+        if data.get("substrate_label") and (path.parent / "substrate.json").exists():
+            substrate = {"substrate": data["substrate_label"], "data_root": path.parent.parent,
+                         "allow_synced_root": True}
+
         # The log file is looked up in the given folder (older files store absolute paths)
         logfile = path / Path(data.get("logger") or "console.log").name
         return {
@@ -427,6 +512,7 @@ class Experiment(object):
             "plane_fit_mode": data["plane_fit_mode"],
             "setup": data["setup"] or "IFOV_off",
             "resume": True,
+            **substrate,
         }
 
     def iter_experiment_locations(self) -> Iterator[tuple[float, float]]:

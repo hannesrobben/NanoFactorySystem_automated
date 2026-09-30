@@ -1,5 +1,6 @@
 """Tests for Experiment (experiment.py) on the dummy backend."""
 import json
+from pathlib import Path
 
 import matplotlib
 import pytest
@@ -11,8 +12,12 @@ from nanofactorysystem.runtime import getLogger
 from nanofactorysystem.storage import ExperimentStore
 
 
-def make_experiment(path, backend, *, dhm_usage=False, skip_corner=True, substrate=None, setup="IFOV_off"):
-    """ Small 20x experiment with one grid cell, as in the experiment template. """
+def make_experiment(path, backend, *, dhm_usage=False, skip_corner=True, substrate=None, setup="IFOV_off",
+                    **kwargs):
+    """ Small 20x experiment with one grid cell, as in the experiment template.
+
+    path=None uses the default location of a substrate (pass substrate_label and data_root).
+    """
 
     matplotlib.use("Agg")
     sys_args = {
@@ -21,7 +26,8 @@ def make_experiment(path, backend, *, dhm_usage=False, skip_corner=True, substra
         "dhm": {"usage": dhm_usage, "oplStep": 100.0},
     }
     return Experiment(
-        path=path, user="Test", objective="Zeiss 20x", logger=getLogger(logfile=path / "console.log"),
+        path=path, user="Test", objective="Zeiss 20x",
+        logger=getLogger(logfile=path / "console.log") if path is not None else getLogger(),
         sys_args=sys_args,
         default_power=0.7, low_speed_um=1000, high_speed_um=5000,
         resin_corner_tr=Point2D(5720, 27190), resin_corner_bl=Point2D(-3333, 17212),
@@ -29,7 +35,7 @@ def make_experiment(path, backend, *, dhm_usage=False, skip_corner=True, substra
         grid=(1, 1), n_mid_points=0, drop_direction=DropDirection.UP,
         corner_z=-2, corner_width=50, corner_length=300, corner_height=7, corner_hatch=0.5, corner_slice=0.75,
         fov_dim=(500, 500), skip_corner=skip_corner, setup=setup, backend=backend,
-        substrate_information=substrate)
+        substrate_information=substrate, substrate=kwargs.pop("substrate_label", None), **kwargs)
 
 
 @pytest.fixture
@@ -113,15 +119,15 @@ def test_opl_scan_uses_dhm_motor_scan(test_config, dummy_backend, no_sleep, tmp_
         assert experiment.opl_scan(m0=0.0) == pytest.approx(m)
 
 
-def test_substrate_information_is_merged(test_config, dummy_backend, no_sleep, tmp_path):
-    for i, info in enumerate([{"name": "S1", "drops": 1}, {"drops": 2, "used drop": "center"}]):
-        path = tmp_path / f"experiment{i}"
-        path.mkdir()
-        with make_experiment(path, dummy_backend, substrate=info):
-            pass
+def test_substrate_information_is_stored_in_the_experiment(test_config, dummy_backend, no_sleep, tmp_path):
+    path = tmp_path / "experiment"
+    path.mkdir()
+    with make_experiment(path, dummy_backend, substrate={"name": "S1", "drops": 2}):
+        pass
 
-    data = json.loads((tmp_path / "substrate_information.json").read_text())
-    assert data == {"name": "S1", "drops": 2, "used drop": "center"}
+    assert ExperimentStore.open(path).read().substrate == {"information": {"name": "S1", "drops": 2}}
+    assert json.loads((path / "experiment_dictionary.json").read_text())["substrate"]["information"]["drops"] == 2
+    assert not (tmp_path / "substrate_information.json").exists()
 
 
 def test_measure_stores_position_of_every_capture(test_config, dummy_backend, no_sleep, tmp_path):
@@ -269,6 +275,68 @@ def test_moved_experiment_can_be_restarted(test_config, dummy_backend, no_sleep,
     assert len(dummy_backend.calllog.filter(device="program")) == len(layers) - 1
     assert not (tmp_path / "old").exists()
     assert ExperimentStore.open(new).read().status == "finished"
+
+
+def test_two_experiments_on_one_substrate(test_config, dummy_backend, no_sleep, tmp_path):
+    from nanofactorysystem.storage.substrate_store import SubstrateStore, find_experiments
+
+    root = tmp_path / "Femtika_Experiment" / "Test"
+    label = SubstrateStore(root).create("Test", "TU", material={"substrate": "glass"}).label
+    folders = []
+    for _ in range(2):  # the same experiment printed twice
+        with make_experiment(None, dummy_backend, substrate_label=label, data_root=root,
+                             skip_corner=False) as experiment:
+            experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+            add_rectangle(experiment)
+            experiment.build_programs()
+            folders.append(experiment.path)
+
+    # Two folders next to each other; the repeated print did not overwrite the first one
+    assert folders[0] != folders[1] and all(f.parent == root / label for f in folders)
+    assert [f.name.rsplit("_", 1)[0] for f in folders] == [f"{label}-A", f"{label}-B"]
+    records = [ExperimentStore.open(f).read() for f in folders]
+    assert records[0].uuid != records[1].uuid
+    assert all(r.substrate_label == label and r.substrate["material"] == {"substrate": "glass"} for r in records)
+    assert [r.label for r in records] == [f"{label}-A", f"{label}-B"]
+    assert (folders[0] / "console.log").is_file()
+
+    index = find_experiments(root, substrate=label)
+    assert [(e["label"], e["status"], e["objective"]) for e in index] == [
+        (f"{label}-A", "built", "Zeiss 20x"), (f"{label}-B", "built", "Zeiss 20x")]
+    assert [Path(e["folder"]) for e in index] == folders
+    assert index[0]["uuid"] == records[0].uuid and index[0]["double_corner_um"] is not None
+    assert index[0]["center_um"] == [1310.0, 19500.0]
+
+
+def test_restart_updates_the_substrate_index(test_config, dummy_backend, no_sleep, tmp_path):
+    from nanofactorysystem.storage.substrate_store import SubstrateStore
+
+    root = tmp_path / "root"
+    substrates = SubstrateStore(root)
+    label = substrates.create("Test", "TU").label
+    with pytest.raises(RuntimeError):
+        with make_experiment(None, dummy_backend, substrate_label=label, data_root=root) as experiment:
+            path = experiment.path
+            experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+            add_rectangle(experiment)
+            experiment.build_programs()
+            raise RuntimeError("abort")
+    assert substrates.get(label).experiments[0]["status"] == "failed"
+
+    # Continue the stored experiment and print it: the index shows the new status
+    with Experiment(**Experiment.parameters_from_dictionary(path), backend=dummy_backend) as restarted:
+        restarted.plane_fit(plane=dummy_backend.world.sample.plane())
+        restarted.retrieve_programs()
+        restarted.print_experiment()
+
+    experiments = substrates.get(label).experiments
+    assert len(experiments) == 1 and experiments[0]["status"] == "finished"
+    assert ExperimentStore.open(path).read().label == f"{label}-A"
+
+
+def test_default_location_needs_a_substrate(test_config, dummy_backend, no_sleep):
+    with pytest.raises(ValueError, match="substrate"):
+        make_experiment(None, dummy_backend)
 
 
 def test_existing_experiment_is_not_overwritten(test_config, dummy_backend, no_sleep, tmp_path):

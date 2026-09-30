@@ -281,7 +281,7 @@ class ExperimentStore:
             meta = _group(f, "metadata")
             for name, values in (("experiment", record.parameters), ("user", record.user),
                                  ("objective", record.objective), ("system", record.system),
-                                 ("software", record.software)):
+                                 ("software", record.software), ("substrate", record.substrate)):
                 group = _group(meta, name)
                 group.attrs.clear()
                 _set_attrs(group, values)
@@ -534,8 +534,20 @@ class ExperimentStore:
     def read_uuid(self) -> str:
         """ Return the experiment UUID without reading the whole file. """
 
+        return self.read_identification()["experiment_uuid"]
+
+    def read_identification(self) -> dict[str, str]:
+        """ Return UUID and label of the experiment and of its substrate. """
+
         with h5py.File(self.path, "r") as f:
-            return _attr(f, "experiment_uuid")
+            return {name: _attr(f, name, "") for name in ("experiment_uuid", "experiment_label",
+                                                          "substrate_uuid", "substrate_label")}
+
+    def read_status(self) -> str:
+        """ Return the experiment status. """
+
+        with h5py.File(self.path, "r") as f:
+            return _attr(f, "status", "")
 
     def has_structure(self, name: str) -> bool:
         """ Return True if a structure of that name is stored. """
@@ -560,6 +572,7 @@ class ExperimentStore:
                 objective=_get_json_attrs(meta["objective"]),
                 system=_get_json_attrs(meta["system"]),
                 software=_get_json_attrs(meta["software"]),
+                substrate=_get_json_attrs(meta["substrate"]) if "substrate" in meta else {},
                 label=_attr(f, "experiment_label", ""),
                 substrate_uuid=_attr(f, "substrate_uuid", ""),
                 substrate_label=_attr(f, "substrate_label", ""),

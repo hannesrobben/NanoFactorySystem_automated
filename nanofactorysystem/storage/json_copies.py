@@ -84,6 +84,7 @@ def experiment_dictionary(record: ExperimentRecord, folder: Path) -> dict:
         "experiment_label": record.label,
         "substrate_uuid": record.substrate_uuid,
         "substrate_label": record.substrate_label,
+        "substrate": record.substrate,
         "schema_version": record.schema_version,
         "status": record.status,
         "created": record.created,

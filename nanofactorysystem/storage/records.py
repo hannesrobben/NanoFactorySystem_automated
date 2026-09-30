@@ -263,8 +263,10 @@ class ExperimentRecord:
     parameters : dict
         ``Experiment`` constructor parameters in the file's typed form
         (see ``schema.PARAMETERS``).
-    user, objective, system, software : dict
-        Contents of the corresponding ``/metadata`` groups.
+    user, objective, system, software, substrate : dict
+        Contents of the corresponding ``/metadata`` groups (``substrate``:
+        copy of the substrate record at the start, and ``information``, the
+        free substrate information of older scripts).
     label, substrate_uuid, substrate_label : str
         Identification (empty until substrates are used, T48).
     created, updated, status, schema_version : str
@@ -289,6 +291,7 @@ class ExperimentRecord:
     objective: dict = field(default_factory=dict)
     system: dict = field(default_factory=dict)
     software: dict = field(default_factory=dict)
+    substrate: dict = field(default_factory=dict)
     label: str = ""
     substrate_uuid: str = ""
     substrate_label: str = ""
