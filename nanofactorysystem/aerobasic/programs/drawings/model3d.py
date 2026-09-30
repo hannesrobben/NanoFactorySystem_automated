@@ -38,7 +38,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Iterator, Optional
+from typing import Any, Callable, Iterator, Optional
 
 import numpy as np
 import trimesh
@@ -302,6 +302,8 @@ class Model3D_Slicer(DrawableObject):
             voxel_overlap: float | object = _UNSET,       # voxel data: overlap ratio of lines/layers
             # --- voxel-aware slicing (T54) -------------------------------------
             voxel_model: Any = None,
+            # --- power per segment (T31) ----------------------------------------
+            power_map: Optional[Callable[[float, str], Optional[float]]] = None,
             # --- input / behaviour -------------------------------------------
             unit: str = "um",
             pixel_size: Optional[float] = None,           # height maps, in `unit`
@@ -356,6 +358,7 @@ class Model3D_Slicer(DrawableObject):
         if voxel_model is not None and power is None:
             raise ValueError("Voxel-aware slicing needs the laser power of the structure (power=...).")
         self.voxel_model = voxel_model
+        self.power_map = power_map
         laser = LaserParameters(scan_speed_um_s=self._velocity_um_s(velocity),
                                 **({"power_mw": float(power)} if power is not None else {}))
 
@@ -471,10 +474,14 @@ class Model3D_Slicer(DrawableObject):
             # order from docs/01 §6 — group_from_layer emits contour rings
             # first (outer → inner, as produced by extract_contour_paths),
             # then infill lines — so we only have to preserve it.
-            lines: list[list[Point2D]] = []
-            polylines: list[list[Point2D]] = []
-            closed_flags: list[bool] = []
+            # Consecutive elements with the same power form one run (T31):
+            # a power override on an element (PathElement.power_mw) starts a
+            # new IFOV block that sets that power. Without overrides there is
+            # one run per leaf type, as before.
+            line_runs: list[tuple[Optional[float], list[list[Point2D]]]] = []
+            polyline_runs: list[tuple[Optional[float], list[list[Point2D]], list[bool]]] = []
             for element in group.elements:
+                power = element.power_mw if element.power_mw is not None else self.power
                 if (element.role == ROLE_INFILL
                         and not element.closed
                         and element.n_vertices == 2):
@@ -483,7 +490,9 @@ class Model3D_Slicer(DrawableObject):
                     # here — the strategy emits its rings as 2-point infill
                     # segments, not as closed paths.
                     p0, p1 = element.points[0], element.points[1]
-                    lines.append([
+                    if not line_runs or line_runs[-1][0] != power:
+                        line_runs.append((power, []))
+                    line_runs[-1][1].append([
                         Point2D(X=float(p0[0]), Y=float(p0[1])),
                         Point2D(X=float(p1[0]), Y=float(p1[1])),
                     ])
@@ -491,13 +500,15 @@ class Model3D_Slicer(DrawableObject):
                     # Contour/shell rings and multi-vertex paths →
                     # IFOV_PolyLines (one continuous laser-on pass per path,
                     # docs/01 §2.2 — no switching at every corner).
-                    polylines.append([
+                    if not polyline_runs or polyline_runs[-1][0] != power:
+                        polyline_runs.append((power, [], []))
+                    polyline_runs[-1][1].append([
                         Point2D(X=float(p[0]), Y=float(p[1]))
                         for p in element.points
                     ])
-                    closed_flags.append(bool(element.closed))
+                    polyline_runs[-1][2].append(bool(element.closed))
 
-            if not lines and not polylines:   # skip empty layers (§3.7)
+            if not line_runs and not polyline_runs:   # skip empty layers (§3.7)
                 continue
 
             layer_program = DrawableAeroBasicProgram(coordinate_system)
@@ -510,24 +521,24 @@ class Model3D_Slicer(DrawableObject):
             # objective threaded through correctly.
 
             # Contours first (outer → inner), then infill — docs/01 §6.
-            if polylines:
+            for power, polylines, closed_flags in polyline_runs:
                 ifov_polylines = IFOV_PolyLines(
                     reference_point=reference_point,
                     polylines=polylines,
                     velocity=self.velocity,
-                    power=self.power,
+                    power=power,
                     closed=closed_flags,
                 )
                 for sub_program in ifov_polylines.iterate_layers(
                         coordinate_system, objective=self.objective):
                     layer_program.add_programm(sub_program)
 
-            if lines:
+            for power, lines in line_runs:
                 ifov_lines = IFOV_Lines(
                     reference_point=reference_point,
                     lines=lines,
                     velocity=self.velocity,
-                    power=self.power,
+                    power=power,
                 )
                 for sub_program in ifov_lines.iterate_layers(
                         coordinate_system, objective=self.objective):
@@ -554,9 +565,37 @@ class Model3D_Slicer(DrawableObject):
         """
         if self._job is None:
             self._job = self._run_slicer()
+            self._apply_power_map(self._job)
             if self.debug_plot_dir is not None:
                 self._write_debug_plots(self._job)
         return self._job
+
+    def _apply_power_map(self, job: ToolpathJob) -> None:
+        """Set per-element power overrides from ``power_map`` (T31) and check them.
+
+        An element keeps an override it already has (e.g. set by an adaptive
+        strategy); ``power_map(z_um, role)`` returning None leaves the
+        element at the structure power.
+
+        Raises:
+            ValueError: If elements carry power overrides but the structure
+                has no ``power`` — the elements without override could not
+                return to the experiment power inside the program.
+        """
+        for group in job.groups:
+            for element in group.elements:
+                if self.power_map is not None and element.power_mw is None and group.z_um is not None:
+                    element.power_mw = self.power_map(float(group.z_um), element.role)
+        if self.power is None and any(e.power_mw is not None for g in job.groups for e in g.elements):
+            raise ValueError("Power per segment needs the power of the structure (power=...) for the "
+                             "segments without their own power.")
+
+    @property
+    def element_powers_mw(self) -> list[float]:
+        """Distinct laser powers the structure prints with (structure power and overrides), in mW."""
+        powers = {e.power_mw if e.power_mw is not None else self.power
+                  for g in self.toolpath_job.groups for e in g.elements}
+        return sorted(float(p) for p in powers if p is not None)
 
     def _write_debug_plots(self, job: ToolpathJob) -> None:
         """Write the layer flipbook to ``debug_plot_dir``.
@@ -712,6 +751,7 @@ class Model3D_Slicer(DrawableObject):
             "n_elements": job.n_elements,
             "mark_length_um": job.mark_length_um,
             "voxel": job.meta.get("voxel"),
+            "element_powers_mw": self.element_powers_mw,
         }
 
     # ----------------------------------------------------------------------

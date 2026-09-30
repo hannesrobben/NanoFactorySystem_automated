@@ -78,7 +78,7 @@ python -m pytest test/test_aerobasic/test_golden_programs.py --update-golden   #
   1. `plot_experiment()`
   2. `plane_fit()`, which measures the substrate surface at sample points (or uses a given `plane=`); the points follow `plane_fit_mode` (`PlaneFitMode.GRID`/`CORNERS`/`BORDER`, old integers accepted), and `plane_fitting.py` (`sample_points`, `measure_plane`) also runs a single plane fit without `Experiment`. A warning is logged if the substrate height under a structure varies by more than `tilt_warning_um`
   3. `opl_scan()`, only when the DHM is used
-  4. `add_structure(StructureType, name, axes, power, structure=DrawableObject)`
+  4. `add_structure(StructureType, name, axes, power, structure=DrawableObject)`; `layer_power=` (list or function of the layer id) makes every layer program set its own power (T31, stored as `layer_powers_mw`). `Model3D_Slicer` prints toolpath elements with a `power_mw` override (or from `power_map(z_um, role)`) in their own IFOV blocks
   5. `build_programs()`, which writes per-layer `.pgm` files and `structures.json`
   6. `print_experiment()`, which runs each layer as an A3200 task and tracks progress; `measure()` takes DHM holograms (with DHM) and camera images only with `Experiment(camera_capture=True)` (default off)
 - `restart_experiment()` and `mains/restart_experiment.py` resume from the progress in `experiment.h5`: every layer printed in an earlier session is skipped, so any number of aborts works. `parameters_from_dictionary()` reads the file (or the JSON of an old folder) and sets `resume=True`; an old JSON-only folder is imported into a new experiment file (`storage/legacy.py`), keeping its UUID.
