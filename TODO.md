@@ -26,7 +26,7 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 | 2 | Experiment storage | T47, T48, T49, T50, T55, T56, T57, T59 | – |
 | 3 | Experiment scripts and substrate main | T51, T52 | – |
 | 4 | Voxel database and voxel-aware slicing (independent of phases 2–3) | T53, T54, T31 | T53 design approved by the maintainer |
-| B | Backlog from T19 (`todo_notes.md`) | T32, T37, T28, T35, T36, T38, T39, T60 | – |
+| B | Backlog from T19 (`todo_notes.md`) | T32, T37, T28, T35, T36, T38, T39, T60, T61 | – |
 
 ### Working rules for Claude Code (in addition to CLAUDE.md)
 1. Pick the first open todo of the lowest unfinished phase whose dependencies are done. Phase 1 may be
@@ -86,6 +86,14 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 
 ### Phase B — Backlog from T19 (details in `todo_notes.md`)
 
+- [ ] T61: Justify the focus-detection threshold and clarify the layer result object (follow-up of T37) [phase: B]
+      Goal: The remaining hotfix and open note of T37 are resolved with lab data and the maintainer's input.
+      Priority: medium | Depends on: –
+      Done when:
+        - The noise threshold `minDiffMax` of the focus detection (`tools/focus.py`, set to 10 ad hoc because noise gave values 1.7–2.5) is replaced by a justified criterion, based on focus scans measured on the lab PC with 20x and 63x (N084, N010).
+        - N088 ("merge with Dominik's result object" in `tools/layer.py`) is clarified by the maintainer and either implemented or dropped.
+      Notes: The code parts of T37 are done (azimuth fix, motor scan loop, capture-time analysis, height profiles); N085/N086 went away with the hotfix line removed in T43.
+
 - [ ] T32: Clean up the AeroBasic API and task handling (from T19) [phase: B]
       Goal: The AeroBasic API is correct and complete for the commands in use.
       Priority: medium | Depends on: –
@@ -94,16 +102,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
         - Program text: compact variable declarations, header metadata, and a mode check for VELOCITY/ABSOLUTE (N031–N033).
         - IFOV setup: ramp types and the F threshold are investigated and documented (N044, N045).
         - `run_program_as_task`: better task-id choice, cleanup of the previous program, and a decision on the old "delete this function" note (N058, N073, N074).
-
-- [ ] T37: Replace the hotfixes in tools and devices (from T19) [phase: B]
-      Goal: Focus, layer, plane, DHM and serialization code have no open hotfixes.
-      Priority: medium | Depends on: T43
-      Done when:
-        - The focus-detection noise threshold `minDiffMax` is replaced by a justified criterion, and its value is checked for 63x (N084, N010).
-        - Layer: sample dictionary, missing `self.device` and the result object are fixed (N085, N086, N088); the orientation part is done in T43.
-        - The plane angle edge case (-180 vs 180) is handled (N090).
-        - DHM: capture time analysed; motor scan loop with limit checks and an own exception (N075, N076).
-        - `DrawableObject._init_args` stores "data" instead of the hotfix (N046).
 
 - [ ] T35: Clarify line and rectangle details (from T19) [phase: B]
       Goal: Line-based structures have checked parameters and no unexplained hotfixes.
@@ -123,6 +121,15 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
+- [ ] T37: Replace the hotfixes in tools and devices (from T19) [phase: B]
+      Goal: Focus, layer, plane, DHM and serialization code have no open hotfixes.
+      Priority: medium | Depends on: T43
+      Done when:
+        - The focus-detection noise threshold `minDiffMax` is replaced by a justified criterion, and its value is checked for 63x (N084, N010).
+        - Layer: sample dictionary, missing `self.device` and the result object are fixed (N085, N086, N088); the orientation part is done in T43.
+        - The plane angle edge case (-180 vs 180) is handled (N090).
+        - DHM: capture time analysed; motor scan loop with limit checks and an own exception (N075, N076).
+        - `DrawableObject._init_args` stores "data" instead of the hotfix (N046).
 - [ ] T51: New template for experiment scripts [phase: 3]
       Goal: One parameterised experiment script replaces the copied scripts; it takes its programs either from stored AeroBasic programs or from the slicer.
       Priority: high | Depends on: T43, T44, T45, T47

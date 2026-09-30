@@ -1614,3 +1614,35 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   - The dummy does not simulate exposures in IFOV mode, so the slicer dry run checks the programs instead of
     exposures.
   - `default_exp_file.py` stays, because the older dry run and the lab use it.
+
+### 2026-09-30 19:20 CEST — [T37] Replace the hotfixes in tools and devices
+- **Status:** partial (the focus threshold needs lab data; N088 needs the maintainer)
+- **Branch:** `fix/phaseB-tools-hotfixes`, based on `feat/phase3-experiment-spec`
+- **Changes:**
+  - N090: `(phi % 360) - 180` from commit f91fe30 rotated the reported azimuth by 180° instead of
+    normalising it.
+    - Fix: new `coordinate_system.normalize_angle()`, used by `PlaneFit.phi_degree` and `tools/plane.py`; tests
+      added. Separate `fix:` commit.
+    - Only the reported azimuth changes; no coordinate depends on it.
+  - N076: `dhm/motorscan.py` has a new `bisectAroundMax()`: a loop over the widening factors 1, 2, 4 and 8, with
+    a motor-range check (`MotorMinPos`/`MotorMaxPos`) and the dedicated `MotorScanError`.
+    `test/dhm/test_motorscan.py` (new, 3 tests).
+  - N075: analysis, no code bug. The capture time in `Dhm.container()` covers only `getimage()`: with
+    `opt=False` this is one `CameraImage` request, i.e. mainly the network transfer. The pause between series
+    images is not included. A comment documents it.
+  - N046: `DrawableObject` no longer skips `data`/`height_profile`. `DOEstep` keeps `feature_size` and stores
+    its height profile; a round-trip test was added.
+  - N085/N086: resolved in T43; the hotfix line with `self.device` and the sample dictionary was removed there.
+  - `test/README.md`; `TODO.md`: T37 moved to In Progress; new follow-up T61 (`minDiffMax` with lab data, N088).
+- **Tests:** `python -m pytest`: all pass (282 passed plus the new tests; test_aerobasic 75 passed).
+- **Commits:** `8444d70` fix(tools): report the plane azimuth without a 180 degree shift [T37];
+  `b396a38` feat(dhm): widen the OPL scan bracket in a loop within the motor range [T37];
+  `040e831` feat(drawings): store height profiles with the structure [T37]; docs(todo): T37 status and T61 [T37]
+- **Remaining gap (T61):**
+  1. A justified focus-detection threshold for 20x and 63x (N084, N010).
+  2. N088 (Dominik's result object): what is meant?
+- **Observation:** `DOEstep` fails with a height-profile pixel of 0: a zero-height `Rectangle3D` gives NaN
+  layers. This belongs to T35 (the "`Z == 0` hotfix" in `Rectangle3D`).
+- **Behaviour change on hardware:**
+  - The reported plane azimuth is rotated by 180° compared with before; it is now correct.
+  - The OPL motor scan tries up to 8× the bracket (before: 2×) and stops at the motor limits.
