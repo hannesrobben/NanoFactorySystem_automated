@@ -72,17 +72,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
         - Dummy test for UP and DOWN checks the counts after a complete and an aborted structure.
       Notes: Can be done as part of T47/T50 if the progress record moves into the experiment file.
 
-- [ ] T50: Restart and repetitions on the new storage [phase: 2]
-      Goal: An aborted experiment can be resumed repeatedly at the right layer from the experiment file and keeps its identity.
-      Priority: high | Depends on: T47, T48
-      Done when:
-        - `restart_experiment()` and `mains/restart_experiment.py` read from the experiment file; old JSON folders still work.
-        - A restarted experiment keeps its UUID and QR text (N027).
-        - After a second abort, printing resumes at the right layer; a dummy test covers two aborts (N028).
-        - Structure names and repetitions are distinguished, and repetitions work although layer programs move absolutely (N080).
-        - The double-corner position and orientation are stored so that an orientation-checked restart (F1) is possible later.
-      Notes: Replaces T30.
-
 ### Phase 3 — Experiment scripts and substrate main
 
 - [ ] T51: New template for experiment scripts [phase: 3]
@@ -315,3 +304,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T48: Substrate model, default location and experiment index — 2026-09-30 — `SubstrateStore` (substrate.json with record and experiment index, labels `HR-26-001`/`-A`, `find_experiments`, `default_root` with `dataRoot` and refused synced folders); `Experiment(path=None, substrate=...)` creates a new folder per print and keeps the index up to date; `substrate_information.json` merging replaced (old files importable). — commits: `1014892`, `cf5ed05`
 
 - [x] T49: Experiment summary — 2026-09-30 — `storage/summary.py` builds a summary (UUID, one row per user structure with position, slice, hatch, power, velocity, IFOV, DHM, camera, status); written into `/summary` and `experiment_summary.json` after building and after every structure and logged as table. — commits: `92b9bcc`
+
+- [x] T50: Restart and repetitions on the new storage — 2026-09-30 — Restart reads parameters and per-layer progress from `experiment.h5` (resumes correctly after any number of aborts, keeps the UUID); old JSON folders are imported into a new experiment file on restart; `REPEAT` fixed (own grid cell, `<name>_rep<n>`, `repeat_of`). — commits: `7aaee04`

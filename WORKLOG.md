@@ -1129,3 +1129,39 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
     `IFOV_Lines` is divided by 1000 internally; the summary shows the value as passed.
   - Camera usage is always "yes" until T45 adds the switch.
 - **Follow-ups:** none new.
+
+### 2026-09-30 13:29 CEST — [T50] Restart and repetitions on the new storage
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/experiment.py`:
+    - `restart_experiment()` reads the progress events from the experiment file. It skips finished
+      structures and every layer with an event from an earlier session; never-started structures get their
+      "before" capture. The final status and summary are written.
+    - `parameters_from_dictionary()` reads `experiment.h5` (`_parameters_from_file`), else the JSON.
+    - A `resume` of a folder without `experiment.h5` imports it (`_import_legacy`, session kind `imported`).
+    - `add_structure()` has a NumPy docstring, a fixed `REPEAT` (names `<name>_rep<n>`, grid check,
+      `repeat_of`), and the duplicate-name check now runs after the type branch, so repeats are covered.
+  - `nanofactorysystem/storage/legacy.py` (new): `read_legacy`, `is_legacy_folder`. The UUID comes from the
+    QR-code structure or the log. Paths are relocated into the folder. Structure types are guessed from the
+    names. Progress comes from `print_progress.json`.
+  - `nanofactorysystem/storage/records.py` and `experiment_store.py`: `StructureRecord.repeat_of`.
+  - `mains/restart_experiment.py`: docstring.
+  - `test/test_experiment.py`:
+    - new helper `abort_after()` makes the controller fail after n layers;
+    - the restart tests and the moved-folder test abort for real instead of writing a fake
+      `print_progress.json`, because the restart no longer reads that file;
+    - new tests: restart after two aborts (every layer printed exactly once), import of an old JSON-only
+      folder with absolute lab paths, repeated structures at their own grid cells.
+  - `test/README.md`, `CLAUDE.md`.
+  - `TODO.md`: T50 moved to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 220 passed, 14 skipped.
+- **Commits:** `7aaee04` feat(experiment): restart and repetitions on the experiment file [T50];
+  docs(todo): close T50 [T50]
+- **Notes:**
+  - A layer interrupted by an abort has no progress event and is printed again on restart. A layer that
+    failed with an `AerotechError` has a `failed` event and is not printed again; this is the behaviour of
+    the old restart logic.
+  - In imported old folders, the layers listed in `print_progress.json` count as printed.
+  - The double-corner position and orientation are stored in `/layout` since T47 (for F1).
+- **Behaviour change on hardware:** `REPEAT` works now; it failed before with a TypeError. The restart script
+  continues the stored experiment, and a second abort no longer shifts the resume point.
