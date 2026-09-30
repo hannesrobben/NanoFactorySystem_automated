@@ -163,7 +163,9 @@ class Dhm(Parameter):
 
         """ Return a HoloContainer with current hologram image. """
 
-        # Hologram image
+        # Hologram image. The capture time covers only getimage(): with opt=False one CameraImage
+        # request to the DHM server, i.e. mainly the image transfer over the network; with opt=True the
+        # exposure optimisation as well. The 0.1 s pause between the images of a series is not included.
         t1 = datetime.datetime.now()
         holo, count = self.getimage(opt=opt)
         t2 = datetime.datetime.now()
