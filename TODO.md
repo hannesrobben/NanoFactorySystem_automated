@@ -133,17 +133,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
-- [ ] T53: Voxel database (SQLite) [phase: 4]
-      Goal: Voxel width and height can be looked up for material, objective, setup, power and velocity, with interpolation between measured points.
-      Priority: high | Depends on: –
-      Done when:
-        - `docs/design/VOXEL_DATABASE.md` defines schema, interpolation and fallback, and is approved by the maintainer.
-        - The SQLite database has at least the tables `material` and `voxel_measurement` (material, objective, setup, power_mW, velocity_um_s, width_um, height_um, method, experiment_uuid, date, notes); the schema version is kept in `PRAGMA user_version` and migrations run in order when the database is opened.
-        - A class (e.g. `VoxelDatabase`) adds measurements, imports CSV files and returns the voxel size for a parameter set, or `None`.
-        - Interpolation per material/objective/setup over a dose-like variable (e.g. P²/v, logarithmic), only inside the convex hull of the measured points and with a configurable minimum number of points; no extrapolation; unknown material or too few points → `None`.
-        - The database path is configured in `nanofactory.json`; the `.sqlite` file is not in git, a CSV or SQL seed file is.
-        - Tests with synthetic data: exact hit, interpolation, outside the hull, unknown material.
-      Decision (maintainer, 2026-09-30): design approved with all proposals V1–V5.
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
 - [ ] T28: Overview images and time estimate (from T19) [phase: B]
@@ -241,3 +230,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T45: Take camera images only on request — 2026-09-30 — `Experiment(camera_capture=False)` (maintainer decision: Experiment argument); `measure()` skips the camera and returns None without it; stored, shown in the summary and used on restart; the 57 existing script calls pass True. — commits: `0315df1`, `314a30b`
 
 - [x] T58: Define the capture position of `measure()` — 2026-09-30 — Before every capture the galvo is set to A = B = 0, Z is not moved (maintainer decision); the commanded position (X, Y, Z=None, A=0, B=0) is stored; golden command logs re-recorded (one added galvo command per capture). — commits: `fc9c425`
+
+- [x] T53: Voxel database (SQLite) — 2026-09-30 — Design approved; `nanofactorysystem.voxel.VoxelDatabase` (tables material/voxel_measurement, PRAGMA user_version with migrations, CSV import/export, `voxel_size()` with exact hit, 2-D (ln P, ln v) interpolation inside the hull, dose fallback, no extrapolation); path `system.voxelDatabase`, seed CSV versioned. — commits: `b45a7d2`, `2de4367`, `9c52f15`

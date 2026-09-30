@@ -1554,3 +1554,28 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   3. The galvo reset before captures (T58) and the tilt warning after the plane fit (T44).
   4. `sys_args["sample"]["orientation"]` is no longer read.
   5. An experiment centre outside the resin-drop box now raises an error.
+
+### 2026-09-30 19:02 CEST — [T53] Voxel database (SQLite)
+- **Status:** done
+- **Branch:** `feat/phase4-voxel-database`, based on `feat/phase1-execution-parameters`
+- **Decision (maintainer, 2026-09-30):** the design is approved with all proposals V1–V5. For V2 this means
+  the power as set in the software, without recording the calibration file. V3: the seed file has the header
+  only.
+- **Changes:**
+  - `docs/design/VOXEL_DATABASE.md`: approval recorded.
+  - `nanofactorysystem/voxel/` (new):
+    - `database.py`: `VoxelDatabase` with `create`, `default`, `add_material`, `add_measurement`,
+      `import_csv` (atomic), `export_csv`, `measurements`, `voxel_size`; also `VoxelSize` and
+      `default_path`;
+    - `interpolation.py`: the lookup rules of design §4;
+    - `migrations.py`: schema version 1 with `PRAGMA user_version`. The statements run one by one, because
+      `executescript()` would commit the migration transaction halfway.
+  - `config/voxel_seed.csv` (new, header only); `.gitignore`: `*.sqlite`.
+  - `test/voxel/test_voxel_database.py` (new, 10 tests); `test/README.md`; `CLAUDE.md` (voxel section; data
+    locations in the configuration section).
+  - `TODO.md`: T53 moved from Blocked to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 269 passed, 14 skipped.
+- **Commits:** `b45a7d2` docs(design): draft the voxel database [T53];
+  `2de4367` docs(design): record the approval of the voxel database design [T53];
+  `9c52f15` feat(voxel): add the voxel database [T53]; docs(todo): close T53 [T53]
+- **Follow-ups:** T54 (voxel-aware slicing) needs T51 as well.
