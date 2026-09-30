@@ -1793,3 +1793,60 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   - The default overlap of 0.3 is a proposal; the maintainer should check it with the first lab prints.
 - **Behaviour change on hardware:** none without `voxel_material` or `voxel_model`. With them, SLICER programs
   set the structure power themselves (`SET_POWER`), and hatch and slice size come from the voxel data.
+
+### 2026-10-01 00:18 CEST — [T31] Laser power per structure, layer and line
+- **Status:** done
+- **Branch:** `feat/phase4-voxel-slicing` (after T54)
+- **Changes:**
+  - N012 (power per structure): this worked already with `add_structure(power=)`; a dummy test now shows the
+    exposures at two powers.
+  - `nanofactorysystem/experiment.py`: `add_structure(layer_power=)` takes a list or a function of the layer id.
+    - `structure_program` writes `POWER(ptoa(p))` with a comment at the start of every layer program, so a
+      restart replays the powers from the stored programs.
+    - A wrong list length raises `ValueError`. Repetitions inherit the layer powers.
+  - `storage/records.py`, `storage/experiment_store.py`: `StructureRecord.layer_powers_mw` (optional attribute
+    `layer_powers_json`; older files read back as empty, so the schema version is unchanged).
+  - `storage/json_copies.py`: `layer_powers` in `structures.json`.
+  - `storage/summary.py`: column `layer_power_mw` (range).
+  - `experiment_spec.py`: `StructureSpec.layer_power`.
+  - `aerobasic/programs/drawings/model3d.py` (N083, per segment):
+    - elements with `PathElement.power_mw` go into their own IFOV blocks; consecutive equal powers share one,
+      so the programs are unchanged without overrides;
+    - `power_map(z_um, role)` sets overrides; existing overrides are kept;
+    - overrides need the structure power;
+    - `element_powers_mw` in `to_json()`.
+  - Tests:
+    - `test/test_experiment.py`: 3 tests (per structure, per layer with a repetition, function and wrong
+      length);
+    - `test/slicer/test_segment_power.py` (new, 4 tests);
+    - `test/integration/test_dry_run_spec.py`: layer powers of a repetition.
+  - `test/README.md`, `CLAUDE.md`; `TODO.md`: T31 moved to Done.
+- **Tests:** `python -m pytest`: 326 passed, 14 skipped. Golden files are unchanged.
+- **Commits:** `a01c64b` feat(experiment): laser power per layer [T31];
+  `1e6cf41` feat(drawings): laser power per segment in slicer structures [T31]; docs(todo): close T31, phase 4
+  summary [T31]
+- **Follow-ups:** The hand-written drawing classes (`Rectangle3D`, …) have no power per line; so far only the
+  slicer IR carries it. This is not required by T31; adaptive strategies (F7) will build on the IR.
+- **Behaviour change on hardware:** none without `layer_power` or power overrides.
+
+### 2026-10-01 00:18 CEST — [Phase 4] Phase summary
+- **Finished todos:**
+  - T53: voxel database;
+  - T54: voxel-aware slicing;
+  - T31: power per structure, layer and segment.
+- **Maintainer decisions used:**
+  - T53: V1–V5 approved;
+  - T54: `voxel_overlap` is the default spacing mode, and `static_hatching` stays available.
+- **Tests:** `python -m pytest` (short-path venv): 326 passed, 14 skipped, including the dry runs. Golden files
+  are unchanged.
+- **Branch:** `feat/phase4-voxel-slicing`, stacked on `feat/phase3-substrate-main` and the earlier branches.
+  Nothing is pushed.
+- **Open follow-ups:**
+  - T63: the real IFOV writing speed for the voxel lookup;
+  - the default overlap of 0.3 is to be checked in the lab;
+  - the voxel database is still empty: the seed CSV has the header only.
+- **To check on the lab PC:**
+  1. Fill the voxel database with the first measurements (CSV import).
+  2. Print a SLICER structure with `voxel_material`, then compare its size with the design (SEM/DHM).
+  3. Print a structure with `layer_power` and check that the attenuator value changes between the layers.
+  4. Print a slicer structure with `power_map` (contours at another power).

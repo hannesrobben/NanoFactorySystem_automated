@@ -57,14 +57,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 
 ### Phase 4 — Voxel database and voxel-aware slicing
 
-- [ ] T31: Laser power per structure, layer and line (from T19) [phase: 4]
-      Goal: Program generation can change the laser power between structures, layers and lines; this enables adaptive slicing and printing strategies (F7).
-      Priority: medium | Depends on: T54
-      Done when:
-        - Parameter test prints can change the power between structures (N012).
-        - `print_structure` supports a power per layer, and slicer toolpaths can carry a power per segment that the AeroBasic generation emits (N083).
-        - The powers used are stored in the metadata.
-
 ### Phase B — Backlog from T19 (details in `todo_notes.md`)
 
 - [ ] T62: Check experiment areas against the shape of the resin drop (found during T52) [phase: B]
@@ -230,3 +222,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T52: Substrate-specific `main.py` — 2026-09-30 — `nanofactorysystem/substrate_plan.py` (`SubstrateSpec`, `SubstrateExperiment`, `run_substrate`): overlap, existing-experiment, resin-drop, objective and name checks before printing, sequential runs into the substrate index with optional confirmation; template `mains/substrate_main.py`; dummy dry run with two experiments on one substrate. — commits: `b46bed8`, `1796164`, `ff6d3a0`
 
 - [x] T54: Voxel-aware slicing and hatching — 2026-09-30 — Voxel models (no data, fixed, database) behind the slicer protocol `VoxelModel`; contour offset, first/last slice at half the voxel height, spacing per `spacing_mode` (maintainer decision: `voxel_overlap` default, `static_hatching` with gap warnings); strategies get a `VoxelContext`; values in job metadata, structure JSON and summary; `ExperimentSpec(voxel_material=)`; no-data path and golden files unchanged. — commits: `e5a2173`, `e7ec542`
+
+- [x] T31: Laser power per structure, layer and line — 2026-10-01 — Power per structure shown in a dummy test; `add_structure(layer_power=)`/`StructureSpec.layer_power` let every layer program set its own power (stored as `layer_powers_mw`, summary column); `Model3D_Slicer` prints toolpath elements with a power override (or `power_map(z_um, role)`) in their own IFOV blocks, unchanged without overrides. — commits: `a01c64b`, `1e6cf41`
