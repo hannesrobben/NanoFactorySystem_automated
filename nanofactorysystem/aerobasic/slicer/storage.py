@@ -66,13 +66,23 @@ def save_job(job: ToolpathJob, path: str | Path,
              time_estimate: TimeEstimate | None = None) -> Path:
     path = Path(path).with_suffix(".h5")
     with h5py.File(path, "w") as f:
-        _write_metadata(f, job)
-        if time_estimate is not None:
-            _write_time_estimate(f, time_estimate)
-        groups = f.create_group("groups")
-        for i, group in enumerate(job.groups):
-            _write_group(groups, i, group)
+        write_job(f, job, time_estimate)
     return path
+
+
+def write_job(parent: h5py.Group, job: ToolpathJob,
+              time_estimate: TimeEstimate | None = None) -> None:
+    """Write a job with the job.h5 schema into an open file or group.
+
+    Used by :func:`save_job` and by the experiment file, which stores the
+    job of a structure below ``/structures/<name>/slicer``.
+    """
+    _write_metadata(parent, job)
+    if time_estimate is not None:
+        _write_time_estimate(parent, time_estimate)
+    groups = parent.create_group("groups")
+    for i, group in enumerate(job.groups):
+        _write_group(groups, i, group)
 
 
 def _write_metadata(f: h5py.File, job: ToolpathJob) -> None:
