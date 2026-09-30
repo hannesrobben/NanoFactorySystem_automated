@@ -1,6 +1,9 @@
 # Design: Voxel database
 
-Status: **draft, waiting for maintainer approval.** The decisions in §9 need an answer first.
+Status: approved 2026-09-30
+
+Approved by the maintainer on 2026-09-30 in the Claude Code session, with every proposal in §9
+accepted as written.
 Date: 2026-09-30. Todo: T53. Used by: T54 (voxel-aware slicing), later F7 (printing strategies).
 
 ## 1. Goals and non-goals
@@ -170,7 +173,11 @@ of them as `None`. T54 builds its `VoxelModel` interface on top of this (a datab
   slice shifted by half the height) and stores the values and their `method` in the experiment metadata.
 - Without data (`None`) the slicer keeps today's behaviour exactly (golden files unchanged).
 
-## 9. Decisions for the maintainer
+## 9. Decisions
+
+All proposals below were accepted by the maintainer on 2026-09-30 (V2: the calibration file is not
+recorded; V3: the seed file starts with the header only).
+
 
 - **V1 – Interpolation variable.** Proposal: 2-D linear interpolation in `(ln P, ln v)` inside the convex hull,
   with a 1-D fallback over `ln(P²/v)` only for collinear data (§4). Alternative: always 1-D over the dose
@@ -187,4 +194,5 @@ of them as `None`. T54 builds its `VoxelModel` interface on top of this (a datab
 
 ## 10. Approval
 
-Maintainer: write `Status: approved <date>` at the top of this document, with the answers to §9.
+Approved by the maintainer on 2026-09-30 (all proposals in §9 accepted); recorded in the status line
+at the top.

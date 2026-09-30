@@ -133,15 +133,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
-## Blocked
-<!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
-- [ ] T28: Overview images and time estimate (from T19) [phase: B]
-      Goal: An experiment documents the whole scene and its expected duration.
-      Priority: low | Depends on: T47
-      Done when:
-        - An overview image of the whole scene is taken before and after printing and stored in the experiment file (N009).
-        - The expected and the actual duration of an experiment are logged and stored (N023).
-      Blocked by: Decision. (1) Overview image: proposal: a camera mosaic of the experiment rectangle, stitched with `tools.stitch.Canvas` and stored in the experiment file, before and after printing (alternative: one capture at the experiment center, as the old commented-out `measure(center)` calls did). (2) Expected duration: proposal: estimate each layer program from the path lengths and F values of its moves (plus a configurable per-layer overhead), log the estimate after `build_programs()` and compare it with the stored start/end times of layers and structures. Asked 2026-09-30.
 - [ ] T53: Voxel database (SQLite) [phase: 4]
       Goal: Voxel width and height can be looked up for material, objective, setup, power and velocity, with interpolation between measured points.
       Priority: high | Depends on: –
@@ -152,7 +143,16 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
         - Interpolation per material/objective/setup over a dose-like variable (e.g. P²/v, logarithmic), only inside the convex hull of the measured points and with a configurable minimum number of points; no extrapolation; unknown material or too few points → `None`.
         - The database path is configured in `nanofactory.json`; the `.sqlite` file is not in git, a CSV or SQL seed file is.
         - Tests with synthetic data: exact hit, interpolation, outside the hull, unknown material.
-      Blocked by: waiting for maintainer approval of `docs/design/VOXEL_DATABASE.md` (draft written 2026-09-30; decisions V1–V5 in §9).
+      Decision (maintainer, 2026-09-30): design approved with all proposals V1–V5.
+## Blocked
+<!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
+- [ ] T28: Overview images and time estimate (from T19) [phase: B]
+      Goal: An experiment documents the whole scene and its expected duration.
+      Priority: low | Depends on: T47
+      Done when:
+        - An overview image of the whole scene is taken before and after printing and stored in the experiment file (N009).
+        - The expected and the actual duration of an experiment are logged and stored (N023).
+      Blocked by: Decision. (1) Overview image: proposal: a camera mosaic of the experiment rectangle, stitched with `tools.stitch.Canvas` and stored in the experiment file, before and after printing (alternative: one capture at the experiment center, as the old commented-out `measure(center)` calls did). (2) Expected duration: proposal: estimate each layer program from the path lengths and F values of its moves (plus a configurable per-layer overhead), log the estimate after `build_programs()` and compare it with the stored start/end times of layers and structures. Asked 2026-09-30.
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
