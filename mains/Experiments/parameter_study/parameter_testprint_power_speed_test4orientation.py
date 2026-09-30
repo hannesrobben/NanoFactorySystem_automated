@@ -3,241 +3,105 @@
 # <hannes.robben@phoenixd.uni-hannover.de>                               #
 # This program is free software under the terms of the MIT license.      #
 ##########################################################################
+"""Orientation test: three rectangles in the corner cells (0, 0), (1, 0) and (1, 1) of the power-speed grid.
 
+Described by ``experiment_spec()`` (T51); ``testprint()`` keeps the former call signature.
+"""
 import datetime
-import os
 from pathlib import Path
-from tkinter import messagebox
-import numpy as np
 
-from nanofactorysystem import mkdir, getLogger
-from nanofactorysystem.aerobasic.programs.drawings.lines import Stair, Rectangle3D
-from nanofactorysystem.aerobasic.programs.drawings.lens import AsphericalLens
+from nanofactorysystem.aerobasic.programs.drawings.lines import Rectangle3D
 from nanofactorysystem.devices.coordinate_system import DropDirection, Point2D, Point3D
-from nanofactorysystem.experiment import Experiment, StructureType
+from nanofactorysystem.experiment_spec import (CornerSpec, ExperimentSpec, StructureSpec, messagebox_confirm,
+                                               run_experiment, script_output)
+from nanofactorysystem.plane_fitting import PlaneFitMode
 
-sys_args = {
-    "attenuator": {
-        "fitKind": "quadratic",
-    },
-    "sample": {
-        "name": "#1",
-        "orientation": "top",
-        "substrate": "boro-silicate glass",
-        "substrateThickness": 700.0,
-        "material": "SZ2080",
-        "materialThickness": 75.0,
-    },
-    "focus": {
-        "OffsetFocusDetection": [120, -80],
-        "minCircularity": 0.6,
-        "exposureValue": 120
-    },
-    "layer": {
-        # "beta": 0.7,
-        # "dzCoarseDefault": 50.0,
-        "dzFineDefault": 25.0,
-        "laserPower": 0.7,
-    },
-    "plane": {},
+OBJECTIVES = {
+    "Zeiss 20x": dict(fov_um=500.0, z_max_um=25700.0, margin_um=200.0, padding_um=100.0,
+                      corner=CornerSpec(width_um=50.0, length_um=300.0, height_um=7.0, hatch_um=0.5, slice_um=0.75)),
+    # zMax could possibly be up to 25550 µm
+    "Zeiss 63x": dict(fov_um=150.0, z_max_um=25480.0, margin_um=50.0, padding_um=100.0,
+                      corner=CornerSpec(width_um=30.0, length_um=120.0, height_um=7.0, hatch_um=0.3, slice_um=0.75)),
 }
+PARAMETERS = {
+    "Zeiss 20x": {"hatch size": 0.125, "slice size": 0.15, "power": [0.7], "velocity": [], "default power": 0.7},
+    "Zeiss 63x": {"hatch size": 0.1, "slice size": 0.2,  # earlier: 0.05 ... 0.2 and 0.1
+                  "power": [0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7],
+                  "velocity": [1_000, 2_000, 3_000, 4_000, 5_000, 7_500, 10_000],
+                  "default power": 0.7},
+}
+PRINTED_CELLS = ((0, 0), (1, 0), (1, 1))  # (velocity index, power index); all other cells stay empty
+
+
+def runtime_arguments() -> dict:
+    """ Runtime sections for the devices and detection tools of this experiment (DHM on by default). """
+
+    return {
+        "attenuator": {"fitKind": "quadratic"},
+        "sample": {"name": "#1", "substrate": "boro-silicate glass", "substrateThickness": 700.0,
+                   "material": "SZ2080", "materialThickness": 75.0},
+        "focus": {"OffsetFocusDetection": [120, -80], "minCircularity": 0.6, "exposureValue": 120},
+        "layer": {"dzFineDefault": 25.0, "laserPower": 0.7},
+        "plane": {},
+    }
+
+
+def rectangle(hatch, slice_size):
+    """ Factory of one rectangle (10 mm/s); the acceleration is read from the running experiment. """
+
+    def build(experiment):
+        return Rectangle3D(center=Point3D(0, 0, -2), width=50, length=50, height=3, hatch_size=hatch,
+                           slice_size=slice_size, velocity=10_000, acceleration=experiment.accel_a_um)
+    return build
+
+
+def experiment_spec(objective="Zeiss 20x", absolute_center=Point2D(0, 0)) -> ExperimentSpec:
+    """ Grid of the power-speed study with rectangles only in ``PRINTED_CELLS``. """
+
+    if objective not in OBJECTIVES:
+        raise ValueError(f"No implemented objective {objective}! Possible objectives are 'Zeiss 20x' and 'Zeiss 63x'.")
+    parameters = PARAMETERS[objective]
+    if not parameters["velocity"]:
+        raise ValueError(f"No velocities are defined for {objective}.")
+    structures = []
+    for i in range(len(parameters["velocity"])):
+        for j in range(len(parameters["power"])):
+            if (i, j) in PRINTED_CELLS:
+                structures.append(StructureSpec(f"rect_{i}_{10_000}_{j}_{0.7}",
+                                                factory=rectangle(parameters["hatch size"], parameters["slice size"]),
+                                                power_mw=0.7, axes="ABZ"))
+            else:
+                structures.append(StructureSpec.empty())
+    return ExperimentSpec(
+        name="parameter_testprint", objective=objective, center=absolute_center,
+        grid=(len(parameters["velocity"]), len(parameters["power"])), structures=structures,
+        drop_direction=DropDirection.DOWN, plane_fit_mode=PlaneFitMode.CORNERS, dhm_usage=True, camera_capture=True,
+        default_power_mw=parameters["default power"], low_speed_um_s=1000, high_speed_um_s=10_000,
+        opl_start_um=350.0, sys_args=runtime_arguments(), **OBJECTIVES[objective])
 
 
 def testprint(absolute_center: Point2D, resin_dimension: list, ask_continue_box=False, path=None,
-              objective="Zeiss 20x", user="Hannes"):
+              objective="Zeiss 20x", user="Hannes", backend=None, plane=None):
+    """ Run the experiment.
+
+    Parameters
+    ----------
+    absolute_center : Point2D
+        Center of the experiment in µm.
+    resin_dimension : list
+        Edges of the resin drop in µm: [[right], [left], [near], [far]].
+    ask_continue_box : bool
+        Confirm every step in a message box.
+    path : Path, optional
+        Root folder; the data go into its subfolder ``parameter_testprint``, without it into ``.output``.
+    backend, plane : optional
+        Dummy backend and known plane for a dry run.
     """
-        absolute_center: Point2D with x- and y-coordinate of the center of this experiment
-        resin_dimension: list of the coordinates of the edges of the resin
-                [[right edge],   Example:   [[100, 18550],
-                [left edge],                [200, 26300],
-                [near edge],                [-3500, 22400],
-                [far edge]]                 [4000, 22400]]
-        ask_continue_box: bool -> controls the asking box
-        path: Path argument for root directory where the experimental data will be safe in a subdirectory called ...
-                If nothing is given, the export_path will be in the subdirectory .output
-    """
 
-    if path is None:
-        path = Path(mkdir(
-            f".output/parameter_study/Orientation_test_TL_MARK_{datetime.datetime.now():%Y%m%d}_{objective}",
-            clean=False))
-    else:
-        path = Path(path)  # accept str or Path
-        path = Path(mkdir(os.path.join(path, "parameter_testprint")))
-    logger = getLogger(logfile=f"{path}/console.log")
-
-    # Size of (oval) resin drop in micrometres
-    edges = np.asarray(resin_dimension)
-    resin_corner_tr = Point2D(*np.max(edges, axis=0))
-    resin_corner_bl = Point2D(*np.min(edges, axis=0))
-    absolute_grid_center = absolute_center
-
-    if objective == "Zeiss 20x":
-        fov = 500
-        zmax = 25700.0
-        # Corner settings
-        c_width = 50
-        c_length = 300
-        c_height = 7
-        c_hatch = 0.5
-        c_slice = 0.75
-        # printing area settings
-        margin = 200
-        padding = 100
-        # printing settings
-        movement_axis = ["ABZ", "XYZ"]
-        parameterset = {
-            "hatch size": [0.125],  # hatch size
-            "slice size": [0.15],  # slice size/ layer height
-            "power": 0.7,
-            "default power": 0.7
-        }
-
-    elif objective == "Zeiss 63x":
-        fov = 150
-        zmax = 25480.0  # could possibly be up to 25550 µm
-        # Corner settings
-        c_width = 30
-        c_length = 120
-        c_height = 7
-        c_hatch = 0.3
-        c_slice = 0.75
-        # printing area settings
-        margin = 50
-        padding = 100
-        # printing settings
-        movement_axis = ["ABZ", "XYZ"]
-        parameterset = {
-            "hatch size": 0.1,  # 0.05, 0.1, 0.15, 0.2  # hatch size
-            "slice size": 0.2,  # 0.1# slice size/ layer height
-            "power": [0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7],  # 8
-            "velocity": [1_000, 2_000, 3_000, 4_000, 5_000, 7_500, 10_000],  # 7
-            "default power": 0.7
-        }
-
-    else:
-        raise Exception(f"No implemented objective {objective}! Possible objectives are 'Zeiss 20x' and 'Zeiss 63x'.")
-
-    logger.info(f"")
-    sys_args.update({"controller": {
-        "zMax": zmax, }
-    })
-    grid_size = (len(parameterset["velocity"]), len(parameterset["power"]))
-    with Experiment(
-            path=path,
-            user=user,
-            objective=objective,
-            logger=logger,
-            sys_args=sys_args,
-            default_power=parameterset["default power"],
-            low_speed_um=1000,
-            high_speed_um=10_000,
-            resin_corner_tr=resin_corner_tr,
-            resin_corner_bl=resin_corner_bl,
-            structure_size=fov,
-            margin=margin,
-            padding=padding,
-            absolute_grid_center=absolute_grid_center,
-            grid=grid_size,
-            n_mid_points=0,
-            camera_capture=True,
-            drop_direction=DropDirection.DOWN,
-            corner_z=-2,
-            corner_width=c_width,
-            corner_length=c_length,
-            corner_height=c_height,
-            corner_hatch=c_hatch,
-            corner_slice=c_slice,
-            plane_fit_mode=1) as experiment:
-
-        # Visualize experiment
-        experiment.plot_experiment(show=False)
-
-        # Get substrate surface plane
-        if ask_continue_box and not messagebox.askyesno(message="Run plane fitting?"): return
-        experiment.plane_fit(force=False)
-
-        # Optical path max_length for DHM
-        if ask_continue_box and not messagebox.askyesno(message="Run OPL motor scan?"): return
-        experiment.opl_scan(m0=350.0, force=False)
-
-        # center = experiment.coordinate_system_grid_to_absolute.convert({"X": 0, "Y": 0, "Z": 0})
-        # experiment.measure(coordinate=center, name="before")
-
-        # ----------------------------------------------------------------------------------------------------------------------
-
-        # ----------------------------------------------------------------------------------------------------------------------
-        # Add structures        - only galvo as movement axis just now
-        # Adding Stair Structure
-
-        for i in range(len(parameterset["velocity"])):
-            for j in range(len(parameterset["power"])):
-
-                if i==0 and j==0:
-                    experiment.add_structure(
-                        structure_type=StructureType.NORMAL,
-                        name=f"rect_{i}_{10_000}_{j}_{0.7}",
-                        axes=movement_axis[0],
-                        power=0.7,
-                        structure=Rectangle3D(
-                            center=Point3D(0, 0, -2),
-                            width=50,
-                            length=50,
-                            height=3,
-                            hatch_size=parameterset["hatch size"],
-                            slice_size=parameterset["slice size"],
-                            velocity=10_000,
-                            acceleration=experiment.accel_a_um))
-                elif i==1 and j==0:
-                    experiment.add_structure(
-                        structure_type=StructureType.NORMAL,
-                        name=f"rect_{i}_{10_000}_{j}_{0.7}",
-                        axes=movement_axis[0],
-                        power=0.7,
-                        structure=Rectangle3D(
-                            center=Point3D(0, 0, -2),
-                            width=50,
-                            length=50,
-                            height=3,
-                            hatch_size=parameterset["hatch size"],
-                            slice_size=parameterset["slice size"],
-                            velocity=10_000,
-                            acceleration=experiment.accel_a_um))
-                elif i==1 and j==1:
-                    experiment.add_structure(
-                        structure_type=StructureType.NORMAL,
-                        name=f"rect_{i}_{10_000}_{j}_{0.7}",
-                        axes=movement_axis[0],
-                        power=0.7,
-                        structure=Rectangle3D(
-                            center=Point3D(0, 0, -2),
-                            width=50,
-                            length=50,
-                            height=3,
-                            hatch_size=parameterset["hatch size"],
-                            slice_size=parameterset["slice size"],
-                            velocity=10_000,
-                            acceleration=experiment.accel_a_um))
-                else:
-                    experiment.skip_structure()
-
-
-
-        # ----------------------------------------------------------------------------------------------------------------------
-        # ----------------------------------------------------------------------------------------------------------------------
-        # Build corner and structure programs
-        if ask_continue_box:
-            if messagebox.askyesno(message="Create programs for all structures?"):
-                experiment.build_programs()
-            else:
-                if not messagebox.askyesno(message="Programs already created?"): return
-        else:
-            experiment.build_programs()
-
-        # Print corners and structures
-        if ask_continue_box and not messagebox.askyesno(message="FINAL STEP: Print experiment?"): return
-        experiment.print_experiment()
-
-        # experiment.measure(coordinate=center, name="after")
-
-# if __name__ == '__main__':
+    spec = experiment_spec(objective, absolute_center)
+    root, spec.name = script_output(
+        path,
+        Path(f".output/parameter_study/Orientation_test_TL_MARK_{datetime.datetime.now():%Y%m%d}_{objective}"),
+        "parameter_testprint")
+    return run_experiment(spec, user=user, resin_edges=resin_dimension, path=root, backend=backend, plane=plane,
+                          confirm=messagebox_confirm if ask_continue_box else None, show_plot=False)
