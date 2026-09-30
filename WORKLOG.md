@@ -1579,3 +1579,38 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   `2de4367` docs(design): record the approval of the voxel database design [T53];
   `9c52f15` feat(voxel): add the voxel database [T53]; docs(todo): close T53 [T53]
 - **Follow-ups:** T54 (voxel-aware slicing) needs T51 as well.
+
+### 2026-09-30 19:14 CEST — [T51] New template for experiment scripts (core)
+- **Status:** partial (the script migration waits for the maintainer's list)
+- **Branch:** `feat/phase3-experiment-spec`, based on `feat/phase4-voxel-database`
+- **Changes:**
+  - `nanofactorysystem/experiment_spec.py` (new):
+    - `ExperimentSpec`, `StructureSpec`, `CornerSpec`, and `OBJECTIVE_DEFAULTS` (the per-objective values of
+      `default_exp_file.py`);
+    - `default_sys_args()` (N001);
+    - `resolved()` fills in the defaults and validates;
+    - `experiment_arguments()`; `run_experiment(confirm=...)`.
+    - The OPL start (the former `m0=350`, N021), the structure size separate from the FOV (N006), the grid and
+      `n_mid_points` (N007, N008, N013) are parameters.
+  - `nanofactorysystem/experiment.py`: `ProgramSource` (DRAWING, SLICER) and the argument `program_source`,
+    stored in the file and the dictionary. `storage/schema.py`: parameter. `storage/summary.py`: the program
+    source is an experiment field.
+  - `nanofactorysystem/backends/dummy/a3200.py`: axis speed statements `BF…`, `ZF…` are accepted. Every IFOV
+    setup program contains them; the slicer dry run showed they were missing (separate fix commit).
+  - `mains/Experiments/experiment_template.py` (new): template with a DRAWING and a SLICER example; `main()`
+    uses message boxes on the lab PC.
+  - `test/integration/test_dry_run_spec.py` (new, 5 tests, marked `slow` where they print): dry runs for DRAWING
+    and SLICER, spec validation, and the template examples (reduced to one coarse structure).
+  - `test/README.md`, `CLAUDE.md`.
+  - `TODO.md`: T51 moved to In Progress, with a status note and the open decision.
+- **Tests:** `python -m pytest`: 274 passed, 14 skipped.
+- **Commits:** `6462705` fix(backends): accept axis speed statements for all axes in the fake controller [T51];
+  `acb2fe2` feat(experiment): describe experiments with ExperimentSpec [T51]; docs(todo): T51 status [T51]
+- **Remaining gap:**
+  - Migrate the scripts the maintainer still uses; move the others to `mains/Experiments/historical/` (or
+    list them in a README); translate German text in the migrated scripts.
+  - Confirm the program-source reading: DRAWING = the drawing classes.
+- **Notes:**
+  - The dummy does not simulate exposures in IFOV mode, so the slicer dry run checks the programs instead of
+    exposures.
+  - `default_exp_file.py` stays, because the older dry run and the lab use it.
