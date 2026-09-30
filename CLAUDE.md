@@ -76,7 +76,8 @@ python -m pytest test/test_aerobasic/test_golden_programs.py --update-golden   #
   4. `add_structure(StructureType, name, axes, power, structure=DrawableObject)`
   5. `build_programs()`, which writes per-layer `.pgm` files and `structures.json`
   6. `print_experiment()`, which runs each layer as an A3200 task and tracks progress
-- `restart_experiment()` and `mains/restart_experiment.py` resume from the saved `experiment_dictionary.json` and `structures.json` (`parameters_from_dictionary()` sets `resume=True`).
+- `restart_experiment()` and `mains/restart_experiment.py` resume from the progress in `experiment.h5`: every layer printed in an earlier session is skipped, so any number of aborts works. `parameters_from_dictionary()` reads the file (or the JSON of an old folder) and sets `resume=True`; an old JSON-only folder is imported into a new experiment file (`storage/legacy.py`), keeping its UUID.
+- `StructureType.REPEAT` prints the most recent grid structure again in the next grid cell as `<name>_rep<n>` (`repeat_of` in the file); a duplicate name gets `_(<i>)`.
 - Experiment outputs go into the `path` passed in, which is usually a lab-PC path. Without `resume`, a folder that already holds an experiment is refused.
 
 **Experiment storage** (`storage/`, design in `docs/design/EXPERIMENT_STORAGE.md`)

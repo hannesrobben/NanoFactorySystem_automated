@@ -35,6 +35,7 @@ from nanofactorysystem.storage import (CaptureRecord, CornerRecord, ExperimentRe
                                        LayoutRecord, PlaneFitRecord, StructureRecord, export_json,
                                        software_info, utc_timestamp, z_function_to_json)
 from nanofactorysystem.storage.json_copies import structures_list, write_json
+from nanofactorysystem.storage.legacy import LegacyExperiment, is_legacy_folder, read_legacy
 from nanofactorysystem.storage.summary import SUMMARY_NAME, format_table, summary
 from nanofactorysystem.storage.substrate_store import (SubstrateRecord, SubstrateStore, check_not_synced,
                                                        default_root)
@@ -212,10 +213,17 @@ class Experiment(object):
         if stored and not resume:
             raise FileExistsError(f"{self.path} contains an experiment already. Use a new folder, "
                                   f"or resume=True to continue that experiment.")
+        legacy = None
         if stored:
             identification = ExperimentStore.open(self.path, self.log).read_identification()
             self.qr_text = identification["experiment_uuid"]
             self.experiment_label = identification["experiment_label"]
+        elif resume and is_legacy_folder(self.path):
+            # Folder written before the experiment file existed: imported, keeping its UUID if known
+            legacy = read_legacy(self.path, 1 if drop_direction == DropDirection.UP else -1, setup)
+            self.qr_text = legacy.uuid or str(uuid.uuid4())
+            if legacy.uuid is None:
+                self.log.warning("The UUID of the old experiment could not be recovered; a new one is used.")
         else:
             self.qr_text = str(uuid.uuid4())
         self.log.info(f"Experiment {self.qr_text}")
@@ -270,7 +278,7 @@ class Experiment(object):
 
         # Experiment file: new, resumed, or created for a resumed folder without one
         self._stored_structures = set()  # names known to be in the experiment file
-        self.store = self._open_store(stored)
+        self.store = self._open_store(stored, legacy)
         try:
             self._register_experiment()
             self._save_exp_dict()
@@ -308,8 +316,12 @@ class Experiment(object):
             self._save_exp_dict()
             self._update_substrate_index()
 
-    def _open_store(self, stored: bool) -> ExperimentStore:
-        """ Open or create the experiment file and start a session. """
+    def _open_store(self, stored: bool, legacy: Optional[LegacyExperiment] = None) -> ExperimentStore:
+        """ Open or create the experiment file and start a session.
+
+        An old folder (``legacy``) is imported into a new experiment file
+        (design decision D7); its files are left unchanged.
+        """
 
         if stored:
             store = ExperimentStore.open(self.path, self.log)
@@ -317,15 +329,36 @@ class Experiment(object):
             return store
 
         store = ExperimentStore.create(self.path, self._experiment_record(), self.log)
-        store.begin_session("new")
+        store.begin_session("new" if legacy is None else "imported")
         try:
             attenuator = self.system.controller.attenuator
             store.write_calibration(attenuator.data, attenuator["fitKind"], attenuator["calibrationFile"])
             store.write_layout(self._layout())
+            if legacy is not None:
+                self._import_legacy(store, legacy)
         except BaseException:
             store.end_session("exception")
             raise
         return store
+
+    def _import_legacy(self, store: ExperimentStore, legacy: LegacyExperiment) -> None:
+        """ Write the structures, programs and progress of an old folder into the new experiment file. """
+
+        for structure in legacy.structures:
+            attempted = sorted(legacy.attempted.get(structure.name, set()))
+            if structure.name in legacy.finished:
+                structure.status = "printed"
+            elif attempted:
+                structure.status = "printing"
+            store.add_structure(structure)
+            self._stored_structures.add(structure.name)
+            for file in structure.layer_files:
+                if self._absolute(file).exists():
+                    store.write_layer_program(structure.name, self._layer_id(file),
+                                              self._absolute(file).read_text(), file)
+            for layer_id in attempted:
+                store.update_progress(structure.name, layer_id, "ok", error="imported from print_progress.json")
+        self.log.info(f"Imported {len(legacy.structures)} structures of the old experiment folder {self.path}")
 
     def _experiment_record(self) -> ExperimentRecord:
         """ Return identification and metadata of this experiment for a new experiment file. """
@@ -457,11 +490,40 @@ class Experiment(object):
         return files[-1] if files else None
 
     @staticmethod
+    def _parameters_from_file(path: Path) -> dict:
+        """ Constructor arguments from the experiment file in ``path``. """
+
+        record = ExperimentStore.open(path).read()
+        values = record.parameters
+        arguments = {}
+        for argument, _, name, kind in schema.PARAMETERS:
+            value = values[name]
+            if argument in ("resin_corner_tr", "resin_corner_bl", "absolute_grid_center"):
+                value = Point2D(*[float(v) for v in value])
+            elif kind == "vector":
+                value = tuple(float(v) for v in value)
+            elif kind == "ivector":
+                value = tuple(int(v) for v in value)
+            elif kind == "enum":
+                value = DropDirection[value]
+            arguments[argument] = value
+        return {
+            "path": path,
+            "user": record.user["key"],
+            "objective": record.objective["key"],
+            "logger": getLogger(logfile=path / Path(values.get("log_file") or "console.log").name),
+            "sys_args": record.system["sys_args"],
+            **arguments,
+            "resume": True,
+        }
+
+    @staticmethod
     def parameters_from_dictionary(path) -> dict:
         """ Rebuild the constructor arguments of a stored experiment.
 
-        Reads ``experiment_dictionary.json``, which every experiment writes into
-        its folder, e.g. to restart an aborted print with
+        Reads the experiment file ``experiment.h5`` or, in folders written
+        before it existed, ``experiment_dictionary.json``, e.g. to restart an
+        aborted print with
         ``Experiment(**Experiment.parameters_from_dictionary(path))``. Vectors
         may be stored as numbers or, in older files, as strings. The
         experiment folder is ``path`` itself, not the folder stored in the
@@ -481,6 +543,13 @@ class Experiment(object):
         """
 
         path = Path(path)
+        if ExperimentStore.exists(path):
+            arguments = Experiment._parameters_from_file(path)
+            identification = ExperimentStore.open(path).read_identification()
+            if identification["substrate_label"] and (path.parent / "substrate.json").exists():
+                arguments |= {"substrate": identification["substrate_label"], "data_root": path.parent.parent,
+                              "allow_synced_root": True}
+            return arguments
         data = json.loads((path / "experiment_dictionary.json").read_text())
 
         def vector(text) -> list[float]:
@@ -915,14 +984,32 @@ class Experiment(object):
                       corner: Optional[CornerPosition] = None,
                       axes: str = None,
                       power: float = None):
+        """ Add a structure to the experiment.
 
-        # Make sure that each structure has an individual name
-        names = [s["name"] for s in self.structures]
-        if name in names:
-            i = 1
-            while f"{name}_({i})" in names:
-                i += 1
-            name = f"{name}_({i})"
+        Parameters
+        ----------
+        structure_type : StructureType
+            ``REPEAT`` prints the most recent grid structure (or, for a
+            repeat, its original) again in the next grid cell; ``structure``,
+            ``axes`` and ``power`` are taken from that structure and the name
+            becomes ``<original>_rep<n>``.
+        name : str
+            Structure name; ``_(<i>)`` is appended if the name is used already.
+        structure : DrawableObject, optional
+        corner : CornerPosition, optional
+            Position of a corner structure.
+        axes : str, optional
+            Printing axes, default ``"ABZ"``.
+        power : float, optional
+            Laser power in mW, default ``default_power``.
+
+        Returns
+        -------
+        str
+            The name the structure got.
+        """
+
+        repeat_of = ""
 
         # Sanity checks for normal structure
         if structure_type == StructureType.DUMMY:
@@ -970,24 +1057,34 @@ class Experiment(object):
                 raise ValueError(f"Too many structures for structure {name}!")
 
         elif structure_type == StructureType.REPEAT:
-            n_structures = sum(
-                [s["structure_type"] in (
-                    StructureType.NORMAL, StructureType.DUMMY, StructureType.REPEAT, StructureType.STITCHING,
-                    StructureType.IFOV) for s in
-                 self.structures])
-            assert n_structures >= 1, "At least one structure has to be defined prior to repeat."
-
-            s_2_repeat = (self.structures[-1]).copy
-            repition_number = sum(
-                s["name"].split("(")[0] in (s_2_repeat["name"].split("(")[0]) for s in self.structures)
-            name = f"{s_2_repeat["name"]}({repition_number})"
-            structure = s_2_repeat["structure"]
-            axes = s_2_repeat["axes"]
-            power = s_2_repeat["power"]
+            grid_types = (StructureType.NORMAL, StructureType.DUMMY, StructureType.REPEAT, StructureType.STITCHING,
+                          StructureType.IFOV)
+            grid_structures = [s for s in self.structures if s["structure_type"] in grid_types]
+            if len(grid_structures) >= self.grid[0] * self.grid[1]:
+                raise ValueError(f"Too many structures for a repetition of {name}!")
+            printable = [s for s in grid_structures if s["structure_type"] != StructureType.DUMMY]
+            if not printable:
+                raise ValueError("A structure has to be added before it can be repeated.")
+            original_name = printable[-1].get("repeat_of") or printable[-1]["name"]
+            original = next(s for s in self.structures if s["name"] == original_name)
+            repeat_of = original_name
+            number = 1 + sum(s.get("repeat_of") == original_name for s in self.structures)
+            name = f"{original_name}_rep{number}"
+            structure = original["structure"]
+            axes = original["axes"]
+            power = original["power"]
 
         # Unknown structure type
         else:
             raise ValueError(f"Unknown structure type {structure_type}!")
+
+        # Make sure that each structure has an individual name
+        names = [s["name"] for s in self.structures]
+        if name in names:
+            i = 1
+            while f"{name}_({i})" in names:
+                i += 1
+            name = f"{name}_({i})"
 
         # Power and axes have default values
         if power is None:
@@ -1003,6 +1100,7 @@ class Experiment(object):
             "axes": axes,
             "power": power,
             "corner": corner,
+            "repeat_of": repeat_of,
         })
 
         # Aware: name may have changed
@@ -1247,7 +1345,8 @@ class Experiment(object):
             structure_class=f"{type(structure).__module__}.{type(structure).__qualname__}",
             config=config["structure"], layer_files=[self._relative(f) for f in config["layer_files"]],
             program_file=self._relative(config["program_file"]),
-            layer_order=self._layer_order(), dhm_image_count=config["number of dhm images"]))
+            layer_order=self._layer_order(), dhm_image_count=config["number of dhm images"],
+            repeat_of=structure_dict.get("repeat_of", "")))
         for file in config["layer_files"]:
             self.store.write_layer_program(name, self._layer_id(file), Path(file).read_text(),
                                            self._relative(file))
@@ -1430,100 +1529,45 @@ class Experiment(object):
         save_path.write_text(json.dumps(data, indent=4))
 
     def restart_experiment(self):
-        progress_path = self.path / "print_progress.json"
+        """ Print what an aborted run of this experiment left over.
 
-        if not progress_path.exists():
-            raise ValueError("No print progress file found.")
+        The resume point comes from the experiment file: structures that
+        were printed (or failed) completely are skipped, and of the other
+        structures every layer that was already printed or attempted in an
+        earlier session is skipped. This works after any number of aborts.
+        Structures that were never started get their "before" capture.
 
-        # loading print progress data
-        print_data = json.loads(progress_path.read_text())
+        Raises
+        ------
+        ValueError
+            If the experiment has no built structures.
+        """
 
-        # retrieve original programs
-        self.retrieve_programs()
+        record = self.store.read()
+        configs = {c["name"]: c for c in self._with_absolute_paths(structures_list(record))}
+        structures = [s for s in record.structures if s.type != "DIRECT" and s.name in configs]
+        if not structures:
+            raise ValueError("No programs: the experiment has no built structures to restart.")
+        self.structure_configs = [configs[s.name] for s in structures]
 
-        # finished structures
-        finished_names = {
-            s["name"] for s in print_data["finished_structures"]
-        }
-
-        # printed structure where the print was aborted - or an empty dictionary
-        current_structure = print_data.get("current_structure", {})
-
-        resume_name = None
-        resume_layer_id = None
-        resume_order = None
-
-        if current_structure:
-            resume_name = current_structure["name"]
-            resume_layer_id = current_structure["finished layer"]
-            resume_order = current_structure["order"]
-
-        # filter out every finished structures
-        remaining_structures = [
-            s for s in self.structure_configs
-            if s["name"] not in finished_names
-        ]
-
-        # Iterate over all remaining (not fully finished) structures
-        for config in remaining_structures:
-
-            name = config["name"]
-            layer_files = [self._absolute(p) for p in config["layer_files"]]
-
-            # If this structure was partially printed, trim the layer list
-            if name == resume_name:
-                self.log.info(
-                    f"Resuming structure '{name}' at layer {resume_layer_id}"
-                )
-
-                # OLD--------------------------------------------------------------
-                #     if resume_order == 1:
-                #         layer_files = layer_files[resume_layer + 1:]
-                #     elif resume_order == -1:
-                #         layer_files = layer_files[:resume_layer]
-                #         layer_files = layer_files[::-1]  # reverse order
-                #     else:
-                #         raise ValueError("Invalid resume order")
-                # NEW--------------------------------------------------------------
-                # long version of the short for block below
-                # for f in layer_files:
-                #     layer_id = extract_layer_id(f)
-                #
-                #     if resume_order == 1:
-                #         if layer_id > resume_layer_id:
-                #             remaining_layers.append(f)
-                #
-                #     elif resume_order == -1:
-                #         if layer_id < resume_layer_id:
-                #             remaining_layers.append(f)
-                #
-                #     else:
-                #         raise ValueError("Invalid resume order")
-
-                # helper function to extract layer id from filename
-                def extract_layer_id(path):
-                    return int(str(path).split('.')[-2])
-
-                # always sort ascending
-                layer_files = sorted(layer_files, key=extract_layer_id)
-
-                remaining_layers = []
-                for f in layer_files:
-                    layer_id = extract_layer_id(f)
-
-                    if (layer_id - resume_layer_id) * resume_order > 0:
-                        remaining_layers.append(f)
-
-                layer_files = remaining_layers
-
+        for structure in structures:
+            if structure.status in ("printed", "failed"):
+                continue
+            config = configs[structure.name]
+            attempted = {event["layer_id"] for event in record.progress.get(structure.name, [])}
+            layer_files = sorted((Path(f) for f in config["layer_files"]
+                                  if self._layer_id(f) not in attempted), key=self._layer_id)
+            started = bool(attempted) or structure.status == "printing"
+            self.log.info(f"Resuming structure '{structure.name}': {len(layer_files)} of {structure.n_layers} "
+                          f"layers left")
             self.print_structure(
                 layer_files,
                 x=config["center_x"],
                 y=config["center_y"],
-                name=name,
+                name=structure.name,
                 power=config["power"],
                 dhm_image_count=config["number of dhm images"],
-                restart=True
+                restart=started
             )
         self.store.set_status(schema.STATUS_FINISHED)
         self._save_exp_dict()

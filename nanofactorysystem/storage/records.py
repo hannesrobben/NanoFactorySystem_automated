@@ -134,6 +134,8 @@ class StructureRecord:
         Holograms per DHM capture.
     status : str
         ``"pending"``, ``"printing"``, ``"printed"`` or ``"failed"``.
+    repeat_of : str
+        Name of the repeated structure for ``REPEAT`` structures, else ``""``.
     """
 
     index: int
@@ -153,6 +155,7 @@ class StructureRecord:
     layer_order: int
     dhm_image_count: int
     status: str = "pending"
+    repeat_of: str = ""
 
     @property
     def n_layers(self) -> int:

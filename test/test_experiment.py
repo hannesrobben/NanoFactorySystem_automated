@@ -54,6 +54,27 @@ def add_rectangle(experiment, name="rect"):
                               velocity=1000, acceleration=500))
 
 
+def abort_after(experiment, n_layers):
+    """ Let the controller fail with RuntimeError("abort") when the layer after ``n_layers`` layers is loaded. """
+
+    run = experiment.a3200.run_program_as_task
+    calls = []
+
+    def run_or_abort(*args, **kwargs):
+        calls.append(args)
+        if len(calls) > n_layers:
+            raise RuntimeError("abort")
+        return run(*args, **kwargs)
+
+    experiment.a3200.run_program_as_task = run_or_abort
+
+
+def printed_layers(path, name="rect"):
+    """ Layer ids printed successfully according to the experiment file, in order. """
+
+    return [e["layer_id"] for e in ExperimentStore.open(path).read().progress[name] if e["status"] == "ok"]
+
+
 def progress(experiment):
     return json.loads((experiment.path / "print_progress.json").read_text())
 
@@ -254,14 +275,14 @@ def test_moved_experiment_can_be_restarted(test_config, dummy_backend, no_sleep,
 
     old = tmp_path / "old" / "experiment"
     old.mkdir(parents=True)
-    with make_experiment(old, dummy_backend) as experiment:
-        experiment.plane_fit(plane=dummy_backend.world.sample.plane())
-        add_rectangle(experiment)
-        experiment.build_programs()
-        layers = experiment.structure_configs[0]["layer_files"]
-    (old / "print_progress.json").write_text(json.dumps({
-        "current_structure": {"name": "rect", "finished layer": 0, "order": 1},
-        "finished_structures": [], "error log": []}))
+    with pytest.raises(RuntimeError, match="abort"):
+        with make_experiment(old, dummy_backend) as experiment:
+            experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+            add_rectangle(experiment)
+            experiment.build_programs()
+            layers = experiment.structure_configs[0]["layer_files"]
+            abort_after(experiment, 1)
+            experiment.print_experiment()
     new = tmp_path / "new" / "experiment"
     getLogger(logfile=tmp_path / "other.log")  # release old/console.log, so that the folder can be moved
     shutil.move(old.parent, new.parent)
@@ -386,18 +407,18 @@ def test_restart_from_stored_dictionary(test_config, dummy_backend, no_sleep, tm
 
     path = tmp_path / "experiment"
     path.mkdir()
-    with make_experiment(path, dummy_backend) as experiment:
-        experiment.plane_fit(plane=dummy_backend.world.sample.plane())
-        add_rectangle(experiment)
-        experiment.build_programs()
-        layers = experiment.structure_configs[0]["layer_files"]
-    layer_ids = sorted(int(str(f).split(".")[-2]) for f in layers)
-    # Simulate a print aborted after the second layer (drop direction up: ascending order)
-    (path / "print_progress.json").write_text(json.dumps({
-        "current_structure": {"name": "rect", "finished layer": layer_ids[1], "order": 1},
-        "finished_structures": [], "error log": []}))
+    # A print aborted after the second layer
+    with pytest.raises(RuntimeError, match="abort"):
+        with make_experiment(path, dummy_backend) as experiment:
+            experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+            add_rectangle(experiment)
+            experiment.build_programs()
+            layers = experiment.structure_configs[0]["layer_files"]
+            abort_after(experiment, 2)
+            experiment.print_experiment()
 
-    params = Experiment.parameters_from_dictionary(path)
+    params = Experiment.parameters_from_dictionary(path)  # read from experiment.h5
+    assert params["resume"] and params["path"] == path
     assert params["objective"] == "Zeiss 20x" and params["grid"] == (1, 1)
     assert params["drop_direction"] == DropDirection.UP
     assert params["resin_corner_tr"].as_tuple() == (5720.0, 27190.0)
@@ -420,3 +441,97 @@ def test_restart_from_stored_dictionary(test_config, dummy_backend, no_sleep, tm
     assert record.uuid == experiment.qr_text
     assert [s["kind"] for s in record.sessions] == ["new", "restart"]
     assert record.status == "finished"
+    assert printed_layers(path) == sorted(int(str(f).split(".")[-2]) for f in layers)
+
+
+def test_restart_after_two_aborts(test_config, dummy_backend, no_sleep, tmp_path):
+    path = tmp_path / "experiment"
+    path.mkdir()
+    with pytest.raises(RuntimeError, match="abort"):
+        with make_experiment(path, dummy_backend) as experiment:
+            experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+            experiment.add_structure(
+                StructureType.NORMAL, "rect", axes="XYZ", power=0.7,
+                structure=Rectangle3D(Point3D(0, 0, -1), 10, 10, 6, hatch_size=1.0, slice_size=1.0,
+                                      velocity=1000, acceleration=500))
+            experiment.build_programs()
+            ids = sorted(int(str(f).split(".")[-2]) for f in experiment.structure_configs[0]["layer_files"])
+            abort_after(experiment, 2)
+            experiment.print_experiment()
+    assert len(ids) >= 5 and printed_layers(path) == ids[:2]
+
+    # Second run: aborted again after one more layer
+    with pytest.raises(RuntimeError, match="abort"):
+        with Experiment(**Experiment.parameters_from_dictionary(path), backend=dummy_backend) as experiment:
+            abort_after(experiment, 1)
+            experiment.restart_experiment()
+    assert printed_layers(path) == ids[:3]
+
+    # Third run: resumes at the fourth layer and finishes; every layer was printed exactly once
+    dummy_backend.calllog.clear()
+    with Experiment(**Experiment.parameters_from_dictionary(path), backend=dummy_backend) as experiment:
+        experiment.restart_experiment()
+    assert len(dummy_backend.calllog.filter(device="program")) == len(ids) - 3
+    assert printed_layers(path) == ids
+    record = ExperimentStore.open(path).read()
+    assert [s["kind"] for s in record.sessions] == ["new", "restart", "restart"]
+    assert [s["end_reason"] for s in record.sessions] == ["exception", "exception", "finished"]
+    assert record.structure("rect").status == "printed" and record.status == "finished"
+
+
+def test_old_json_folder_is_imported_on_restart(test_config, dummy_backend, no_sleep, tmp_path):
+    path = tmp_path / "experiment"
+    path.mkdir()
+    with pytest.raises(RuntimeError, match="abort"):
+        with make_experiment(path, dummy_backend) as experiment:
+            experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+            add_rectangle(experiment)
+            experiment.build_programs()
+            layers = experiment.structure_configs[0]["layer_files"]
+            abort_after(experiment, 2)
+            experiment.print_experiment()
+    uuid = experiment.qr_text
+    # Make it look like a folder written before the experiment file: no experiment.h5, absolute paths of the
+    # lab PC in structures.json, and print_progress.json as the only progress record
+    (path / "experiment.h5").unlink()
+    structures = json.loads((path / "structures.json").read_text())
+    for s in structures:
+        s["layer_files"] = [f"C:/Users/Nanofactory/old/experiment/{f}" for f in s["layer_files"]]
+    (path / "structures.json").write_text(json.dumps(structures))
+    dummy_backend.calllog.clear()
+
+    with Experiment(**Experiment.parameters_from_dictionary(path), backend=dummy_backend) as experiment:
+        experiment.restart_experiment()
+
+    assert len(dummy_backend.calllog.filter(device="program")) == len(layers) - 2
+    record = ExperimentStore.open(path).read()
+    assert record.uuid == uuid  # recovered from the log file
+    assert [s["kind"] for s in record.sessions] == ["imported"]
+    assert record.structure("rect").status == "printed" and record.status == "finished"
+    assert len(printed_layers(path)) == len(layers)
+    assert all(not Path(f).is_absolute() for f in record.structure("rect").layer_files)
+
+
+def test_repeated_structure_is_printed_at_its_own_place(test_config, dummy_backend, no_sleep, tmp_path):
+    path = tmp_path / "experiment"
+    path.mkdir()
+    with make_experiment(path, dummy_backend, grid=(1, 3)) as experiment:
+        experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+        add_rectangle(experiment)
+        add_rectangle(experiment)  # same name: a second, different structure
+        # REPEAT repeats the most recent structure; "_(1)" marks a duplicate name, "_rep1" a repetition
+        assert experiment.add_structure(StructureType.REPEAT, "ignored") == "rect_(1)_rep1"
+        with pytest.raises(ValueError, match="Too many"):
+            experiment.add_structure(StructureType.REPEAT, "ignored")
+        experiment.build_programs()
+        experiment.print_experiment()
+
+    record = ExperimentStore.open(path).read()
+    assert [(s.name, s.repeat_of) for s in record.structures] == [("rect", ""), ("rect_(1)", ""),
+                                                                  ("rect_(1)_rep1", "rect_(1)")]
+    centers = [s.center_um[:2] for s in record.structures]
+    assert len(set(centers)) == 3
+    # The repeat was written at its own grid cell, not on top of the original
+    repeat_x = record.structure("rect_(1)_rep1").center_um[0]
+    assert any(abs(1000 * e.end[0] - repeat_x) < 10 for e in dummy_backend.world.exposures)
+    assert record.structure("rect_(1)_rep1").status == "printed"

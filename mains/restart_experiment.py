@@ -1,8 +1,10 @@
 """Restart an aborted experiment on the lab PC.
 
-Set ``exp_path`` to the experiment folder (the one containing experiment_dictionary.json,
-structures.json and print_progress.json) and run this script. The experiment parameters are
-read from experiment_dictionary.json; the remaining layers are printed.
+Set ``exp_path`` to the experiment folder (the one containing experiment.h5, or
+experiment_dictionary.json and structures.json in folders written before the experiment file
+existed) and run this script. Parameters and progress are read from the experiment file; an
+old folder is imported into a new experiment file first. The experiment keeps its UUID, and
+every layer that was not printed in an earlier run is printed, also after several aborts.
 """
 from nanofactorysystem.experiment import Experiment
 
