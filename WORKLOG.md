@@ -1301,3 +1301,28 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   - The plot uses a y axis pointing up, and the corner names follow the experiment's `rectangle_*`
     properties, where "top" is the smaller Y. Whether that matches the camera view on the lab PC is not
     verified.
+
+### 2026-09-30 14:06 CEST — [T38] Visualization: laser power and axis formatting
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/utils/visualization.py`:
+    - `ATTENUATOR_PATTERN`; `Movement.attenuator`;
+    - `read_text()` tracks `$AO[0].A=` (N091);
+    - `plot_movements_fast(calibration=...)` colours laser-on lines by power with a colour bar on the
+      second axes (N092);
+    - `_axis_formatter()` uses `ScalarFormatter(useOffset=False)` with scientific notation off for mm
+      (N093); the commented-out calls are removed;
+    - docstrings.
+  - `nanofactorysystem/experiment.py`: structure plots use the attenuator calibration.
+  - `test/test_utils/test_visualization.py`: two tests (power colours with and without calibration; mm axes
+    without offset and scientific notation).
+  - `test/README.md`.
+  - `TODO.md`: T38 moved to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 236 passed, 14 skipped. A first version put the colour bar on both axes,
+  which made `tight_layout()` in the drawing tests warn; it is on the second axes now.
+- **Commits:** `f688a61` feat(visualization): colour movements by laser power, plain axis labels [T38];
+  docs(todo): close T38 [T38]
+- **Open question (not changed):** IFOV programs switch the laser without `GALVO LASEROVERRIDE`; presumably
+  `LINEAR` moves in IFOV mode are exposures and `RAPID` moves are not. The reader still treats all
+  movements of IFOV programs as laser off, as before. Whether IFOV `LINEAR` should count as laser on needs
+  confirmation from the maintainer.

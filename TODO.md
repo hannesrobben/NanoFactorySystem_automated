@@ -138,13 +138,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
         - The camera offset is integrated into `System.zline` (N071); the z-line program uses global variables and is not recompiled every time (N072).
         - `z_line_focal_points.py`: dz split, z recalculation, noise on dz, min_distance, boundary, result dictionary and file-exists check are resolved (N014–N020).
 
-- [ ] T38: Visualization: laser power and axis formatting (from T19) [phase: B]
-      Goal: Movement plots show the laser power and readable axes.
-      Priority: low | Depends on: –
-      Done when:
-        - The laser power is read from the program and shown as colour (N091, N092).
-        - Axis labels are shown without scientific notation (N093).
-
 - [ ] T39: Manual DHM helper: implement reset (from T19) [phase: B]
       Goal: The interactive DHM helper can reset its state.
       Priority: low | Depends on: –
@@ -285,3 +278,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T56: Make structure serialisation complete and reversible — 2026-09-30 — `to_json()` stores only constructor parameters (with `__module__`, reversible encoding of enums/points/calibrations, lost parameters reported), `structure_from_json()` rebuilds structures; all golden-test structures round-trip to identical programs, golden files unchanged. — commits: `1f379ae`
 
 - [x] T60: Experiment plots: corners, QR code and structure plots — 2026-09-30 — `plot_experiment()` draws corners (double corner highlighted, positions labelled), QR code and the UUID and returns the figure; `build_programs(plot_structures=True)` replaces the hard-coded switch. — commits: `f729324`
+
+- [x] T38: Visualization: laser power and axis formatting — 2026-09-30 — Movements carry the attenuator value read from `$AO[0].A=`, laser-on lines are coloured by power (mW with a calibration) with a colour bar, and mm axes have no offset or scientific notation. — commits: `f688a61`
