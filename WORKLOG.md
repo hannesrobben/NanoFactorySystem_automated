@@ -1341,3 +1341,15 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** `python -m pytest`: 238 passed, 14 skipped.
 - **Commits:** `b875fe0` feat(dhm): implement reset of the manual DHM helper [T39]; docs(todo): close T39 [T39]
 - **Note:** the old Zeiss 20x default had two assignments (3100.0, then 100.0); the effective value 100.0 is kept.
+
+### 2026-09-30 14:10 CEST — [T28] Overview images and time estimate (evaluated, blocked)
+- **Status:** blocked (decision needed)
+- **Changes:**
+  - `TODO.md`: T28 moved to Blocked, with proposals for the overview image (mosaic or center capture) and the
+    time estimate (path length / F per layer program plus overhead).
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (no code change).
+- **Commits:** docs(todo): block T28 on decisions [T28]
+- **Notes:**
+  - The actual durations are already stored since T47/T59: session, structure and layer start/end times.
+  - Only the estimate and the overview image are missing.
