@@ -95,6 +95,8 @@ class StructureSpec:
         acceleration ``experiment.accel_a_um`` read from the controller).
     power_mw : float, optional
         Laser power; default: the experiment default power.
+    layer_power : sequence of float or callable, optional
+        Laser power in mW per layer (see Experiment.add_structure, T31).
     axes : str
         Printing axes, ``"ABZ"`` (galvo) or ``"XYZ"`` (stages).
     repeat : int
@@ -113,6 +115,7 @@ class StructureSpec:
     repeat: int = 0
     structure_type: Optional[StructureType] = None
     factory: Optional[Callable[[Experiment], DrawableObject]] = None
+    layer_power: Any = None
 
     @classmethod
     def empty(cls) -> "StructureSpec":
@@ -381,7 +384,7 @@ def run_experiment(spec: ExperimentSpec, *, user: str, resin_edges, path: Option
                 continue
             name = experiment.add_structure(
                 structure.type_for(spec.program_source), structure.name, axes=structure.axes,
-                power=structure.power_mw,
+                power=structure.power_mw, layer_power=structure.layer_power,
                 structure=structure.drawable(spec.program_source, spec.objective, experiment,
                                              voxel_model=voxel_model, default_power_mw=spec.default_power_mw))
             for _ in range(structure.repeat):

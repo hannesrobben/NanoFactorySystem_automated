@@ -34,7 +34,7 @@ def test_drawing_spec_dry_run(test_config, dummy_backend, no_sleep, tmp_path):
                                          velocity=1000, acceleration=500)),
             StructureSpec("rect", Rectangle3D(Point3D(0, 0, -1), 20, 20, 2, hatch_size=2.0, slice_size=1.0,
                                               velocity=1000, acceleration=500), axes="XYZ", power_mw=1.0,
-                          repeat=1),
+                          repeat=1, layer_power=[1.0, 1.2, 1.4]),
         ])
 
     folder = run_experiment(spec, user="Test", resin_edges=RESIN_EDGES, path=tmp_path / "out",
@@ -48,6 +48,7 @@ def test_drawing_spec_dry_run(test_config, dummy_backend, no_sleep, tmp_path):
     assert record.parameters["structure_size_um"] == 500.0  # defaults of the objective
     assert record.system["sys_args"]["controller"]["zMax"] == 24550.0
     assert record.structure("rect").power_mw == 1.0 and not record.captures  # camera off by default
+    assert record.structure("rect_rep1").layer_powers_mw == [1.0, 1.2, 1.4]
 
 
 @pytest.mark.slow

@@ -399,6 +399,7 @@ class ExperimentStore:
             })
             group.attrs["config_json"] = _json(structure.config)
             group.attrs["layer_files_json"] = _json(structure.layer_files)
+            group.attrs["layer_powers_json"] = _json(list(structure.layer_powers_mw))
             for name in ("programs", "progress", "captures"):
                 group.create_group(name)
 
@@ -673,7 +674,8 @@ class ExperimentStore:
             program_file=_attr(group, "program_file"), layer_order=int(_attr(group, "layer_order")),
             dhm_image_count=int(_attr(group, "dhm_image_count")), status=_attr(group, "status"),
             repeat_of=_attr(group, "repeat_of", ""), started=_attr(group, "started", ""),
-            ended=_attr(group, "ended", ""))
+            ended=_attr(group, "ended", ""),
+            layer_powers_mw=json.loads(_attr(group, "layer_powers_json", "[]")))
 
     @staticmethod
     def _read_capture(group: h5py.Group) -> CaptureRecord:

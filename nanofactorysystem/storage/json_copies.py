@@ -118,7 +118,7 @@ def structures_list(record: ExperimentRecord) -> list[dict]:
     One entry per structure with the keys of the file written before the
     store (``name``, ``axes``, ``power``, ``center_x/y/z``, ``structure``,
     ``program_file``, ``layer_files``, ``number of dhm images``) plus
-    ``experiment_uuid``, ``type``, ``corner_position``, ``status`` and
+    ``layer_powers`` (T31, empty without power per layer), ``experiment_uuid``, ``type``, ``corner_position``, ``status`` and
     ``center_um``.
 
     Parameters
@@ -143,6 +143,7 @@ def structures_list(record: ExperimentRecord) -> list[dict]:
             "program_file": s.program_file,
             "layer_files": s.layer_files,
             "number of dhm images": s.dhm_image_count,
+            "layer_powers": s.layer_powers_mw,
             "experiment_uuid": record.uuid,
             "type": s.type,
             "corner_position": s.corner_position,

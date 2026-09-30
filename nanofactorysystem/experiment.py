@@ -1070,7 +1070,8 @@ class Experiment(object):
                       structure: Optional[DrawableObject] = None,
                       corner: Optional[CornerPosition] = None,
                       axes: str = None,
-                      power: float = None):
+                      power: float = None,
+                      layer_power=None):
         """ Add a structure to the experiment.
 
         Parameters
@@ -1089,6 +1090,12 @@ class Experiment(object):
             Printing axes, default ``"ABZ"``.
         power : float, optional
             Laser power in mW, default ``default_power``.
+        layer_power : sequence of float or callable, optional
+            Laser power in mW per layer (T31): one value per layer, or
+            ``layer_power(layer_id) -> float``. Each layer program then sets
+            its own power at its start (``$AO[0].A`` via the attenuator
+            calibration); ``power`` is still set before the structure.
+            Repetitions take it from their original.
 
         Returns
         -------
@@ -1160,6 +1167,7 @@ class Experiment(object):
             structure = original["structure"]
             axes = original["axes"]
             power = original["power"]
+            layer_power = original.get("layer_power")
 
         # Unknown structure type
         else:
@@ -1188,6 +1196,7 @@ class Experiment(object):
             "power": power,
             "corner": corner,
             "repeat_of": repeat_of,
+            "layer_power": layer_power,
         })
 
         # Aware: name may have changed
@@ -1203,10 +1212,13 @@ class Experiment(object):
                           path: Path,
                           n_dhm_img: int = 0,
                           stitching: bool = False,
-                          plot: bool = False):
+                          plot: bool = False,
+                          layer_power=None):
         """ Write the layer programs of one structure and return their paths and the configuration.
 
-        With ``plot``, the movements of the structure program are plotted to
+        With ``layer_power`` (see :meth:`add_structure`) every layer program
+        starts by setting its laser power; the powers are returned in the
+        configuration as ``layer_powers``. With ``plot``, the movements of the structure program are plotted to
         ``plot_<name>.png`` in the structure folder.
         """
         self.log.info(f"Creating layer programs for {name}: {structure}")
@@ -1255,6 +1267,7 @@ class Experiment(object):
             coordinate_system = coordinate_system_stage
         structure_pgm = DrawableAeroBasicProgram(coordinate_system)
         layer_pgm_paths = []
+        layer_powers = []
         # NOTE What to do with tiles
         x_structure_center = structure_center_absolute_mm["X"]
         y_structure_center = structure_center_absolute_mm["Y"]
@@ -1286,6 +1299,10 @@ class Experiment(object):
                 y_value = y_structure_center
 
             layer_pgm.LINEAR(X=x_value, Y=y_value)
+            if layer_power is not None:
+                layer_powers.append(self._layer_power(layer_power, layer_id))
+                layer_pgm.comment(f"Layer power {layer_powers[-1]:g} mW")
+                layer_pgm.POWER(float(self.system.controller.attenuator.ptoa(layer_powers[-1])))
 
             layer_pgm.add_programm(layer)
 
@@ -1296,6 +1313,9 @@ class Experiment(object):
 
             # Add layer program to structure program
             structure_pgm.add_programm(layer_pgm)
+
+        if layer_power is not None and not callable(layer_power) and len(layer_power) != len(layer_pgm_paths):
+            raise ValueError(f"{name}: {len(layer_power)} layer powers for {len(layer_pgm_paths)} layers")
 
         # Store structure program file
         structure_pgm_path = path / f"program_{name}.txt"
@@ -1313,6 +1333,7 @@ class Experiment(object):
             "program_file": str(structure_pgm_path),
             "layer_files": layer_pgm_paths,
             "number of dhm images": n_dhm_img,
+            "layer_powers": layer_powers,
         }
 
         if plot:
@@ -1411,7 +1432,8 @@ class Experiment(object):
                 path=path,
                 n_dhm_img=n_dhm_img,
                 stitching=stitching,
-                plot=plot_structures)
+                plot=plot_structures,
+                layer_power=structure_dict.get("layer_power"))
             self.structure_programs.append(paths)
             grid_types = (StructureType.NORMAL, StructureType.STITCHING, StructureType.IFOV, StructureType.REPEAT)
             grid_index = structure_id - 1 if structure_dict["structure_type"] in grid_types else -1
@@ -1446,11 +1468,21 @@ class Experiment(object):
             config=config["structure"], layer_files=[self._relative(f) for f in config["layer_files"]],
             program_file=self._relative(config["program_file"]),
             layer_order=self._layer_order(), dhm_image_count=config["number of dhm images"],
-            repeat_of=structure_dict.get("repeat_of", "")))
+            repeat_of=structure_dict.get("repeat_of", ""), layer_powers_mw=config.get("layer_powers", [])))
         for file in config["layer_files"]:
             self.store.write_layer_program(name, self._layer_id(file), Path(file).read_text(),
                                            self._relative(file))
         self.store.write_structure_program(name, Path(config["program_file"]).read_text())
+
+    @staticmethod
+    def _layer_power(layer_power, layer_id: int) -> float:
+        """ Laser power in mW of a layer from a list or a function of the layer id. """
+
+        if callable(layer_power):
+            return float(layer_power(layer_id))
+        if layer_id >= len(layer_power):
+            raise ValueError(f"No layer power for layer {layer_id} ({len(layer_power)} values given)")
+        return float(layer_power[layer_id])
 
     @staticmethod
     def _layer_id(file) -> int:

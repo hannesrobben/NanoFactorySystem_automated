@@ -19,7 +19,8 @@ HATCH_KEYS = ("hatch_size", "hatch_distance", "hatch_dist", "hatch_size_opt")
 VELOCITY_KEYS = ("velocity", "scan_speed_um_s", "horizontal_velocity", "F")
 POWER_KEYS = ("power", "power_val")
 
-COLUMNS = ("name", "type", "x_um", "y_um", "slice_um", "hatch_um", "power_mw", "velocity", "velocity_unit",
+COLUMNS = ("name", "type", "x_um", "y_um", "slice_um", "hatch_um", "power_mw", "layer_power_mw", "velocity",
+           "velocity_unit",
            "voxel_width_um", "voxel_height_um", "ifov", "dhm", "camera", "n_layers", "printed_layers", "status")
 
 
@@ -29,6 +30,15 @@ def _first_number(arguments: dict, keys) -> Optional[float]:
         if isinstance(value, (int, float)) and not isinstance(value, bool):
             return float(value)
     return None
+
+
+def _power_range(powers: list[float]) -> Optional[str]:
+    """ ``"<min>-<max>"`` of the layer powers (or the single value), None without power per layer. """
+
+    if not powers:
+        return None
+    low, high = min(powers), max(powers)
+    return f"{low:g}" if low == high else f"{low:g}-{high:g}"
 
 
 def print_parameters(structure: StructureRecord) -> dict[str, Any]:
@@ -112,6 +122,7 @@ def summary(record: ExperimentRecord) -> dict[str, Any]:
             "x_um": structure.center_um[0],
             "y_um": structure.center_um[1],
             **print_parameters(structure),
+            "layer_power_mw": _power_range(structure.layer_powers_mw),
             "ifov": structure.setup == "IFOV_on",
             "dhm": dhm,
             "camera": camera,

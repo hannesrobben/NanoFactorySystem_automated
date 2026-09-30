@@ -665,3 +665,70 @@ def test_repeated_structure_is_printed_at_its_own_place(test_config, dummy_backe
     repeat_x = record.structure("rect_(1)_rep1").center_um[0]
     assert any(abs(1000 * e.end[0] - repeat_x) < 10 for e in dummy_backend.world.exposures)
     assert record.structure("rect_(1)_rep1").status == "printed"
+
+
+def exposure_powers(world, since=0):
+    """ Laser powers (mW, rounded) of the exposures after index ``since``, grouped by z in um. """
+
+    powers = {}
+    for exposure in world.exposures[since:]:
+        powers.setdefault(round(exposure.end[2] * 1000, 3), set()).add(round(exposure.power, 1))
+    return powers
+
+
+def test_power_per_structure(test_config, dummy_backend, no_sleep, tmp_path):
+    # Parameter test prints: every structure prints with its own power (N012)
+    world = dummy_backend.world
+    with make_experiment(tmp_path, dummy_backend, grid=(1, 2)) as experiment:
+        experiment.plane_fit(plane=world.sample.plane())
+        for name, power in (("low", 1.0), ("high", 3.0)):
+            experiment.add_structure(StructureType.NORMAL, name, axes="XYZ", power=power,
+                                     structure=Rectangle3D(Point3D(0, 0, -1), 10, 10, 1, hatch_size=2.0,
+                                                           slice_size=1.0, velocity=1000, acceleration=500))
+        experiment.build_programs()
+        experiment.print_experiment()
+
+    powers = {p for ps in exposure_powers(world).values() for p in ps}
+    assert powers == {1.0, 3.0}
+
+
+def test_power_per_layer(test_config, dummy_backend, no_sleep, tmp_path):
+    world = dummy_backend.world
+    with make_experiment(tmp_path, dummy_backend, grid=(1, 2)) as experiment:
+        experiment.plane_fit(plane=world.sample.plane())
+        experiment.add_structure(StructureType.NORMAL, "rect", axes="XYZ", power=0.7, layer_power=[1.0, 2.0, 3.0, 4.0],
+                                 structure=Rectangle3D(Point3D(0, 0, -1), 10, 10, 3, hatch_size=2.0, slice_size=1.0,
+                                                       velocity=1000, acceleration=500))
+        experiment.add_structure(StructureType.REPEAT, "rect")
+        experiment.build_programs()
+        experiment.print_experiment()
+
+    # Each of the 4 layers of the structure and its repetition prints with its own power
+    by_z = exposure_powers(world)
+    assert sorted(p for ps in by_z.values() for p in ps) == [1.0, 2.0, 3.0, 4.0]
+    assert all(len(ps) == 1 for ps in by_z.values())
+    for power in (1.0, 2.0, 3.0, 4.0):  # in both grid cells (600 um apart)
+        x_um = [e.end[0] * 1000 for e in world.exposures if round(e.power, 1) == power]
+        assert max(x_um) - min(x_um) > 500
+    record = ExperimentStore.open(tmp_path).read()
+    assert record.structure("rect").layer_powers_mw == [1.0, 2.0, 3.0, 4.0]
+    assert record.structure("rect_rep1").layer_powers_mw == [1.0, 2.0, 3.0, 4.0]
+    program = ExperimentStore.open(tmp_path).read_program("rect", 1)
+    assert "Layer power 2 mW" in program and "$AO[0].A=" in program
+    from nanofactorysystem.storage.summary import summary
+    assert summary(record)["structures"][0]["layer_power_mw"] == "1-4"
+    assert json.loads((tmp_path / "structures.json").read_text())[0]["layer_powers"] == [1.0, 2.0, 3.0, 4.0]
+
+
+def test_power_per_layer_as_function_and_wrong_length(test_config, dummy_backend, no_sleep, tmp_path):
+    with make_experiment(tmp_path, dummy_backend, grid=(1, 2)) as experiment:
+        experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+        rectangle = Rectangle3D(Point3D(0, 0, -1), 10, 10, 3, hatch_size=2.0, slice_size=1.0, velocity=1000,
+                                acceleration=500)
+        experiment.add_structure(StructureType.NORMAL, "ramp", axes="XYZ", structure=rectangle,
+                                 layer_power=lambda layer_id: 0.5 * (layer_id + 1))
+        experiment.add_structure(StructureType.NORMAL, "short", axes="XYZ", structure=rectangle,
+                                 layer_power=[1.0, 2.0])
+        with pytest.raises(ValueError, match="layer"):
+            experiment.build_programs()
+    assert ExperimentStore.open(tmp_path).read().structure("ramp").layer_powers_mw == [0.5, 1.0, 1.5, 2.0]

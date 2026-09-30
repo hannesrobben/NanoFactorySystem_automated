@@ -139,6 +139,9 @@ class StructureRecord:
         Name of the repeated structure for ``REPEAT`` structures, else ``""``.
     started, ended : str
         When printing of the structure started and ended (ISO 8601, UTC), or ``""``.
+    layer_powers_mw : list of float
+        Laser power of each layer if the structure sets it per layer (T31),
+        else empty.
     """
 
     index: int
@@ -161,6 +164,7 @@ class StructureRecord:
     repeat_of: str = ""
     started: str = ""
     ended: str = ""
+    layer_powers_mw: list[float] = field(default_factory=list)
 
     @property
     def n_layers(self) -> int:
