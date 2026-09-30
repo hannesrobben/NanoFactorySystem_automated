@@ -138,12 +138,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
         - The camera offset is integrated into `System.zline` (N071); the z-line program uses global variables and is not recompiled every time (N072).
         - `z_line_focal_points.py`: dz split, z recalculation, noise on dz, min_distance, boundary, result dictionary and file-exists check are resolved (N014–N020).
 
-- [ ] T39: Manual DHM helper: implement reset (from T19) [phase: B]
-      Goal: The interactive DHM helper can reset its state.
-      Priority: low | Depends on: –
-      Done when:
-        - `test/manual/dhm/DHMUserBackend.py` implements its reset method (N094).
-
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
 ## Blocked
@@ -280,3 +274,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T60: Experiment plots: corners, QR code and structure plots — 2026-09-30 — `plot_experiment()` draws corners (double corner highlighted, positions labelled), QR code and the UUID and returns the figure; `build_programs(plot_structures=True)` replaces the hard-coded switch. — commits: `f729324`
 
 - [x] T38: Visualization: laser power and axis formatting — 2026-09-30 — Movements carry the attenuator value read from `$AO[0].A=`, laser-on lines are coloured by power (mW with a calibration) with a colour bar, and mm axes have no offset or scientific notation. — commits: `f688a61`
+
+- [x] T39: Manual DHM helper: implement reset — 2026-09-30 — `DHMBackend.reset()` closes the client, restores the start state (motor position, flags, counter) and reconnects; tested on the dummy DHM. — commits: `b875fe0`

@@ -1326,3 +1326,18 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   `LINEAR` moves in IFOV mode are exposures and `RAPID` moves are not. The reader still treats all
   movements of IFOV programs as laser off, as before. Whether IFOV `LINEAR` should count as laser on needs
   confirmation from the maintainer.
+
+### 2026-09-30 14:09 CEST — [T39] Manual DHM helper: implement reset
+- **Status:** done
+- **Changes:**
+  - `test/manual/dhm/DHMUserBackend.py`:
+    - `reset(reconnect=True)` closes the client, restores the start state and reconnects (N094);
+    - the default motor positions moved into `default_motor_pos()`, which the constructor uses too;
+    - earlier values are kept as a comment;
+    - the German module note is translated.
+  - `test/dhm/test_manual_helper.py` (new, 2 tests on the dummy DHM).
+  - `test/README.md`.
+  - `TODO.md`: T39 moved to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 238 passed, 14 skipped.
+- **Commits:** `b875fe0` feat(dhm): implement reset of the manual DHM helper [T39]; docs(todo): close T39 [T39]
+- **Note:** the old Zeiss 20x default had two assignments (3100.0, then 100.0); the effective value 100.0 is kept.
