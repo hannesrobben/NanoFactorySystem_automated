@@ -1270,7 +1270,7 @@ class Experiment(object):
             # Plot structure to image file
             self.log.info(f"Plotting {name}")
             movements = read_file(structure_pgm_path)
-            plot_movements(movements)
+            plot_movements(movements, calibration=PowerCalibration(self.system.controller.attenuator.data))
             plt.savefig(path / f"plot_{name}.png")
             plt.close()
 
