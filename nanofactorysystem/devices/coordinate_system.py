@@ -73,6 +73,31 @@ class Point3D(Point2D):
 
 
 class DropDirection(Enum):
+    """ Orientation of the resin drop on the substrate.
+
+    The drop direction never changes the z coordinates of a structure: a
+    structure point at local height z is written at ``plane(x, y) + z`` for
+    both directions (``CoordinateSystem.convert``). It changes the order of
+    printing and which interface is the substrate surface. Places that depend
+    on it:
+
+    - ``Experiment.print_structure`` (and restart): layers are printed in
+      ascending layer order for UP and in descending order for DOWN.
+    - ``Experiment.plane_fit``: the plane is fitted through the "high"
+      interface points for UP and through the "low" ones for DOWN.
+    - ``tools.detector.Scanner`` / ``tools.layer.Layer``: if two focus ranges
+      are found, DOWN keeps the lowest one (a range above is e.g. the
+      substrate/immersion-oil interface), UP keeps the highest one; the drop
+      direction reaches the tools as ``sys_args["layer"]["dropDirection"]``.
+    - ``QRCode.pixel_program``: the vertical pixel lines are drawn in negative
+      z direction for UP and in positive z direction for DOWN.
+    - ``storage.legacy.read_legacy``: the layer order of old progress files.
+
+    Dip-in lithography (objective immersed in the resin) behaves like UP
+    without an upper end of the resin; it needs a different computation and
+    is planned (future_todo.md F8). There is no ``DIP_IN`` member yet.
+    """
+
     UP = -1
     DOWN = 1
 

@@ -3,6 +3,7 @@
 # <reinhard.caspary@phoenixd.uni-hannover.de>                            #
 # This program is free software under the terms of the MIT license.      #
 ##########################################################################
+import copy
 import datetime
 import json
 import logging
@@ -175,9 +176,10 @@ class Experiment(object):
             self.log = getLogger(logfile=Path(path) / "console.log")
         self.path = Path(path)
         self.substrate_information = substrate_information
+        # Runtime arguments as stored with the experiment; the tools get the drop direction from here
+        self.sys_args = self._with_drop_direction(sys_args, drop_direction)
         log_file = self._log_file()
         self._log_offset = Path(log_file).stat().st_size if log_file and Path(log_file).exists() else 0
-        self.sys_args = sys_args
         self.default_power = float(default_power)
         self.low_speed_um = float(low_speed_um)
         self.high_speed_um = float(high_speed_um)
@@ -234,7 +236,7 @@ class Experiment(object):
 
         # Init system object
         self.log.info("Initialize system object...")
-        self.system = System(user, objective, logger, backend=backend, **sys_args)
+        self.system = System(user, objective, logger, backend=backend, **self.sys_args)
         self.system.log_dir = self.path  # A3200.log belongs to the experiment
 
         # Set default laser power
@@ -315,6 +317,25 @@ class Experiment(object):
             self.store.end_session(reason)
             self._save_exp_dict()
             self._update_substrate_index()
+
+    @staticmethod
+    def _with_drop_direction(sys_args: dict, drop_direction: DropDirection) -> dict:
+        """ Return a copy of ``sys_args`` with ``layer.dropDirection`` set to the drop direction.
+
+        Raises
+        ------
+        ValueError
+            If ``sys_args`` names a different drop direction.
+        """
+
+        sys_args = copy.deepcopy(sys_args)
+        layer = sys_args.setdefault("layer", {})
+        given = str(layer.get("dropDirection", drop_direction.name)).upper()
+        if given != drop_direction.name:
+            raise ValueError(f"sys_args['layer']['dropDirection'] is {given}, but the experiment uses "
+                             f"{drop_direction.name}.")
+        layer["dropDirection"] = drop_direction.name
+        return sys_args
 
     def _open_store(self, stored: bool, legacy: Optional[LegacyExperiment] = None) -> ExperimentStore:
         """ Open or create the experiment file and start a session.

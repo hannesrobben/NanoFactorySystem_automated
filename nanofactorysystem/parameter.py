@@ -18,11 +18,6 @@ from scidatacontainer import load_config
 from .config import sysConfig
 
 
-class Orientation(Enum):
-    UP = auto()
-    DOWN = auto()
-
-
 class Interface(Flag):
     LOW = auto()
     HIGH = auto()

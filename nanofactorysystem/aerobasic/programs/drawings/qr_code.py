@@ -7,7 +7,7 @@ import qrcode
 
 from nanofactorysystem.aerobasic.programs.drawings import DrawableObject, DrawableAeroBasicProgram
 from nanofactorysystem.aerobasic.programs.drawings.lines import ZLines, HatchingDirection, XLines, YLines
-from nanofactorysystem.devices.coordinate_system import CoordinateSystem, Point2D, Point3D
+from nanofactorysystem.devices.coordinate_system import DropDirection, CoordinateSystem, Point2D, Point3D
 
 
 class QrErrorCorrection(Enum):
@@ -103,16 +103,20 @@ class QRCode(DrawableObject):
 
         """
         Special layer. Draw a vertical line for each True pixel. Note: drawing must take place in the
-        same direction (negative z direction in global coordinate system) for all lines to minimise
-        disturbing effects of exposed resin.
+        same direction for all lines to minimise disturbing effects of exposed resin: in negative z
+        direction for a drop facing up, and in positive z direction for a drop facing down, where the
+        layers are printed in reverse order as well (see DropDirection).
         """
 
         program = DrawableAeroBasicProgram(coordinate_system)
 
         # Note: z is relative to substrate surface
-        z_start = self.base_height + self.pixel_height
-        z_end = self.base_height - self.anchor_height
-        lines = [[z_start, z_end]]
+        z_top = self.base_height + self.pixel_height
+        z_bottom = self.base_height - self.anchor_height
+        if coordinate_system.drop_direction == DropDirection.DOWN:
+            lines = [[z_bottom, z_top]]
+        else:
+            lines = [[z_top, z_bottom]]
 
         h, w = self.data.shape
         order = 1

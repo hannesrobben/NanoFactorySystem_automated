@@ -14,12 +14,13 @@ import numpy as np
 from skimage.registration import phase_cross_correlation
 from scidatacontainer import Container
 
-from ..parameter import Parameter, Orientation, Interface, Result, flex_round
+from ..parameter import Parameter, Interface, Result, flex_round
 from ..config import popargs
 from ..runtime import mkdir
 from ..image import functions as image
 from .focus import Focus, focusStatus
 from .detector import Scanner
+from ..devices.coordinate_system import DropDirection
 from .bisect import Locator
 
 
@@ -107,6 +108,9 @@ class Layer(Parameter):
         "beta": 0.7,
         "resolution": 0.5,
         "lateralPitch": 4.0,
+        # Drop direction ("UP" or "DOWN", see DropDirection); decides which focus range is the
+        # resin layer. Experiment sets it; the default keeps the behaviour before T43.
+        "dropDirection": "DOWN",
         }
 
     def __init__(self, system, logger=None, **kwargs):
@@ -116,8 +120,7 @@ class Layer(Parameter):
         # Store system object
         self.system = system
         user = self.system.user["key"]
-        # self["sampleOrientation"] = self.system.sample['sample']["orientation"]
-        
+
         # Initialize parameter class
         args = popargs(kwargs, "layer")
         super().__init__(user, logger, **args)
@@ -204,10 +207,9 @@ class Layer(Parameter):
             if dz is None:
                 dz = self["dzCoarseDefault"]
 
-            # orientation = Orientation[self["sampleOrientation"].upper()]
-            # orientation = Orientation["DOWN"]
-            orientation = Orientation["UP"]
-            scanner = Scanner(z_guess, dz, self.zmin, self.zmax, orientation, interface, self["stretch"], self["overlap"], self["jitter"], self.log)
+            drop_direction = DropDirection[str(self["dropDirection"]).upper()]
+            scanner = Scanner(z_guess, dz, self.zmin, self.zmax, drop_direction, interface, self["stretch"],
+                              self["overlap"], self["jitter"], self.log)
             self.result["coarse"] = self.scan(spiral, scanner, "coarse", path)
             if z_low is not None:
                 z_low, dz_low = scanner.low_edge
