@@ -20,7 +20,7 @@ VELOCITY_KEYS = ("velocity", "scan_speed_um_s", "horizontal_velocity", "F")
 POWER_KEYS = ("power", "power_val")
 
 COLUMNS = ("name", "type", "x_um", "y_um", "slice_um", "hatch_um", "power_mw", "velocity", "velocity_unit",
-           "ifov", "dhm", "camera", "n_layers", "printed_layers", "status")
+           "voxel_width_um", "voxel_height_um", "ifov", "dhm", "camera", "n_layers", "printed_layers", "status")
 
 
 def _first_number(arguments: dict, keys) -> Optional[float]:
@@ -45,21 +45,37 @@ def print_parameters(structure: StructureRecord) -> dict[str, Any]:
     Returns
     -------
     dict
-        ``slice_um``, ``hatch_um``, ``velocity``, ``velocity_unit`` and
-        ``power_mw``. The velocity is given as passed to the structure;
-        ``velocity_unit`` is ``"mm/s"`` for IFOV structures (``IFOV_Lines``
-        and the structures built on it) and ``"um/s"`` otherwise. The power
+        ``slice_um``, ``hatch_um``, ``velocity``, ``velocity_unit``,
+        ``power_mw``, ``voxel_width_um`` and ``voxel_height_um``. Slicer
+        structures (``Model3D_Slicer``) report the slice and hatch size they
+        were sliced with (after voxel compensation, T54) and the voxel size
+        used (None without voxel data). The velocity is given as passed to
+        the structure; ``velocity_unit`` is ``"mm/s"`` for IFOV structures
+        (``IFOV_Lines`` and the structures built on it) and ``"um/s"``
+        otherwise; for ``Model3D_Slicer`` values below 500 are mm/s (its IFOV
+        convention). The power
         is the power the structure itself sets (IFOV structures), else the
         power set for the structure before printing (design decision D5).
     """
 
-    arguments = structure.config.get("__init__", {}) if isinstance(structure.config, dict) else {}
+    config = structure.config if isinstance(structure.config, dict) else {}
+    arguments = config.get("__init__", {})
+    slicing = (config.get("params") or {}).get("slicing") or {}
+    voxel = config.get("voxel") or {}
+    if slicing:  # Model3D_Slicer: own JSON format with the job parameters
+        arguments = {"slice_size": slicing.get("layer_height_um"), "hatch_size": slicing.get("hatch_spacing_um"),
+                     "velocity": config.get("velocity"), "power": config.get("power")}
     own_power = _first_number(arguments, POWER_KEYS)
+    velocity = _first_number(arguments, VELOCITY_KEYS)
     ifov_class = "IFOV" in structure.structure_class.rsplit(".", 1)[-1].upper()
+    if slicing:  # IFOV convention of Model3D_Slicer: 500–25000 in um/s, smaller values in mm/s
+        ifov_class = velocity is not None and velocity < 500
     return {
+        "voxel_width_um": _first_number(voxel, ("width_um",)),
+        "voxel_height_um": _first_number(voxel, ("height_um",)),
         "slice_um": _first_number(arguments, SLICE_KEYS),
         "hatch_um": _first_number(arguments, HATCH_KEYS),
-        "velocity": _first_number(arguments, VELOCITY_KEYS),
+        "velocity": velocity,
         "velocity_unit": "mm/s" if ifov_class else "um/s",
         "power_mw": own_power if own_power is not None else structure.power_mw,
     }

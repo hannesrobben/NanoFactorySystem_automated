@@ -79,6 +79,40 @@ def test_slicer_spec_dry_run(test_config, dummy_backend, no_sleep, tmp_path):
         assert "IFOV ON" in program and "LINEAR A" in program
 
 
+@pytest.mark.slow
+def test_slicer_spec_with_voxel_data_dry_run(test_config, dummy_backend, no_sleep, tmp_path):
+    import matplotlib
+    matplotlib.use("Agg")
+    pytest.importorskip("shapely")
+    from nanofactorysystem.storage.summary import summary
+    from nanofactorysystem.voxel import VoxelDatabase
+
+    database = tmp_path / "voxels.sqlite"
+    with VoxelDatabase(database) as voxels:  # measured at the structure's power and velocity (5 mm/s)
+        voxels.add_measurement("SZ2080", "Zeiss 63x", "IFOV_on", 0.3, 5000, width_um=1.0, height_um=1.5, method="SEM")
+    height_map = np.zeros((20, 20))
+    height_map[5:15, 5:15] = 3.0
+    spec = ExperimentSpec(
+        name="voxel_test", objective="Zeiss 63x", center=CENTER, grid=(1, 1), skip_corner=True,
+        program_source=ProgramSource.SLICER, setup="IFOV_on", voxel_material="SZ2080", voxel_database=database,
+        structures=[StructureSpec("block", height_data=height_map, power_mw=0.3,
+                                  slicer={"velocity": 5, "hatch_size": 0.1, "slice_size": 0.1, "pixel_size": 1.0,
+                                          "unit": "um"})])
+
+    folder = run_experiment(spec, user="Test", resin_edges=RESIN_EDGES, path=tmp_path / "out",
+                            backend=dummy_backend, plane=dummy_backend.world.sample.plane())
+
+    record = check_dry_run(dummy_backend.world, dummy_backend, folder)
+    voxel = record.structure("block").config["voxel"]
+    assert voxel["width_um"] == 1.0 and voxel["height_um"] == 1.5 and voxel["mode"] == "voxel_overlap"
+    assert voxel["model"]["material"] == "SZ2080" and voxel["model"]["setup"] == "IFOV_on"
+    row = summary(record)["structures"][0]
+    # Spacing derived from the voxel (overlap 0.3) instead of the 0.1 um given
+    assert (row["voxel_width_um"], row["voxel_height_um"]) == (1.0, 1.5)
+    assert row["hatch_um"] == pytest.approx(0.7) and row["slice_um"] == pytest.approx(1.05)
+    assert row["power_mw"] == 0.3
+
+
 def test_spec_validation():
     with pytest.raises(ValueError, match="IFOV_on"):
         ExperimentSpec("x", "Zeiss 63x", CENTER, (1, 1), program_source="slicer").resolved()

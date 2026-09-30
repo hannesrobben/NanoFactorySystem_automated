@@ -121,10 +121,15 @@ class StructureSpec:
         return cls("dummy", structure_type=StructureType.DUMMY)
 
     def drawable(self, source: ProgramSource, objective: str,
-                 experiment: Optional[Experiment] = None) -> Optional[DrawableObject]:
+                 experiment: Optional[Experiment] = None, *, voxel_model=None,
+                 default_power_mw: Optional[float] = None) -> Optional[DrawableObject]:
         """ The structure to add to the experiment for the given program source.
 
-        Returns None for an empty grid cell.
+        Returns None for an empty grid cell. For program source SLICER a
+        ``voxel_model`` (see :meth:`ExperimentSpec.voxel_model`) makes the
+        slicing voxel-aware (T54); the slicer then needs the power of the
+        structure (``power_mw``, else ``default_power_mw``) and sets it
+        itself. ``voxel_model`` in ``slicer`` takes precedence.
 
         Raises
         ------
@@ -146,7 +151,11 @@ class StructureSpec:
             if self.height_data is None:
                 raise ValueError(f"Structure {self.name}: program source SLICER needs height data or a mesh.")
             from .aerobasic.programs.drawings.model3d import Model3D_Slicer
-            arguments = {"center": Point3D(0, 0, 0), "objective": objective} | self.slicer
+            arguments = {"center": Point3D(0, 0, 0), "objective": objective}
+            if voxel_model is not None:
+                power = self.power_mw if self.power_mw is not None else default_power_mw
+                arguments |= {"voxel_model": voxel_model, "power": power}
+            arguments |= self.slicer
             return Model3D_Slicer(source=self.height_data, **arguments)
         raise ValueError(f"Unknown program source {source}")
 
@@ -182,6 +191,13 @@ class ExperimentSpec:
         DRAWING or SLICER.
     setup : {"IFOV_off", "IFOV_on"}
         SLICER needs ``"IFOV_on"``.
+    voxel_material : str, optional
+        Resin name in the voxel database. With program source SLICER the
+        structures are sliced with the measured voxel size of this material,
+        objective and setup (T54; spacing per ``slicer["spacing_mode"]``,
+        default ``"voxel_overlap"``). None: no voxel compensation.
+    voxel_database : Path, optional
+        Voxel database; default: ``system.voxelDatabase`` of the configuration.
     """
 
     name: str
@@ -209,6 +225,17 @@ class ExperimentSpec:
     opl_start_um: Optional[float] = None
     tilt_warning_um: float = 1.0
     sys_args: dict = field(default_factory=default_sys_args)
+    voxel_material: Optional[str] = None
+    voxel_database: Optional[Path] = None
+
+    def voxel_model(self):
+        """ The voxel model of the experiment (:class:`~nanofactorysystem.voxel.DatabaseVoxelModel`), or None
+        without ``voxel_material``. """
+
+        if self.voxel_material is None:
+            return None
+        from .voxel import DatabaseVoxelModel
+        return DatabaseVoxelModel(self.voxel_material, self.objective, self.setup, database=self.voxel_database)
 
     def resolved(self) -> "ExperimentSpec":
         """ Return a copy with every None replaced by the default of the objective.
@@ -338,6 +365,7 @@ def run_experiment(spec: ExperimentSpec, *, user: str, resin_edges, path: Option
     def ask(question: str) -> bool:
         return confirm is None or confirm(question)
 
+    voxel_model = spec.voxel_model()
     with Experiment(**arguments) as experiment:
         experiment.plot_experiment(show=show_plot)
         if not ask("Run plane fitting?"):
@@ -354,7 +382,8 @@ def run_experiment(spec: ExperimentSpec, *, user: str, resin_edges, path: Option
             name = experiment.add_structure(
                 structure.type_for(spec.program_source), structure.name, axes=structure.axes,
                 power=structure.power_mw,
-                structure=structure.drawable(spec.program_source, spec.objective, experiment))
+                structure=structure.drawable(spec.program_source, spec.objective, experiment,
+                                             voxel_model=voxel_model, default_power_mw=spec.default_power_mw))
             for _ in range(structure.repeat):
                 experiment.add_structure(StructureType.REPEAT, name)
         experiment.build_programs()
