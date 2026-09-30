@@ -1428,3 +1428,84 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
     with a stand-in for `tools.plane.Plane`.
 - **Behaviour change on hardware:** an experiment centre outside the resin-drop box now fails at construction.
   The dictionaries store the mode name instead of the integer.
+
+### 2026-09-30 18:51 CEST — [T45] Take camera images only on request
+- **Status:** done
+- **Decision (maintainer, 2026-09-30):**
+  - The switch is `Experiment(camera_capture=False)`, an argument of the experiment, not `sys_args["camera"]`.
+  - The existing experiment scripts get `camera_capture=True`, so that they keep their behaviour.
+- **Changes:**
+  - `nanofactorysystem/experiment.py`: argument `camera_capture` with a docstring. `measure()` takes camera
+    images only with it and otherwise returns None as camera container. It is stored in the parameters, and
+    `parameters_from_dictionary()` restores it for the restart.
+  - `nanofactorysystem/storage/schema.py`: parameter `camera_capture`. `summary.py`: comment (files written
+    before T45 always had camera images).
+  - `test/test_experiment.py`: tests for both values (captures, camera calls, stored value, summary, restart)
+    and for the default. `make_experiment` keeps camera images on by default for the tests written before
+    T45.
+  - `test/README.md`, `CLAUDE.md`.
+  - Scripts with `camera_capture=True` added, one line each before `drop_direction=` (57 calls in 57 files):
+    - `mains/Experiments/Big_substrate_20x/grating_ifov_test.py`
+    - `mains/Experiments/DHM_tomography/hollow_rect_first_print_63xobj.py`
+    - `mains/Experiments/Grating_20x/grating_big_stitching.py`
+    - `mains/Experiments/Grating_20x/plane_fitting_20x.py`
+    - `mains/Experiments/Grating_20x/zumLaufBringen_20x.py`
+    - `mains/Experiments/Grating_20x/zumLaufBringen_20x_grating.py`
+    - `mains/Experiments/Grating_63/Angle_test_NO_hatching.py`
+    - `mains/Experiments/Grating_63/Angle_test_with_hatching.py`
+    - `mains/Experiments/Grating_63/FOV_Stitch_test.py`
+    - `mains/Experiments/Grating_63/binary_grating_test1.py`
+    - `mains/Experiments/Grating_63/coordinate_test.py`
+    - `mains/Experiments/Grating_63/grating_test_claude.py`
+    - `mains/Experiments/Grating_63/grid_point_test.py`
+    - `mains/Experiments/Grating_63/parameter_test.py`
+    - `mains/Experiments/Grating_63/parameter_test_hatching_slicing.py`
+    - `mains/Experiments/Grating_63/realignment_grating.py`
+    - `mains/Experiments/Grating_63/test_program_cycle.py`
+    - `mains/Experiments/Grating_63/test_stitching.py`
+    - `mains/Experiments/IFOV_63/ifov_test.py`
+    - `mains/Experiments/Kailas/Quadrants_line_power_gap.py`
+    - `mains/Experiments/Kailas/Rectangle_plane_fitting.py`
+    - `mains/Experiments/Kailas/Voxel_row_on_pad.py`
+    - `mains/Experiments/Kailas/grating_ifov_big.py`
+    - `mains/Experiments/Kailas/ifovGrating_diffPower_500um.py`
+    - `mains/Experiments/Kailas/ifovGrating_diffPower_75um.py`
+    - `mains/Experiments/Kailas/ifovGrating_noPower_differentSize.py`
+    - `mains/Experiments/Kailas/ifovLens_diffSlice_75um.py`
+    - `mains/Experiments/Kailas/lens_surface_test.py`
+    - `mains/Experiments/Kailas/lenses.py`
+    - `mains/Experiments/Kailas/padding_test_0_5mm.py`
+    - `mains/Experiments/Kailas/parametric_4q.py`
+    - `mains/Experiments/Kailas/power_z_pitch_lines.py`
+    - `mains/Experiments/Kailas/voxel_dose_test.py`
+    - `mains/Experiments/Kailas/zoffset_voxel__dose_test.py`
+    - `mains/Experiments/Model_3D_experiment.py`
+    - `mains/Experiments/default_exp_file.py`
+    - `mains/Experiments/dhm/dhm_img_4_SEM.py`
+    - `mains/Experiments/dhm/dhm_paper.py`
+    - `mains/Experiments/dhm/dhm_paper_aligning_DHM_camera.py`
+    - `mains/Experiments/dhm/dhm_paper_power_refractiveIndex.py`
+    - `mains/Experiments/dhm/dhm_paper_voxel_axial.py`
+    - `mains/Experiments/other/dhm_paper_print.py`
+    - `mains/Experiments/other/parameter_testprint.py`
+    - `mains/Experiments/other/parameter_testprint_slicing_hatching.py`
+    - `mains/Experiments/other/qr_code_investigation.py`
+    - `mains/Experiments/other/testprint_dhm.py`
+    - `mains/Experiments/other/testprint_dhm2.py`
+    - `mains/Experiments/other/testprint_dhm3.py`
+    - `mains/Experiments/other/z_line_focal_points.py`
+    - `mains/Experiments/parameter_study/line_test/Power_speed_line_test.py`
+    - `mains/Experiments/parameter_study/parameter_testprint_power_speed.py`
+    - `mains/Experiments/parameter_study/parameter_testprint_power_speed_test4orientation.py`
+    - `mains/Experiments/parameter_study/parameter_testprint_slicing_hatching.py`
+    - `mains/Experiments/refractive_index/refractive_index_vel_power.py`
+    - `mains/Experiments/stacked/stacked_lenses_test.py`
+    - `mains/dhm_paper.py`
+    - `mains/dhm_paper_pillowProblem_63.py`
+    `mains/restart_experiment.py` passes the stored value (`**parameters`) and needs no change.
+  - `TODO.md`: T45 moved from Blocked (with the decision) to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 258 passed, 14 skipped.
+- **Commits:** `0315df1` feat(experiment): take camera images only on request [T45];
+  `314a30b` chore(mains): keep camera images in the existing experiment scripts [T45]; docs(todo): close T45 [T45]
+- **Behaviour change:** new scripts take no camera images unless they pass `camera_capture=True`. The
+  existing scripts are unchanged.

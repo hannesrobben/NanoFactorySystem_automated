@@ -162,16 +162,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
         - Dummy test: after a layer with galvo offsets, the capture is taken at the defined Z and A = B = 0 (or the decided values).
       Notes: Today `measure()` sends only `LINEAR X Y`; in the T41 dry run captures were taken at A = 30 µm, B = 225 µm and the Z of the last layer.
       Blocked by: Decision. Proposal: before every capture move to Z = plane height at the capture position plus an objective-specific offset `captureZOffset` (new key of the objective section, default 0 µm), and set A = B = 0. Asked 2026-09-29.
-- [ ] T45: Take camera images only on request [phase: 1]
-      Goal: `Experiment.measure()` takes a camera image only when this is explicitly enabled.
-      Priority: medium | Depends on: –
-      Done when:
-        - A parameter `camera_capture: bool = False` exists (Decision: `sys_args["camera"]` or `Experiment` argument; document the choice) and is stored in the experiment dictionary.
-        - `measure()` skips `System.getimage()` when it is False and returns `None` for the camera container; `restart_experiment()` uses the stored value.
-        - Experiment scripts that need camera images set it to True explicitly (listed in WORKLOG.md).
-        - Dummy tests for both values.
-      Notes: Video recording in a thread is future_todo.md F3.
-      Blocked by: Decision. Proposal: an `Experiment` keyword argument `camera_capture: bool = False` (an experiment choice, not a camera device setting, so not in `sys_args["camera"]`), stored in the experiment metadata. Question: which experiment scripts in `mains/Experiments/` need camera images (they get `camera_capture=True`)? Asked 2026-09-29.
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
@@ -256,3 +246,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T43: Make the drop direction consistent everywhere — 2026-09-30 — `Orientation` merged into `DropDirection`: the scanner keeps the lowest focus range for DOWN and the highest for UP (maintainer's description), `Experiment` passes it via `sys_args['layer']['dropDirection']`, QR pixel lines follow it; z coordinates never depend on it (decision), only the order; docstring lists all places. — commits: `97e2345`
 
 - [x] T44: Restructure how plane fitting is run — 2026-09-30 — `PlaneFitMode` (GRID/CORNERS/new BORDER, old integers accepted), `plane_fitting.sample_points/measure_plane` for plane fits outside `Experiment`, center validated against the resin edges, tilt warning with `tilt_warning_um`; the +1 of mode 0 is correct. — commits: `c619b7e`
+
+- [x] T45: Take camera images only on request — 2026-09-30 — `Experiment(camera_capture=False)` (maintainer decision: Experiment argument); `measure()` skips the camera and returns None without it; stored, shown in the summary and used on restart; the 57 existing script calls pass True. — commits: `0315df1`, `314a30b`
