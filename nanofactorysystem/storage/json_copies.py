@@ -20,6 +20,8 @@ from .records import ExperimentRecord
 
 DICTIONARY_NAME = "experiment_dictionary.json"
 STRUCTURES_NAME = "structures.json"
+PROGRESS_NAME = "print_progress.json"
+PROGRESS_SCHEMA = "nanofactory.print_progress/2"
 
 
 def _plain(value):
@@ -150,10 +152,69 @@ def structures_list(record: ExperimentRecord) -> list[dict]:
     return entries
 
 
+def print_progress(record: ExperimentRecord) -> dict:
+    """ Return the content of ``print_progress.json`` (schema ``nanofactory.print_progress/2``).
+
+    Schema::
+
+        {
+          "schema": "nanofactory.print_progress/2",
+          "experiment_uuid": str,
+          "status": str,                      # experiment status
+          "current_structure": str or null,   # structure with status "printing"
+          "structures": [                     # in print order
+            {
+              "name": str, "status": "pending" | "printing" | "printed" | "failed",
+              "n_layers": int,                # layers of the structure
+              "printed_layers": int,          # layers printed successfully (a count, in all sessions)
+              "failed_layers": int,           # layers whose program failed
+              "started": str, "ended": str,   # ISO 8601 UTC, "" if not yet
+              "layers": [                     # one entry per printed or failed layer, in print order
+                {"layer_id": int, "status": "ok" | "failed", "started": str, "ended": str,
+                 "session": str, "error": str}
+              ]
+            }
+          ]
+        }
+
+    Parameters
+    ----------
+    record : ExperimentRecord
+
+    Returns
+    -------
+    dict
+    """
+
+    structures = []
+    for s in record.structures:
+        events = record.progress.get(s.name, [])
+        structures.append({
+            "name": s.name, "status": s.status, "n_layers": s.n_layers,
+            "printed_layers": sum(1 for e in events if e.get("status") == "ok"),
+            "failed_layers": sum(1 for e in events if e.get("status") == "failed"),
+            "started": s.started, "ended": s.ended,
+            "layers": [{key: e.get(key, "") for key in ("layer_id", "status", "started", "ended", "session", "error")}
+                       for e in events],
+        })
+    current = next((s.name for s in record.structures if s.status == "printing"), None)
+    return _plain({"schema": PROGRESS_SCHEMA, "experiment_uuid": record.uuid, "status": record.status,
+                   "current_structure": current, "structures": structures})
+
+
+def export_progress(record: ExperimentRecord, folder: Path) -> None:
+    """ Write ``print_progress.json`` if the experiment has structures. """
+
+    if record.structures:
+        write_json(Path(folder) / PROGRESS_NAME, print_progress(record))
+
+
 def export_json(record: ExperimentRecord, folder: Path) -> None:
-    """ Write ``experiment_dictionary.json`` and, if structures exist, ``structures.json``. """
+    """ Write ``experiment_dictionary.json`` and, if structures exist, ``structures.json`` and
+    ``print_progress.json``. """
 
     folder = Path(folder)
     write_json(folder / DICTIONARY_NAME, experiment_dictionary(record, folder))
     if record.structures:
         write_json(folder / STRUCTURES_NAME, structures_list(record))
+        export_progress(record, folder)

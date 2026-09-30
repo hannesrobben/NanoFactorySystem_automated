@@ -13,7 +13,7 @@ from nanofactorysystem.storage import ExperimentStore
 
 
 def make_experiment(path, backend, *, dhm_usage=False, skip_corner=True, substrate=None, setup="IFOV_off",
-                    grid=(1, 1), **kwargs):
+                    grid=(1, 1), drop_direction=DropDirection.UP, **kwargs):
     """ Small 20x experiment with one grid cell, as in the experiment template.
 
     path=None uses the default location of a substrate (pass substrate_label and data_root).
@@ -32,7 +32,7 @@ def make_experiment(path, backend, *, dhm_usage=False, skip_corner=True, substra
         default_power=0.7, low_speed_um=1000, high_speed_um=5000,
         resin_corner_tr=Point2D(5720, 27190), resin_corner_bl=Point2D(-3333, 17212),
         structure_size=500, margin=200, padding=100, absolute_grid_center=Point2D(1310, 19500),
-        grid=grid, n_mid_points=0, drop_direction=DropDirection.UP,
+        grid=grid, n_mid_points=0, drop_direction=drop_direction,
         corner_z=-2, corner_width=50, corner_length=300, corner_height=7, corner_hatch=0.5, corner_slice=0.75,
         fov_dim=(500, 500), skip_corner=skip_corner, setup=setup, backend=backend,
         substrate_information=substrate, substrate=kwargs.pop("substrate_label", None), **kwargs)
@@ -75,8 +75,13 @@ def printed_layers(path, name="rect"):
     return [e["layer_id"] for e in ExperimentStore.open(path).read().progress[name] if e["status"] == "ok"]
 
 
-def progress(experiment):
-    return json.loads((experiment.path / "print_progress.json").read_text())
+def progress(experiment, name=None):
+    """ print_progress.json of the experiment, or the entry of one structure. """
+
+    data = json.loads((experiment.path / "print_progress.json").read_text())
+    if name is None:
+        return data
+    return next(s for s in data["structures"] if s["name"] == name)
 
 
 def test_print_experiment_runs_all_layers(experiment, dummy_backend):
@@ -88,9 +93,8 @@ def test_print_experiment_runs_all_layers(experiment, dummy_backend):
     runs = dummy_backend.calllog.filter(device="program")
     layers = experiment.structure_configs[0]["layer_files"]
     assert len(runs) == len(layers) > 1
-    data = progress(experiment)
-    assert data["error log"] == []
-    assert [s["name"] for s in data["finished_structures"]] == ["rect"]
+    rect = progress(experiment, "rect")
+    assert (rect["status"], rect["printed_layers"], rect["failed_layers"]) == ("printed", len(layers), 0)
 
 
 def test_failed_layer_is_logged_and_printing_continues(experiment, dummy_backend):
@@ -100,14 +104,14 @@ def test_failed_layer_is_logged_and_printing_continues(experiment, dummy_backend
 
     experiment.print_experiment()
 
-    data = progress(experiment)
-    assert len(data["error log"]) == 1
-    assert "42" in data["error log"][0]["error"]
+    rect = progress(experiment, "rect")
+    failed = [layer for layer in rect["layers"] if layer["status"] == "failed"]
+    assert len(failed) == 1 and "42" in failed[0]["error"]
     # The failed task was stopped and all layers were attempted
     assert "PROGRAM 1 STOP" in dummy_backend.calllog.commands()
     layers = experiment.structure_configs[0]["layer_files"]
     assert len(dummy_backend.calllog.filter(device="program")) == len(layers)
-    assert [s["name"] for s in data["finished_structures"]] == ["rect"]
+    assert (rect["status"], rect["printed_layers"], rect["failed_layers"]) == ("failed", len(layers) - 1, 1)
 
 
 def test_experiment_dictionary(experiment):
@@ -121,8 +125,35 @@ def test_experiment_dictionary(experiment):
 def test_structure_without_layers(experiment):
     experiment.print_structure([], x=1310.0, y=19500.0, name="empty", power=0.7)
 
-    data = progress(experiment)
-    assert data["finished_structures"][-1] == {"name": "empty", "finished layer": None}
+    empty = progress(experiment, "empty")
+    assert (empty["status"], empty["printed_layers"], empty["layers"]) == ("printed", 0, [])
+
+
+@pytest.mark.parametrize("drop_direction", [DropDirection.UP, DropDirection.DOWN])
+def test_print_progress_counts_layers(drop_direction, test_config, dummy_backend, no_sleep, tmp_path):
+    path = tmp_path / "experiment"
+    path.mkdir()
+    with pytest.raises(RuntimeError, match="abort"):
+        with make_experiment(path, dummy_backend, grid=(1, 2), drop_direction=drop_direction) as experiment:
+            experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+            add_rectangle(experiment, "done")
+            add_rectangle(experiment, "aborted")
+            experiment.build_programs()
+            n = len(experiment.structure_configs[0]["layer_files"])
+            abort_after(experiment, n + 2)  # the first structure completely, two layers of the second
+            experiment.print_experiment()
+
+    data = json.loads((path / "print_progress.json").read_text())
+    assert data["schema"] == "nanofactory.print_progress/2" and data["current_structure"] == "aborted"
+    done, aborted = data["structures"]
+    assert (done["status"], done["printed_layers"], done["n_layers"]) == ("printed", n, n)
+    assert (aborted["status"], aborted["printed_layers"]) == ("printing", 2)
+    # Layers in print order: ascending for drop direction UP, descending for DOWN
+    ids = [layer["layer_id"] for layer in done["layers"]]
+    assert ids == sorted(ids, reverse=drop_direction == DropDirection.DOWN)
+    assert [layer["layer_id"] for layer in aborted["layers"]] == ids[:2]
+    assert done["started"] and done["ended"] and aborted["started"] and not aborted["ended"]
+    assert all(layer["started"] and layer["ended"] for layer in done["layers"])
 
 
 def test_opl_scan_uses_dhm_motor_scan(test_config, dummy_backend, no_sleep, tmp_path):
@@ -433,7 +464,7 @@ def test_restart_from_stored_dictionary(test_config, dummy_backend, no_sleep, tm
     module.restart(path, backend=dummy_backend)
 
     assert len(dummy_backend.calllog.filter(device="program")) == len(layers) - 2
-    assert [s["name"] for s in progress(experiment)["finished_structures"]] == ["rect"]
+    assert progress(experiment, "rect")["status"] == "printed"
     stored = json.loads((path / "structures.json").read_text())
     assert not any(Path(f).is_absolute() for s in stored for f in s["layer_files"] + [s["program_file"]])
     # The restart continued the same experiment file and kept its UUID
@@ -494,6 +525,10 @@ def test_old_json_folder_is_imported_on_restart(test_config, dummy_backend, no_s
     # Make it look like a folder written before the experiment file: no experiment.h5, absolute paths of the
     # lab PC in structures.json, and print_progress.json as the only progress record
     (path / "experiment.h5").unlink()
+    ids = sorted(int(str(f).split(".")[-2]) for f in layers)
+    (path / "print_progress.json").write_text(json.dumps({
+        "current_structure": {"name": "rect", "finished layer": ids[1], "order": 1},
+        "finished_structures": [], "error log": []}))
     structures = json.loads((path / "structures.json").read_text())
     for s in structures:
         s["layer_files"] = [f"C:/Users/Nanofactory/old/experiment/{f}" for f in s["layer_files"]]

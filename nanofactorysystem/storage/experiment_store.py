@@ -428,10 +428,19 @@ class ExperimentStore:
             write_job(group.create_group("slicer"), job, time_estimate)
 
     def set_structure_status(self, structure: str, status: str) -> None:
-        """ Set the status of a structure (``pending``/``printing``/``printed``/``failed``). """
+        """ Set the status of a structure (``pending``/``printing``/``printed``/``failed``).
+
+        ``printing`` records the start time (the first time only, so that a
+        restart keeps it), ``printed`` and ``failed`` the end time.
+        """
 
         with self._write() as f:
-            f[f"structures/{structure}"].attrs["status"] = status
+            group = f[f"structures/{structure}"]
+            group.attrs["status"] = status
+            if status == "printing" and not _attr(group, "started"):
+                group.attrs["started"] = utc_timestamp()
+            elif status in ("printed", "failed"):
+                group.attrs["ended"] = utc_timestamp()
 
     def update_progress(self, structure: str, layer_id: Optional[int], status: str, *,
                         started: Optional[str] = None, error: Optional[str] = None) -> None:
@@ -575,8 +584,14 @@ class ExperimentStore:
         with h5py.File(self.path, "r") as f:
             return f"structures/{name}" in f
 
-    def read(self) -> ExperimentRecord:
+    def read(self, include_captures: bool = True) -> ExperimentRecord:
         """ Reconstruct all experiment metadata from the file (without image data).
+
+        Parameters
+        ----------
+        include_captures : bool
+            Read the capture metadata as well. Their number grows with every
+            layer; the JSON copies and the summary do not need them.
 
         Returns
         -------
@@ -620,8 +635,9 @@ class ExperimentStore:
             for name, group in f.get("structures", {}).items():
                 record.structures.append(self._read_structure(group))
                 record.progress[name] = [_get_json_attrs(g) for _, g in sorted(group["progress"].items())]
-                for _, capture in sorted(group["captures"].items()):
-                    record.captures.append(self._read_capture(capture))
+                if include_captures:
+                    for _, capture in sorted(group["captures"].items()):
+                        record.captures.append(self._read_capture(capture))
             record.structures.sort(key=lambda s: s.index)
             record.captures.sort(key=lambda c: c.capture_id)
         return record
@@ -656,7 +672,8 @@ class ExperimentStore:
             layer_files=json.loads(_attr(group, "layer_files_json")),
             program_file=_attr(group, "program_file"), layer_order=int(_attr(group, "layer_order")),
             dhm_image_count=int(_attr(group, "dhm_image_count")), status=_attr(group, "status"),
-            repeat_of=_attr(group, "repeat_of", ""))
+            repeat_of=_attr(group, "repeat_of", ""), started=_attr(group, "started", ""),
+            ended=_attr(group, "ended", ""))
 
     @staticmethod
     def _read_capture(group: h5py.Group) -> CaptureRecord:

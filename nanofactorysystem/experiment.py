@@ -34,7 +34,7 @@ from nanofactorysystem.devices.power_calibration import PowerCalibration, power_
 from nanofactorysystem.storage import (CaptureRecord, CornerRecord, ExperimentRecord, ExperimentStore,
                                        LayoutRecord, PlaneFitRecord, StructureRecord, export_json,
                                        software_info, utc_timestamp, z_function_to_json)
-from nanofactorysystem.storage.json_copies import structures_list, write_json
+from nanofactorysystem.storage.json_copies import export_progress, structures_list, write_json
 from nanofactorysystem.storage.legacy import LegacyExperiment, is_legacy_folder, read_legacy
 from nanofactorysystem.storage.summary import SUMMARY_NAME, format_table, summary
 from nanofactorysystem.storage.substrate_store import (SubstrateRecord, SubstrateStore, check_not_synced,
@@ -425,7 +425,7 @@ class Experiment(object):
     def _write_summary(self) -> dict:
         """ Write the experiment summary into the file and as ``experiment_summary.json``; return it. """
 
-        data = summary(self.store.read())
+        data = summary(self.store.read(include_captures=False))
         self.store.write_summary(data)
         write_json(self.path / SUMMARY_NAME, data)
         return data
@@ -438,7 +438,7 @@ class Experiment(object):
     def _save_exp_dict(self):
         """ Write the JSON copies (experiment dictionary, structures) from the experiment file. """
 
-        export_json(self.store.read(), self.path)
+        export_json(self.store.read(include_captures=False), self.path)
 
     def _register_experiment(self) -> None:
         """ Enter the experiment into the index of its substrate (not again on a restart). """
@@ -1424,11 +1424,10 @@ class Experiment(object):
         order = self._layer_order()
 
         # Write all layers of the structure
-        layer_id = layer_count = None  # stay None if the structure has no layers
         failed = False
         t1 = time.time()
-        for layer_count in range(len(pgm_files_list))[::order]:
-            layer_pgm_path = pgm_files_list[layer_count]
+        for index in range(len(pgm_files_list))[::order]:
+            layer_pgm_path = pgm_files_list[index]
             layer_id = self._layer_id(layer_pgm_path)
             started = utc_timestamp()
             # Details about the program: if a program exceeds a certain size, consider splitting it
@@ -1439,23 +1438,18 @@ class Experiment(object):
                 self.store.update_progress(name, layer_id, "ok", started=started)
                 self.measure(structure_center_absolute_mm, structure=name, phase="layer", layer_id=layer_id,
                              dhm_image_count=dhm_image_count)
-                self.update_print_progress(name, layer_id=layer_id, layer_count=layer_count, order=order,
-                                           drop_direction=self.drop_direction)
             except AerotechError as e:
                 self.log.error(f"Program failed for {name}: {e}")
                 failed = True
                 self.store.update_progress(name, layer_id, "failed", started=started, error=str(e))
                 self._stop_failed_task(task_id=1)
-                self.update_print_progress(name, layer_id=layer_id, layer_count=layer_count, order=order, error=e,
-                                           drop_direction=self.drop_direction, error_log=True)
+            export_progress(self.store.read(include_captures=False), self.path)
         t2 = time.time()
         self.log.info(f"Making {name} took {t2 - t1:.2f}s")
 
         # Images after structure writing
         self.measure(structure_center_absolute_mm, structure=name, phase="after",
                      dhm_image_count=dhm_image_count + 10)
-        self.update_print_progress(name, layer_id=layer_id, layer_count=layer_count, order=order,
-                                   drop_direction=self.drop_direction, finished=True)
         self.store.set_structure_status(name, "failed" if failed else "printed")
         self._save_exp_dict()
         self._write_summary()
@@ -1484,49 +1478,6 @@ class Experiment(object):
         self.store.set_status(schema.STATUS_FINISHED)
         self._save_exp_dict()
         self.log.info("Experiment summary:\n" + format_table(self._write_summary()))
-
-    def update_print_progress(self,
-                              name: str,
-                              layer_id: int,
-                              layer_count: int = None,
-                              order: int = None,
-                              error=None,
-                              drop_direction=None,
-                              finished: bool = False,
-                              error_log: bool = False):
-        save_path = self.path / "print_progress.json"
-
-        if save_path.exists():
-            data = json.loads(save_path.read_text())
-        else:
-            data = {
-                "current_structure": {},
-                "finished_structures": [],
-                "error log": []
-            }
-        if error is not None:
-            e = error
-            print(e)
-        if not finished:
-            data["current_structure"] = {"name": name,
-                                         "finished layer": layer_id,
-                                         "layer count (n printed layers)": layer_count,
-                                         "order": order,
-                                         "error": str(error),
-                                         "drop direction": drop_direction.to_text() if drop_direction is not None else "No information",
-                                         "information": "order -1 -> Drop direction negative.\norder +1 -> Drop direction positive.\nlayer count varies, because if a print is aborted and restarted the layer count give the amount of printed layers in that print instance."
-                                         }
-            if error_log:
-                data["error log"].append(data["current_structure"])
-        else:
-            # Without any printed layer there is no current structure yet; record at least its name
-            completed_structure = data["current_structure"] or {"name": name, "finished layer": layer_id}
-            data["finished_structures"].append(completed_structure)
-            if error_log:
-                data["error log"].append(data["current_structure"])
-            data["current_structure"] = {}
-
-        save_path.write_text(json.dumps(data, indent=4))
 
     def restart_experiment(self):
         """ Print what an aborted run of this experiment left over.

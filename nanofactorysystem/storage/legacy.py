@@ -33,7 +33,8 @@ class LegacyExperiment:
         files exist there.
     attempted : dict
         Structure name → layer ids that were printed (or failed) according to
-        ``print_progress.json``.
+        ``print_progress.json`` (the old format, or schema
+        ``nanofactory.print_progress/2``).
     finished : set of str
         Structures that were completed.
     """
@@ -133,6 +134,13 @@ def read_legacy(folder: Path, layer_order: int, setup: str) -> LegacyExperiment:
     progress_file = folder / "print_progress.json"
     if progress_file.is_file():
         progress = json.loads(progress_file.read_text())
+        if str(progress.get("schema", "")).startswith("nanofactory.print_progress/"):
+            # Newer copy exported from an experiment file (e.g. when only the JSON copies are left)
+            for entry in progress["structures"]:
+                legacy.attempted[entry["name"]] = {layer["layer_id"] for layer in entry["layers"]}
+                if entry["status"] in ("printed", "failed"):
+                    legacy.finished.add(entry["name"])
+            return legacy
         by_name = {s.name: s for s in structures}
         for done in progress.get("finished_structures", []):
             legacy.finished.add(done["name"])

@@ -136,6 +136,8 @@ class StructureRecord:
         ``"pending"``, ``"printing"``, ``"printed"`` or ``"failed"``.
     repeat_of : str
         Name of the repeated structure for ``REPEAT`` structures, else ``""``.
+    started, ended : str
+        When printing of the structure started and ended (ISO 8601, UTC), or ``""``.
     """
 
     index: int
@@ -156,6 +158,8 @@ class StructureRecord:
     dhm_image_count: int
     status: str = "pending"
     repeat_of: str = ""
+    started: str = ""
+    ended: str = ""
 
     @property
     def n_layers(self) -> int:

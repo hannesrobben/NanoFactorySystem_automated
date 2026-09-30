@@ -94,7 +94,9 @@ def test_structures_programs_and_progress_round_trip(store):
     store.set_structure_status("rect", "failed")
 
     data = store.read()
-    assert data.structure("rect") == structure().__class__(**{**vars(structure()), "status": "failed"})
+    stored = data.structure("rect")
+    assert stored.ended.endswith("Z") and not stored.started  # "failed" records the end time
+    assert stored == structure().__class__(**{**vars(structure()), "status": "failed", "ended": stored.ended})
     assert store.read_program("rect", 0) == "LINEAR X1\n"
     assert [(e["layer_id"], e["status"], e["error"]) for e in data.progress["rect"]] == [
         (0, "ok", ""), (1, "failed", "task error 42")]
