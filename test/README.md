@@ -84,6 +84,7 @@ level, so the exact command strings are checked.
 | `devices/test_attenuator.py` | Power ↔ attenuator conversion | Wrong laser power | – (plus 1 hardware test) |
 | `devices/test_camera.py` | Exposure optimisation, image container | Unusable camera images | – (plus 1 hardware test) |
 | `dhm/test_dhm.py` | DHM client: objective selection, shutter, motor, hologram | DHM communication errors | – (plus 1 hardware test) |
+| `dhm/test_manual_helper.py` | `reset()` of the interactive DHM helper `test/manual/dhm/DHMUserBackend.py`, run on the dummy DHM | A helper that keeps an old connection or old state after a reset | – |
 | `test_femtika/test_device_no_laser.py` | `Aerotech3200` status, positions, tasks, homing on the simulated controller | Parsing errors in the status answers of the controller | – (the same tests also run as hardware tests) |
 | `test_experiment.py` | `Experiment`: printing all layers, a failed layer (logged, printing continues), empty structures, OPL scan, substrate information, experiment dictionary, restart (same experiment file and UUID), restart after two aborts, import of an old JSON-only folder on restart, repeated structures (names, own grid cell), restart of a moved experiment folder (relative paths), capture records in the experiment file (commanded and actual position per capture, several positions), an exception during printing, refusing a folder that already holds an experiment, command and console log stored per experiment and session (also after an abort), two experiments on one substrate in the default location (labels, folders, index), the substrate index after a restart, substrate information in the experiment file, the summary after building and printing, the experiment plot (corners, double corner, QR code, UUID) and structure plots on request, `print_progress.json` counts and times for drop direction UP and DOWN after a complete and an aborted structure | A single failed layer aborting a whole print; wrong metadata for restarts; captures that cannot be traced to a stage position; an unreadable file after a crash; overwriting an earlier experiment; a command log overwritten by the next run | – |
 | `test_system.py` | `System` data container, homing | Missing metadata in stored experiments | – (plus 1 hardware test) |
@@ -112,7 +113,7 @@ These are not collected by pytest. Run them directly on the lab PC when needed.
 |---|---|---|
 | `devices/_test_dhm.py`, `devices/_test_dhm_objective.py`, `devices/test_dhm_objective.py` | DHM images and objective configuration checks | DHM, `offaxisholo` |
 | `devices/live_tilt.py`, `devices/live_tilt_cv.py` | Live view for aligning the sample tilt | DHM, `offaxisholo`, a person |
-| `dhm/DHMUserBackend.py` | Interactive DHM helper | DHM |
+| `dhm/DHMUserBackend.py` | Interactive DHM helper (its `reset()` is tested in `dhm/test_manual_helper.py`) | DHM |
 | `femtika/test_device_WITH_laser.py` | Laser override and IFOV checks; watch whether the laser is visible | A3200 and laser, a person |
 | `tools/test_focus.py`, `test_63x_focus.py`, `test_layer.py`, `test_plane.py`, `test_grid.py` | Focus, layer, plane and grid measurements on a real sample (they expose the laser) | all devices, a sample |
 | `tools/test_stitch.py`, `tools/eval_grid.py` | Evaluation of stored measurements | data files (`focus-2/…`, not in the repository) |
