@@ -130,16 +130,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
         - The plane angle edge case (-180 vs 180) is handled (N090).
         - DHM: capture time analysed; motor scan loop with limit checks and an own exception (N075, N076).
         - `DrawableObject._init_args` stores "data" instead of the hotfix (N046).
-- [ ] T51: New template for experiment scripts [phase: 3]
-      Goal: One parameterised experiment script replaces the copied scripts; it takes its programs either from stored AeroBasic programs or from the slicer.
-      Priority: high | Depends on: T43, T44, T45, T47
-      Done when:
-        - The experiment is described by one parameter object (e.g. an `ExperimentSpec` dataclass: label, center, grid, structure size, objective, setup, drop direction, plane-fit mode, DHM usage, camera capture, power and speeds, program source) instead of values edited in the script (N001, N006–N008, N013); hardcoded values such as the DHM-paper value are passed or determined (N021).
-        - Program source is an explicit enum: stored hand-written AeroBasic programs, or the slicer with height data (`aerobasic/slicer/pipeline.slice_geometry`); the enum can be extended later (phase data, F2); the source is stored in the metadata.
-        - Dummy dry runs pass for both program sources.
-        - `mains/Experiments/`: scripts the maintainer still uses are migrated (Decision: list from the maintainer); the others are moved to `mains/Experiments/historical/` or listed as historical in a README; German text in migrated scripts is translated.
-      Notes: Replaces T26.
-      Status 2026-09-30: `ExperimentSpec`, `ProgramSource` (DRAWING = the drawing classes, SLICER = height data via `Model3D_Slicer`), `run_experiment()` and `mains/Experiments/experiment_template.py` are done and dry-run for both sources (commits `6462705`, `acb2fe2`). Open: migrating the scripts in `mains/Experiments/` (Decision: which scripts are still used; proposal: none are migrated automatically, the maintainer names the ones to port to `ExperimentSpec`, all others move to `mains/Experiments/historical/`). Also to confirm: "stored hand-written AeroBasic programs" = the drawing classes (DRAWING), not `.pgm` files from disk.
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
 - [ ] T28: Overview images and time estimate (from T19) [phase: B]
@@ -239,3 +229,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T58: Define the capture position of `measure()` — 2026-09-30 — Before every capture the galvo is set to A = B = 0, Z is not moved (maintainer decision); the commanded position (X, Y, Z=None, A=0, B=0) is stored; golden command logs re-recorded (one added galvo command per capture). — commits: `fc9c425`
 
 - [x] T53: Voxel database (SQLite) — 2026-09-30 — Design approved; `nanofactorysystem.voxel.VoxelDatabase` (tables material/voxel_measurement, PRAGMA user_version with migrations, CSV import/export, `voxel_size()` with exact hit, 2-D (ln P, ln v) interpolation inside the hull, dose fallback, no extrapolation); path `system.voxelDatabase`, seed CSV versioned. — commits: `b45a7d2`, `2de4367`, `9c52f15`
+
+- [x] T51: New template for experiment scripts — 2026-09-30 — `ExperimentSpec`/`StructureSpec` (structure, slicer height data, or a factory of the running experiment; empty cells), `ProgramSource` (DRAWING/SLICER, stored) and `run_experiment()` with `mains/Experiments/experiment_template.py`; the 11 scripts named by the maintainer are ported (dry-run tested), all others moved to `mains/Experiments/historical/`. — commits: `acb2fe2`, `6462705`, `854bc8c`, `6d9afc1`, `905d1c2`

@@ -1646,3 +1646,46 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Behaviour change on hardware:**
   - The reported plane azimuth is rotated by 180° compared with before; it is now correct.
   - The OPL motor scan tries up to 8× the bracket (before: 2×) and stops at the motor limits.
+
+### 2026-09-30 21:59 CEST — [T51] Port the experiment scripts in use, move the others to historical/
+- **Status:** done
+- **Branch:** `feat/phase3-ported-scripts`, based on `fix/phaseB-tools-hotfixes`
+- **Changes:**
+  - `nanofactorysystem/experiment_spec.py`: `StructureSpec.factory(experiment)` for structures that need the
+    running experiment (controller acceleration); `StructureSpec.empty()` for a skipped grid cell
+    (`run_experiment` calls `skip_structure`); `run_experiment(substrate_information=)`; `script_output()`
+    (output folder convention of the older scripts) and `messagebox_confirm()`.
+  - Ported to `experiment_spec()` + `run_experiment()` (maintainer's list). The former entry function keeps its
+    signature and gains `backend=`/`plane=`. Objective values unchanged; `sample.orientation` dropped (T43);
+    an objective without a parameter set raises `ValueError`; German text translated:
+    - `mains/Experiments/Kailas/parametric_4q.py`, `Quadrants_line_power_gap.py`, `lens_surface_test.py`,
+      `zoffset_voxel__dose_test.py`, `Voxel_row_on_pad.py`
+    - `mains/Experiments/parameter_study/parameter_testprint_power_speed.py`,
+      `parameter_testprint_power_speed_test4orientation.py`, `parameter_testprint_slicing_hatching.py`,
+      `line_test/Power_speed_line_test.py`
+    - `mains/Experiments/refractive_index/refractive_index_vel_power.py`
+    - `mains/Experiments/DHM_tomography/hollow_rect_first_print_63xobj.py`
+  - Renamed → `mains/Experiments/historical/…` (unchanged content): `Big_substrate_20x/`, `Grating_20x/`,
+    `Grating_63/`, `IFOV_63/`, `dhm/`, `other/`, `stacked/`, `Model_3D_experiment.py`, and
+    `Kailas/{Rectangle_plane_fitting, grating_ifov_big, ifovGrating_diffPower_500um, ifovGrating_diffPower_75um,
+    ifovGrating_noPower_differentSize, ifovLens_diffSlice_75um, lenses, padding_test_0_5mm, power_z_pitch_lines,
+    voxel_dose_test}.py`.
+  - `mains/Experiments/historical/README.md` (new): status, content, how to port a script.
+  - `mains/main.py`, `mains/main_IFOV.py`, `mains/main_3D_model.py`, `mains/grating_try.py`: imports from
+    `Experiments.historical`; two already stale commented imports corrected.
+  - `test/integration/test_ported_scripts.py` (new): every ported script builds a valid spec for its objectives
+    and refuses the others; dry run of the DHM tomography script (grid 1 × 2, coarse hatch, no corners; 6 s).
+  - `test/README.md`, `CLAUDE.md`: scripts in use vs. historical.
+  - `TODO.md`: T51 moved to Done.
+- **Tests:** `python -m pytest`: 295 passed, 14 skipped. The five active imports of the entry scripts import
+  from `mains/`.
+- **Commits:** `854bc8c` feat(experiment): structure factories and empty cells in specs [T51];
+  `6d9afc1` refactor(mains): port the current experiment scripts to ExperimentSpec [T51];
+  `905d1c2` chore(mains): move the unported experiment scripts to historical/ [T51];
+  docs(todo): close T51 [T51]
+- **Follow-ups:**
+  - The active import of `mains/main.py` (`power_z_pitch_lines`) and of `main_IFOV.py` now point to historical
+    scripts, which still set `sample.orientation`; the maintainer should port them if they are used again.
+  - `todo_notes.md` still lists the old paths of the moved scripts (notes file, left unchanged).
+- **Behaviour change on hardware:** none for the ported scripts' parameters; 20x runs of scripts without a 20x
+  parameter set now stop before the hardware starts.
