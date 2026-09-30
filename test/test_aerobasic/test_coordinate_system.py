@@ -1,5 +1,7 @@
 from unittest import TestCase
 
+import pytest
+
 import numpy as np
 
 from nanofactorysystem.devices.coordinate_system import PlaneFit
@@ -72,3 +74,22 @@ class TestCoordinateSystem(TestCase):
         self.assertIsInstance(str(planefit), str)
         print(str(planefit))
         print(planefit.parameters)
+
+
+@pytest.mark.parametrize("slope_x, slope_y, azimuth", [
+    (0.01, 0.0, 180.0),   # surface rises towards +x: the normal leans towards -x
+    (-0.01, 0.0, 0.0),
+    (0.0, 0.01, -90.0),
+    (0.0, -0.01, 90.0),
+])
+def test_plane_fit_azimuth(slope_x, slope_y, azimuth):
+    from nanofactorysystem.devices.coordinate_system import PlaneFit
+    points = [(x, y, 20000.0 + slope_x * x + slope_y * y) for x in (0.0, 100.0) for y in (0.0, 100.0)]
+
+    assert PlaneFit.from_points(np.asarray(points)).phi_degree == pytest.approx(azimuth)
+
+
+def test_normalize_angle():
+    from nanofactorysystem.devices.coordinate_system import normalize_angle
+    assert [normalize_angle(a) for a in (10.0, 180.0, -180.0, 190.0, -190.0, 540.0)] == [10.0, 180.0, 180.0, -170.0,
+                                                                                            170.0, 180.0]

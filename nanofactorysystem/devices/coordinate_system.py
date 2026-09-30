@@ -72,6 +72,12 @@ class Point3D(Point2D):
         return Point3D(0, 0, self.Z) + super().rotate2D(rotation_rad)  # Small hack to only implement once
 
 
+def normalize_angle(degree: float) -> float:
+    """ Return the angle in degrees mapped into the range (-180, 180]. """
+
+    return 180.0 - ((180.0 - degree) % 360.0)
+
+
 class DropDirection(Enum):
     """ Orientation of the resin drop on the substrate.
 
@@ -194,9 +200,10 @@ class PlaneFit(Plane):
 
     @cached_property
     def phi_degree(self) -> float:
+        """ Azimuth of the surface normal in degrees, in the range (-180, 180]. """
+
         x, y, z = np.cross(self.p1, self.p2)
-        phi = math.atan2(y, x) * 180 / np.pi
-        return (phi % 360) - 180
+        return normalize_angle(math.atan2(y, x) * 180 / np.pi)
 
     @classmethod
     def from_points(cls, points: np.ndarray | Iterable[Iterable[float]]):

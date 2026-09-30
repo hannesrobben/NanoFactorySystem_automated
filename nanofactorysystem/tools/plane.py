@@ -15,6 +15,7 @@ from scidatacontainer import Container
 
 from ..parameter import Parameter
 from ..config import popargs
+from ..devices.coordinate_system import normalize_angle
 from ..runtime import mkdir
 from .layer import Layer
 
@@ -56,13 +57,8 @@ class PlaneFit(object):
         self.slope = rxy / z
         self.theta = np.arctan2(rxy, z) * 180.0 / np.pi
 
-        # Azimuthal angle
-        self.phi = np.arctan2(y, x) * 180.0 / np.pi
-        self.phi = (self.phi % 360) - 180
-        # while self.phi > 180.0:
-        #     self.phi -= 360.0
-        # while self.phi <= -180.0:
-        #     self.phi += 360.0
+        # Azimuthal angle in (-180, 180]
+        self.phi = normalize_angle(np.arctan2(y, x) * 180.0 / np.pi)
 
     @cached_property
     def max_dev(self) -> float:
