@@ -133,6 +133,17 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
+- [ ] T44: Restructure how plane fitting is run [phase: 1]
+      Goal: Plane-fit modes are named, documented and selectable per experiment, and a single plane fit can run outside `Experiment`. The fitting algorithms stay unchanged.
+      Priority: high | Depends on: T43
+      Done when:
+        - `plane_fit_mode: int` is replaced by an enum with descriptive names for the current modes 0 and 1; the old integers are still accepted when an `experiment_dictionary.json` is read.
+        - A "border only" mode exists (N026).
+        - A single plane fit can be run outside `experiment.py` (N079).
+        - The `+1` in the sample points for mode 0 is checked (N078); the experiment center is validated against the resin drop edges (N022); for big structures the z deviation between the corners is checked and a warning is logged above a configurable threshold (N082).
+        - Mode, sample points and the fitted plane are stored in the experiment dictionary.
+        - A dummy test per mode checks number and positions of the sample points.
+      Notes: Replaces T29.
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
 - [ ] T28: Overview images and time estimate (from T19) [phase: B]
@@ -172,30 +183,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
         - Dummy tests for both values.
       Notes: Video recording in a thread is future_todo.md F3.
       Blocked by: Decision. Proposal: an `Experiment` keyword argument `camera_capture: bool = False` (an experiment choice, not a camera device setting, so not in `sys_args["camera"]`), stored in the experiment metadata. Question: which experiment scripts in `mains/Experiments/` need camera images (they get `camera_capture=True`)? Asked 2026-09-29.
-- [ ] T44: Restructure how plane fitting is run [phase: 1]
-      Goal: Plane-fit modes are named, documented and selectable per experiment, and a single plane fit can run outside `Experiment`. The fitting algorithms stay unchanged.
-      Priority: high | Depends on: T43
-      Done when:
-        - `plane_fit_mode: int` is replaced by an enum with descriptive names for the current modes 0 and 1; the old integers are still accepted when an `experiment_dictionary.json` is read.
-        - A "border only" mode exists (N026).
-        - A single plane fit can be run outside `experiment.py` (N079).
-        - The `+1` in the sample points for mode 0 is checked (N078); the experiment center is validated against the resin drop edges (N022); for big structures the z deviation between the corners is checked and a warning is logged above a configurable threshold (N082).
-        - Mode, sample points and the fitted plane are stored in the experiment dictionary.
-        - A dummy test per mode checks number and positions of the sample points.
-      Notes: Replaces T29.
-      Blocked by: T43.
-- [ ] T43: Make the drop direction consistent everywhere [phase: 1]
-      Goal: The drop direction is one explicit parameter that flows from the experiment script through `Experiment`, `System`, the tools and the structures; no orientation hotfixes remain.
-      Priority: high | Depends on: –
-      Done when:
-        - Every active experiment script in `mains/` passes `drop_direction` explicitly (N002); no script sets a z sign by hand.
-        - `tools/layer.py` and `tools/detector.py` derive their orientation from `DropDirection` instead of the separate `Orientation` value and the "Top" hotfix; the drop direction is part of `sys_args` where the tools need it (N087, N089). Decision: merge `Orientation` into `DropDirection` or map one to the other.
-        - `QRCode` takes the drop direction into account (N070).
-        - Every place that depends on the sign is listed in the `DropDirection` docstring (coordinate system, layer order in `print_structure`, start z in `plane_fit`, restart, detector) and checked.
-        - The `DropDirection` docstring states that dip-in needs a different computation and is planned (future_todo.md F8); no `DIP_IN` member is added yet.
-        - Dummy tests: UP and DOWN give mirrored z values in the layer programs; existing golden files are unchanged.
-      Notes: Covers N002, N070, N087, N089 (parts of T35 and T37).
-      Blocked by: Decision (Orientation vs. DropDirection). Proposal: remove `parameter.Orientation` and let `Scanner`/`Layer` take a `DropDirection` from `sys_args["layer"]["dropDirection"]` (set by `Experiment`). Open physics question for the maintainer: today `Layer` hard-codes `Orientation.UP` for both objectives, and the scanner removes the second layer (immersion oil) above the interface for UP and below for DOWN. Must DOWN (63x) really map to the "below" rule, or should both drop directions keep the current UP behaviour? Asked 2026-09-29.
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
@@ -276,3 +263,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T38: Visualization: laser power and axis formatting — 2026-09-30 — Movements carry the attenuator value read from `$AO[0].A=`, laser-on lines are coloured by power (mW with a calibration) with a colour bar, and mm axes have no offset or scientific notation. — commits: `f688a61`
 
 - [x] T39: Manual DHM helper: implement reset — 2026-09-30 — `DHMBackend.reset()` closes the client, restores the start state (motor position, flags, counter) and reconnects; tested on the dummy DHM. — commits: `b875fe0`
+
+- [x] T43: Make the drop direction consistent everywhere — 2026-09-30 — `Orientation` merged into `DropDirection`: the scanner keeps the lowest focus range for DOWN and the highest for UP (maintainer's description), `Experiment` passes it via `sys_args['layer']['dropDirection']`, QR pixel lines follow it; z coordinates never depend on it (decision), only the order; docstring lists all places. — commits: `97e2345`

@@ -1353,3 +1353,45 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Notes:**
   - The actual durations are already stored since T47/T59: session, structure and layer start/end times.
   - Only the estimate and the overview image are missing.
+
+### 2026-09-30 18:38 CEST — [T43] Make the drop direction consistent everywhere
+- **Status:** done
+- **Branch:** `feat/phase1-execution-parameters`, based on `feat/phaseB-plots`
+- **Decisions (maintainer, 2026-09-30):**
+  - Physics: for a drop facing down, the substrate/polymer interface is the lower one, and an
+    oil/substrate interface can appear above it (objective raised too high) and must not be used. For a
+    drop facing up, the interface with the higher z is decisive; below it is polymer/air. Dip-in behaves
+    like UP without an upper end.
+  - "The z coordinate should NOT be changed. Only the order changes in regards to how the droplet is
+    oriented." So the criterion "mirrored z values" of the todo reads as: identical layer programs, printed
+    in opposite order.
+- **Changes:**
+  - `nanofactorysystem/parameter.py`: `Orientation` removed; its only users were the scanner and the
+    layer.
+  - `nanofactorysystem/tools/detector.py`: `Scanner(drop_direction=...)`. DOWN keeps the lowest focus
+    range, UP the highest; the result reports `dropDirection`.
+  - `nanofactorysystem/tools/layer.py`: new parameter `dropDirection` (default `"DOWN"`, which is the former
+    hard-coded behaviour); the hotfix and the commented `sampleOrientation` are removed (N087, N089).
+  - `nanofactorysystem/experiment.py`: `_with_drop_direction()` makes a copy of `sys_args` with
+    `layer.dropDirection`, rejects a contradicting value, and is used for `System` and the tools; the value
+    is stored with the experiment.
+  - `nanofactorysystem/aerobasic/programs/drawings/qr_code.py`: the pixel lines are drawn upwards for DOWN
+    (N070).
+  - `nanofactorysystem/devices/coordinate_system.py`: the `DropDirection` docstring lists every place that
+    depends on it and the dip-in plan (F8).
+  - `test/test_drop_direction.py` (new, 6 tests); `test/README.md`; `CLAUDE.md` (separate commit, because
+    the first edit did not apply).
+  - `TODO.md`: T43 moved from Blocked to In Progress (with the decision), then to Done.
+- **Tests:** `python -m pytest`: 244 passed, 14 skipped; golden programs and command logs are unchanged.
+  - A script check finds all 58 `Experiment` calls in `mains/` passing `drop_direction`, and no hand-made
+    z sign.
+- **Commits:** `97e2345` feat(tools): derive the resin-layer choice from the drop direction [T43];
+  `5a8402d` docs(claude): describe what the drop direction changes [T43]; docs(todo): close T43 [T43]
+- **Behaviour changes on hardware (to check on the lab PC):**
+  1. 20x (UP) plane fits: when two focus ranges are found, the highest one is now kept (before: always the
+     lowest). With one focus range nothing changes.
+  2. 63x (DOWN): unchanged, because the old hard-coded rule is the DOWN rule.
+  3. QR codes printed with 63x (DOWN): the vertical pixel lines are now drawn from the anchor upwards
+     instead of downwards.
+- **Follow-ups:** `sys_args["sample"]["orientation"] = "top"` in the scripts is no longer read by any code;
+  T51 can drop it when the scripts are migrated.
