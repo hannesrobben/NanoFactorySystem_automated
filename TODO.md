@@ -53,16 +53,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 
 ### Phase 2 — Experiment storage
 
-- [ ] T56: Make structure serialisation complete and reversible (found during T41) [phase: 2]
-      Goal: A structure can be rebuilt from its stored configuration.
-      Priority: medium | Depends on: T47
-      Done when:
-        - `DrawableObject._init_args` uses only the `__init__` parameters (not local variables) and fails loudly or warns when a parameter cannot be recovered, instead of dropping it silently.
-        - Enums and nested objects are stored in a form that can be read back; the class is identified by module and name.
-        - A `from_json` (or equivalent) rebuilds every active structure class; a test round-trips each class used in the golden tests.
-        - Golden files unchanged.
-      Notes: The skipped height data (`data`, `height_profile`, N046) stays in T37 and can build on this.
-
 ### Phase 3 — Experiment scripts and substrate main
 
 - [ ] T51: New template for experiment scripts [phase: 3]
@@ -299,3 +289,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T50: Restart and repetitions on the new storage — 2026-09-30 — Restart reads parameters and per-layer progress from `experiment.h5` (resumes correctly after any number of aborts, keeps the UUID); old JSON folders are imported into a new experiment file on restart; `REPEAT` fixed (own grid cell, `<name>_rep<n>`, `repeat_of`). — commits: `7aaee04`
 
 - [x] T59: Correct the print-progress record — 2026-09-30 — `print_progress.json` is exported from the experiment file (schema `nanofactory.print_progress/2`): printed/failed layer counts, start/end time per layer and structure; UP and DOWN tested after a complete and an aborted structure. — commits: `154d85d`
+
+- [x] T56: Make structure serialisation complete and reversible — 2026-09-30 — `to_json()` stores only constructor parameters (with `__module__`, reversible encoding of enums/points/calibrations, lost parameters reported), `structure_from_json()` rebuilds structures; all golden-test structures round-trip to identical programs, golden files unchanged. — commits: `1f379ae`

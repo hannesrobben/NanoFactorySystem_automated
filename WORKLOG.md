@@ -1195,3 +1195,33 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   `0356fc2` docs(test): fix escaped backticks in the README [T59]; docs(todo): close T59 [T59]
 - **Behaviour change:** `print_progress.json` has a new format. It is a readable copy; restart uses the
   experiment file.
+
+### 2026-09-30 13:51 CEST — [T56] Make structure serialisation complete and reversible
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/aerobasic/programs/drawings/base.py`:
+    - `_init_args()`/`to_json()` use `inspect.signature` and the new class attributes `_json_attributes`
+      (parameter → attribute) and `_json_skip` (`data`, `height_profile`, N046).
+    - A lost parameter gives a warning and a `__missing__` entry.
+    - New functions: `encode_json_value`, `decode_json_value`, `structure_from_json`.
+    - `to_json()` adds `__module__`.
+    - Two commented-out former versions of `_init_args` were removed (dead code inside the rewritten
+      function).
+  - `ifov_gratings.py`: `Rectangle2D_IFOV._json_attributes = {"angle": "phi"}`.
+  - `devices/power_calibration.py`: `PowerCalibration.from_json()`.
+  - `test/test_aerobasic/test_structure_json.py` (new, 10 tests): the 8 golden-test structure classes
+    round-trip and render identical programs; value encoding; reporting of lost arguments.
+  - `test/test_aerobasic/test_power_calibration.py`: the calibration inside `IFOV_Lines.to_json()` is now
+    encoded with its class. The old assert (raw `calibration.to_json()`) is replaced by the new encoding
+    plus a check that the rebuilt structure sets the same power. This assert changed because T56 requires
+    a reversible encoding.
+  - `test/README.md`, `CLAUDE.md`.
+  - `TODO.md`: T56 moved to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 232 passed, 14 skipped. The golden files are unchanged.
+- **Commits:** `1f379ae` feat(drawings): make structure serialisation complete and reversible [T56];
+  docs(todo): close T56 [T56]
+- **Notes:**
+  - `structures.json` and `/structures/<name>` configs now contain `__module__` and the new enum/object
+    encoding.
+  - Structure classes outside the golden tests are not checked one by one; if they lose a parameter, they
+    warn at `build_programs()`. No such warning appears in the test suite or the dry run.
