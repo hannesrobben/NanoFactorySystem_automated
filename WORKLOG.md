@@ -1026,3 +1026,28 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   - `A3200.log` of an experiment is now in the experiment folder, not in `mains/`.
   - `/logs/console` also covers D8 of the approved design.
 - **Follow-ups:** none.
+
+### 2026-09-30 08:42 CEST — [T57] Store paths relative to the experiment folder
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/experiment.py`:
+    - `_relative()` and `_absolute()` convert paths to and from the experiment folder.
+    - The log file, layer files, structure program and layer-program `file` attributes are stored
+      relative to the folder.
+    - `structure_configs` in memory stays absolute (`_with_absolute_paths()`, also used by
+      `retrieve_programs()`), so callers see no change. Print and restart resolve the stored paths.
+    - `parameters_from_dictionary()` uses the given folder and finds the log file there by name.
+  - `nanofactorysystem/storage/json_copies.py`: `"path"` is `"."` in `experiment_dictionary.json`.
+  - `test/test_experiment.py`: a new test builds an experiment, moves its folder and restarts it from the
+    new place. `test_experiment_dictionary` and the restart test now expect relative paths; these asserts
+    changed because T57 requires relative paths.
+  - `test/integration/test_dry_run_default_experiment.py`: the paths in `structures.json` are relative
+    and resolve to existing files.
+  - `test/README.md`, `CLAUDE.md`.
+  - `TODO.md`: T57 moved to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 202 passed, 14 skipped.
+- **Commits:** `e07db5a` feat(experiment): store paths relative to the experiment folder [T57];
+  docs(todo): close T57 [T57]
+- **Follow-ups:** A folder written before T57 still holds absolute paths. They are used as they are, so
+  a legacy folder can only be restarted in its original place. T50 imports legacy folders and can
+  relocate those paths.

@@ -63,13 +63,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
         - Golden files unchanged.
       Notes: The skipped height data (`data`, `height_profile`, N046) stays in T37 and can build on this.
 
-- [ ] T57: Store paths relative to the experiment folder (found during T41) [phase: 2]
-      Goal: A copied or moved experiment folder can be read and restarted from its new location.
-      Priority: medium | Depends on: T47
-      Done when:
-        - `path`, `logger`, `program_file` and `layer_files` are stored relative to the experiment root (old absolute entries are still read).
-        - Dummy test: build an experiment, move the folder, restart it from the new location.
-
 - [ ] T59: Correct the print-progress record (found during T41) [phase: 2]
       Goal: The progress record states correctly how many layers were printed and when.
       Priority: low | Depends on: T47
@@ -336,3 +329,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T47: Implement the HDF5 experiment store — 2026-09-30 — New `nanofactorysystem.storage` (`ExperimentStore`, records, JSON copies, lock file, software info); `Experiment` writes metadata, calibration, plane fit, OPL scan, layout, structures, layer programs, progress and captures (no more `.zdc`/`.npy`) into `experiment.h5`, exports the JSON copies from it, and refuses an existing experiment folder unless `resume=True`. — commits: `bc371eb`, `fe6036a`, `bed280b`
 
 - [x] T55: Store the controller command log with the experiment — 2026-09-30 — `A3200.log` is written into the experiment folder, and the command log and the session's console log are stored per session under `/logs` in `experiment.h5`, also after an exception or abort. — commits: `b624a66`
+
+- [x] T57: Store paths relative to the experiment folder — 2026-09-30 — Layer/structure program files and the log file are stored relative to the experiment folder (file and JSON copies); `parameters_from_dictionary()` uses the given folder, so a moved experiment can be restarted; old absolute entries still work. — commits: `e07db5a`
