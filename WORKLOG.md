@@ -1259,3 +1259,26 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   5. `StructureType.REPEAT` works. It failed before with a TypeError.
   6. Disk usage: roughly 0.3–0.6 MB per camera image and about 10× more per hologram series. Check the free
      space on the lab PC for large experiments.
+
+### 2026-09-30 13:52 CEST — [T53] Voxel database (design part)
+- **Status:** blocked (design draft written; waiting for maintainer approval)
+- **Branch:** `docs/phase4-voxel-database`, based on `feat/phase2-experiment-store`
+- **Changes:**
+  - `docs/design/VOXEL_DATABASE.md` (new). It covers:
+    - terms and units;
+    - SQLite schema v1 with `PRAGMA user_version` and migrations;
+    - lookup: exact hit, 2-D interpolation in (ln P, ln v) inside the convex hull, 1-D dose fallback for
+      collinear data, no extrapolation;
+    - the CSV seed, import and export;
+    - the location of the database;
+    - the `VoxelDatabase` API, the tests and the link to T54.
+  - `TODO.md`: T53 moved to In Progress, then to Blocked ("waiting for maintainer approval").
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (design document).
+- **Commits:** `b45a7d2` docs(design): draft the voxel database [T53]; docs(todo): block T53 on approval [T53]
+- **Open decisions (§9):**
+  - V1: interpolation variable;
+  - V2: power reference, and whether to record the calibration file;
+  - V3: existing measurements for the seed file;
+  - V4: location of the database;
+  - V5: minimum numbers of points.

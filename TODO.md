@@ -76,17 +76,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 
 ### Phase 4 — Voxel database and voxel-aware slicing
 
-- [ ] T53: Voxel database (SQLite) [phase: 4]
-      Goal: Voxel width and height can be looked up for material, objective, setup, power and velocity, with interpolation between measured points.
-      Priority: high | Depends on: –
-      Done when:
-        - `docs/design/VOXEL_DATABASE.md` defines schema, interpolation and fallback, and is approved by the maintainer.
-        - The SQLite database has at least the tables `material` and `voxel_measurement` (material, objective, setup, power_mW, velocity_um_s, width_um, height_um, method, experiment_uuid, date, notes); the schema version is kept in `PRAGMA user_version` and migrations run in order when the database is opened.
-        - A class (e.g. `VoxelDatabase`) adds measurements, imports CSV files and returns the voxel size for a parameter set, or `None`.
-        - Interpolation per material/objective/setup over a dose-like variable (e.g. P²/v, logarithmic), only inside the convex hull of the measured points and with a configurable minimum number of points; no extrapolation; unknown material or too few points → `None`.
-        - The database path is configured in `nanofactory.json`; the `.sqlite` file is not in git, a CSV or SQL seed file is.
-        - Tests with synthetic data: exact hit, interpolation, outside the hull, unknown material.
-
 - [ ] T54: Voxel-aware slicing and hatching [phase: 4]
       Goal: With voxel data, the printed geometry matches the designed geometry as closely as possible instead of being enlarged by the voxel size.
       Priority: high | Depends on: T53, T51
@@ -174,6 +163,17 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 <!-- Claude Code moves a todo here when starting work. -->
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
+- [ ] T53: Voxel database (SQLite) [phase: 4]
+      Goal: Voxel width and height can be looked up for material, objective, setup, power and velocity, with interpolation between measured points.
+      Priority: high | Depends on: –
+      Done when:
+        - `docs/design/VOXEL_DATABASE.md` defines schema, interpolation and fallback, and is approved by the maintainer.
+        - The SQLite database has at least the tables `material` and `voxel_measurement` (material, objective, setup, power_mW, velocity_um_s, width_um, height_um, method, experiment_uuid, date, notes); the schema version is kept in `PRAGMA user_version` and migrations run in order when the database is opened.
+        - A class (e.g. `VoxelDatabase`) adds measurements, imports CSV files and returns the voxel size for a parameter set, or `None`.
+        - Interpolation per material/objective/setup over a dose-like variable (e.g. P²/v, logarithmic), only inside the convex hull of the measured points and with a configurable minimum number of points; no extrapolation; unknown material or too few points → `None`.
+        - The database path is configured in `nanofactory.json`; the `.sqlite` file is not in git, a CSV or SQL seed file is.
+        - Tests with synthetic data: exact hit, interpolation, outside the hull, unknown material.
+      Blocked by: waiting for maintainer approval of `docs/design/VOXEL_DATABASE.md` (draft written 2026-09-30; decisions V1–V5 in §9).
 - [ ] T58: Define the capture position of `measure()` (found during T41) [phase: 1]
       Goal: Camera and DHM captures are taken at a defined Z and galvo position, not wherever the last layer left the axes.
       Priority: medium | Depends on: T46
