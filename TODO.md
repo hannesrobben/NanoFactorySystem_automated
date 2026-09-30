@@ -151,14 +151,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
       Done when:
         - `test/manual/dhm/DHMUserBackend.py` implements its reset method (N094).
 
-- [ ] T60: Experiment plots: corners, QR code and structure plots (found during T41) [phase: B]
-      Goal: The overview plot shows everything that is printed, and structure plots can be switched on.
-      Priority: low | Depends on: –
-      Done when:
-        - `plot_experiment()` draws the corners (marking the double corner) and the QR code, and shows the experiment UUID.
-        - The hard-coded `plotting_structure = False` in `structure_program` is replaced by a parameter (default off) or removed.
-        - Test: the plot is written for the dry-run experiment.
-
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
 ## Blocked
@@ -291,3 +283,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T59: Correct the print-progress record — 2026-09-30 — `print_progress.json` is exported from the experiment file (schema `nanofactory.print_progress/2`): printed/failed layer counts, start/end time per layer and structure; UP and DOWN tested after a complete and an aborted structure. — commits: `154d85d`
 
 - [x] T56: Make structure serialisation complete and reversible — 2026-09-30 — `to_json()` stores only constructor parameters (with `__module__`, reversible encoding of enums/points/calibrations, lost parameters reported), `structure_from_json()` rebuilds structures; all golden-test structures round-trip to identical programs, golden files unchanged. — commits: `1f379ae`
+
+- [x] T60: Experiment plots: corners, QR code and structure plots — 2026-09-30 — `plot_experiment()` draws corners (double corner highlighted, positions labelled), QR code and the UUID and returns the figure; `build_programs(plot_structures=True)` replaces the hard-coded switch. — commits: `f729324`

@@ -1282,3 +1282,22 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   - V3: existing measurements for the seed file;
   - V4: location of the database;
   - V5: minimum numbers of points.
+
+### 2026-09-30 13:57 CEST — [T60] Experiment plots: corners, QR code and structure plots
+- **Status:** done
+- **Branch:** `feat/phaseB-plots`, based on `docs/phase4-voxel-database`
+- **Changes:**
+  - `nanofactorysystem/experiment.py`:
+    - `plot_experiment()` has a NumPy docstring and draws corners, the double corner, the QR code and the
+      UUID/label, using the stored layout. It returns the figure and closes it when not shown.
+    - `build_programs(plot_structures=False)` passes `plot` to `structure_program()`. This replaces the
+      hard-coded `plotting_structure = False` and its commented-out switch.
+  - `test/test_experiment.py`: two tests (plot content; structure plot only on request).
+  - `test/README.md`.
+  - `TODO.md`: T60 moved to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 234 passed, 14 skipped.
+- **Commits:** `f729324` feat(experiment): show corners and QR code in the experiment plot [T60]; docs(todo): close T60 [T60]
+- **Notes:**
+  - The plot uses a y axis pointing up, and the corner names follow the experiment's `rectangle_*`
+    properties, where "top" is the smaller Y. Whether that matches the camera view on the lab PC is not
+    verified.
