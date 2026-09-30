@@ -1689,3 +1689,59 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   - `todo_notes.md` still lists the old paths of the moved scripts (notes file, left unchanged).
 - **Behaviour change on hardware:** none for the ported scripts' parameters; 20x runs of scripts without a 20x
   parameter set now stop before the hardware starts.
+
+### 2026-09-30 23:27 CEST — [T52] Substrate-specific main file
+- **Status:** done
+- **Branch:** `feat/phase3-substrate-main`, based on `feat/phase3-ported-scripts`
+- **Changes:**
+  - `nanofactorysystem/experiment.py`: a new experiment with `substrate=` and an explicit `path=` gets the
+    next free experiment label. Before, it was entered into the index with an empty label, and a second one on
+    the same substrate failed. Separate `fix:` commit with a regression test in `test/test_experiment.py`.
+  - `nanofactorysystem/substrate_plan.py` (new):
+    - `SubstrateSpec` (label, user, objective, resin edges, material, notes, data root) and
+      `SubstrateExperiment` (`ExperimentSpec` + optional folder);
+    - `experiment_area`: the same geometry as `Experiment` (grid + margin), widened by the QR code (140 µm,
+      centred on the upper edge) and the corners when markers are printed;
+    - `existing_areas`: rectangles of the experiments already in the substrate index, read from their files;
+    - `check_layout`: resin-drop bounding box, overlaps, existing experiments, objective, unique names; every
+      problem in one `LayoutError`;
+    - `plot_substrate`, `open_substrate` (creates the substrate and records the resin drop once);
+    - `run_substrate`: checks first, then runs the experiments one after another via `run_experiment` into
+      the substrate index, with optional `confirm_between`.
+  - `nanofactorysystem/experiment_spec.py`: `run_experiment(allow_synced_root=)`.
+  - `mains/substrate_main.py` (new): template with two ported Kailas experiments (63x); `mains/main.py` is
+    unchanged.
+  - `test/test_substrate_plan.py` (new, 7 tests); `test/integration/test_dry_run_substrate.py` (new, 4 tests:
+    two experiments on one substrate give two experiment files and one index, planned areas equal the printed
+    rectangles, a repeated run is refused, optional folder, confirmation between experiments, an invalid layout
+    creates nothing, the template's layout is valid).
+  - `test/README.md`, `CLAUDE.md`; `TODO.md`: T52 moved to Done, new T62.
+- **Tests:** `python -m pytest`: 307 passed, 14 skipped. A full dry run of the template took 7 minutes (real 63x
+  structures with DHM). It was run once, passed, and is not part of the suite; the suite checks the
+  template's layout only.
+- **Commits:** `b46bed8` fix(experiment): label experiments in explicit folders on their substrate [T52];
+  `1796164` feat(experiment): run several experiments on one substrate [T52];
+  `ff6d3a0` feat(mains): add a substrate main template [T52]; docs(todo): close T52, phase 3 summary [T52]
+- **Follow-ups:** T62 (phase B, low): the resin check uses the bounding box of the four edge points, like the
+  centre check of `Experiment`. An area near the rim of a round drop passes the check.
+
+### 2026-09-30 23:27 CEST — [Phase 3] Phase summary
+- **Finished todos:**
+  - T51: `ExperimentSpec`/`run_experiment`, program sources DRAWING and SLICER, 11 scripts ported, the others
+    moved to `mains/Experiments/historical/`;
+  - T52: substrate main files with layout checks.
+- **Maintainer decisions used:** DRAWING = the drawing classes; the list of scripts still in use; all other
+  scripts go to `historical/`.
+- **Tests:** `python -m pytest` (short-path venv): 307 passed, 14 skipped, including the dry runs.
+  Golden files are unchanged.
+- **Branches:** `feat/phase3-experiment-spec` → `fix/phaseB-tools-hotfixes` (T37) → `feat/phase3-ported-scripts`
+  → `feat/phase3-substrate-main`, stacked on the earlier branches. Nothing is pushed.
+- **Open follow-ups:** T62 (resin-drop outline). The active imports of `mains/main.py`
+  (`power_z_pitch_lines`) and `mains/main_IFOV.py` point to historical scripts that still set
+  `sample.orientation`.
+- **To check on the lab PC:**
+  1. One ported script per objective, e.g. `DHM_tomography/hollow_rect_first_print_63xobj.print_file`: the same
+     values as before (zMax, margin, corners, plane-fit mode).
+  2. `mains/substrate_main.py` with a real substrate label: the layout plot, the message boxes between the
+     experiments, and `substrate.json` afterwards.
+  3. Scripts without a 20x parameter set now stop with `ValueError` before the hardware starts.

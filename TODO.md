@@ -26,7 +26,7 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 | 2 | Experiment storage | T47, T48, T49, T50, T55, T56, T57, T59 | – |
 | 3 | Experiment scripts and substrate main | T51, T52 | – |
 | 4 | Voxel database and voxel-aware slicing (independent of phases 2–3) | T53, T54, T31 | T53 design approved by the maintainer |
-| B | Backlog from T19 (`todo_notes.md`) | T32, T37, T28, T35, T36, T38, T39, T60, T61 | – |
+| B | Backlog from T19 (`todo_notes.md`) | T32, T37, T28, T35, T36, T38, T39, T60, T61, T62 | – |
 
 ### Working rules for Claude Code (in addition to CLAUDE.md)
 1. Pick the first open todo of the lowest unfinished phase whose dependencies are done. Phase 1 may be
@@ -55,15 +55,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 
 ### Phase 3 — Experiment scripts and substrate main
 
-- [ ] T52: Substrate-specific `main.py` [phase: 3]
-      Goal: The main file describes one substrate and the list of experiments printed on it.
-      Priority: high | Depends on: T48, T51
-      Done when:
-        - The main file defines the substrate (label, resin edges, user, objective) and a list of experiments, each with its `ExperimentSpec` and an optional storage path (default location otherwise).
-        - Before printing, experiment areas are checked for overlap with each other and against the resin edges.
-        - Experiments run one after another and are entered into the substrate index; an optional confirmation between experiments.
-        - Dummy dry run: two experiments on one substrate give two experiment files and one substrate index.
-
 ### Phase 4 — Voxel database and voxel-aware slicing
 
 - [ ] T54: Voxel-aware slicing and hatching [phase: 4]
@@ -85,6 +76,13 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
         - The powers used are stored in the metadata.
 
 ### Phase B — Backlog from T19 (details in `todo_notes.md`)
+
+- [ ] T62: Check experiment areas against the shape of the resin drop (found during T52) [phase: B]
+      Goal: Experiments near the rim of a drop are refused before printing, not only those outside its bounding box.
+      Priority: low | Depends on: –
+      Done when:
+        - `substrate_plan.check_layout` (and the center check of `Experiment`) test the experiment area against a drop outline derived from the four edge points (e.g. an ellipse or their convex hull with a margin; Decision: which outline), instead of their bounding box.
+        - Tests with an area inside the bounding box but outside the outline.
 
 - [ ] T61: Justify the focus-detection threshold and clarify the layer result object (follow-up of T37) [phase: B]
       Goal: The remaining hotfix and open note of T37 are resolved with lab data and the maintainer's input.
@@ -231,3 +229,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T53: Voxel database (SQLite) — 2026-09-30 — Design approved; `nanofactorysystem.voxel.VoxelDatabase` (tables material/voxel_measurement, PRAGMA user_version with migrations, CSV import/export, `voxel_size()` with exact hit, 2-D (ln P, ln v) interpolation inside the hull, dose fallback, no extrapolation); path `system.voxelDatabase`, seed CSV versioned. — commits: `b45a7d2`, `2de4367`, `9c52f15`
 
 - [x] T51: New template for experiment scripts — 2026-09-30 — `ExperimentSpec`/`StructureSpec` (structure, slicer height data, or a factory of the running experiment; empty cells), `ProgramSource` (DRAWING/SLICER, stored) and `run_experiment()` with `mains/Experiments/experiment_template.py`; the 11 scripts named by the maintainer are ported (dry-run tested), all others moved to `mains/Experiments/historical/`. — commits: `acb2fe2`, `6462705`, `854bc8c`, `6d9afc1`, `905d1c2`
+
+- [x] T52: Substrate-specific `main.py` — 2026-09-30 — `nanofactorysystem/substrate_plan.py` (`SubstrateSpec`, `SubstrateExperiment`, `run_substrate`): overlap, existing-experiment, resin-drop, objective and name checks before printing, sequential runs into the substrate index with optional confirmation; template `mains/substrate_main.py`; dummy dry run with two experiments on one substrate. — commits: `b46bed8`, `1796164`, `ff6d3a0`
