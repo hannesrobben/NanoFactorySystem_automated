@@ -53,15 +53,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 
 ### Phase 2 — Experiment storage
 
-- [ ] T55: Store the controller command log with the experiment (found during T41) [phase: 2]
-      Goal: The record of every command sent to the A3200 belongs to the experiment and survives the next run and an abort.
-      Priority: medium | Depends on: T47
-      Done when:
-        - `A3200.log` (or its content in the experiment file) is written into the experiment, not into the working directory, and is not overwritten by a later experiment.
-        - It is also written when the experiment ends with an exception.
-        - Dummy test: two experiments in a row keep two separate command logs; an aborted run still has one.
-      Notes: Today `System.close()` writes `A3200.log` to `backend.program_dir()`, i.e. the working directory on the lab PC.
-
 - [ ] T56: Make structure serialisation complete and reversible (found during T41) [phase: 2]
       Goal: A structure can be rebuilt from its stored configuration.
       Priority: medium | Depends on: T47
@@ -343,3 +334,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T46: Record the stage position of every capture — 2026-09-29 — `measure()` stores a `CaptureRecord` (commanded and actual XYZAB position, structure, phase, layer, image index/count, UTC time) in every camera/DHM container and in `captures.json`, and accepts a list of capture offsets; golden command logs unchanged. — commits: `c16f5ae`
 
 - [x] T47: Implement the HDF5 experiment store — 2026-09-30 — New `nanofactorysystem.storage` (`ExperimentStore`, records, JSON copies, lock file, software info); `Experiment` writes metadata, calibration, plane fit, OPL scan, layout, structures, layer programs, progress and captures (no more `.zdc`/`.npy`) into `experiment.h5`, exports the JSON copies from it, and refuses an existing experiment folder unless `resume=True`. — commits: `bc371eb`, `fe6036a`, `bed280b`
+
+- [x] T55: Store the controller command log with the experiment — 2026-09-30 — `A3200.log` is written into the experiment folder, and the command log and the session's console log are stored per session under `/logs` in `experiment.h5`, also after an exception or abort. — commits: `b624a66`

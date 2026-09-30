@@ -1000,3 +1000,29 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   - T55 (`/logs/a3200`), T57 (relative paths), T49 (`/summary`) and T48 (folder layout, substrates) build
     on this.
   - Suggestion: faster tests with a lower gzip level for dummy images. Not done; the design fixes level 4.
+
+### 2026-09-30 08:38 CEST — [T55] Store the controller command log with the experiment
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/devices/aerotech/__init__.py`: `command_log()` returns the log text; `save_log()` uses it.
+  - `nanofactorysystem/system.py`: new attribute `log_dir`, the folder for `A3200.log` on `close()`.
+    The default is unchanged: the backend's program folder, else the working directory.
+  - `nanofactorysystem/storage/experiment_store.py`: `write_log(kind, text)` and `read_logs(kind)` for
+    `/logs/<kind>/<session>`.
+  - `nanofactorysystem/experiment.py`:
+    - `System.log_dir` is set to the experiment folder.
+    - `__exit__` closes the system first and then calls `_end_session()`. That method stores the command
+      log and the console-log text written since the experiment started (offset remembered in
+      `__init__`, design D8), sets `failed`/`aborted` after an exception, ends the session and exports the
+      JSON copies. It runs in a `finally`, so an aborted run keeps its logs.
+  - `test/test_experiment.py`: two tests (two experiments in a row with separate logs; a
+    KeyboardInterrupt keeps the log and sets `aborted`).
+  - `test/README.md`, `CLAUDE.md`: logs in the experiment.
+  - `TODO.md`: T55 moved to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 201 passed, 14 skipped.
+- **Commits:** `b624a66` feat(experiment): store command and console logs with the experiment [T55];
+  docs(todo): close T55 [T55]
+- **Behaviour change on hardware:**
+  - `A3200.log` of an experiment is now in the experiment folder, not in `mains/`.
+  - `/logs/console` also covers D8 of the approved design.
+- **Follow-ups:** none.
