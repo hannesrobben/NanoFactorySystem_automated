@@ -1745,3 +1745,51 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   2. `mains/substrate_main.py` with a real substrate label: the layout plot, the message boxes between the
      experiments, and `substrate.json` afterwards.
   3. Scripts without a 20x parameter set now stop with `ValueError` before the hardware starts.
+
+### 2026-09-30 23:46 CEST — [T54] Voxel-aware slicing and hatching
+- **Status:** done
+- **Branch:** `feat/phase4-voxel-slicing`, based on `feat/phase3-substrate-main`
+- **Decision (maintainer, 2026-09-30):** option (b) is the default: with voxel data the hatch spacing and layer
+  height are derived from the voxel size and an overlap ratio. Option (a) stays available as `static_hatching`
+  (given spacing, gaps only warned about), e.g. for very dense spacing later.
+- **Changes:**
+  - `nanofactorysystem/aerobasic/slicer/voxel.py` (new):
+    - `SpacingMode` (`voxel_overlap`, `static_hatching`);
+    - the `VoxelModel` protocol, so the slicer stays self-contained;
+    - `VoxelContext`;
+    - `compensate()`: contour offset = width / 2 (an explicit offset is kept), `voxel_height_um` = height, and
+      the spacing per mode; the report goes into `job.meta["voxel"]`.
+  - `slicer/parameters.py`: `voxel_height_um` (0 = the old planes), `spacing_mode`, `voxel_overlap` (0.3).
+  - `slicer/slicing.py`: with a voxel height, the first and last plane lie half a voxel height inside the
+    part, with even spacing (at most `layer_height_um`) in between. A part thinner than one voxel gets one plane
+    at mid-height and a warning.
+  - `slicer/hatching.py`: the strategies get `voxel=` (a `VoxelContext` or None).
+  - `slicer/pipeline.py`: `slice_geometry(voxel_model=)`.
+  - `slicer/storage.py`: string parameters are read back as `str`. `slicer/__init__.py`: exports.
+  - `aerobasic/programs/drawings/model3d.py`: `voxel_model`, `spacing_mode`, `voxel_overlap`. A voxel model
+    needs `power`. The power is recorded in `LaserParameters`. `to_json()["voxel"]`.
+  - `nanofactorysystem/voxel/model.py` (new): `NoVoxelData`, `FixedVoxelModel`, `DatabaseVoxelModel`.
+    `voxel/__init__.py`: exports.
+  - `nanofactorysystem/experiment_spec.py`: `ExperimentSpec.voxel_material`, `voxel_database`, `voxel_model()`.
+    SLICER structures then get the model and their power.
+  - `nanofactorysystem/storage/summary.py`:
+    - new columns `voxel_width_um`, `voxel_height_um`;
+    - slice and hatch size of `Model3D_Slicer` structures come from their stored job parameters (before, the
+      summary showed none);
+    - the velocity unit follows their IFOV convention.
+  - Tests:
+    - `test/slicer/test_voxel_slicing.py` (new, 10 tests);
+    - `test/integration/test_dry_run_spec.py`: SLICER dry run with a voxel database;
+    - `test/storage/test_summary.py`: the expected `print_parameters` result gains the two new keys (new
+      output, no assertion weakened), plus a slicer case.
+  - `test/README.md`, `CLAUDE.md`; `TODO.md`: T54 moved to Done, new T63.
+- **Tests:** `python -m pytest`: 319 passed, 14 skipped. The golden files are unchanged, so the no-data path is
+  identical.
+- **Commits:** `e5a2173` feat(slicer): slice with the voxel size of the laser parameters [T54];
+  `e7ec542` feat(experiment): voxel material in experiment specs and summary [T54]; docs(todo): close T54 [T54]
+- **Follow-ups:**
+  - T63: `IFOV_Lines` writes with `F=5` (63x) or `F=10` (20x) mm/s regardless of `velocity`, so the voxel lookup
+    uses the nominal velocity, not the real writing speed.
+  - The default overlap of 0.3 is a proposal; the maintainer should check it with the first lab prints.
+- **Behaviour change on hardware:** none without `voxel_material` or `voxel_model`. With them, SLICER programs
+  set the structure power themselves (`SET_POWER`), and hatch and slice size come from the voxel data.
