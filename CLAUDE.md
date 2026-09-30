@@ -92,7 +92,8 @@ python -m pytest test/test_aerobasic/test_golden_programs.py --update-golden   #
 - `storage/records.py` holds the plain data records (`ExperimentRecord`, `StructureRecord`, `CaptureRecord`, …); `ExperimentStore.read()` rebuilds all metadata from the file alone.
 
 **Experiment scripts** (`mains/`)
-- `mains/Experiments/**` holds one script per experiment. Each defines a function like `print_file(absolute_center, resin_dimension, path, objective, user, dhm_usage, setup, ...)`, which builds `sys_args` and objective-specific parameters (FOV, zMax, drop direction, corner sizes) and runs the `Experiment` flow.
+- `mains/Experiments/**` holds one script per experiment in use. Each describes its experiment in `experiment_spec(objective, absolute_center, ...)` (objective values: FOV, zMax, drop direction, margins, corners) and keeps its former entry function (`print_file`/`testprint`, with `backend=` and `plane=` for dry runs), which runs it with `run_experiment()`. `test/integration/test_ported_scripts.py` checks all of them.
+- `mains/Experiments/historical/` holds the scripts of earlier experiments that are not ported (not tested; see its README).
 - New experiments are described by an `ExperimentSpec` (`nanofactorysystem/experiment_spec.py`: objective defaults for FOV, drop direction, zMax, margins and corners; structures as `StructureSpec`; `ProgramSource.DRAWING` or `.SLICER`) and run with `run_experiment()`; `mains/Experiments/experiment_template.py` is the template (dry run: `main(backend="dummy", plane=...)`).
 - `mains/Experiments/default_exp_file.py` is the former template; its `binary_testprint(..., backend=, plane=)` can be dry-run on the dummy backend (see `test/integration/`).
 - `mains/main.py` selects one of these functions by import and supplies the resin edge coordinates and center for the current substrate.

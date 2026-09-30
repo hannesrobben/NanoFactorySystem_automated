@@ -2,25 +2,25 @@ import os
 import datetime
 from nanofactorysystem.devices.coordinate_system import Point2D
 # from Experiments.parameter_study.parameter_testprint_power_speed import testprint as print_program
-# from Experiments.dhm.dhm_img_4_SEM import dhm_paper as print_program
-# from Experiments.dhm.dhm_paper import dhm_paper as print_program
-# from Experiments.dhm.dhm_paper_aligning_DHM_camera import dhm_paper as print_program
-# from Experiments.dhm.dhm_paper_power_refractiveIndex import dhm_paper as print_program
-# from Experiments.dhm.dhm_paper_voxel_axial import dhm_paper as print_program
-# from Experiments.stacked.stacked_lenses_test import stacked_lens_testprint as print_program
-# from Experiments.Grating_63.grating_test_claude import gratings_testprint as print_program
-# from Experiments.Grating_63.grid_point_test import binary_testprint as print_program
-# from Experiments.Grating_63.FOV_Stitch_test import binary_testprint as print_program
-# from Experiments.Grating_20x.plane_fitting_20x import binary_testprint as print_program
-# from Experiments.Grating_20x.zumLaufBringen_20x_grating import binary_testprint as print_program
-from Experiments.Big_substrate_20x.grating_ifov_test import binary_testprint as print_program
-# from Experiments.Grating_20x.grating_big_stitching import binary_testprint as print_program
-# from Experiments.Grating_63.test_stitching import binary_testprint as print_program
-# from Experiments.Grating_63.test_program_cycle import binary_testprint as print_program
-# from Experiments.parameter_study.line_test.Power_speed_line_test import dhm_testprint as print_program
+# from Experiments.historical.dhm.dhm_img_4_SEM import dhm_paper as print_program
+# from Experiments.historical.dhm.dhm_paper import dhm_paper as print_program
+# from Experiments.historical.dhm.dhm_paper_aligning_DHM_camera import dhm_paper as print_program
+# from Experiments.historical.dhm.dhm_paper_power_refractiveIndex import dhm_paper as print_program
+# from Experiments.historical.dhm.dhm_paper_voxel_axial import dhm_paper as print_program
+# from Experiments.historical.stacked.stacked_lenses_test import stacked_lens_testprint as print_program
+# from Experiments.historical.Grating_63.grating_test_claude import gratings_testprint as print_program
+# from Experiments.historical.Grating_63.grid_point_test import binary_testprint as print_program
+# from Experiments.historical.Grating_63.FOV_Stitch_test import binary_testprint as print_program
+# from Experiments.historical.Grating_20x.plane_fitting_20x import binary_testprint as print_program
+# from Experiments.historical.Grating_20x.zumLaufBringen_20x_grating import binary_testprint as print_program
+from Experiments.historical.Big_substrate_20x.grating_ifov_test import binary_testprint as print_program
+# from Experiments.historical.Grating_20x.grating_big_stitching import binary_testprint as print_program
+# from Experiments.historical.Grating_63.test_stitching import binary_testprint as print_program
+# from Experiments.historical.Grating_63.test_program_cycle import binary_testprint as print_program
+# from Experiments.parameter_study.line_test.Power_speed_line_test import print_file as print_program
 
 # from Experiments.parameter_study.parameter_testprint_power_speed_test4orientation import testprint as print_program
-# from Experiments.testprint_dhm import dhm_testprint as print_program
+# from Experiments.historical.other.testprint_dhm import dhm_testprint as print_program
 
 """
 Hannes 0912e
