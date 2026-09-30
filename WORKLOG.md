@@ -1051,3 +1051,50 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Follow-ups:** A folder written before T57 still holds absolute paths. They are used as they are, so
   a legacy folder can only be restarted in its original place. T50 imports legacy folders and can
   relocate those paths.
+
+### 2026-09-30 08:55 CEST — [T48] Substrate model, default location and experiment index
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/storage/substrate_store.py` (new):
+    - `SubstrateRecord` (label, UUID, created, user, material, resin drops, notes, experiments, extra);
+    - `SubstrateStore`: `create` (label proposed per user and year, D2), `get` by label or UUID,
+      `add_resin_drop`, `next_experiment_label`, `experiment_folder` (D3), `register_experiment` and
+      `update_experiment` (lock file plus atomic write), `import_legacy` for old
+      `substrate_information.json` files;
+    - `find_experiments` (by substrate, objective, date range, status);
+    - `default_root` (`dataRoot` of the user, else `~/Documents/Femtika_Experiment/<user>`) and
+      `check_not_synced` (D1: hard error for Seafile/OneDrive/Dropbox; names configurable as
+      `system.syncFolderNames`).
+  - `nanofactorysystem/experiment.py`:
+    - new keyword arguments `substrate`, `data_root`, `allow_synced_root`.
+    - `path=None` creates the next experiment folder of the substrate and adds `console.log` there.
+    - The experiment is registered in the substrate index once; the status is copied into the index at
+      the end of every session.
+    - The experiment file holds the experiment label, the substrate UUID/label and a copy of the substrate
+      record.
+    - `_save_substrate_information` (merge into the parent folder) is removed; the free dictionary is stored
+      as `/metadata/substrate/information`.
+    - `parameters_from_dictionary()` passes substrate and data root for experiments in a substrate folder.
+  - `nanofactorysystem/storage/experiment_store.py`: `/metadata/substrate`, `read_identification()`,
+    `read_status()`. `records.py`: `ExperimentRecord.substrate`. `json_copies.py`: `substrate` key.
+  - Tests:
+    - `test/storage/test_substrate_store.py` (new): 9 tests.
+    - `test/test_experiment.py`: two experiments on one substrate (the same experiment printed twice);
+      the index after an abort and a restart; path or substrate needed.
+    - `test_substrate_information_is_merged` is replaced by
+      `test_substrate_information_is_stored_in_the_experiment`, because T48 replaces the merge logic.
+    - The dry run checks the substrate information in the file instead of `substrate_information.json`.
+  - `test/README.md`, `CLAUDE.md`.
+  - `TODO.md`: T48 moved to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 214 passed, 14 skipped.
+- **Commits:** `1014892` feat(storage): add substrate records and the experiment index [T48];
+  `cf5ed05` feat(experiment): place experiments on substrates in the default location [T48];
+  docs(todo): close T48 [T48]
+- **Deviations from the design:**
+  - `substrate.json` has an additional `extra` field for keys without a fixed field (old dictionaries).
+  - Material fields are free-form.
+  - The experiment template (`default_exp_file.py`) still uses an explicit `path`; T51/T52 move the scripts to
+    substrates.
+- **Behaviour change on hardware:** `substrate_information.json` is no longer written into the parent folder.
+- **To check on the lab PC:** `~/Documents` must not be inside a Seafile library, otherwise set `dataRoot` per
+  user.

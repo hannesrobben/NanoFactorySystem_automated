@@ -72,17 +72,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
         - Dummy test for UP and DOWN checks the counts after a complete and an aborted structure.
       Notes: Can be done as part of T47/T50 if the progress record moves into the experiment file.
 
-- [ ] T48: Substrate model, default location and experiment index [phase: 2]
-      Goal: Several experiments on one substrate are stored side by side under a default location and can be found again.
-      Priority: high | Depends on: T47
-      Done when:
-        - A substrate record (label, UUID, material, resin drop edges, notes) is stored once per substrate and every experiment references the substrate UUID; it replaces the merge logic of `_save_substrate_information` (old `substrate_information.json` files can still be read).
-        - The default root is `~/Documents/Femtika_Experiment/<user>/`, configurable per user in `nanofactory.json`; an explicit `path` overrides it.
-        - A new print never overwrites an earlier one on the same substrate, also when the same experiment is printed again (N003–N005).
-        - The substrate index lists every experiment with UUID, label, center, double-corner position, file path, date, objective and status; a function finds experiments by substrate, date and objective (N025).
-        - Dummy tests: two experiments on one substrate, one repeated experiment.
-      Notes: Together with T42 and T47 replaces T27.
-
 - [ ] T49: Experiment summary [phase: 2]
       Goal: A quick check of what was printed in an experiment and with which parameters.
       Priority: medium | Depends on: T47
@@ -331,3 +320,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T55: Store the controller command log with the experiment — 2026-09-30 — `A3200.log` is written into the experiment folder, and the command log and the session's console log are stored per session under `/logs` in `experiment.h5`, also after an exception or abort. — commits: `b624a66`
 
 - [x] T57: Store paths relative to the experiment folder — 2026-09-30 — Layer/structure program files and the log file are stored relative to the experiment folder (file and JSON copies); `parameters_from_dictionary()` uses the given folder, so a moved experiment can be restarted; old absolute entries still work. — commits: `e07db5a`
+
+- [x] T48: Substrate model, default location and experiment index — 2026-09-30 — `SubstrateStore` (substrate.json with record and experiment index, labels `HR-26-001`/`-A`, `find_experiments`, `default_root` with `dataRoot` and refused synced folders); `Experiment(path=None, substrate=...)` creates a new folder per print and keeps the index up to date; `substrate_information.json` merging replaced (old files importable). — commits: `1014892`, `cf5ed05`
