@@ -87,7 +87,8 @@ def test_experiment_dictionary(experiment):
     data = json.loads((experiment.path / "experiment_dictionary.json").read_text())
 
     assert data["objective"] == "Zeiss 20x"
-    assert data["logger"] == str(experiment.path / "console.log")
+    # Paths are relative to the experiment folder (T57)
+    assert data["logger"] == "console.log" and data["path"] == "."
 
 
 def test_structure_without_layers(experiment):
@@ -242,6 +243,34 @@ def test_aborted_experiment_keeps_its_command_log(test_config, dummy_backend, no
     assert store.read().status == "aborted" and store.read().sessions[0]["end_reason"] == "aborted"
 
 
+def test_moved_experiment_can_be_restarted(test_config, dummy_backend, no_sleep, tmp_path):
+    import shutil
+
+    old = tmp_path / "old" / "experiment"
+    old.mkdir(parents=True)
+    with make_experiment(old, dummy_backend) as experiment:
+        experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+        add_rectangle(experiment)
+        experiment.build_programs()
+        layers = experiment.structure_configs[0]["layer_files"]
+    (old / "print_progress.json").write_text(json.dumps({
+        "current_structure": {"name": "rect", "finished layer": 0, "order": 1},
+        "finished_structures": [], "error log": []}))
+    new = tmp_path / "new" / "experiment"
+    getLogger(logfile=tmp_path / "other.log")  # release old/console.log, so that the folder can be moved
+    shutil.move(old.parent, new.parent)
+    dummy_backend.calllog.clear()
+
+    with Experiment(**Experiment.parameters_from_dictionary(new), backend=dummy_backend) as restarted:
+        assert restarted.path == new
+        restarted.restart_experiment()
+
+    # All remaining layers ran; they can only have been read from the new folder, the old one is gone
+    assert len(dummy_backend.calllog.filter(device="program")) == len(layers) - 1
+    assert not (tmp_path / "old").exists()
+    assert ExperimentStore.open(new).read().status == "finished"
+
+
 def test_existing_experiment_is_not_overwritten(test_config, dummy_backend, no_sleep, tmp_path):
     path = tmp_path / "experiment"
     path.mkdir()
@@ -285,6 +314,8 @@ def test_restart_from_stored_dictionary(test_config, dummy_backend, no_sleep, tm
 
     assert len(dummy_backend.calllog.filter(device="program")) == len(layers) - 2
     assert [s["name"] for s in progress(experiment)["finished_structures"]] == ["rect"]
+    stored = json.loads((path / "structures.json").read_text())
+    assert not any(Path(f).is_absolute() for s in stored for f in s["layer_files"] + [s["program_file"]])
     # The restart continued the same experiment file and kept its UUID
     record = ExperimentStore.open(path).read()
     assert record.uuid == experiment.qr_text

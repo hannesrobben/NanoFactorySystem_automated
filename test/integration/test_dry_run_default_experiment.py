@@ -66,10 +66,11 @@ def test_default_experiment_dry_run(test_config, dummy_backend, no_sleep, tmp_pa
     assert [s.status for s in record.structures] == ["printed"] * len(structures)
     assert record.layout.double_corner.name == "corner_tl"
     assert record.layout.qrcode_text == record.uuid
-    layer_files = [Path(f) for s in structures for f in s["layer_files"]]
+    # Paths are stored relative to the experiment folder (T57)
+    assert all(not Path(f).is_absolute() for s in structures for f in s["layer_files"])
+    layer_files = [out / f for s in structures for f in s["layer_files"]]
     assert structures and layer_files
     assert all(f.is_file() for f in layer_files)
-    assert all(tmp_path in f.parents for f in layer_files)
 
     # Every layer program was loaded, run to completion and fully understood by the simulation.
     # If this fails after adding new AeroBasic commands, extend FakeA3200Transport.execute().

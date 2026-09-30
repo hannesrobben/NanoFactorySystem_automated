@@ -81,7 +81,7 @@ python -m pytest test/test_aerobasic/test_golden_programs.py --update-golden   #
 
 **Experiment storage** (`storage/`, design in `docs/design/EXPERIMENT_STORAGE.md`)
 - `ExperimentStore` writes everything of an experiment into `<path>/experiment.h5` (schema version, metadata, calibration, plane fit, OPL scan, layout, structures with layer programs and progress, camera/DHM captures with commanded and actual positions, DHM products, and per session the controller command log and the console log under `/logs`). Every write opens and closes the file; a lock file `experiment.lock` allows one writing process, and each run is a session.
-- `experiment_dictionary.json` and `structures.json` are copies exported from the file (`storage/json_copies.py`); captures are no longer written as `.zdc` files (`export_capture()` writes one on request).
+- `experiment_dictionary.json` and `structures.json` are copies exported from the file (`storage/json_copies.py`); all stored paths are relative to the experiment folder, so a moved folder can be restarted; captures are no longer written as `.zdc` files (`export_capture()` writes one on request).
 - `storage/records.py` holds the plain data records (`ExperimentRecord`, `StructureRecord`, `CaptureRecord`, …); `ExperimentStore.read()` rebuilds all metadata from the file alone.
 
 **Experiment scripts** (`mains/`)

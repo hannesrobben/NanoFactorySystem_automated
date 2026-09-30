@@ -54,7 +54,8 @@ def experiment_dictionary(record: ExperimentRecord, folder: Path) -> dict:
     ----------
     record : ExperimentRecord
     folder : Path
-        Experiment folder (stored as ``path``).
+        Experiment folder. ``path`` is stored as ``"."``: all paths in the
+        copies are relative to the experiment folder.
 
     Returns
     -------
@@ -65,7 +66,7 @@ def experiment_dictionary(record: ExperimentRecord, folder: Path) -> dict:
 
     parameters = record.parameters
     data = {
-        "path": str(folder),
+        "path": ".",
         "user": record.user.get("key", ""),
         "objective": record.objective.get("key", ""),
         "logger": parameters.get("log_file") or None,

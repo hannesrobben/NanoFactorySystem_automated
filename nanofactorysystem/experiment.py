@@ -284,7 +284,7 @@ class Experiment(object):
         converters = {"float": float, "int": int, "bool": bool, "str": str, "enum": str,
                       "vector": lambda v: np.asarray(v, dtype=float), "ivector": lambda v: np.asarray(v, dtype=int)}
         parameters = {name: converters[kind](values[argument]) for argument, _, name, kind in schema.PARAMETERS}
-        parameters["log_file"] = self._log_file() or ""
+        parameters["log_file"] = self._relative(self._log_file()) if self._log_file() else ""
         parameters["dhm_usage"] = self.system.dhm is not None
 
         devices = {key: value for key, value in self.system.items().items() if key != "data/objective.json"}
@@ -343,6 +343,20 @@ class Experiment(object):
 
         file_path.write_text(json.dumps(data, indent=4))
 
+    def _relative(self, file) -> str:
+        """ Return ``file`` relative to the experiment folder (POSIX form), or unchanged if outside it. """
+
+        try:
+            return Path(file).resolve().relative_to(self.path.resolve()).as_posix()
+        except ValueError:
+            return str(file)
+
+    def _absolute(self, file) -> Path:
+        """ Return a stored path as absolute path; relative paths are relative to the experiment folder. """
+
+        file = Path(file)
+        return file if file.is_absolute() else self.path / file
+
     def _log_file(self) -> Optional[str]:
         """ Return the file of the most recently added file handler of the logger, or None. """
 
@@ -356,7 +370,9 @@ class Experiment(object):
         Reads ``experiment_dictionary.json``, which every experiment writes into
         its folder, e.g. to restart an aborted print with
         ``Experiment(**Experiment.parameters_from_dictionary(path))``. Vectors
-        may be stored as numbers or, in older files, as strings.
+        may be stored as numbers or, in older files, as strings. The
+        experiment folder is ``path`` itself, not the folder stored in the
+        file, so that a moved or copied experiment can be restarted.
 
         Parameters
         ----------
@@ -380,9 +396,10 @@ class Experiment(object):
                 return [float(v) for v in text]
             return [float(v) for v in str(text).strip("[]() ").replace(",", " ").split()]
 
-        logfile = data.get("logger") or path / "console.log"
+        # The log file is looked up in the given folder (older files store absolute paths)
+        logfile = path / Path(data.get("logger") or "console.log").name
         return {
-            "path": Path(data["path"]),
+            "path": path,
             "user": data["user"],
             "objective": data["objective"],
             "logger": getLogger(logfile=logfile),
@@ -1106,7 +1123,7 @@ class Experiment(object):
         # structures.json is a copy of the structures in the experiment file
         self.store.set_status(schema.STATUS_BUILT)
         self._save_exp_dict()
-        self.structure_configs = structures_list(self.store.read())
+        self.structure_configs = self._with_absolute_paths(structures_list(self.store.read()))
 
     def _layer_order(self) -> int:
         """ +1 if layers are printed with ascending ids (drop direction UP), -1 otherwise. """
@@ -1127,10 +1144,12 @@ class Experiment(object):
             center_um=(config["center_x"], config["center_y"], float(config["center_z"])),
             reference_um=tuple(float(v) for v in reference), power_mw=config["power"],
             structure_class=f"{type(structure).__module__}.{type(structure).__qualname__}",
-            config=config["structure"], layer_files=config["layer_files"], program_file=config["program_file"],
+            config=config["structure"], layer_files=[self._relative(f) for f in config["layer_files"]],
+            program_file=self._relative(config["program_file"]),
             layer_order=self._layer_order(), dhm_image_count=config["number of dhm images"]))
         for file in config["layer_files"]:
-            self.store.write_layer_program(name, self._layer_id(file), Path(file).read_text(), file)
+            self.store.write_layer_program(name, self._layer_id(file), Path(file).read_text(),
+                                           self._relative(file))
         self.store.write_structure_program(name, Path(config["program_file"]).read_text())
 
     @staticmethod
@@ -1151,12 +1170,27 @@ class Experiment(object):
         self.store.add_structure(StructureRecord(
             index=-1, name=name, type="DIRECT", grid_index=-1, corner_position="", axes="", setup=self.setup,
             center_um=(float(x), float(y), float("nan")), reference_um=(float(x), float(y)),
-            power_mw=float(power), structure_class="", config={}, layer_files=[str(f) for f in layer_files],
+            power_mw=float(power), structure_class="", config={}, layer_files=[self._relative(f) for f in layer_files],
             program_file="", layer_order=self._layer_order(), dhm_image_count=int(dhm_image_count)))
 
     def retrieve_programs(self):
+        """ Load the structure configurations from ``structures.json`` (paths made absolute). """
+
         structure_configs_path = self.path / "structures.json"
-        self.structure_configs = json.loads(open(structure_configs_path).read())
+        self.structure_configs = self._with_absolute_paths(json.loads(structure_configs_path.read_text()))
+
+    def _with_absolute_paths(self, configs: list[dict]) -> list[dict]:
+        """ Return structure configurations with absolute program paths.
+
+        The stored copies hold paths relative to the experiment folder; in
+        memory the configurations use absolute paths, as before.
+        """
+
+        for config in configs:
+            config["layer_files"] = [str(self._absolute(f)) for f in config["layer_files"]]
+            if config.get("program_file"):
+                config["program_file"] = str(self._absolute(config["program_file"]))
+        return configs
 
     def print_structure(self,
                         pgm_files_list: list[Path],
@@ -1239,7 +1273,7 @@ class Experiment(object):
 
         for structure_config in self.structure_configs:
             self.print_structure(
-                [Path(p) for p in structure_config["layer_files"]],
+                [self._absolute(p) for p in structure_config["layer_files"]],
                 x=structure_config["center_x"],
                 y=structure_config["center_y"],
                 name=structure_config["name"],
@@ -1331,7 +1365,7 @@ class Experiment(object):
         for config in remaining_structures:
 
             name = config["name"]
-            layer_files = [Path(p) for p in config["layer_files"]]
+            layer_files = [self._absolute(p) for p in config["layer_files"]]
 
             # If this structure was partially printed, trim the layer list
             if name == resume_name:
