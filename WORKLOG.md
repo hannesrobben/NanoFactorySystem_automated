@@ -928,3 +928,75 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Follow-ups:**
   - The commanded Z is None because `measure()` does not move Z; T58 defines it.
   - `captures.json` is the interim storage until T47 moves the records into `experiment.h5`.
+
+### 2026-09-30 08:34 CEST — [T47] Implement the HDF5 experiment store
+- **Status:** done
+- **Branch:** `feat/phase2-experiment-store`, based on `feat/phase1-capture-positions`
+- **Changes:**
+  - `nanofactorysystem/aerobasic/slicer/storage.py`: new `write_job()`, which writes the unchanged `job.h5`
+    schema into an open group. `save_job()` uses it.
+  - `nanofactorysystem/storage/` (package from T46, extended):
+    - `experiment_store.py` (new): `ExperimentStore` with `create`/`open`/`exists`, sessions with a lock,
+      and the write methods of design §11. Read methods: `read`, `read_uuid`, `has_structure`,
+      `read_capture`, `read_dhm_product`, `read_program`, `plane_fit_container`. Export: `export_capture`
+      writes a `.zdc` file on request. Every write opens and closes the file.
+    - `records.py`: `StructureRecord`, `PlaneFitRecord`, `CornerRecord`, `LayoutRecord`, `ExperimentRecord`,
+      `z_function_to_json`/`z_function_from_json`; `CaptureRecord` gets a `capture_id`.
+    - `schema.py` (new): file type, `SCHEMA_VERSION = "1.0"`, status values, and the mapping of constructor
+      argument → JSON key → HDF5 attribute.
+    - `json_copies.py` (new): `experiment_dictionary.json` and `structures.json` built from the record. The
+      old keys stay; vectors are numbers now.
+    - `locking.py` (new): lock file with host, PID and start time. On Windows the PID check uses
+      `OpenProcess`, because `os.kill(pid, 0)` would terminate the process there.
+    - `software.py` (new): package version, git commit/branch/dirty state, library versions.
+  - `nanofactorysystem/experiment.py`:
+    - The constructor creates or opens `experiment.h5`. Each `Experiment` is one session;
+      `__exit__` records how it ended and sets the status to `failed` or `aborted` after an exception.
+    - New keyword `resume`. Without it, an existing experiment file is refused. With it, the stored
+      experiment continues with its UUID; `parameters_from_dictionary()` sets it, and reads vectors as
+      numbers or old strings.
+    - `plot_experiment`, `plane_fit` (given, loaded, measured, incl. the `.zdc` containers),
+      `opl_scan`, `_build_programs`, `print_structure` (status, per-layer progress with start/end time)
+      and `print_experiment`/`restart_experiment` (final status) write through the store.
+    - `measure()` stores the images and holograms in the file and no longer writes `.zdc` files.
+      Its signature is `measure(coordinate, *, structure, phase, layer_id, dhm_image_count, offsets_um)`.
+      Structures printed or measured without `build_programs()` are registered as type `DIRECT`.
+    - `calibration_file.npy`, `_create_experiment_dictionary` and `captures.json` (from T46) were removed.
+  - `test/storage/test_experiment_store.py` (new): 11 unit tests.
+  - `test/test_experiment.py`: the capture tests read from the store. New tests: an exception during
+    printing leaves a readable file with status `failed`; an existing folder is refused; a restart keeps
+    the file and the UUID.
+  - `test/integration/test_dry_run_default_experiment.py`:
+    - it checks `experiment.h5`, and that the JSON copies equal what is exported from the file;
+    - it checks the camera captures inside the file instead of `calibration_file.npy` and `.zdc` files.
+    Justification: design D6, approved 2026-09-29. No assertion was weakened; the file checks were
+    replaced by stronger content checks.
+  - `test/README.md`, `CLAUDE.md`: the storage package and the changed tests.
+  - `TODO.md`: T47 moved to Done.
+- **Tests:** `python -m pytest` (short-path venv): 199 passed, 14 skipped. Golden programs and golden command
+  logs are unchanged.
+  - The suite takes about 80 s instead of about 40 s. The two DHM-on command-log experiments and the dry run
+    are already marked `slow`.
+  - Profiling shows file opens of about 6 ms (plain) and 14 ms (HDF5) on this PC, probably on-access virus
+    scanning of the temp folder, plus about 45 ms of gzip per camera image.
+  - On the lab PC this adds roughly 0.1 s per layer.
+- **Commits:** `bc371eb` refactor(slicer): write a job into an open HDF5 group [T47];
+  `fe6036a` feat(storage): add the HDF5 experiment store [T47];
+  `bed280b` feat(experiment): write all experiment data through the store [T47];
+  docs(todo): close T47 [T47]
+- **Deviations from the design:**
+  - A stale lock (same host, process no longer running) is replaced with a warning, instead of requiring
+    `force=True`. A restart after a crash must not need a manual step, and a dead process cannot be
+    writing.
+  - The layer program files stay in `structures/<name>/programs/`; the design's `programs/` layout comes
+    with the folder layout in T48.
+  - `print_progress.json` is still written, because the restart logic reads it (T50, T59).
+- **Behaviour changes on hardware:**
+  - No `.zdc` files for captures and no `calibration_file.npy`; everything is in `experiment.h5`.
+  - Running a script twice into the same folder now fails with `FileExistsError`. Before, it overwrote the
+    earlier data.
+  - The restart script continues the stored experiment and keeps its UUID (part of N027/T50).
+- **Follow-ups:**
+  - T55 (`/logs/a3200`), T57 (relative paths), T49 (`/summary`) and T48 (folder layout, substrates) build
+    on this.
+  - Suggestion: faster tests with a lower gzip level for dummy images. Not done; the design fixes level 4.

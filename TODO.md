@@ -53,17 +53,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 
 ### Phase 2 — Experiment storage
 
-- [ ] T47: Implement the HDF5 experiment store [phase: 2]
-      Goal: All experiment data is written and read through one storage interface as designed in T42.
-      Priority: high | Depends on: T42 (approved)
-      Done when:
-        - The store class of T42 exists in its own module, writes a `schema_version`, and opens and closes the file per write.
-        - `Experiment` writes the experiment dictionary, calibration, structure configurations, layer programs, captures and print progress through the store; `structures.json` and `experiment_dictionary.json` are still written as copies from the same data.
-        - A generic method stores DHM products by name with metadata (hologram, phase, amplitude, …); this is the interface for the DHM PC (F4).
-        - Slicer outputs (`aerobasic/slicer/storage.py`) are stored in, or linked from, the experiment file.
-        - A load function reconstructs all experiment metadata from the HDF5 file alone.
-        - Tests: a dummy dry run writes the file and reading it back matches the JSON copies; an exception in the middle of printing leaves a readable file.
-
 - [ ] T55: Store the controller command log with the experiment (found during T41) [phase: 2]
       Goal: The record of every command sent to the A3200 belongs to the experiment and survives the next run and an abort.
       Priority: medium | Depends on: T47
@@ -352,3 +341,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T42: Design the experiment storage and substrate model — 2026-09-29 — `docs/design/EXPERIMENT_STORAGE.md` defines one self-contained HDF5 file per experiment below the per-user default root, substrate/experiment labels and UUIDs, write strategy, JSON copies, legacy reading and the store API; approved by the maintainer with all proposals D1–D8. — commits: `ef2ff63`, `3f75e0a`
 
 - [x] T46: Record the stage position of every capture — 2026-09-29 — `measure()` stores a `CaptureRecord` (commanded and actual XYZAB position, structure, phase, layer, image index/count, UTC time) in every camera/DHM container and in `captures.json`, and accepts a list of capture offsets; golden command logs unchanged. — commits: `c16f5ae`
+
+- [x] T47: Implement the HDF5 experiment store — 2026-09-30 — New `nanofactorysystem.storage` (`ExperimentStore`, records, JSON copies, lock file, software info); `Experiment` writes metadata, calibration, plane fit, OPL scan, layout, structures, layer programs, progress and captures (no more `.zdc`/`.npy`) into `experiment.h5`, exports the JSON copies from it, and refuses an existing experiment folder unless `resume=True`. — commits: `bc371eb`, `fe6036a`, `bed280b`
