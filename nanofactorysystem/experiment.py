@@ -20,7 +20,7 @@ import numpy as np
 from matplotlib.patches import Ellipse, Rectangle
 from scidatacontainer import Container
 
-from nanofactorysystem import System, ImageContainer, Plane, mkdir, getLogger
+from nanofactorysystem import System, ImageContainer, mkdir, getLogger
 from nanofactorysystem.aerobasic import SingleAxis, AxisStatusDataItem
 from nanofactorysystem.aerobasic.ascii import AerotechError
 from nanofactorysystem.aerobasic.programs import AeroBasicProgram
@@ -29,9 +29,11 @@ from nanofactorysystem.aerobasic.programs.drawings.lines import Corner
 from nanofactorysystem.aerobasic.programs.drawings.qr_code import QRCode, QrErrorCorrection
 from nanofactorysystem.aerobasic.programs.setups import DefaultSetup, SetupIFOV
 from nanofactorysystem.backends import BackendLike
-from nanofactorysystem.devices.coordinate_system import CoordinateSystem, PlaneFit, DropDirection, Unit, \
+from nanofactorysystem.devices.coordinate_system import CoordinateSystem, DropDirection, Unit, \
     Point2D, Point3D, Coordinate, ZFunction
 from nanofactorysystem.devices.power_calibration import PowerCalibration, power_calibration
+from nanofactorysystem.plane_fitting import (PlaneFitMode, interface_for, measure_plane, sample_points,
+                                             structure_tilt)
 from nanofactorysystem.storage import (CaptureRecord, CornerRecord, ExperimentRecord, ExperimentStore,
                                        LayoutRecord, PlaneFitRecord, StructureRecord, export_json,
                                        software_info, utc_timestamp, z_function_to_json)
@@ -92,14 +94,15 @@ class Experiment(object):
                  fov_dim: tuple[float, float],
                  *,
                  skip_corner: bool = False,
-                 plane_fit_mode: int = 0,
+                 plane_fit_mode: PlaneFitMode | int | str = PlaneFitMode.GRID,
                  setup: Literal["IFOV_off", "IFOV_on"] = "IFOV_off",
                  substrate_information: dict=None,
                  backend: BackendLike = None,
                  resume: bool = False,
                  substrate: Optional[str] = None,
                  data_root: Optional[Path] = None,
-                 allow_synced_root: bool = False):
+                 allow_synced_root: bool = False,
+                 tilt_warning_um: float = 1.0):
         """ Experiment on one substrate.
 
         Only the newer parameters are documented here; see the class
@@ -127,6 +130,12 @@ class Experiment(object):
             ``~/Documents/Femtika_Experiment/<user>``).
         allow_synced_root : bool
             Accept a data root inside a synchronised folder (Seafile, …).
+        plane_fit_mode : PlaneFitMode, int or str
+            Where the substrate is measured (see :class:`PlaneFitMode`); the
+            integers of older scripts (0, 1) are accepted.
+        tilt_warning_um : float
+            After the plane fit, a warning is logged if the substrate height
+            under a structure varies by more than this value.
         backend : {"real", "dummy"}, Backend or None
             Hardware backend passed to :class:`System`. None or ``"real"``
             (default) uses the lab hardware, ``"dummy"`` or a
@@ -190,6 +199,10 @@ class Experiment(object):
         self.margin = float(margin)
         self.padding = float(padding)
         self.absolute_grid_center = np.array(absolute_grid_center.as_tuple(), dtype=float)
+        if not (np.all(self.resin_corner_bl <= self.absolute_grid_center)
+                and np.all(self.absolute_grid_center <= self.resin_corner_tr)):
+            raise ValueError(f"The experiment center {self.absolute_grid_center.tolist()} lies outside the resin "
+                             f"drop edges {self.resin_corner_bl.tolist()} - {self.resin_corner_tr.tolist()}.")
         self.fov_dimensions = fov_dim
 
         self.grid = np.array(grid, dtype=int)
@@ -200,7 +213,8 @@ class Experiment(object):
         assert self.n_mid_points >= 0
 
         self.drop_direction = drop_direction
-        self.plane_fit_mode = plane_fit_mode
+        self.plane_fit_mode = PlaneFitMode.parse(plane_fit_mode)
+        self.tilt_warning_um = float(tilt_warning_um)
 
         # Corner dimensions
         self.corner_z = float(corner_z)
@@ -393,7 +407,8 @@ class Experiment(object):
             "corner_z": self.corner_z, "corner_width": self.corner_width, "corner_length": self.corner_length,
             "corner_height": self.corner_height, "corner_hatch": self.corner_hatch,
             "corner_slice": self.corner_slice, "fov_dim": self.fov_dimensions, "skip_corner": self.skip_corner,
-            "plane_fit_mode": self.plane_fit_mode, "setup": self.setup,
+            "plane_fit_mode": self.plane_fit_mode.name, "setup": self.setup,
+            "tilt_warning_um": self.tilt_warning_um,
         }
         converters = {"float": float, "int": int, "bool": bool, "str": str, "enum": str,
                       "vector": lambda v: np.asarray(v, dtype=float), "ivector": lambda v: np.asarray(v, dtype=int)}
@@ -518,6 +533,8 @@ class Experiment(object):
         values = record.parameters
         arguments = {}
         for argument, _, name, kind in schema.PARAMETERS:
+            if name not in values:
+                continue  # parameter added later; the constructor default applies
             value = values[name]
             if argument in ("resin_corner_tr", "resin_corner_bl", "absolute_grid_center"):
                 value = Point2D(*[float(v) for v in value])
@@ -525,8 +542,10 @@ class Experiment(object):
                 value = tuple(float(v) for v in value)
             elif kind == "ivector":
                 value = tuple(int(v) for v in value)
-            elif kind == "enum":
+            elif argument == "drop_direction":
                 value = DropDirection[value]
+            elif argument == "plane_fit_mode":
+                value = PlaneFitMode.parse(value)
             arguments[argument] = value
         return {
             "path": path,
@@ -613,7 +632,8 @@ class Experiment(object):
             "corner_slice": data["corner_slice"],
             "fov_dim": tuple(vector(data["fov_dim"])),
             "skip_corner": bool(data["skip_corner"]),
-            "plane_fit_mode": data["plane_fit_mode"],
+            "plane_fit_mode": PlaneFitMode.parse(data["plane_fit_mode"]),
+            **({"tilt_warning_um": data["tilt_warning_um"]} if "tilt_warning_um" in data else {}),
             "setup": data["setup"] or "IFOV_off",
             "resume": True,
             **substrate,
@@ -691,45 +711,10 @@ class Experiment(object):
         return self.center_point + self.grid_center + [-self.grid_width / 2, self.grid_height / 2]
 
     def sample_points_for_plane_fitting(self) -> list[tuple[float, float]]:
-        n_rows = self.grid[0]  # + 1
-        n_cols = self.grid[1]
-        points = []
-        if self.plane_fit_mode == 0:  # plane fitting points also in between structures
-            for i in range(n_rows + 1):
-                for j in range(n_cols + 1):
-                    x = float(self.rectangle_tl[0]) + self.margin - 0.5 * self.padding + j * (
-                            self.structure_size + self.padding)
-                    y = float(self.rectangle_tl[1]) + self.margin - 0.5 * self.padding + i * (
-                            self.structure_size + self.padding)
-                    points.append((x, y))
-        elif self.plane_fit_mode == 1:
-            x0 = float(self.rectangle_tl[0]) + self.margin - 0.5 * self.padding
-            x1 = float(self.rectangle_tl[0]) + self.margin - 0.5 * self.padding + n_cols * (
-                    self.structure_size + self.padding)
-            y0 = float(self.rectangle_tl[1]) + self.margin - 0.5 * self.padding
-            y1 = float(self.rectangle_tl[1]) + self.margin - 0.5 * self.padding + n_rows * (
-                    self.structure_size + self.padding)
-            points.append((x0, y0))
-            points.append((x0, y1))
-            points.append((x1, y0))
-            points.append((x1, y1))
-        else:
-            raise NotImplementedError(f"Plane fit mode {self.plane_fit_mode} is not implemented!")
-        return points
+        """ Sample points of the plane fit for ``plane_fit_mode`` (see :class:`PlaneFitMode`), in µm. """
 
-    # def sample_points_for_plane_fitting_old(self) -> list[tuple[float, float]]:
-    #     tl = self.rectangle_tl + self.margin / 2
-    #     br = self.rectangle_br - self.margin / 2
-    #     points = set()
-    #     for x in np.linspace(tl[0], br[0], self.n_mid_points + 2):
-    #         points.add((x, tl[1]))
-    #         points.add((x, br[1]))
-    #
-    #     for y in np.linspace(tl[1], br[1], self.n_mid_points + 2):
-    #         points.add((tl[0], y))
-    #         points.add((br[0], y))
-    #
-    #     return list(points)
+        return sample_points(self.plane_fit_mode, self.rectangle_tl, self.margin, self.padding,
+                             self.structure_size, self.grid)
 
     def plot_experiment(self, show: bool = True):
         """ Plot the experiment layout and save it as ``experiment.png``.
@@ -838,48 +823,47 @@ class Experiment(object):
             self.log.info(f"Using given substrate plane {plane!r} (no plane detection)")
             self._store_plane_fit(plane, source="given", interface="", points=np.empty((0, 3)))
             self._init_coordinate_system(plane)
+            self._check_tilt(plane)
             return
 
         path = self.path / "planefit"
-        mkdir(path, clean=False)
-        plane_dc_path = path / "plane.zdc"
-
-        if not force and plane_dc_path.exists():
-            self.log.info("Load plane detection results...")
-            dc = Container(file=str(plane_dc_path))
-            source = "loaded"
-
-        else:
-            source = "measured"
-            # Plane needs micrometer coordinates
-            if self.system.objective['magnification'] == 63.0:
-                zlo = self.system.z0
-                zup = None
-            else:
-                zlo = zup = self.system.z0
-
-            plane = Plane(zlo, zup, self.system, self.log, **self.sys_args)
-
-            self.log.info("Store background image...")
-            plane.layer.focus.imgBack.write(str(path / "back.zdc"))
-
-            self.log.info("Run plane detection...")
-            for x, y in self.sample_points_for_plane_fitting():
-                plane.run(x, y, path=path)
-
-            self.log.info("Store plane detection results...")
-            dc = plane.container()
-            dc.write(str(plane_dc_path))
-
-        interface = "low" if self.drop_direction == DropDirection.DOWN else "high"
-        plane_points = dc["meas/result.json"][interface]["points"]
-        plane_fit_function = PlaneFit.from_points(np.asarray(plane_points))  # in um
+        plane_fit_function, dc, source = measure_plane(
+            self.system, self.sample_points_for_plane_fitting(), self.drop_direction, path, self.log,
+            sys_args=self.sys_args, force=force)
+        interface = interface_for(self.drop_direction)
         self.plane_fit_function = plane_fit_function
-        self.log.info(str(plane_fit_function))
         containers = {p.relative_to(path).as_posix(): p.read_bytes() for p in sorted(path.rglob("*.zdc"))}
         self._store_plane_fit(plane_fit_function, source=source, interface=interface,
-                              points=np.asarray(plane_points, dtype=float), containers=containers)
+                              points=np.asarray(dc["meas/result.json"][interface]["points"], dtype=float),
+                              containers=containers)
         self._init_coordinate_system(plane_fit_function)
+        self._check_tilt(plane_fit_function)
+
+    def _check_tilt(self, z_function: ZFunction) -> list[tuple[int, float]]:
+        """ Warn about grid cells where the substrate height varies more than ``tilt_warning_um``.
+
+        The structures are written at the plane height of their center, so on
+        a tilted substrate the corners of a large structure are higher or
+        lower than its center.
+
+        Returns
+        -------
+        list of (int, float)
+            Grid index and height deviation of every cell above the threshold.
+        """
+
+        tilted = []
+        for index, center in enumerate(self.iter_experiment_locations()):
+            deviation, z_min, z_max = structure_tilt(z_function, center, self.structure_size)
+            if deviation > self.tilt_warning_um:
+                tilted.append((index, deviation))
+        if tilted:
+            worst = max(d for _, d in tilted)
+            self.log.warning(f"The substrate height varies by up to {worst:.2f} um under a structure "
+                             f"({len(tilted)} of {int(self.grid[0] * self.grid[1])} grid cells above "
+                             f"{self.tilt_warning_um:g} um); the structures are written at the height of "
+                             f"their center.")
+        return tilted
 
     def _store_plane_fit(self, z_function: ZFunction, *, source: str, interface: str, points: np.ndarray,
                          containers: Optional[dict[str, bytes]] = None) -> None:
@@ -887,7 +871,7 @@ class Experiment(object):
 
         name, parameters = z_function_to_json(z_function)
         self.store.write_plane_fit(PlaneFitRecord(
-            mode=str(self.plane_fit_mode), source=source, function=name, function_json=parameters,
+            mode=self.plane_fit_mode.name, source=source, function=name, function_json=parameters,
             interface=interface, sample_points_um=np.asarray(self.sample_points_for_plane_fitting(), dtype=float),
             interface_points_um=points), containers)
         self._save_exp_dict()

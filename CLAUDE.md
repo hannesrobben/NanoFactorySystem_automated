@@ -71,7 +71,7 @@ python -m pytest test/test_aerobasic/test_golden_programs.py --update-golden   #
 - `Experiment` is a context manager that owns a `System`. It lays out a grid of structures inside the resin-drop bounds, adding corner markers plus a QR code (the experiment UUID) unless `skip_corner=True`.
 - Typical flow:
   1. `plot_experiment()`
-  2. `plane_fit()`, which measures the substrate surface at sample points (or uses a given `plane=`)
+  2. `plane_fit()`, which measures the substrate surface at sample points (or uses a given `plane=`); the points follow `plane_fit_mode` (`PlaneFitMode.GRID`/`CORNERS`/`BORDER`, old integers accepted), and `plane_fitting.py` (`sample_points`, `measure_plane`) also runs a single plane fit without `Experiment`. A warning is logged if the substrate height under a structure varies by more than `tilt_warning_um`
   3. `opl_scan()`, only when the DHM is used
   4. `add_structure(StructureType, name, axes, power, structure=DrawableObject)`
   5. `build_programs()`, which writes per-layer `.pgm` files and `structures.json`

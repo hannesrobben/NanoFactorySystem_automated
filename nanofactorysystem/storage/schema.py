@@ -42,8 +42,9 @@ PARAMETERS = (
     ("corner_slice", "corner_slice", "corner_slice_um", "float"),
     ("fov_dim", "fov_dim", "fov_um", "vector"),
     ("skip_corner", "skip_corner", "skip_corner", "bool"),
-    ("plane_fit_mode", "plane_fit_mode", "plane_fit_mode", "int"),
+    ("plane_fit_mode", "plane_fit_mode", "plane_fit_mode", "enum"),
     ("setup", "setup", "setup", "str"),
+    ("tilt_warning_um", "tilt_warning_um", "tilt_warning_um", "float"),
 )
 
 

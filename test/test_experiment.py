@@ -13,7 +13,7 @@ from nanofactorysystem.storage import ExperimentStore
 
 
 def make_experiment(path, backend, *, dhm_usage=False, skip_corner=True, substrate=None, setup="IFOV_off",
-                    grid=(1, 1), drop_direction=DropDirection.UP, **kwargs):
+                    grid=(1, 1), drop_direction=DropDirection.UP, center=Point2D(1310, 19500), **kwargs):
     """ Small 20x experiment with one grid cell, as in the experiment template.
 
     path=None uses the default location of a substrate (pass substrate_label and data_root).
@@ -31,7 +31,7 @@ def make_experiment(path, backend, *, dhm_usage=False, skip_corner=True, substra
         sys_args=sys_args,
         default_power=0.7, low_speed_um=1000, high_speed_um=5000,
         resin_corner_tr=Point2D(5720, 27190), resin_corner_bl=Point2D(-3333, 17212),
-        structure_size=500, margin=200, padding=100, absolute_grid_center=Point2D(1310, 19500),
+        structure_size=500, margin=200, padding=100, absolute_grid_center=center,
         grid=grid, n_mid_points=0, drop_direction=drop_direction,
         corner_z=-2, corner_width=50, corner_length=300, corner_height=7, corner_hatch=0.5, corner_slice=0.75,
         fov_dim=(500, 500), skip_corner=skip_corner, setup=setup, backend=backend,
