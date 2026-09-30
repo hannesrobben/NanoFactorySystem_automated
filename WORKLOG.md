@@ -1225,3 +1225,37 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
     encoding.
   - Structure classes outside the golden tests are not checked one by one; if they lose a parameter, they
     warn at `build_programs()`. No such warning appears in the test suite or the dry run.
+
+### 2026-09-30 13:51 CEST — [Phase 2] Phase summary
+- **Finished todos:**
+  - T47: HDF5 experiment store;
+  - T48: substrates, default location, experiment index;
+  - T49: summary;
+  - T50: restart and repetitions;
+  - T55: command log in the experiment;
+  - T56: reversible structure serialisation;
+  - T57: relative paths;
+  - T59: print progress.
+  - Also T46 (phase 1), which the store builds on.
+- **Branches:**
+  - `feat/phase1-capture-positions` (T46, based on `docs/t41-metadata-audit`);
+  - `feat/phase2-experiment-store` (T47–T59, based on the phase 1 branch).
+  - Nothing is pushed.
+- **Tests:** `python -m pytest` (fresh short-path venv): 232 passed, 14 skipped, including the dry run in
+  `test/integration/`. Golden programs and golden command logs are unchanged.
+  - The suite takes about 105 s now (about 40 s before phase 2): about 15–50 ms per HDF5 write on this PC.
+- **Open follow-ups:**
+  - T45 (camera switch): the summary shows `camera = yes` until then.
+  - T58 (capture Z): the commanded Z is None until then.
+  - T51/T52: move the experiment scripts to substrates and the default location. `default_exp_file.py`
+    still uses an explicit `path`.
+- **To check on the lab PC:**
+  1. `~/Documents` must not be inside a Seafile library; otherwise set `dataRoot` for each user in
+     `nanofactory.json`.
+  2. A dry run of a real script with `backend=None`: `experiment.h5` is written next to the JSON copies,
+     `A3200.log` is in the experiment folder, and there are no `.zdc`/`.npy` files.
+  3. Restart an interrupted print with `mains/restart_experiment.py`, also a second time.
+  4. An old experiment folder (JSON only) can be restarted; it is imported into `experiment.h5`.
+  5. `StructureType.REPEAT` works. It failed before with a TypeError.
+  6. Disk usage: roughly 0.3–0.6 MB per camera image and about 10× more per hologram series. Check the free
+     space on the lab PC for large experiments.
