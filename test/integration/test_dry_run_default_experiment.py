@@ -66,6 +66,11 @@ def test_default_experiment_dry_run(test_config, dummy_backend, no_sleep, tmp_pa
     assert [s.status for s in record.structures] == ["printed"] * len(structures)
     assert record.layout.double_corner.name == "corner_tl"
     assert record.layout.qrcode_text == record.uuid
+    # Summary (T49): the template adds no user structures, corners and QR code are not listed
+    summary = json.loads((out / "experiment_summary.json").read_text())
+    assert summary == ExperimentStore.open(out).read_summary()
+    assert summary["experiment_uuid"] == record.uuid and summary["status"] == "finished"
+    assert summary["structures"] == []
     # Paths are stored relative to the experiment folder (T57)
     assert all(not Path(f).is_absolute() for s in structures for f in s["layer_files"])
     layer_files = [out / f for s in structures for f in s["layer_files"]]

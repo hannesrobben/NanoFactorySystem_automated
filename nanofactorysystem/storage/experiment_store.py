@@ -459,6 +459,26 @@ class ExperimentStore:
                                                "current_layer_id": -1 if layer_id is None else int(layer_id),
                                                "printed_layers": printed, "updated": utc_timestamp()})
 
+    def write_summary(self, data: dict) -> None:
+        """ Store the experiment summary (see :func:`storage.summary.summary`) in ``/summary``. """
+
+        with self._write() as f:
+            group = _group(f, "summary")
+            group.attrs.clear()
+            _set_attrs(group, {k: v for k, v in data.items() if k != "structures" and v is not None})
+            group.attrs["structures_json"] = _json(data["structures"])
+            group.attrs["written"] = utc_timestamp()
+
+    def read_summary(self) -> Optional[dict]:
+        """ Return the stored summary, or None if none was written. """
+
+        with h5py.File(self.path, "r") as f:
+            if "summary" not in f:
+                return None
+            data = _get_json_attrs(f["summary"])
+            data.pop("written", None)
+            return data
+
     # --------------------------------------------------------------- captures
 
     def add_capture(self, capture: CaptureRecord, data: np.ndarray, *, device: dict,

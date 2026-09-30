@@ -13,7 +13,7 @@ from nanofactorysystem.storage import ExperimentStore
 
 
 def make_experiment(path, backend, *, dhm_usage=False, skip_corner=True, substrate=None, setup="IFOV_off",
-                    **kwargs):
+                    grid=(1, 1), **kwargs):
     """ Small 20x experiment with one grid cell, as in the experiment template.
 
     path=None uses the default location of a substrate (pass substrate_label and data_root).
@@ -32,7 +32,7 @@ def make_experiment(path, backend, *, dhm_usage=False, skip_corner=True, substra
         default_power=0.7, low_speed_um=1000, high_speed_um=5000,
         resin_corner_tr=Point2D(5720, 27190), resin_corner_bl=Point2D(-3333, 17212),
         structure_size=500, margin=200, padding=100, absolute_grid_center=Point2D(1310, 19500),
-        grid=(1, 1), n_mid_points=0, drop_direction=DropDirection.UP,
+        grid=grid, n_mid_points=0, drop_direction=DropDirection.UP,
         corner_z=-2, corner_width=50, corner_length=300, corner_height=7, corner_hatch=0.5, corner_slice=0.75,
         fov_dim=(500, 500), skip_corner=skip_corner, setup=setup, backend=backend,
         substrate_information=substrate, substrate=kwargs.pop("substrate_label", None), **kwargs)
@@ -337,6 +337,37 @@ def test_restart_updates_the_substrate_index(test_config, dummy_backend, no_slee
 def test_default_location_needs_a_substrate(test_config, dummy_backend, no_sleep):
     with pytest.raises(ValueError, match="substrate"):
         make_experiment(None, dummy_backend)
+
+
+def test_summary_after_build_and_print(test_config, dummy_backend, no_sleep, tmp_path, caplog):
+    from nanofactorysystem.aerobasic.programs.drawings.lines import Stair
+
+    path = tmp_path / "experiment"
+    path.mkdir()
+    with make_experiment(path, dummy_backend, grid=(1, 2)) as experiment:
+        experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+        add_rectangle(experiment)
+        experiment.add_structure(StructureType.NORMAL, "stair", axes="ABZ", power=0.5,
+                                 structure=Stair(Point3D(0, 0, -2), n_steps=2, step_height=0.6, step_length=20,
+                                                 step_width=50, hatch_size=0.5, slice_size=0.6, socket_height=1,
+                                                 velocity=10_000, acceleration=500_000))
+        experiment.build_programs()
+
+        built = json.loads((path / "experiment_summary.json").read_text())
+        assert [(r["name"], r["status"]) for r in built["structures"]] == [("rect", "pending"), ("stair", "pending")]
+        assert "Experiment summary" in caplog.text
+
+        experiment.print_experiment()
+
+    data = json.loads((path / "experiment_summary.json").read_text())
+    assert data == ExperimentStore.open(path).read_summary()
+    assert data["experiment_uuid"] == experiment.qr_text and data["status"] == "finished"
+    rect, stair = data["structures"]
+    assert (rect["name"], rect["slice_um"], rect["hatch_um"], rect["velocity"], rect["power_mw"]) == (
+        "rect", 1.0, 1.0, 1000.0, 0.7)
+    assert (stair["slice_um"], stair["hatch_um"], stair["power_mw"], stair["status"]) == (0.6, 0.5, 0.5, "printed")
+    assert rect["printed_layers"] == rect["n_layers"] > 0 and not rect["ifov"] and not rect["dhm"]
+    assert rect["x_um"] != stair["x_um"]
 
 
 def test_existing_experiment_is_not_overwritten(test_config, dummy_backend, no_sleep, tmp_path):

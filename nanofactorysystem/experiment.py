@@ -34,7 +34,8 @@ from nanofactorysystem.devices.power_calibration import PowerCalibration, power_
 from nanofactorysystem.storage import (CaptureRecord, CornerRecord, ExperimentRecord, ExperimentStore,
                                        LayoutRecord, PlaneFitRecord, StructureRecord, export_json,
                                        software_info, utc_timestamp, z_function_to_json)
-from nanofactorysystem.storage.json_copies import structures_list
+from nanofactorysystem.storage.json_copies import structures_list, write_json
+from nanofactorysystem.storage.summary import SUMMARY_NAME, format_table, summary
 from nanofactorysystem.storage.substrate_store import (SubstrateRecord, SubstrateStore, check_not_synced,
                                                        default_root)
 from nanofactorysystem.storage import schema
@@ -387,6 +388,19 @@ class Experiment(object):
             rectangle_um=np.array([self.rectangle_tl, self.rectangle_tr, self.rectangle_br, self.rectangle_bl]),
             grid_positions_um=np.array(list(self.iter_experiment_locations()), dtype=float),
             corners=corners, qrcode_um=qrcode, qrcode_text=self.qr_text if qrcode is not None else "")
+
+    def _write_summary(self) -> dict:
+        """ Write the experiment summary into the file and as ``experiment_summary.json``; return it. """
+
+        data = summary(self.store.read())
+        self.store.write_summary(data)
+        write_json(self.path / SUMMARY_NAME, data)
+        return data
+
+    def log_summary(self) -> None:
+        """ Write the experiment summary as table to the log. """
+
+        self.log.info("Experiment summary:\n" + format_table(summary(self.store.read())))
 
     def _save_exp_dict(self):
         """ Write the JSON copies (experiment dictionary, structures) from the experiment file. """
@@ -1209,6 +1223,7 @@ class Experiment(object):
         # structures.json is a copy of the structures in the experiment file
         self.store.set_status(schema.STATUS_BUILT)
         self._save_exp_dict()
+        self.log.info("Experiment summary:\n" + format_table(self._write_summary()))
         self.structure_configs = self._with_absolute_paths(structures_list(self.store.read()))
 
     def _layer_order(self) -> int:
@@ -1344,6 +1359,7 @@ class Experiment(object):
                                    drop_direction=self.drop_direction, finished=True)
         self.store.set_structure_status(name, "failed" if failed else "printed")
         self._save_exp_dict()
+        self._write_summary()
 
     def _stop_failed_task(self, task_id: int) -> None:
         """ Stop a task after a failed program, so that the next program can be loaded. """
@@ -1368,6 +1384,7 @@ class Experiment(object):
             )
         self.store.set_status(schema.STATUS_FINISHED)
         self._save_exp_dict()
+        self.log.info("Experiment summary:\n" + format_table(self._write_summary()))
 
     def update_print_progress(self,
                               name: str,
@@ -1510,6 +1527,7 @@ class Experiment(object):
             )
         self.store.set_status(schema.STATUS_FINISHED)
         self._save_exp_dict()
+        self.log.info("Experiment summary:\n" + format_table(self._write_summary()))
 
     def measure(self,
                 coordinate: Coordinate,
