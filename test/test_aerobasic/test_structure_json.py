@@ -91,3 +91,19 @@ def test_lost_arguments_are_reported():
         structure_from_json(data)
     with pytest.raises(ValueError, match="__module__"):
         structure_from_json({"__class__": "Stair", "__init__": {}})
+
+
+def test_height_profile_is_stored_and_restored():
+    from nanofactorysystem.aerobasic.programs.drawings.DOE import DOEstep
+    from nanofactorysystem.aerobasic.programs.setups import DefaultSetup
+    profile = np.array([[0.5, 1.0, 1.5], [1.5, 1.0, 0.5]])  # a pixel of height 0 fails in DOEstep (see T35)
+    doe = DOEstep(Point3D(0, 0, -1), 5.0, profile, 1.0, hatch_size=1.0, slice_size=0.5, velocity=1000,
+                  acceleration=500)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        data = json.loads(json.dumps(doe.to_json()))
+
+    rebuilt = structure_from_json(data)
+
+    assert np.array_equal(rebuilt.height_profile, profile) and rebuilt.feature_size == 5.0
+    assert render(DefaultSetup(), rebuilt) == render(DefaultSetup(), doe)

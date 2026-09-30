@@ -369,8 +369,8 @@ class DrawableObject(abc.ABC):
     # Constructor parameters that are stored under another attribute name (parameter -> attribute)
     _json_attributes: dict[str, str] = {}
 
-    # Constructor parameters that are not serialised (large data; see T37/N046)
-    _json_skip: tuple[str, ...] = ("data", "height_profile")
+    # Constructor parameters that are not serialised; arrays such as height profiles are stored (N046)
+    _json_skip: tuple[str, ...] = ()
 
     def _init_args(self) -> dict[str, Any]:
         """ Return the constructor arguments of this structure in JSON form.
