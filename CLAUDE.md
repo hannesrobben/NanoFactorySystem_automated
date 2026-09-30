@@ -76,8 +76,13 @@ python -m pytest test/test_aerobasic/test_golden_programs.py --update-golden   #
   4. `add_structure(StructureType, name, axes, power, structure=DrawableObject)`
   5. `build_programs()`, which writes per-layer `.pgm` files and `structures.json`
   6. `print_experiment()`, which runs each layer as an A3200 task and tracks progress
-- `restart_experiment()` and `mains/restart_experiment.py` resume from the saved `experiment_dictionary.json` and `structures.json`.
-- Experiment outputs (the JSON files, `calibration_file.npy`, logs and programs) go into the `path` passed in, which is usually a lab-PC path.
+- `restart_experiment()` and `mains/restart_experiment.py` resume from the saved `experiment_dictionary.json` and `structures.json` (`parameters_from_dictionary()` sets `resume=True`).
+- Experiment outputs go into the `path` passed in, which is usually a lab-PC path. Without `resume`, a folder that already holds an experiment is refused.
+
+**Experiment storage** (`storage/`, design in `docs/design/EXPERIMENT_STORAGE.md`)
+- `ExperimentStore` writes everything of an experiment into `<path>/experiment.h5` (schema version, metadata, calibration, plane fit, OPL scan, layout, structures with layer programs and progress, camera/DHM captures with commanded and actual positions, DHM products). Every write opens and closes the file; a lock file `experiment.lock` allows one writing process, and each run is a session.
+- `experiment_dictionary.json` and `structures.json` are copies exported from the file (`storage/json_copies.py`); captures are no longer written as `.zdc` files (`export_capture()` writes one on request).
+- `storage/records.py` holds the plain data records (`ExperimentRecord`, `StructureRecord`, `CaptureRecord`, …); `ExperimentStore.read()` rebuilds all metadata from the file alone.
 
 **Experiment scripts** (`mains/`)
 - `mains/Experiments/**` holds one script per experiment. Each defines a function like `print_file(absolute_center, resin_dimension, path, objective, user, dhm_usage, setup, ...)`, which builds `sys_args` and objective-specific parameters (FOV, zMax, drop direction, corner sizes) and runs the `Experiment` flow.

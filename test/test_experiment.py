@@ -8,6 +8,7 @@ from nanofactorysystem.aerobasic.programs.drawings import Rectangle3D
 from nanofactorysystem.devices.coordinate_system import DropDirection, Point2D, Point3D
 from nanofactorysystem.experiment import Experiment, StructureType
 from nanofactorysystem.runtime import getLogger
+from nanofactorysystem.storage import ExperimentStore
 
 
 def make_experiment(path, backend, *, dhm_usage=False, skip_corner=True, substrate=None, setup="IFOV_off"):
@@ -130,30 +131,38 @@ def test_measure_stores_position_of_every_capture(test_config, dummy_backend, no
     with make_experiment(path, dummy_backend, dhm_usage=True) as experiment:
         experiment.plane_fit(plane=dummy_backend.world.sample.plane())
 
-        results = experiment.measure({"X": 1.31, "Y": 19.5}, name="rect.2", camera_path=path, dhm_path=path,
-                                     dhm_image_count=2, structure="rect", layer_id=2,
+        results = experiment.measure({"X": 1.31, "Y": 19.5}, structure="rect", layer_id=2, dhm_image_count=2,
                                      offsets_um=[(0.0, 0.0), (20.0, -10.0)])
 
     assert len(results) == 2
-    captures = json.loads((path / "captures.json").read_text())
-    assert [(c["kind"], c["image_index"]) for c in captures] == [("dhm", 0), ("camera", 0), ("dhm", 1), ("camera", 1)]
+    store = ExperimentStore.open(path)
+    captures = store.read().captures
+    assert [(c.kind, c.image_index) for c in captures] == [("dhm", 0), ("camera", 0), ("dhm", 1), ("camera", 1)]
     for capture in captures:
-        dx, dy = capture["offset_um"]
-        assert capture["commanded_um"] == pytest.approx([1310.0 + dx, 19500.0 + dy, None])
+        dx, dy = capture.offset_um
+        assert capture.commanded_um[:2] == pytest.approx((1310.0 + dx, 19500.0 + dy))
+        assert capture.commanded_um[2] is None  # measure() does not move Z (T58)
         # The dummy stage reaches the target, so the actual position equals the commanded one
-        assert capture["actual_um"]["X"] == pytest.approx(1310.0 + dx)
-        assert capture["actual_um"]["Y"] == pytest.approx(19500.0 + dy)
-        assert set(capture["actual_um"]) == set("XYZAB")
-        assert capture["structure"] == "rect" and capture["layer_id"] == 2 and capture["phase"] == "layer"
-        assert capture["image_count"] == (2 if capture["kind"] == "dhm" else 1)
-        assert capture["time"].endswith("Z")
-    # Every container carries its own record, and the DHM container its location
-    assert [c["file"] for c in captures] == ["dhm_rect.2_p0.zdc", "camera_rect.2_p0.zdc",
-                                             "dhm_rect.2_p1.zdc", "camera_rect.2_p1.zdc"]
-    dc = Container(file=str(path / "dhm_rect.2_p1.zdc"))
-    assert dc["data/capture.json"] == captures[2]
-    assert dc["data/location.json"]["X"] == pytest.approx(1330.0)
-    assert Container(file=str(path / "camera_rect.2_p1.zdc"))["data/capture.json"] == captures[3]
+        assert capture.actual_um["X"] == pytest.approx(1310.0 + dx)
+        assert capture.actual_um["Y"] == pytest.approx(19500.0 + dy)
+        assert set(capture.actual_um) == set("XYZAB")
+        assert capture.structure == "rect" and capture.layer_id == 2 and capture.phase == "layer"
+        assert capture.image_count == (2 if capture.kind == "dhm" else 1)
+        assert capture.time.endswith("Z")
+    # Image data: two holograms per DHM capture, one camera image
+    _, holograms, _ = store.read_capture(captures[2].capture_id)
+    _, image, camera = store.read_capture(captures[3].capture_id)
+    assert holograms.ndim == 3 and holograms.shape[0] == 2 and image.ndim == 2
+    assert "ExposureTime" in camera
+    # The returned containers carry the same record, the DHM container also its location
+    dhm_container, camera_container = results[1]
+    assert dhm_container["data/capture.json"] == captures[2].to_dict()
+    assert dhm_container["data/location.json"]["X"] == pytest.approx(1330.0)
+    assert camera_container["data/capture.json"] == captures[3].to_dict()
+    # A capture can still be exported as .zdc file
+    exported = store.export_capture(captures[2].capture_id, tmp_path / "dhm.zdc")
+    assert Container(file=str(exported))["data/capture.json"]["capture_id"] == captures[2].capture_id
+    assert not list(path.rglob("*.zdc"))
 
 
 def test_print_structure_records_captures(experiment):
@@ -162,12 +171,53 @@ def test_print_structure_records_captures(experiment):
 
     experiment.print_experiment()
 
-    captures = json.loads((experiment.path / "captures.json").read_text())
+    record = ExperimentStore.open(experiment.path).read()
+    captures = record.captures
     n_layers = len(experiment.structure_configs[0]["layer_files"])
-    assert [c["phase"] for c in captures] == ["before"] + ["layer"] * n_layers + ["after"]
-    assert [c["layer_id"] for c in captures if c["phase"] == "layer"] == list(range(n_layers))
-    assert {c["structure"] for c in captures} == {"rect"}
-    assert captures[1]["file"] == "structures/rect/camera/camera_rect.0.zdc"
+    assert [c.phase for c in captures] == ["before"] + ["layer"] * n_layers + ["after"]
+    assert [c.layer_id for c in captures if c.phase == "layer"] == list(range(n_layers))
+    assert {c.structure for c in captures} == {"rect"}
+    assert [e["status"] for e in record.progress["rect"]] == ["ok"] * n_layers
+    assert record.structure("rect").status == "printed" and record.status == "finished"
+
+
+def test_exception_while_printing_leaves_readable_file(test_config, dummy_backend, no_sleep, tmp_path):
+    path = tmp_path / "experiment"
+    path.mkdir()
+    with pytest.raises(RuntimeError, match="cable unplugged"):
+        with make_experiment(path, dummy_backend) as experiment:
+            experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+            add_rectangle(experiment)
+            experiment.build_programs()
+            run = experiment.a3200.run_program_as_task
+            calls = []
+
+            def failing_run(*args, **kwargs):
+                calls.append(args)
+                if len(calls) == 2:
+                    raise RuntimeError("cable unplugged")
+                return run(*args, **kwargs)
+
+            experiment.a3200.run_program_as_task = failing_run
+            experiment.print_experiment()
+
+    record = ExperimentStore.open(path).read()
+    assert record.status == "failed"
+    assert record.sessions[-1]["end_reason"] == "exception"
+    assert [e["layer_id"] for e in record.progress["rect"]] == [0]
+    assert record.structure("rect").status == "printing"
+    assert not (path / "experiment.lock").exists()
+    assert json.loads((path / "experiment_dictionary.json").read_text())["status"] == "failed"
+
+
+def test_existing_experiment_is_not_overwritten(test_config, dummy_backend, no_sleep, tmp_path):
+    path = tmp_path / "experiment"
+    path.mkdir()
+    with make_experiment(path, dummy_backend):
+        pass
+
+    with pytest.raises(FileExistsError):
+        make_experiment(path, dummy_backend)
 
 
 def test_restart_from_stored_dictionary(test_config, dummy_backend, no_sleep, tmp_path):
@@ -203,3 +253,8 @@ def test_restart_from_stored_dictionary(test_config, dummy_backend, no_sleep, tm
 
     assert len(dummy_backend.calllog.filter(device="program")) == len(layers) - 2
     assert [s["name"] for s in progress(experiment)["finished_structures"]] == ["rect"]
+    # The restart continued the same experiment file and kept its UUID
+    record = ExperimentStore.open(path).read()
+    assert record.uuid == experiment.qr_text
+    assert [s["kind"] for s in record.sessions] == ["new", "restart"]
+    assert record.status == "finished"

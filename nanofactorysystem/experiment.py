@@ -30,7 +30,11 @@ from nanofactorysystem.backends import BackendLike
 from nanofactorysystem.devices.coordinate_system import CoordinateSystem, PlaneFit, DropDirection, Unit, \
     Point2D, Point3D, Coordinate, ZFunction
 from nanofactorysystem.devices.power_calibration import PowerCalibration, power_calibration
-from nanofactorysystem.storage import CaptureRecord
+from nanofactorysystem.storage import (CaptureRecord, CornerRecord, ExperimentRecord, ExperimentStore,
+                                       LayoutRecord, PlaneFitRecord, StructureRecord, export_json,
+                                       software_info, utc_timestamp, z_function_to_json)
+from nanofactorysystem.storage.json_copies import structures_list
+from nanofactorysystem.storage import schema
 from nanofactorysystem.dhm.optimage import optImageMedian
 from nanofactorysystem.utils.visualization import read_file, plot_movements
 
@@ -85,11 +89,14 @@ class Experiment(object):
                  plane_fit_mode: int = 0,
                  setup: Literal["IFOV_off", "IFOV_on"] = "IFOV_off",
                  substrate_information: dict=None,
-                 backend: BackendLike = None):
+                 backend: BackendLike = None,
+                 resume: bool = False):
         """ Experiment on one substrate.
 
-        Only the new parameter is documented here; see the class attributes
-        for the others.
+        Only the newer parameters are documented here; see the class
+        attributes for the others. All data is written through an
+        :class:`ExperimentStore` into ``<path>/experiment.h5``; the JSON
+        files in ``path`` are copies.
 
         Parameters
         ----------
@@ -97,9 +104,19 @@ class Experiment(object):
             Hardware backend passed to :class:`System`. None or ``"real"``
             (default) uses the lab hardware, ``"dummy"`` or a
             ``DummyBackend`` object simulated devices.
+        resume : bool
+            Continue the experiment stored in ``path`` (restart): its
+            experiment file is opened and its UUID is kept. Without
+            ``resume``, a folder that already contains an experiment file is
+            refused, so that no earlier experiment is overwritten.
+
+        Raises
+        ------
+        FileExistsError
+            If ``path`` contains an experiment file and ``resume`` is False.
         """
 
-        self.path = path
+        self.path = Path(path)
         self.user = str(user)
         self.objective = str(objective)
         self.log = logger
@@ -134,8 +151,12 @@ class Experiment(object):
         self.corner_hatch = float(corner_hatch)
         self.corner_slice = float(corner_slice)
 
-        # UUID for this experiment
-        self.qr_text = str(uuid.uuid4())
+        # UUID for this experiment; a resumed experiment keeps the UUID of its file
+        stored = ExperimentStore.exists(self.path)
+        if stored and not resume:
+            raise FileExistsError(f"{self.path} contains an experiment already. Use a new folder, "
+                                  f"or resume=True to continue that experiment.")
+        self.qr_text = ExperimentStore.open(self.path, self.log).read_uuid() if stored else str(uuid.uuid4())
         self.log.info(f"Experiment {self.qr_text}")
 
         # No plane fitting data yet
@@ -182,40 +203,112 @@ class Experiment(object):
         # No programs yet
         self.structure_programs = None
         self.structure_configs = None
-        # create dictionary for restart purpose
-        self._create_experiment_dictionary(skip_corner=skip_corner, setup=setup)
-        calibration_file = self.system.controller.attenuator.data
-        self._save_experimental_data(calibration_file=calibration_file, substrate=substrate_information)
+        self.skip_corner = bool(skip_corner)
+        self.setup = setup
+
+        # Experiment file: new, resumed, or created for a resumed folder without one
+        self._stored_structures = set()  # names known to be in the experiment file
+        self.store = self._open_store(stored)
+        try:
+            self._save_exp_dict()
+            self._save_substrate_information(path=self.path.parent, file=substrate_information)
+        except BaseException:
+            self.store.end_session("exception")
+            raise
 
     def __enter__(self):
         return self
 
-    def __exit__(self, type, value, traceback):
-        self.system.close()
-        return
+    def __exit__(self, errtype, value, traceback):
+        try:
+            if errtype is None:
+                reason = "finished"
+            else:
+                reason = "aborted" if issubclass(errtype, KeyboardInterrupt) else "exception"
+                self.store.set_status(schema.STATUS_ABORTED if reason == "aborted" else schema.STATUS_FAILED)
+            self.store.end_session(reason)
+            self._save_exp_dict()
+        finally:
+            self.system.close()
 
-    def _save_experimental_data(self, calibration_file, substrate):
-        # path has to be changed accordingly
-        #   - substrate information is not only for one experiment!
-        #   - calibration file is needed in each experiment and changes only during setup/ changing of system
-        #   - experiment dictionary is only for 1 experiment
+    def _open_store(self, stored: bool) -> ExperimentStore:
+        """ Open or create the experiment file and start a session. """
 
-        self._save_exp_dict(path=self.path)
-        # Calibration file first column are attenuator values, second column is laser power in mW.
-        self._save_calibration(path=self.path, file=calibration_file)
-        path = self.path.parent
-        self._save_substrate_information(path=path, file = substrate)
+        if stored:
+            store = ExperimentStore.open(self.path, self.log)
+            store.begin_session("restart")
+            return store
 
-    def _save_calibration(self, path, file):
-        file_path = os.path.join(path, "calibration_file.npy")
-        np.save(file_path, file)
+        store = ExperimentStore.create(self.path, self._experiment_record(), self.log)
+        store.begin_session("new")
+        try:
+            attenuator = self.system.controller.attenuator
+            store.write_calibration(attenuator.data, attenuator["fitKind"], attenuator["calibrationFile"])
+            store.write_layout(self._layout())
+        except BaseException:
+            store.end_session("exception")
+            raise
+        return store
 
-    def _save_exp_dict(self, path):
-        if self.exp_dict is None:
-            self._create_experiment_dictionary(skip_corner=None, setup=None)
-            raise Warning("No experiment dictionary. Created one with incomplete information!")
-        file_path = path / "experiment_dictionary.json"
-        file_path.write_text(json.dumps(self.exp_dict, indent=4))
+    def _experiment_record(self) -> ExperimentRecord:
+        """ Return identification and metadata of this experiment for a new experiment file. """
+
+        values = {
+            "default_power": self.default_power, "low_speed_um": self.low_speed_um,
+            "high_speed_um": self.high_speed_um, "resin_corner_tr": self.resin_corner_tr,
+            "resin_corner_bl": self.resin_corner_bl, "structure_size": self.structure_size,
+            "margin": self.margin, "padding": self.padding, "absolute_grid_center": self.absolute_grid_center,
+            "grid": self.grid, "n_mid_points": self.n_mid_points, "drop_direction": self.drop_direction.name,
+            "corner_z": self.corner_z, "corner_width": self.corner_width, "corner_length": self.corner_length,
+            "corner_height": self.corner_height, "corner_hatch": self.corner_hatch,
+            "corner_slice": self.corner_slice, "fov_dim": self.fov_dimensions, "skip_corner": self.skip_corner,
+            "plane_fit_mode": self.plane_fit_mode, "setup": self.setup,
+        }
+        converters = {"float": float, "int": int, "bool": bool, "str": str, "enum": str,
+                      "vector": lambda v: np.asarray(v, dtype=float), "ivector": lambda v: np.asarray(v, dtype=int)}
+        parameters = {name: converters[kind](values[argument]) for argument, _, name, kind in schema.PARAMETERS}
+        parameters["log_file"] = self._log_file() or ""
+        parameters["dhm_usage"] = self.system.dhm is not None
+
+        devices = {key: value for key, value in self.system.items().items() if key != "data/objective.json"}
+        return ExperimentRecord(
+            uuid=self.qr_text,
+            parameters=parameters,
+            user={"key": self.user, **self.system.user},
+            objective={"key": self.objective, **self.system.objective},
+            system={"sys_args": self.sys_args, "devices": devices,
+                    "acceleration_x_mm_s2": self.accel_x_mm, "acceleration_a_mm_s2": self.accel_a_mm,
+                    "acceleration_z_mm_s2": self.accel_z_mm,
+                    "acceleration_a_rule": "controller" if self.setup == "IFOV_off" else "x/2 (IFOV workaround)",
+                    "backend": self.system.backend.name},
+            software=software_info(),
+        )
+
+    def _layout(self) -> LayoutRecord:
+        """ Return the geometry of the experiment: rectangle, grid, corners and QR code. """
+
+        corners = []
+        qrcode = None
+        for s in self.structures:
+            if s["structure_type"] == StructureType.CORNER:
+                reference = self.corner_location(s["corner"]).as_tuple()
+                offset = s["structure"].center_point
+                corners.append(CornerRecord(
+                    name=s["name"], position=s["corner"].name, reference_um=reference,
+                    center_um=(reference[0] + offset.X, reference[1] + offset.Y),
+                    rotation_deg=float(getattr(s["structure"], "rotation_degree", 0.0)),
+                    double=bool(getattr(s["structure"], "mark", False))))
+            elif s["structure_type"] == StructureType.QRCODE:
+                qrcode = self.qrcode_location().as_tuple()
+        return LayoutRecord(
+            rectangle_um=np.array([self.rectangle_tl, self.rectangle_tr, self.rectangle_br, self.rectangle_bl]),
+            grid_positions_um=np.array(list(self.iter_experiment_locations()), dtype=float),
+            corners=corners, qrcode_um=qrcode, qrcode_text=self.qr_text if qrcode is not None else "")
+
+    def _save_exp_dict(self):
+        """ Write the JSON copies (experiment dictionary, structures) from the experiment file. """
+
+        export_json(self.store.read(), self.path)
 
     def _save_substrate_information(self, path, file):
         if file is None:
@@ -239,44 +332,14 @@ class Experiment(object):
         files = [h.baseFilename for h in self.log.handlers if isinstance(h, logging.FileHandler)]
         return files[-1] if files else None
 
-    def _create_experiment_dictionary(self, *, skip_corner, setup):
-        self.exp_dict = {"path": str(self.path),
-                         "user": self.user,
-                         "objective": self.objective,
-                         "logger": self._log_file(),
-                         "sys_args": self.sys_args,
-                         "default_power": self.default_power,
-                         "low_speed_um": self.low_speed_um,
-                         "high_speed_um": self.high_speed_um,
-                         "resin_corner_tr": str(self.resin_corner_tr),
-                         "resin_corner_bl": str(self.resin_corner_bl),
-                         "structure_size": self.structure_size,
-                         "margin": self.margin,
-                         "padding": self.padding,
-                         "absolute_grid_center": str(self.absolute_grid_center),
-                         "grid_size": str(self.grid),
-                         "n_mid_points": self.n_mid_points,
-                         "drop_direction": self.drop_direction.value,
-                         "drop_direction_information": self.drop_direction.name,
-                         "corner_z": self.corner_z,
-                         "corner_width": self.corner_width,
-                         "corner_length": self.corner_length,
-                         "corner_height": self.corner_height,
-                         "corner_hatch": self.corner_hatch,
-                         "corner_slice": self.corner_slice,
-                         "fov_dim": str(self.fov_dimensions),
-                         "skip_corner": skip_corner,
-                         "plane_fit_mode": self.plane_fit_mode,
-                         "setup": setup
-                         }
-
     @staticmethod
     def parameters_from_dictionary(path) -> dict:
         """ Rebuild the constructor arguments of a stored experiment.
 
         Reads ``experiment_dictionary.json``, which every experiment writes into
         its folder, e.g. to restart an aborted print with
-        ``Experiment(**Experiment.parameters_from_dictionary(path))``.
+        ``Experiment(**Experiment.parameters_from_dictionary(path))``. Vectors
+        may be stored as numbers or, in older files, as strings.
 
         Parameters
         ----------
@@ -287,14 +350,17 @@ class Experiment(object):
         -------
         dict
             Keyword arguments for :class:`Experiment`. ``logger`` writes to the
-            stored log file (or ``console.log`` in the folder).
+            stored log file (or ``console.log`` in the folder); ``resume`` is
+            True, so that the stored experiment is continued.
         """
 
         path = Path(path)
         data = json.loads((path / "experiment_dictionary.json").read_text())
 
         def vector(text) -> list[float]:
-            # Stored with str(): "[5720. 27190.]" or "(500, 500)"
+            # Numbers ([5720.0, 27190.0]) or, in older files, str(): "[5720. 27190.]" or "(500, 500)"
+            if isinstance(text, (list, tuple)):
+                return [float(v) for v in text]
             return [float(v) for v in str(text).strip("[]() ").replace(",", " ").split()]
 
         logfile = data.get("logger") or path / "console.log"
@@ -326,6 +392,7 @@ class Experiment(object):
             "skip_corner": bool(data["skip_corner"]),
             "plane_fit_mode": data["plane_fit_mode"],
             "setup": data["setup"] or "IFOV_off",
+            "resume": True,
         }
 
     def iter_experiment_locations(self) -> Iterator[tuple[float, float]]:
@@ -488,6 +555,7 @@ class Experiment(object):
         plt.legend()
         plt.tight_layout()
         plt.savefig(self.path / "experiment.png")
+        self.store.write_layout(self._layout(), (self.path / "experiment.png").read_bytes())
         if show:
             plt.show()
 
@@ -506,6 +574,7 @@ class Experiment(object):
         if plane is not None:
             self.plane_fit_function = plane
             self.log.info(f"Using given substrate plane {plane!r} (no plane detection)")
+            self._store_plane_fit(plane, source="given", interface="", points=np.empty((0, 3)))
             self._init_coordinate_system(plane)
             return
 
@@ -516,8 +585,10 @@ class Experiment(object):
         if not force and plane_dc_path.exists():
             self.log.info("Load plane detection results...")
             dc = Container(file=str(plane_dc_path))
+            source = "loaded"
 
         else:
+            source = "measured"
             # Plane needs micrometer coordinates
             if self.system.objective['magnification'] == 63.0:
                 zlo = self.system.z0
@@ -538,14 +609,26 @@ class Experiment(object):
             dc = plane.container()
             dc.write(str(plane_dc_path))
 
-        if self.drop_direction == DropDirection.DOWN:
-            plane_points = dc["meas/result.json"]["low"]["points"]
-        else:
-            plane_points = dc["meas/result.json"]["high"]["points"]
+        interface = "low" if self.drop_direction == DropDirection.DOWN else "high"
+        plane_points = dc["meas/result.json"][interface]["points"]
         plane_fit_function = PlaneFit.from_points(np.asarray(plane_points))  # in um
         self.plane_fit_function = plane_fit_function
         self.log.info(str(plane_fit_function))
+        containers = {p.relative_to(path).as_posix(): p.read_bytes() for p in sorted(path.rglob("*.zdc"))}
+        self._store_plane_fit(plane_fit_function, source=source, interface=interface,
+                              points=np.asarray(plane_points, dtype=float), containers=containers)
         self._init_coordinate_system(plane_fit_function)
+
+    def _store_plane_fit(self, z_function: ZFunction, *, source: str, interface: str, points: np.ndarray,
+                         containers: Optional[dict[str, bytes]] = None) -> None:
+        """ Store the substrate plane used for this experiment. """
+
+        name, parameters = z_function_to_json(z_function)
+        self.store.write_plane_fit(PlaneFitRecord(
+            mode=str(self.plane_fit_mode), source=source, function=name, function_json=parameters,
+            interface=interface, sample_points_um=np.asarray(self.sample_points_for_plane_fitting(), dtype=float),
+            interface_points_um=points), containers)
+        self._save_exp_dict()
 
     def _init_coordinate_system(self, z_function: ZFunction):
         """ Create the global coordinate system from the substrate surface. """
@@ -571,7 +654,9 @@ class Experiment(object):
             with open(opl_dc_path, "r") as fp:
                 m0 = float(fp.readline())
             self.log.info(f"Retrieved OPL motor pos {m0:.1f} µm")
+            source = "loaded"
         else:
+            source = "measured"
             image_center = self.coordinate_system_grid_to_absolute.convert({"X": 0, "Y": 0, "Z": 0})
             self.a3200.api.LINEAR(**image_center, F=2)  # Slower, as we also move in z direction and it is scary
 
@@ -585,6 +670,7 @@ class Experiment(object):
                 fp.write(str(m0))
 
         self.system.dhm.device.MotorPos = m0
+        self.store.write_opl_scan(m0, source)
         return m0
 
     def add_corner_structures(self):
@@ -995,11 +1081,61 @@ class Experiment(object):
                 n_dhm_img=n_dhm_img,
                 stitching=stitching)
             self.structure_programs.append(paths)
-            self.structure_configs.append(config)
+            grid_types = (StructureType.NORMAL, StructureType.STITCHING, StructureType.IFOV, StructureType.REPEAT)
+            grid_index = structure_id - 1 if structure_dict["structure_type"] in grid_types else -1
+            self._store_structure(structure_dict, config, index=len(self.structure_programs) - 1,
+                                  grid_index=grid_index, reference=(x, y))
 
-        # Write JSON file with all configurations
-        structure_configs_path = self.path / "structures.json"
-        structure_configs_path.write_text(json.dumps(self.structure_configs, indent=4))
+        # structures.json is a copy of the structures in the experiment file
+        self.store.set_status(schema.STATUS_BUILT)
+        self._save_exp_dict()
+        self.structure_configs = structures_list(self.store.read())
+
+    def _layer_order(self) -> int:
+        """ +1 if layers are printed with ascending ids (drop direction UP), -1 otherwise. """
+
+        return 1 if self.drop_direction == DropDirection.UP else -1
+
+    def _store_structure(self, structure_dict: dict, config: dict, *, index: int, grid_index: int,
+                         reference: tuple[float, float]) -> None:
+        """ Write a built structure and its programs into the experiment file. """
+
+        structure = structure_dict["structure"]
+        name = config["name"]
+        self._stored_structures.add(name)
+        self.store.add_structure(StructureRecord(
+            index=index, name=name, type=structure_dict["structure_type"].name, grid_index=grid_index,
+            corner_position=structure_dict["corner"].name if structure_dict["corner"] is not None else "",
+            axes=config["axes"], setup=self.setup,
+            center_um=(config["center_x"], config["center_y"], float(config["center_z"])),
+            reference_um=tuple(float(v) for v in reference), power_mw=config["power"],
+            structure_class=f"{type(structure).__module__}.{type(structure).__qualname__}",
+            config=config["structure"], layer_files=config["layer_files"], program_file=config["program_file"],
+            layer_order=self._layer_order(), dhm_image_count=config["number of dhm images"]))
+        for file in config["layer_files"]:
+            self.store.write_layer_program(name, self._layer_id(file), Path(file).read_text(), file)
+        self.store.write_structure_program(name, Path(config["program_file"]).read_text())
+
+    @staticmethod
+    def _layer_id(file) -> int:
+        """ Layer id from a layer program file name ``program_<name>.<iii>.txt``. """
+
+        return int(str(file).split('.')[-2])
+
+    def _ensure_structure(self, name: str, layer_files: list[Path], x: float, y: float, power: float,
+                          dhm_image_count: int) -> None:
+        """ Register a structure printed without build_programs() (e.g. a direct print_structure call). """
+
+        if name in self._stored_structures:
+            return
+        self._stored_structures.add(name)
+        if self.store.has_structure(name):
+            return
+        self.store.add_structure(StructureRecord(
+            index=-1, name=name, type="DIRECT", grid_index=-1, corner_position="", axes="", setup=self.setup,
+            center_um=(float(x), float(y), float("nan")), reference_um=(float(x), float(y)),
+            power_mw=float(power), structure_class="", config={}, layer_files=[str(f) for f in layer_files],
+            program_file="", layer_order=self._layer_order(), dhm_image_count=int(dhm_image_count)))
 
     def retrieve_programs(self):
         structure_configs_path = self.path / "structures.json"
@@ -1014,11 +1150,9 @@ class Experiment(object):
                         dhm_image_count: int = 0,
                         restart: bool = False):
 
-        structure_path = self.path / "structures" / name
-        camera_path = structure_path / "camera"
-        mkdir(camera_path, clean=False)
-        dhm_path = structure_path / "dhm"
-        mkdir(dhm_path, clean=False)
+        self._ensure_structure(name, pgm_files_list, x, y, power, dhm_image_count)
+        self.store.set_status(schema.STATUS_PRINTING)
+        self.store.set_structure_status(name, "printing")
 
         self.log.info(f"Printing {name}")
         # program files angucken
@@ -1032,47 +1166,34 @@ class Experiment(object):
 
         # Images before structure writing
         if not restart:
-            self.measure(
-                coordinate=structure_center_absolute_mm,
-                name=f"{name}_before",
-                camera_path=structure_path,
-                dhm_path=structure_path,
-                dhm_image_count=dhm_image_count,
-                structure=name,
-                phase="before")
+            self.measure(structure_center_absolute_mm, structure=name, phase="before",
+                         dhm_image_count=dhm_image_count)
 
         # Prepare order of layer writing
-        if self.drop_direction == DropDirection.UP:
-            order = 1
-        elif self.drop_direction == DropDirection.DOWN:
-            order = -1
-        else:
-            raise ValueError(f"Unknown drop direction {self.drop_direction}!")
+        order = self._layer_order()
 
         # Write all layers of the structure
         layer_id = layer_count = None  # stay None if the structure has no layers
+        failed = False
         t1 = time.time()
         for layer_count in range(len(pgm_files_list))[::order]:
             layer_pgm_path = pgm_files_list[layer_count]
-            layer_id = int(str(layer_pgm_path).split('.')[-2])
+            layer_id = self._layer_id(layer_pgm_path)
+            started = utc_timestamp()
             # Details about the program: if a program exceeds a certain size, consider splitting it
             try:
                 task = self.a3200.run_program_as_task(layer_pgm_path, task_id=1)
                 task.wait_to_finish()
                 task.finish()
-                self.measure(
-                    coordinate=structure_center_absolute_mm,
-                    name=f"{name}.{layer_id}",
-                    camera_path=camera_path,
-                    dhm_path=dhm_path,
-                    dhm_image_count=dhm_image_count,
-                    structure=name,
-                    phase="layer",
-                    layer_id=layer_id)
+                self.store.update_progress(name, layer_id, "ok", started=started)
+                self.measure(structure_center_absolute_mm, structure=name, phase="layer", layer_id=layer_id,
+                             dhm_image_count=dhm_image_count)
                 self.update_print_progress(name, layer_id=layer_id, layer_count=layer_count, order=order,
                                            drop_direction=self.drop_direction)
             except AerotechError as e:
                 self.log.error(f"Program failed for {name}: {e}")
+                failed = True
+                self.store.update_progress(name, layer_id, "failed", started=started, error=str(e))
                 self._stop_failed_task(task_id=1)
                 self.update_print_progress(name, layer_id=layer_id, layer_count=layer_count, order=order, error=e,
                                            drop_direction=self.drop_direction, error_log=True)
@@ -1080,16 +1201,12 @@ class Experiment(object):
         self.log.info(f"Making {name} took {t2 - t1:.2f}s")
 
         # Images after structure writing
-        self.measure(
-            coordinate=structure_center_absolute_mm,
-            name=f"{name}_after",
-            camera_path=structure_path,
-            dhm_path=structure_path,
-            dhm_image_count=dhm_image_count + 10,
-            structure=name,
-            phase="after")
+        self.measure(structure_center_absolute_mm, structure=name, phase="after",
+                     dhm_image_count=dhm_image_count + 10)
         self.update_print_progress(name, layer_id=layer_id, layer_count=layer_count, order=order,
                                    drop_direction=self.drop_direction, finished=True)
+        self.store.set_structure_status(name, "failed" if failed else "printed")
+        self._save_exp_dict()
 
     def _stop_failed_task(self, task_id: int) -> None:
         """ Stop a task after a failed program, so that the next program can be loaded. """
@@ -1112,6 +1229,8 @@ class Experiment(object):
                 power=structure_config["power"],
                 dhm_image_count=structure_config["number of dhm images"]
             )
+        self.store.set_status(schema.STATUS_FINISHED)
+        self._save_exp_dict()
 
     def update_print_progress(self,
                               name: str,
@@ -1252,45 +1371,41 @@ class Experiment(object):
                 dhm_image_count=config["number of dhm images"],
                 restart=True
             )
+        self.store.set_status(schema.STATUS_FINISHED)
+        self._save_exp_dict()
 
     def measure(self,
                 coordinate: Coordinate,
-                name: str,
-                camera_path: Path,
-                dhm_path: Path,
-                dhm_image_count: int = 0,
                 *,
-                structure: Optional[str] = None,
+                structure: str,
                 phase: Literal["before", "layer", "after"] = "layer",
                 layer_id: int = -1,
+                dhm_image_count: int = 0,
                 offsets_um: Optional[list[tuple[float, float]]] = None,
                 ) -> list[tuple[Optional[Container], ImageContainer]]:
         """ Take DHM and camera captures at one or more positions.
 
-        For every capture a :class:`CaptureRecord` with the commanded and the
-        actual stage position is stored in the container (``data/capture.json``)
-        and appended to ``captures.json`` in the experiment folder.
+        Every capture is stored in the experiment file with a
+        :class:`CaptureRecord` that holds the commanded and the actual stage
+        position. The returned containers carry the same record as
+        ``data/capture.json``; they are not written to files
+        (``ExperimentStore.export_capture`` writes a ``.zdc`` on request).
 
         Parameters
         ----------
         coordinate : dict
             Absolute X and Y of the structure center in mm.
-        name : str
-            Name used in the file names (e.g. ``"rect.3"``).
-        camera_path, dhm_path : Path
-            Folders for the camera and DHM containers.
-        dhm_image_count : int
-            Number of holograms per DHM capture.
-        structure : str, optional
-            Structure the captures belong to; default: ``name``.
+        structure : str
+            Structure the captures belong to.
         phase : {"before", "layer", "after"}
             When the capture is taken.
         layer_id : int
             Layer after which the capture is taken; -1 for before/after.
+        dhm_image_count : int
+            Number of holograms per DHM capture.
         offsets_um : list of (float, float), optional
             Capture positions as (x, y) offsets in µm from ``coordinate``.
-            Default: one capture at ``coordinate``. With more than one
-            position, ``_p<i>`` is appended to the file names.
+            Default: one capture at ``coordinate``.
 
         Returns
         -------
@@ -1299,11 +1414,10 @@ class Experiment(object):
             ``dhm_container`` is None without DHM.
         """
 
-        structure = name if structure is None else structure
         offsets = [(0.0, 0.0)] if offsets_um is None else [(float(x), float(y)) for x, y in offsets_um]
+        self._ensure_structure(structure, [], 1000 * coordinate["X"], 1000 * coordinate["Y"], 0.0, dhm_image_count)
         results = []
         for index, (dx, dy) in enumerate(offsets):
-            suffix = f"_p{index}" if len(offsets) > 1 else ""
             target = dict(coordinate)
             target["X"] += dx / 1000
             target["Y"] += dy / 1000
@@ -1313,53 +1427,50 @@ class Experiment(object):
             self.a3200.api.LINEAR(**target, F=20)
             actual = self.system.current_pos()
 
-            def record(kind, image_count, file):
+            def record(kind, image_count):
                 return CaptureRecord(
                     kind=kind, structure=structure, phase=phase, layer_id=int(layer_id),
                     image_index=index, image_count=int(image_count), offset_um=(dx, dy),
-                    commanded_um=commanded, actual_um=actual, file=self._relative(file))
+                    commanded_um=commanded, actual_um=actual)
 
             # Take DHM image
             if self.system.dhm is not None:
-                fn = dhm_path / f"dhm_{name}{suffix}.zdc"
-                capture = record("dhm", dhm_image_count, fn)
+                capture = record("dhm", dhm_image_count)
                 dhm_container = self.system.dhm.container(opt=False, loc=actual, image_count=dhm_image_count)
+                holograms, times = self._holograms(dhm_container)
+                self.store.add_capture(capture, holograms, device=dhm_container["data/hologram.json"],
+                                       capture_times_s=times)
                 dhm_container["data/capture.json"] = capture.to_dict()
-                dhm_container.write(fn)
-                self._append_capture(capture)
-                self.log.info(f"DHM image: '{fn}'")
+                self.log.info(f"DHM image: capture {capture.capture_id} of {structure} ({phase} {layer_id})")
             else:
                 self.log.info(f"DHM images was not captured!")
                 dhm_container = None
 
             # Take camera image
-            fn = camera_path / f"camera_{name}{suffix}.zdc"
-            capture = record("camera", 1, fn)
+            capture = record("camera", 1)
             camera_container = self.system.camera.container(loc=actual)
+            self.store.add_capture(capture, camera_container["meas/image.png"],
+                                   device=camera_container["data/camera.json"])
             camera_container["data/capture.json"] = capture.to_dict()
-            camera_container.write(fn)
-            self._append_capture(capture)
-            self.log.info(f"Camera image: '{fn}'")
+            self.log.info(f"Camera image: capture {capture.capture_id} of {structure} ({phase} {layer_id})")
 
             results.append((dhm_container, camera_container))
 
         return results
 
-    def _relative(self, file: Path) -> str:
-        """ Return ``file`` relative to the experiment folder if it is inside it. """
+    @staticmethod
+    def _holograms(container) -> tuple[np.ndarray, list[float]]:
+        """ Return the holograms (n×H×W) and capture durations of a DHM container. """
 
-        try:
-            return Path(file).relative_to(self.path).as_posix()
-        except ValueError:
-            return str(file)
+        n = 1 + sum(1 for key in container.keys() if key.startswith("meas/image_") and key.endswith(".png"))
+        images = [container["meas/image.png"]] + [container[f"meas/image_{i}.png"] for i in range(1, n)]
+        if "meas/image_capture_times.json" in container.keys():
+            times = container["meas/image_capture_times.json"]
+            durations = [times[f"Image_{i}_capture_time"] for i in range(n)]
+        else:
+            durations = [container["meas/image_capture_time.json"]]
+        return np.stack(images), [float(t) for t in durations]
 
-    def _append_capture(self, capture: CaptureRecord) -> None:
-        """ Append a capture record to ``captures.json`` in the experiment folder. """
-
-        file_path = self.path / "captures.json"
-        data = json.loads(file_path.read_text()) if file_path.exists() else []
-        data.append(capture.to_dict())
-        file_path.write_text(json.dumps(data, indent=4))
 
     # def measurement_factory(self,
     #         #system: System,

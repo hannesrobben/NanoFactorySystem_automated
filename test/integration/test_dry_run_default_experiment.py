@@ -15,6 +15,8 @@ import matplotlib
 import pytest
 
 from nanofactorysystem.devices.coordinate_system import Point2D
+from nanofactorysystem.storage import ExperimentStore
+from nanofactorysystem.storage.json_copies import experiment_dictionary, structures_list
 
 TEMPLATE = Path(__file__).parents[2] / "mains" / "Experiments" / "default_exp_file.py"
 
@@ -49,11 +51,21 @@ def test_default_experiment_dry_run(test_config, dummy_backend, no_sleep, tmp_pa
         plane=world.sample.plane(),
     )
 
-    # Experiment output
+    # Experiment output: the experiment file and its JSON copies
     out = tmp_path / "out" / "testprint_dhm"
-    for name in ("experiment_dictionary.json", "structures.json", "print_progress.json", "calibration_file.npy"):
+    for name in ("experiment.h5", "experiment_dictionary.json", "structures.json", "print_progress.json"):
         assert (out / name).is_file(), name
+    assert not (out / "experiment.lock").exists()
+    record = ExperimentStore.open(out).read()
     structures = json.loads((out / "structures.json").read_text())
+    assert structures == structures_list(record)
+    assert json.loads((out / "experiment_dictionary.json").read_text()) == experiment_dictionary(record, out)
+    assert record.status == "finished" and record.system["backend"] == "dummy"
+    assert record.calibration["table"].shape[1] == 2
+    assert record.plane_fit.source == "given"
+    assert [s.status for s in record.structures] == ["printed"] * len(structures)
+    assert record.layout.double_corner.name == "corner_tl"
+    assert record.layout.qrcode_text == record.uuid
     layer_files = [Path(f) for s in structures for f in s["layer_files"]]
     assert structures and layer_files
     assert all(f.is_file() for f in layer_files)
@@ -78,8 +90,10 @@ def test_default_experiment_dry_run(test_config, dummy_backend, no_sleep, tmp_pa
     # Substrate information is passed on to the experiment
     assert json.loads((tmp_path / "out" / "substrate_information.json").read_text())["Name"] == "dry-run substrate"
 
-    # Camera images before, during and after writing
-    assert list((out / "structures").rglob("camera_*.zdc"))
+    # Camera images before, during and after writing, stored in the experiment file
+    cameras = [c for c in record.captures if c.kind == "camera"]
+    assert len(cameras) == len(layer_files) + 2 * len(structures)
+    assert not list(out.rglob("*.zdc"))
 
     # Nothing was written outside tmp_path's output and backend folders
     assert set(os.listdir(tmp_path)) <= {"out", "dummy", "programs"}
