@@ -120,6 +120,8 @@ class Experiment(object):
         self.user = str(user)
         self.objective = str(objective)
         self.log = logger
+        log_file = self._log_file()
+        self._log_offset = Path(log_file).stat().st_size if log_file and Path(log_file).exists() else 0
         self.sys_args = sys_args
         self.default_power = float(default_power)
         self.low_speed_um = float(low_speed_um)
@@ -166,6 +168,7 @@ class Experiment(object):
         # Init system object
         self.log.info("Initialize system object...")
         self.system = System(user, objective, logger, backend=backend, **sys_args)
+        self.system.log_dir = self.path  # A3200.log belongs to the experiment
 
         # Set default laser power
         self.system.controller.power(default_power)
@@ -221,15 +224,29 @@ class Experiment(object):
 
     def __exit__(self, errtype, value, traceback):
         try:
-            if errtype is None:
-                reason = "finished"
-            else:
-                reason = "aborted" if issubclass(errtype, KeyboardInterrupt) else "exception"
+            self.system.close()
+        finally:
+            self._end_session(errtype)
+
+    def _end_session(self, errtype) -> None:
+        """ Store the logs of this session, set the status after an exception and end the session. """
+
+        if errtype is None:
+            reason = "finished"
+        else:
+            reason = "aborted" if issubclass(errtype, KeyboardInterrupt) else "exception"
+        try:
+            self.store.write_log("a3200", self.a3200.command_log())
+            log_file = self._log_file()
+            if log_file and Path(log_file).exists():
+                with open(log_file, "rb") as fp:
+                    fp.seek(self._log_offset)
+                    self.store.write_log("console", fp.read().decode("utf-8", errors="replace"))
+            if reason != "finished":
                 self.store.set_status(schema.STATUS_ABORTED if reason == "aborted" else schema.STATUS_FAILED)
+        finally:
             self.store.end_session(reason)
             self._save_exp_dict()
-        finally:
-            self.system.close()
 
     def _open_store(self, stored: bool) -> ExperimentStore:
         """ Open or create the experiment file and start a session. """

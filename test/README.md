@@ -82,7 +82,7 @@ level, so the exact command strings are checked.
 | `devices/test_camera.py` | Exposure optimisation, image container | Unusable camera images | – (plus 1 hardware test) |
 | `dhm/test_dhm.py` | DHM client: objective selection, shutter, motor, hologram | DHM communication errors | – (plus 1 hardware test) |
 | `test_femtika/test_device_no_laser.py` | `Aerotech3200` status, positions, tasks, homing on the simulated controller | Parsing errors in the status answers of the controller | – (the same tests also run as hardware tests) |
-| `test_experiment.py` | `Experiment`: printing all layers, a failed layer (logged, printing continues), empty structures, OPL scan, substrate information, experiment dictionary, restart (same experiment file and UUID), capture records in the experiment file (commanded and actual position per capture, several positions), an exception during printing, refusing a folder that already holds an experiment | A single failed layer aborting a whole print; wrong metadata for restarts; captures that cannot be traced to a stage position; an unreadable file after a crash; overwriting an earlier experiment | – |
+| `test_experiment.py` | `Experiment`: printing all layers, a failed layer (logged, printing continues), empty structures, OPL scan, substrate information, experiment dictionary, restart (same experiment file and UUID), capture records in the experiment file (commanded and actual position per capture, several positions), an exception during printing, refusing a folder that already holds an experiment, command and console log stored per experiment and session (also after an abort) | A single failed layer aborting a whole print; wrong metadata for restarts; captures that cannot be traced to a stage position; an unreadable file after a crash; overwriting an earlier experiment; a command log overwritten by the next run | – |
 | `test_system.py` | `System` data container, homing | Missing metadata in stored experiments | – (plus 1 hardware test) |
 | `tools/test_focus_dummy.py` | `Focus` runs end to end on `System`; the z-line exposure reaches the controller | The tools breaking on API changes of `System` | – |
 | `integration/test_dry_run_default_experiment.py` | `mains/Experiments/default_exp_file.py` end to end: start-up, `plane_fit` (known plane), `build_programs`, `print_experiment`; the experiment file matches its JSON copies | An experiment script failing on the lab PC halfway through a print; JSON copies that differ from the experiment file | – (marked `slow`) |
@@ -175,8 +175,8 @@ binary_testprint(..., path=Path("dry_run"), backend=backend, plane=backend.world
 ## Where generated files go
 
 - `tmp_path` (pytest's per-test temporary directory): everything the unit and dummy tests write. This
-  includes experiment output, the backend workdir (calibration file, `__zline__.pgm`, `A3200.log`) and
-  programs.
+  includes experiment output (incl. `A3200.log` of an experiment), the backend workdir (calibration file,
+  `__zline__.pgm`, the `A3200.log` of a plain `System`) and programs.
 - `test/_programs/` (gitignored): programs and movement plots written by `test_program.py` and the drawing
   tests, kept for manual inspection.
 - `test/golden/`: the committed reference programs. Change them only with `--update-golden`, and review the

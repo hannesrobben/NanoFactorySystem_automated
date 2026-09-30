@@ -245,6 +245,27 @@ class ExperimentStore:
                 self._lock.release()
                 self._lock = None
 
+    def write_log(self, kind: str, text: str) -> None:
+        """ Store a log of the current session below ``/logs/<kind>/<session>``.
+
+        Parameters
+        ----------
+        kind : {"a3200", "console"}
+            Controller command log or console (logger) output.
+        text : str
+            Log text of this session.
+        """
+
+        with self._write() as f:
+            _replace_text(_group(f, f"logs/{kind}"), self._session or "none", text)
+
+    def read_logs(self, kind: str) -> dict[str, str]:
+        """ Return the logs of one kind, keyed by session id. """
+
+        with h5py.File(self.path, "r") as f:
+            group = f.get(f"logs/{kind}")
+            return {} if group is None else {name: _text(dataset[()]) for name, dataset in sorted(group.items())}
+
     @property
     def session(self) -> str:
         """ Id of the current session, or ``""``. """

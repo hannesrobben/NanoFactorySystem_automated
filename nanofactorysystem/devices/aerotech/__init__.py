@@ -85,9 +85,23 @@ class AerotechController:
         self.set_velocity_mode(VelocityMode.ON)
         self.set_wait_mode(WaitMode.AUTO)
 
-    def save_log(self, folder: Path | str = ".") -> str:
+    def command_log(self) -> str:
+        """ Return the controller log: init, connect and close times and every command sent.
+
+        Returns
+        -------
+        str
+            The text that :meth:`save_log` writes to ``A3200.log``.
+        """
+
         s = f"{self.__class__.__name__}:\nInitialized: {self.init_time}\nConnected: {self.connect_time}\nClosed: {self.close_time}\n\nCommands:\n"
         s += "\n".join(map(str, self.api.history))
+        return s
+
+    def save_log(self, folder: Path | str = ".") -> str:
+        """ Write :meth:`command_log` to ``<folder>/A3200.log`` and return it. """
+
+        s = self.command_log()
         (Path(folder) / "A3200.log").write_text(s)
         return s
 

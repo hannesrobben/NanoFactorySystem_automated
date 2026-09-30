@@ -210,6 +210,38 @@ def test_exception_while_printing_leaves_readable_file(test_config, dummy_backen
     assert json.loads((path / "experiment_dictionary.json").read_text())["status"] == "failed"
 
 
+def test_command_log_belongs_to_the_experiment(test_config, dummy_backend, no_sleep, tmp_path):
+    paths = [tmp_path / "first", tmp_path / "second"]
+    for i, path in enumerate(paths):
+        path.mkdir()
+        with make_experiment(path, dummy_backend) as experiment:
+            experiment.system.moveabs(x=100.0 * (i + 1))
+
+    for i, path in enumerate(paths):
+        logs = ExperimentStore.open(path).read_logs("a3200")
+        assert list(logs) == ["000"]
+        assert f"X{0.1 * (i + 1):.10f}"[:5] in logs["000"]  # the move of this experiment
+        # Same commands as A3200.log in the folder (the stored copy also has the close time)
+        assert (path / "A3200.log").read_text().split("Commands:")[1] == logs["000"].split("Commands:")[1]
+        console = ExperimentStore.open(path).read_logs("console")["000"]
+        assert "Initializing system." in console and "System closed." in console
+    # Each experiment has its own log; the second does not repeat the first one's session
+    assert ExperimentStore.open(paths[1]).read_logs("console")["000"].count("Initializing system.") == 1
+    assert not (tmp_path / "A3200.log").exists() and not (tmp_path / "dummy" / "A3200.log").exists()
+
+
+def test_aborted_experiment_keeps_its_command_log(test_config, dummy_backend, no_sleep, tmp_path):
+    path = tmp_path / "experiment"
+    path.mkdir()
+    with pytest.raises(KeyboardInterrupt):
+        with make_experiment(path, dummy_backend):
+            raise KeyboardInterrupt
+
+    store = ExperimentStore.open(path)
+    assert "Commands:" in store.read_logs("a3200")["000"]
+    assert store.read().status == "aborted" and store.read().sessions[0]["end_reason"] == "aborted"
+
+
 def test_existing_experiment_is_not_overwritten(test_config, dummy_backend, no_sleep, tmp_path):
     path = tmp_path / "experiment"
     path.mkdir()

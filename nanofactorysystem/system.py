@@ -53,6 +53,10 @@ class System(Parameter):
         # Not open now
         self.opened = False
 
+        # Folder for A3200.log when the system is closed; None: the backend's program folder or
+        # the working directory. Experiment sets its experiment folder.
+        self.log_dir = None
+
         # Initialize parameter class
         args = popargs(kwargs, "system")
         super().__init__(user, logger, **args)
@@ -134,7 +138,8 @@ class System(Parameter):
             self.dhm.close()
         self.camera["AcquisitionMode"] = "Continuous"
         program_dir = self.backend.program_dir()
-        self.a3200_new.save_log(program_dir if program_dir is not None else ".")
+        log_dir = self.log_dir if self.log_dir is not None else program_dir
+        self.a3200_new.save_log(log_dir if log_dir is not None else ".")
         self.camera.close()
 
         try:
