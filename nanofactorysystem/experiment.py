@@ -66,6 +66,35 @@ class StructureType(Enum):
     REPEAT = 6
 
 
+class ProgramSource(Enum):
+    """ Where the layer programs of the structures of an experiment come from.
+
+    Members
+    -------
+    DRAWING
+        The drawing classes of ``aerobasic/programs/drawings`` (``Stair``,
+        ``BinaryGrating_IFOV``, …): hand-written program generators stored in
+        this package.
+    SLICER
+        Height data or a mesh sliced by ``aerobasic/slicer``
+        (``Model3D_Slicer``); needs the IFOV setup.
+
+    Phase data as input (future_todo.md F2) can be added as another member.
+    """
+
+    DRAWING = "drawing"
+    SLICER = "slicer"
+
+    @classmethod
+    def parse(cls, value) -> "ProgramSource":
+        """ Return the source for a member, its name or its value (any case). """
+
+        if isinstance(value, cls):
+            return value
+        text = str(value)
+        return cls[text.upper()] if text.upper() in cls.__members__ else cls(text.lower())
+
+
 class Experiment(object):
     def __init__(self,
                  path: Optional[Path],
@@ -103,7 +132,8 @@ class Experiment(object):
                  data_root: Optional[Path] = None,
                  allow_synced_root: bool = False,
                  tilt_warning_um: float = 1.0,
-                 camera_capture: bool = False):
+                 camera_capture: bool = False,
+                 program_source: ProgramSource | str = ProgramSource.DRAWING):
         """ Experiment on one substrate.
 
         Only the newer parameters are documented here; see the class
@@ -141,6 +171,9 @@ class Experiment(object):
             Take camera images before, during and after printing (in
             ``measure()``). Off by default; it is an experiment choice and
             therefore an argument here, not a camera setting in ``sys_args``.
+        program_source : ProgramSource or str
+            Where the programs of the structures come from; stored with the
+            experiment.
         backend : {"real", "dummy"}, Backend or None
             Hardware backend passed to :class:`System`. None or ``"real"``
             (default) uses the lab hardware, ``"dummy"`` or a
@@ -221,6 +254,7 @@ class Experiment(object):
         self.plane_fit_mode = PlaneFitMode.parse(plane_fit_mode)
         self.tilt_warning_um = float(tilt_warning_um)
         self.camera_capture = bool(camera_capture)
+        self.program_source = ProgramSource.parse(program_source)
 
         # Corner dimensions
         self.corner_z = float(corner_z)
@@ -415,6 +449,7 @@ class Experiment(object):
             "corner_slice": self.corner_slice, "fov_dim": self.fov_dimensions, "skip_corner": self.skip_corner,
             "plane_fit_mode": self.plane_fit_mode.name, "setup": self.setup,
             "tilt_warning_um": self.tilt_warning_um, "camera_capture": self.camera_capture,
+            "program_source": self.program_source.name,
         }
         converters = {"float": float, "int": int, "bool": bool, "str": str, "enum": str,
                       "vector": lambda v: np.asarray(v, dtype=float), "ivector": lambda v: np.asarray(v, dtype=int)}
@@ -639,7 +674,7 @@ class Experiment(object):
             "fov_dim": tuple(vector(data["fov_dim"])),
             "skip_corner": bool(data["skip_corner"]),
             "plane_fit_mode": PlaneFitMode.parse(data["plane_fit_mode"]),
-            **{key: data[key] for key in ("tilt_warning_um", "camera_capture") if key in data},
+            **{key: data[key] for key in ("tilt_warning_um", "camera_capture", "program_source") if key in data},
             "setup": data["setup"] or "IFOV_off",
             "resume": True,
             **substrate,

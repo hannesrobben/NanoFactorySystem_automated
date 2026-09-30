@@ -77,7 +77,7 @@ def summary(record: ExperimentRecord) -> dict[str, Any]:
     dict
         Experiment fields (``experiment_uuid``, ``experiment_label``,
         ``substrate_label``, ``objective``, ``setup``, ``drop_direction``,
-        ``plane_fit_mode``, ``dhm_usage``, ``camera_capture``, ``started``,
+        ``plane_fit_mode``, ``program_source``, ``dhm_usage``, ``camera_capture``, ``started``,
         ``status``) and ``structures``, one row per user structure (corners
         and QR code excluded) with the keys in :data:`COLUMNS`.
     """
@@ -111,6 +111,7 @@ def summary(record: ExperimentRecord) -> dict[str, Any]:
         "setup": parameters.get("setup", ""),
         "drop_direction": parameters.get("drop_direction", ""),
         "plane_fit_mode": parameters.get("plane_fit_mode"),
+        "program_source": parameters.get("program_source", "DRAWING"),
         "dhm_usage": dhm,
         "camera_capture": camera,
         "started": record.created,

@@ -92,6 +92,7 @@ level, so the exact command strings are checked.
 | `test_plane_fitting.py` | Plane-fit modes (`GRID`, `CORNERS`, `BORDER`, old integers), number and positions of the sample points, their storage, the experiment center check, the tilt warning, and a plane fit outside `Experiment` with a stand-in for the detection | Plane fits at wrong positions; experiments outside the resin drop; unnoticed tilt under large structures | – |
 | `test_system.py` | `System` data container, homing | Missing metadata in stored experiments | – (plus 1 hardware test) |
 | `tools/test_focus_dummy.py` | `Focus` runs end to end on `System`; the z-line exposure reaches the controller | The tools breaking on API changes of `System` | – |
+| `integration/test_dry_run_spec.py` | Experiments described by `ExperimentSpec` and run with `run_experiment()`: program sources DRAWING and SLICER (height map through `Model3D_Slicer`), objective defaults, repetitions, validation, and the examples of `mains/Experiments/experiment_template.py` | A template or spec that fails on the lab PC; slicer programs with statements the controller simulation does not know | – (marked `slow`) |
 | `integration/test_dry_run_default_experiment.py` | `mains/Experiments/default_exp_file.py` end to end: start-up, `plane_fit` (known plane), `build_programs`, `print_experiment`; the experiment file matches its JSON copies and the summary | An experiment script failing on the lab PC halfway through a print; JSON copies that differ from the experiment file | – (marked `slow`) |
 
 ## Hardware tests
