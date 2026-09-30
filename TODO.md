@@ -72,15 +72,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
         - Dummy test for UP and DOWN checks the counts after a complete and an aborted structure.
       Notes: Can be done as part of T47/T50 if the progress record moves into the experiment file.
 
-- [ ] T49: Experiment summary [phase: 2]
-      Goal: A quick check of what was printed in an experiment and with which parameters.
-      Priority: medium | Depends on: T47
-      Done when:
-        - After `build_programs()` and after every printed structure, a summary is written into the experiment file and as `experiment_summary.json`.
-        - It contains the experiment UUID (QR code) and one row per user structure (corner and QR-code structures excluded): name, type, position, slice, hatch, power, velocity, IFOV on/off, DHM yes/no, camera yes/no, status (pending/printed/failed).
-        - It can be printed as a table to the log.
-        - Dummy test checks the rows of the template experiment.
-
 - [ ] T50: Restart and repetitions on the new storage [phase: 2]
       Goal: An aborted experiment can be resumed repeatedly at the right layer from the experiment file and keeps its identity.
       Priority: high | Depends on: T47, T48
@@ -322,3 +313,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T57: Store paths relative to the experiment folder — 2026-09-30 — Layer/structure program files and the log file are stored relative to the experiment folder (file and JSON copies); `parameters_from_dictionary()` uses the given folder, so a moved experiment can be restarted; old absolute entries still work. — commits: `e07db5a`
 
 - [x] T48: Substrate model, default location and experiment index — 2026-09-30 — `SubstrateStore` (substrate.json with record and experiment index, labels `HR-26-001`/`-A`, `find_experiments`, `default_root` with `dataRoot` and refused synced folders); `Experiment(path=None, substrate=...)` creates a new folder per print and keeps the index up to date; `substrate_information.json` merging replaced (old files importable). — commits: `1014892`, `cf5ed05`
+
+- [x] T49: Experiment summary — 2026-09-30 — `storage/summary.py` builds a summary (UUID, one row per user structure with position, slice, hatch, power, velocity, IFOV, DHM, camera, status); written into `/summary` and `experiment_summary.json` after building and after every structure and logged as table. — commits: `92b9bcc`

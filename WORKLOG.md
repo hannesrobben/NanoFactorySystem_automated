@@ -1098,3 +1098,34 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Behaviour change on hardware:** `substrate_information.json` is no longer written into the parent folder.
 - **To check on the lab PC:** `~/Documents` must not be inside a Seafile library, otherwise set `dataRoot` per
   user.
+
+### 2026-09-30 13:17 CEST — [T49] Experiment summary
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/storage/summary.py` (new):
+    - `summary(record)`: experiment fields plus one row per user structure; corners and the QR code are
+      excluded.
+    - `print_parameters(structure)`: slice, hatch, velocity and power are taken from the stored constructor
+      arguments, using the first of the known names. D5 applies: IFOV structures report their own power.
+    - `format_table()` formats the summary for the log.
+  - `nanofactorysystem/storage/experiment_store.py`: `write_summary`, `read_summary` (`/summary`).
+  - `nanofactorysystem/experiment.py`: `_write_summary()` after `build_programs()` and after every structure,
+    also written as `experiment_summary.json`; the table is logged after building and at the end of printing
+    or a restart; `log_summary()`.
+  - Tests:
+    - `test/storage/test_summary.py` (new, 2 tests);
+    - `test/test_experiment.py`: summary of two printed structures; `make_experiment` gets a `grid`
+      parameter;
+    - dry run: the summary exists, equals the file, and has no user rows, because the template adds no
+      user structure.
+  - `test/README.md`, `CLAUDE.md`.
+  - `TODO.md`: T49 moved to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 217 passed, 14 skipped; the dry run passes with the summary check.
+- **Commits:** `92b9bcc` feat(experiment): write an experiment summary [T49]; docs(todo): close T49 [T49]
+- **Notes:**
+  - The template experiment of the todo text has no user structures (the stair is commented out), so the
+    rows are checked with a small experiment of two structures instead.
+  - The velocity unit is `um/s`, or `mm/s` for IFOV classes (T35, N065). A velocity above 500 passed to
+    `IFOV_Lines` is divided by 1000 internally; the summary shows the value as passed.
+  - Camera usage is always "yes" until T45 adds the switch.
+- **Follow-ups:** none new.
