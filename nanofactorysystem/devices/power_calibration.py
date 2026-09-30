@@ -99,6 +99,12 @@ class PowerCalibration:
 
         return {"fit_kind": self.fit_kind, "data": self.data.tolist()}
 
+    @classmethod
+    def from_json(cls, data: dict) -> "PowerCalibration":
+        """ Rebuild a calibration from :meth:`to_json`. """
+
+        return cls(data["data"], fit_kind=data["fit_kind"])
+
     def __repr__(self) -> str:
         return f"PowerCalibration({len(self.data)} points, fit_kind={self.fit_kind!r})"
 

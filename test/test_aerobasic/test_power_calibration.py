@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from nanofactorysystem.aerobasic.programs.drawings import IFOV_Lines
+from nanofactorysystem.aerobasic.programs.drawings.base import structure_from_json
 from nanofactorysystem.backends.dummy import SimulatedWorld, write_calibration_file
 from nanofactorysystem.config import DEFAULT_CONFIG, use_config
 from nanofactorysystem.devices.coordinate_system import CoordinateSystem, DropDirection, Point2D, Point3D, Unit
@@ -39,8 +40,12 @@ def test_ifov_lines_with_explicit_calibration(calibration_file):
     lines = IFOV_Lines(Point3D(0, 0, 0), LINES, velocity=5, power=5.0, calibration=calibration)
 
     assert set_power_value(lines) == pytest.approx(float(calibration.ptoa(5.0)))
-    assert lines.to_json()["__init__"]["calibration"] == calibration.to_json()
-    json.dumps(calibration.to_json())
+    # Stored with its class, so that the structure can be rebuilt with the same calibration (T56)
+    stored = lines.to_json()["__init__"]["calibration"]
+    assert stored == {"__object__": "nanofactorysystem.devices.power_calibration.PowerCalibration",
+                      "value": calibration.to_json()}
+    rebuilt = structure_from_json(json.loads(json.dumps(lines.to_json())))
+    assert set_power_value(rebuilt) == pytest.approx(set_power_value(lines))
 
 
 def test_active_calibration_is_used(calibration_file):

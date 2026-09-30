@@ -250,6 +250,7 @@ class BinaryGrating_IFOV(DrawableObject):
 
 
 class Rectangle2D_IFOV(DrawableObject):
+    _json_attributes = {"angle": "phi"}  # the angle is stored as self.phi
 
     def __init__(
             self,

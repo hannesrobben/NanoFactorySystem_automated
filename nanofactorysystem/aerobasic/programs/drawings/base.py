@@ -1,4 +1,8 @@
 import abc
+import enum
+import importlib
+import inspect
+import warnings
 from typing import Optional, Any, Iterator, Literal
 
 from nanofactorysystem.aerobasic import SingleAxis, BezierMode, Axis, GalvoLaserOverrideMode, IFOV_Mode, VelocityMode
@@ -362,135 +366,171 @@ class DrawableObject(abc.ABC):
     def iterate_layers(self, coordinate_system: CoordinateSystem) -> Iterator[DrawableAeroBasicProgram]:
         pass
 
+    # Constructor parameters that are stored under another attribute name (parameter -> attribute)
+    _json_attributes: dict[str, str] = {}
+
+    # Constructor parameters that are not serialised (large data; see T37/N046)
+    _json_skip: tuple[str, ...] = ("data", "height_profile")
+
     def _init_args(self) -> dict[str, Any]:
-        # Try to import numpy safely
-        try:
-            import numpy as np
-        except ImportError:
-            np = None
+        """ Return the constructor arguments of this structure in JSON form.
 
-        code = self.__init__.__code__
+        Only the parameters of ``__init__`` are considered. Each is read from
+        the attribute of the same name (or the one named in
+        ``_json_attributes``) and encoded with :func:`encode_json_value`, so
+        that :func:`structure_from_json` can rebuild the structure. A
+        parameter without such an attribute cannot be recovered; a warning
+        names it, and :meth:`to_json` lists it under ``"__missing__"``.
 
-        # CHANGE 1: use co_varnames instead of co_names
-        # co_varnames = local variables/parameters of __init__
-        # [1:] = skip 'self'
-        param_names = code.co_varnames[1:]
+        Returns
+        -------
+        dict
+            Parameter name → encoded value.
+        """
 
-        # CHANGE 2: remove the problematic check
-        # (The old line: if "__init__" not in code.co_names: return {})
+        arguments, _ = self._collect_init_args()
+        return arguments
 
-        kwargs = {}
-        for name in param_names:
-            attr = getattr(self, name, "[NOT FOUND]")
-
-            # Skip missing attributes
-            if isinstance(attr, str) and attr == "[NOT FOUND]":
+    def _collect_init_args(self) -> tuple[dict[str, Any], list[str]]:
+        arguments, missing = {}, []
+        for name in _init_parameters(type(self)):
+            if name in self._json_skip:
+                missing.append(name)
                 continue
-
-            # Skip special attributes
-            if name in ("data", "height_profile"):
+            attribute = self._json_attributes.get(name, name)
+            if not hasattr(self, attribute):
+                missing.append(name)
                 continue
+            try:
+                arguments[name] = encode_json_value(getattr(self, attribute))
+            except TypeError:
+                missing.append(name)
+        if missing:
+            warnings.warn(f"{type(self).__name__}: the constructor arguments {missing} cannot be stored; "
+                          f"the structure cannot be rebuilt from its JSON form without them.", stacklevel=3)
+        return arguments, missing
 
-            # Properly handle serialization
-            if hasattr(attr, "to_json"):
-                attr = attr.to_json()
-            elif np is not None and isinstance(attr, np.ndarray):
-                attr = {
-                    "type": "ndarray",
-                    "shape": attr.shape,
-                    "dtype": str(attr.dtype),
-                    "values": attr.tolist()
-                }
-            elif isinstance(attr, (str, int, float, dict, list)) or attr is None:
-                pass
-            else:
-                try:
-                    attr = str(attr)
-                except Exception:
-                    attr = f"<unserializable object of type {type(attr).__name__}>"
+    def to_json(self) -> dict[str, Any]:
+        """ Return a JSON-compatible description of this structure.
 
-            kwargs[name] = attr
+        Returns
+        -------
+        dict
+            ``__class__`` (class name), ``__module__``, ``center_point``,
+            ``__init__`` (encoded constructor arguments) and, if some
+            arguments could not be stored, ``__missing__``.
+        """
 
-        return kwargs
-
-    def to_json(self):
-        return {
+        arguments, missing = self._collect_init_args()
+        data = {
             "__class__": self.__class__.__name__,
+            "__module__": self.__class__.__module__,
             "center_point": self.center_point.as_tuple(),
-            "__init__": self._init_args()
+            "__init__": arguments,
         }
+        if missing:
+            data["__missing__"] = missing
+        return data
 
-    # def _init_args(self) -> dict[str, Any]:
-    #     code = self.__init__.__code__
-    #     if "__init__" not in code.co_names:
-    #         return {}
-    #
-    #     start_idx = code.co_names.index("__init__") + 1
-    #     kwargs = {}
-    #     # for name in code.co_names[start_idx:start_idx + code.co_argcount]: # here is a mistake - co_argcount is 5 but should be higher
-    #     for name in code.co_names[start_idx:]:
-    #         attr = getattr(self, name, "[NOT FOUND]")
-    #         if name == "data" or name == "height_profile":
-    #             continue
-    #         if attr == "[NOT FOUND]":
-    #             continue
-    #         if hasattr(attr, "to_json"):
-    #             attr = attr.to_json()
-    #         elif not isinstance(attr, (str, int, float, dict, list)) or attr is not None:
-    #             attr = str(attr)
-    #
-    #         kwargs[name] = attr
-    #     return kwargs
-    #
-    # def _init_args(self) -> dict[str, Any]:
-    #     # Try to import numpy safely
-    #     try:
-    #         import numpy as np
-    #     except ImportError:
-    #         np = None
-    #
-    #     code = self.__init__.__code__
-    #     if "__init__" not in code.co_names:
-    #         return {}
-    #
-    #     start_idx = code.co_names.index("__init__") + 1
-    #     kwargs = {}
-    #
-    #     for name in code.co_names[start_idx:]:
-    #         attr = getattr(self, name, "[NOT FOUND]")
-    #
-    #         # Skip missing attributes
-    #         if isinstance(attr, str) and attr == "[NOT FOUND]":
-    #             continue
-    #
-    #         # Skip special attributes
-    #         if name in ("data", "height_profile"):
-    #             continue
-    #
-    #             # Properly handle serialization
-    #         if hasattr(attr, "to_json"):
-    #             attr = attr.to_json()
-    #         elif np is not None and isinstance(attr, np.ndarray):
-    #             # Serialize numpy arrays safely
-    #             attr = {
-    #                 "type": "ndarray",
-    #                 "shape": attr.shape,
-    #                 "dtype": str(attr.dtype),
-    #                 "values": attr.tolist()
-    #             }
-    #         elif isinstance(attr, (str, int, float, dict, list)) or attr is None:
-    #             # Keep native types unchanged
-    #             pass
-    #         else:
-    #             # Fallback for custom objects — avoid infinite loops
-    #             try:
-    #                 attr = str(attr)
-    #             except Exception:
-    #                 attr = f"<unserializable object of type {type(attr).__name__}>"
-    #
-    #         kwargs[name] = attr
-    #
-    #     return kwargs
+
+def _init_parameters(cls) -> list[str]:
+    """ Names of the named parameters of ``cls.__init__`` (without ``self``, ``*args``, ``**kwargs``). """
+
+    parameters = inspect.signature(cls.__init__).parameters.values()
+    return [p.name for p in parameters
+            if p.name != "self" and p.kind not in (p.VAR_POSITIONAL, p.VAR_KEYWORD)]
+
+
+def encode_json_value(value) -> Any:
+    """ Encode a constructor argument so that :func:`decode_json_value` can restore it.
+
+    Enums become ``{"__enum__": "<module>.<class>", "name": ...}``, objects
+    with a ``to_json`` method ``{"__object__": "<module>.<class>", "value": ...}``
+    (restored with ``from_json`` or the class called with the value as
+    keyword arguments), NumPy arrays ``{"type": "ndarray", ...}`` as before.
+
+    Raises
+    ------
+    TypeError
+        If the value cannot be encoded.
+    """
+
+    import numpy as np
+
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, enum.Enum):
+        return {"__enum__": f"{type(value).__module__}.{type(value).__qualname__}", "name": value.name}
+    if isinstance(value, np.ndarray):
+        return {"type": "ndarray", "shape": list(value.shape), "dtype": str(value.dtype), "values": value.tolist()}
+    if isinstance(value, np.generic):
+        return value.item()
+    if hasattr(value, "to_json"):
+        return {"__object__": f"{type(value).__module__}.{type(value).__qualname__}", "value": value.to_json()}
+    if isinstance(value, (list, tuple)):
+        return [encode_json_value(v) for v in value]
+    if isinstance(value, dict) and all(isinstance(k, str) for k in value):
+        return {k: encode_json_value(v) for k, v in value.items()}
+    raise TypeError(f"Cannot encode {type(value).__name__} for JSON")
+
+
+def _import(qualified_name: str):
+    module_name, _, name = qualified_name.rpartition(".")
+    obj = importlib.import_module(module_name)
+    return getattr(obj, name)
+
+
+def decode_json_value(value) -> Any:
+    """ Restore a value written by :func:`encode_json_value`. """
+
+    import numpy as np
+
+    if isinstance(value, list):
+        return [decode_json_value(v) for v in value]
+    if not isinstance(value, dict):
+        return value
+    if "__enum__" in value:
+        return _import(value["__enum__"])[value["name"]]
+    if "__object__" in value:
+        cls = _import(value["__object__"])
+        if hasattr(cls, "from_json"):
+            return cls.from_json(value["value"])
+        return cls(**value["value"])
+    if value.get("type") == "ndarray":
+        return np.asarray(value["values"], dtype=value["dtype"]).reshape(value["shape"])
+    return {k: decode_json_value(v) for k, v in value.items()}
+
+
+def structure_from_json(data: dict[str, Any]) -> "DrawableObject":
+    """ Rebuild a structure from :meth:`DrawableObject.to_json`.
+
+    Parameters
+    ----------
+    data : dict
+        JSON form of the structure (with ``__module__``, written since T56).
+
+    Returns
+    -------
+    DrawableObject
+
+    Raises
+    ------
+    ValueError
+        If the module is not stored, or a required constructor argument is
+        missing.
+    """
+
+    if "__module__" not in data:
+        raise ValueError(f"Cannot rebuild {data.get('__class__')}: the JSON form has no __module__ (written "
+                         f"before T56).")
+    cls = _import(f"{data['__module__']}.{data['__class__']}")
+    arguments = {name: decode_json_value(value) for name, value in data["__init__"].items()}
+    required = [p.name for p in inspect.signature(cls.__init__).parameters.values()
+                if p.name != "self" and p.default is p.empty and p.kind not in (p.VAR_POSITIONAL, p.VAR_KEYWORD)]
+    lacking = [name for name in required if name not in arguments]
+    if lacking:
+        raise ValueError(f"Cannot rebuild {cls.__name__}: the arguments {lacking} were not stored.")
+    return cls(**arguments)
 
 
 class VoidStructure(DrawableObject):
