@@ -89,6 +89,10 @@ class StructureSpec:
     slicer : dict
         Keyword arguments of ``Model3D_Slicer`` (``velocity``, ``hatch_size``,
         ``slice_size``, ``pixel_size``, ``unit``, …) for program source SLICER.
+    factory : callable, optional
+        ``factory(experiment) -> DrawableObject`` for program source DRAWING,
+        for structures that need values of the running experiment (e.g. the
+        acceleration ``experiment.accel_a_um`` read from the controller).
     power_mw : float, optional
         Laser power; default: the experiment default power.
     axes : str
@@ -96,7 +100,8 @@ class StructureSpec:
     repeat : int
         Number of repetitions of this structure in the following grid cells.
     structure_type : StructureType, optional
-        Default: ``NORMAL`` for DRAWING, ``IFOV`` for SLICER.
+        Default: ``NORMAL`` for DRAWING, ``IFOV`` for SLICER; ``DUMMY`` leaves
+        the grid cell empty (see :meth:`empty`).
     """
 
     name: str
@@ -107,9 +112,19 @@ class StructureSpec:
     axes: str = "ABZ"
     repeat: int = 0
     structure_type: Optional[StructureType] = None
+    factory: Optional[Callable[[Experiment], DrawableObject]] = None
 
-    def drawable(self, source: ProgramSource, objective: str) -> DrawableObject:
+    @classmethod
+    def empty(cls) -> "StructureSpec":
+        """ An empty grid cell (``Experiment.skip_structure``). """
+
+        return cls("dummy", structure_type=StructureType.DUMMY)
+
+    def drawable(self, source: ProgramSource, objective: str,
+                 experiment: Optional[Experiment] = None) -> Optional[DrawableObject]:
         """ The structure to add to the experiment for the given program source.
+
+        Returns None for an empty grid cell.
 
         Raises
         ------
@@ -117,9 +132,15 @@ class StructureSpec:
             If the data needed by the program source is missing.
         """
 
+        if self.structure_type == StructureType.DUMMY:
+            return None
         if source == ProgramSource.DRAWING:
+            if self.factory is not None:
+                if experiment is None:
+                    raise ValueError(f"Structure {self.name}: a factory needs the running experiment.")
+                return self.factory(experiment)
             if self.structure is None:
-                raise ValueError(f"Structure {self.name}: program source DRAWING needs a structure.")
+                raise ValueError(f"Structure {self.name}: program source DRAWING needs a structure or a factory.")
             return self.structure
         if source == ProgramSource.SLICER:
             if self.height_data is None:
@@ -265,7 +286,7 @@ class ExperimentSpec:
 def run_experiment(spec: ExperimentSpec, *, user: str, resin_edges, path: Optional[Path] = None,
                    substrate: Optional[str] = None, data_root: Optional[Path] = None, backend=None,
                    plane: Optional[ZFunction] = None, confirm: Optional[Callable[[str], bool]] = None,
-                   show_plot: bool = False) -> Path:
+                   show_plot: bool = False, substrate_information: Optional[dict] = None) -> Path:
     """ Run an experiment: plot, plane fit, OPL scan (DHM), structures, build and print.
 
     Parameters
@@ -290,6 +311,8 @@ def run_experiment(spec: ExperimentSpec, *, user: str, resin_edges, path: Option
         printing (e.g. a message box on the lab PC); returning False stops.
     show_plot : bool
         Show the experiment plot window.
+    substrate_information : dict, optional
+        Free substrate information of older scripts, stored in the experiment file.
 
     Returns
     -------
@@ -306,6 +329,7 @@ def run_experiment(spec: ExperimentSpec, *, user: str, resin_edges, path: Option
         folder, logger = None, getLogger()
     arguments = spec.experiment_arguments(user=user, resin_edges=resin_edges, logger=logger, backend=backend,
                                           path=folder, substrate=substrate, data_root=data_root)
+    arguments["substrate_information"] = substrate_information
 
     def ask(question: str) -> bool:
         return confirm is None or confirm(question)
@@ -320,9 +344,13 @@ def run_experiment(spec: ExperimentSpec, *, user: str, resin_edges, path: Option
                 return experiment.path
             experiment.opl_scan(m0=spec.opl_start_um)
         for structure in spec.structures:
+            if structure.structure_type == StructureType.DUMMY:
+                experiment.skip_structure()
+                continue
             name = experiment.add_structure(
                 structure.type_for(spec.program_source), structure.name, axes=structure.axes,
-                power=structure.power_mw, structure=structure.drawable(spec.program_source, spec.objective))
+                power=structure.power_mw,
+                structure=structure.drawable(spec.program_source, spec.objective, experiment))
             for _ in range(structure.repeat):
                 experiment.add_structure(StructureType.REPEAT, name)
         experiment.build_programs()
@@ -330,3 +358,34 @@ def run_experiment(spec: ExperimentSpec, *, user: str, resin_edges, path: Option
             return experiment.path
         experiment.print_experiment()
         return experiment.path
+
+
+def script_output(path: Optional[Path], default: Path, folder_name: str) -> tuple[Path, str]:
+    """ Root folder and experiment name in the convention of the older experiment scripts.
+
+    Parameters
+    ----------
+    path : Path or None
+        Root folder passed to the script.
+    default : Path
+        Folder used without ``path`` (e.g. ``.output/<topic>/<name>_<date>``).
+    folder_name : str
+        Subfolder of ``path``.
+
+    Returns
+    -------
+    tuple of (Path, str)
+        ``(root, name)`` for :func:`run_experiment` (``path=root`` with
+        ``spec.name = name``).
+    """
+
+    if path is None:
+        return Path(default).parent, Path(default).name
+    return Path(path), folder_name
+
+
+def messagebox_confirm(question: str) -> bool:
+    """ Ask a yes/no question in a message box (lab PC). """
+
+    from tkinter import messagebox
+    return messagebox.askyesno(message=question)
