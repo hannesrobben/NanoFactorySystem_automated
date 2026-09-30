@@ -1509,3 +1509,22 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   `314a30b` chore(mains): keep camera images in the existing experiment scripts [T45]; docs(todo): close T45 [T45]
 - **Behaviour change:** new scripts take no camera images unless they pass `camera_capture=True`. The
   existing scripts are unchanged.
+
+### 2026-09-30 18:57 CEST — [T58] Define the capture position of `measure()`
+- **Status:** done
+- **Decision (maintainer, 2026-09-30):** before every capture only the galvo axes are set to A = B = 0; Z stays
+  where it is.
+- **Changes:**
+  - `nanofactorysystem/experiment.py`: `measure()` sends `LINEAR A0 B0 F20` before the X/Y move; docstring.
+  - `nanofactorysystem/storage/records.py`: `commanded_um` is (X, Y, Z, A, B) with Z = None and A = B = 0.
+    Records written before T58 have three values.
+  - `test/golden/commands_experiment_ifov_off.txt`, `commands_experiment_ifov_on.txt`: re-recorded with
+    `--update-golden`. The diff consists only of 65 added lines `LINEAR A0.0000000000 B0.0000000000 F20.000000`
+    per file, one before each capture move. T58 requires this change of the commands sent.
+  - `test/test_experiment.py`: new test. After galvo layers every capture has A = B = 0 and Z is not
+    commanded. Without the reset the test fails (A = 30 µm, B = 2030 µm), which was checked.
+  - `test/README.md`.
+  - `TODO.md`: T58 moved from Blocked (with the decision) to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 259 passed, 14 skipped.
+- **Commits:** `fc9c425` feat(experiment): set the galvo to zero before every capture [T58]; docs(todo): close T58 [T58]
+- **Behaviour change on hardware:** one extra galvo move to A = B = 0 before every camera/DHM capture.

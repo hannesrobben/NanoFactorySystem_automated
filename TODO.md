@@ -153,15 +153,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
         - The database path is configured in `nanofactory.json`; the `.sqlite` file is not in git, a CSV or SQL seed file is.
         - Tests with synthetic data: exact hit, interpolation, outside the hull, unknown material.
       Blocked by: waiting for maintainer approval of `docs/design/VOXEL_DATABASE.md` (draft written 2026-09-30; decisions V1–V5 in §9).
-- [ ] T58: Define the capture position of `measure()` (found during T41) [phase: 1]
-      Goal: Camera and DHM captures are taken at a defined Z and galvo position, not wherever the last layer left the axes.
-      Priority: medium | Depends on: T46
-      Done when:
-        - Decision: capture Z (e.g. plane height at the structure center plus an offset, per drop direction) and whether A/B are reset to 0 before a capture; documented in the `measure()` docstring.
-        - `measure()` moves to that position before every capture; the commanded position is what T46 stores.
-        - Dummy test: after a layer with galvo offsets, the capture is taken at the defined Z and A = B = 0 (or the decided values).
-      Notes: Today `measure()` sends only `LINEAR X Y`; in the T41 dry run captures were taken at A = 30 µm, B = 225 µm and the Z of the last layer.
-      Blocked by: Decision. Proposal: before every capture move to Z = plane height at the capture position plus an objective-specific offset `captureZOffset` (new key of the objective section, default 0 µm), and set A = B = 0. Asked 2026-09-29.
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
@@ -248,3 +239,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T44: Restructure how plane fitting is run — 2026-09-30 — `PlaneFitMode` (GRID/CORNERS/new BORDER, old integers accepted), `plane_fitting.sample_points/measure_plane` for plane fits outside `Experiment`, center validated against the resin edges, tilt warning with `tilt_warning_um`; the +1 of mode 0 is correct. — commits: `c619b7e`
 
 - [x] T45: Take camera images only on request — 2026-09-30 — `Experiment(camera_capture=False)` (maintainer decision: Experiment argument); `measure()` skips the camera and returns None without it; stored, shown in the summary and used on restart; the 57 existing script calls pass True. — commits: `0315df1`, `314a30b`
+
+- [x] T58: Define the capture position of `measure()` — 2026-09-30 — Before every capture the galvo is set to A = B = 0, Z is not moved (maintainer decision); the commanded position (X, Y, Z=None, A=0, B=0) is stored; golden command logs re-recorded (one added galvo command per capture). — commits: `fc9c425`
