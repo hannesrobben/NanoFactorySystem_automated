@@ -711,7 +711,24 @@ class Experiment(object):
     #     return list(points)
 
     def plot_experiment(self, show: bool = True):
-        # Visualize experiment
+        """ Plot the experiment layout and save it as ``experiment.png``.
+
+        The plot shows the resin drop, the experiment rectangle, the grid
+        cells with their indices, the plane-fit sample points, the corners
+        (the double corner, which marks the orientation, highlighted) and the
+        QR code; the title holds the experiment UUID. The plot is also stored
+        in the experiment file.
+
+        Parameters
+        ----------
+        show : bool
+            Show the plot window; otherwise the figure is closed after saving.
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+        """
+
         fig, ax = plt.subplots()
         assert isinstance(ax, plt.Axes)
 
@@ -749,18 +766,39 @@ class Experiment(object):
         plane_fit_points = self.sample_points_for_plane_fitting()
         ax.scatter(*zip(*plane_fit_points), s=3, marker=".", color="red", label="Plane Fitting Probe Points")
 
+        # Corners (the double corner marks the orientation) and QR code
+        layout = self._layout()
+        corners = [c for c in layout.corners if not c.double]
+        if corners:
+            ax.scatter([c.center_um[0] for c in corners], [c.center_um[1] for c in corners], s=12, marker="s",
+                       color="orange", label="Corners")
+        double = layout.double_corner
+        if double is not None:
+            ax.scatter([double.center_um[0]], [double.center_um[1]], s=30, marker="D", color="darkred",
+                       label="Double corner (orientation)")
+        for corner in layout.corners:
+            ax.annotate(corner.position, corner.center_um, fontsize=6, color="darkorange")
+        if layout.qrcode_um is not None:
+            ax.scatter([layout.qrcode_um[0]], [layout.qrcode_um[1]], s=20, marker="s", color="black",
+                       label="QR code")
+        label = f"{self.experiment_label} " if self.experiment_label else ""
+        ax.set_title(f"Experiment {label}{self.qr_text}", fontsize=8)
+
         # Set limits and aspect ratio
         ax.set_xlim(self.resin_corner_bl[0], self.resin_corner_tr[0])
         ax.set_ylim(self.resin_corner_bl[1], self.resin_corner_tr[1])
         ax.set_xlabel("X [um]")
         ax.set_ylabel("Y [um]")
         ax.set_aspect('equal')
-        plt.legend()
-        plt.tight_layout()
-        plt.savefig(self.path / "experiment.png")
-        self.store.write_layout(self._layout(), (self.path / "experiment.png").read_bytes())
+        ax.legend(fontsize=6)
+        fig.tight_layout()
+        fig.savefig(self.path / "experiment.png")
+        self.store.write_layout(layout, (self.path / "experiment.png").read_bytes())
         if show:
             plt.show()
+        else:
+            plt.close(fig)
+        return fig
 
     def plane_fit(self, force: bool = False, *, plane: Optional[ZFunction] = None):
         """ Determine the substrate surface and the global coordinate system.
@@ -1115,10 +1153,13 @@ class Experiment(object):
                           power: float,
                           path: Path,
                           n_dhm_img: int = 0,
-                          stitching: bool = False):
-        plotting_structure = False
-        # if not stitching:
-        #     plotting_structure = True
+                          stitching: bool = False,
+                          plot: bool = False):
+        """ Write the layer programs of one structure and return their paths and the configuration.
+
+        With ``plot``, the movements of the structure program are plotted to
+        ``plot_<name>.png`` in the structure folder.
+        """
         self.log.info(f"Creating layer programs for {name}: {structure}")
         assert isinstance(structure, DrawableObject)
 
@@ -1225,7 +1266,7 @@ class Experiment(object):
             "number of dhm images": n_dhm_img,
         }
 
-        if plotting_structure:
+        if plot:
             # Plot structure to image file
             self.log.info(f"Plotting {name}")
             movements = read_file(structure_pgm_path)
@@ -1236,12 +1277,21 @@ class Experiment(object):
         # Done
         return layer_pgm_paths, structure_config
 
-    def build_programs(self):
+    def build_programs(self, plot_structures: bool = False):
+        """ Write the layer programs of all structures and store them in the experiment file.
+
+        Parameters
+        ----------
+        plot_structures : bool
+            Also plot the movements of every structure to
+            ``structures/<name>/plot_<name>.png`` (slow for large structures).
+        """
+
         # Structures that set the laser power (IFOV) use the calibration of this system's attenuator
         with power_calibration(PowerCalibration(self.system.controller.attenuator.data)):
-            self._build_programs()
+            self._build_programs(plot_structures)
 
-    def _build_programs(self):
+    def _build_programs(self, plot_structures: bool = False):
 
         path = self.path / "structures"
         mkdir(path, clean=False)
@@ -1311,7 +1361,8 @@ class Experiment(object):
                 power=structure_dict["power"],
                 path=path,
                 n_dhm_img=n_dhm_img,
-                stitching=stitching)
+                stitching=stitching,
+                plot=plot_structures)
             self.structure_programs.append(paths)
             grid_types = (StructureType.NORMAL, StructureType.STITCHING, StructureType.IFOV, StructureType.REPEAT)
             grid_index = structure_id - 1 if structure_dict["structure_type"] in grid_types else -1

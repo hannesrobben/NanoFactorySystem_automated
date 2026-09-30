@@ -422,6 +422,31 @@ def test_summary_after_build_and_print(test_config, dummy_backend, no_sleep, tmp
     assert rect["x_um"] != stair["x_um"]
 
 
+def test_experiment_plot_shows_corners_and_qr_code(test_config, dummy_backend, no_sleep, tmp_path):
+    path = tmp_path / "experiment"
+    path.mkdir()
+    with make_experiment(path, dummy_backend, skip_corner=False) as experiment:
+        fig = experiment.plot_experiment(show=False)
+
+        ax = fig.axes[0]
+        labels = ax.get_legend_handles_labels()[1]
+        assert {"Corners", "Double corner (orientation)", "QR code", "Resin Drop"} <= set(labels)
+        assert experiment.qr_text in ax.get_title()
+        assert sorted(t.get_text() for t in ax.texts if t.get_text() in ("TL", "TR", "BL", "BR")) == [
+            "BL", "BR", "TL", "TR"]
+    assert (path / "experiment.png").is_file()
+
+
+def test_structure_plots_on_request(experiment):
+    add_rectangle(experiment)
+    experiment.build_programs()
+    assert not (experiment.path / "structures" / "rect" / "plot_rect.png").exists()
+
+    experiment.build_programs(plot_structures=True)
+
+    assert (experiment.path / "structures" / "rect" / "plot_rect.png").is_file()
+
+
 def test_existing_experiment_is_not_overwritten(test_config, dummy_backend, no_sleep, tmp_path):
     path = tmp_path / "experiment"
     path.mkdir()
