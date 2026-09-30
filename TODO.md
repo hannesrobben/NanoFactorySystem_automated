@@ -133,17 +133,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
-- [ ] T44: Restructure how plane fitting is run [phase: 1]
-      Goal: Plane-fit modes are named, documented and selectable per experiment, and a single plane fit can run outside `Experiment`. The fitting algorithms stay unchanged.
-      Priority: high | Depends on: T43
-      Done when:
-        - `plane_fit_mode: int` is replaced by an enum with descriptive names for the current modes 0 and 1; the old integers are still accepted when an `experiment_dictionary.json` is read.
-        - A "border only" mode exists (N026).
-        - A single plane fit can be run outside `experiment.py` (N079).
-        - The `+1` in the sample points for mode 0 is checked (N078); the experiment center is validated against the resin drop edges (N022); for big structures the z deviation between the corners is checked and a warning is logged above a configurable threshold (N082).
-        - Mode, sample points and the fitted plane are stored in the experiment dictionary.
-        - A dummy test per mode checks number and positions of the sample points.
-      Notes: Replaces T29.
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
 - [ ] T28: Overview images and time estimate (from T19) [phase: B]
@@ -265,3 +254,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T39: Manual DHM helper: implement reset — 2026-09-30 — `DHMBackend.reset()` closes the client, restores the start state (motor position, flags, counter) and reconnects; tested on the dummy DHM. — commits: `b875fe0`
 
 - [x] T43: Make the drop direction consistent everywhere — 2026-09-30 — `Orientation` merged into `DropDirection`: the scanner keeps the lowest focus range for DOWN and the highest for UP (maintainer's description), `Experiment` passes it via `sys_args['layer']['dropDirection']`, QR pixel lines follow it; z coordinates never depend on it (decision), only the order; docstring lists all places. — commits: `97e2345`
+
+- [x] T44: Restructure how plane fitting is run — 2026-09-30 — `PlaneFitMode` (GRID/CORNERS/new BORDER, old integers accepted), `plane_fitting.sample_points/measure_plane` for plane fits outside `Experiment`, center validated against the resin edges, tilt warning with `tilt_warning_um`; the +1 of mode 0 is correct. — commits: `c619b7e`

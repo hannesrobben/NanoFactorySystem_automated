@@ -1395,3 +1395,36 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
      instead of downwards.
 - **Follow-ups:** `sys_args["sample"]["orientation"] = "top"` in the scripts is no longer read by any code;
   T51 can drop it when the scripts are migrated.
+
+### 2026-09-30 18:47 CEST — [T44] Restructure how plane fitting is run
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/plane_fitting.py` (new):
+    - `PlaneFitMode`: `GRID` = 0, `CORNERS` = 1, new `BORDER` = 2 (N026); `parse()` takes a member, a name or an
+      integer.
+    - `sample_points()`; `measure_plane()` (the former body of `Experiment.plane_fit`, now usable from scripts,
+      N079); `interface_for()`; `structure_tilt()`.
+  - `nanofactorysystem/experiment.py`:
+    - `plane_fit_mode` accepts a member, a name or an integer, and is stored by name;
+    - new `tilt_warning_um` (default 1 µm) and `_check_tilt()` after every plane fit (N082);
+    - the centre is checked against the resin edges (N022, `ValueError`);
+    - `plane_fit()` uses `measure_plane()`; the commented-out old sample-point function is removed;
+    - the unused imports `Plane` and `PlaneFit` are removed;
+    - reading from the file and from old dictionaries: `PlaneFitMode.parse`, and parameters missing from older
+      files keep the constructor default.
+  - `nanofactorysystem/storage/schema.py`: `plane_fit_mode` has kind "enum"; new parameter `tilt_warning_um`.
+  - `test/test_plane_fitting.py` (new, 11 tests); `test/test_experiment.py`: `make_experiment(center=...)`;
+    `test/README.md`; `CLAUDE.md`.
+  - `TODO.md`: T44 moved to Done.
+- **Tests:** `python -m pytest`: 255 passed, 14 skipped.
+- **Commits:** `c619b7e` feat(experiment): named plane-fit modes and a stand-alone plane fit [T44]; docs(todo): close T44 [T44]
+- **Notes:**
+  - N078: the `+1` is correct. There are rows + 1 and cols + 1 grid lines (before, between and after the
+    cells).
+  - The tilt check only warns. N082 also suggested placing a structure at the lowest or highest corner height
+    instead of its centre; that is not implemented, because it would change the printed z (open for the
+    maintainer).
+  - `measure_plane()` cannot run on the dummy backend, which does not simulate plane detection. It is tested
+    with a stand-in for `tools.plane.Plane`.
+- **Behaviour change on hardware:** an experiment centre outside the resin-drop box now fails at construction.
+  The dictionaries store the mode name instead of the integer.
