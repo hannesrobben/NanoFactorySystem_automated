@@ -1528,3 +1528,29 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** `python -m pytest`: 259 passed, 14 skipped.
 - **Commits:** `fc9c425` feat(experiment): set the galvo to zero before every capture [T58]; docs(todo): close T58 [T58]
 - **Behaviour change on hardware:** one extra galvo move to A = B = 0 before every camera/DHM capture.
+
+### 2026-09-30 18:57 CEST — [Phase 1] Phase summary
+- **Finished todos:**
+  - T46: capture positions (before phase 2);
+  - T43: drop direction;
+  - T44: plane-fit modes and stand-alone plane fit;
+  - T45: camera images only on request;
+  - T58: galvo at zero before captures.
+- **Maintainer decisions used:** the drop-direction physics and "z never changes, only the order" (T43);
+  `camera_capture` as an `Experiment` argument, with True in the existing scripts (T45); only A = B = 0 before
+  captures (T58).
+- **Tests:** `python -m pytest` (short-path venv): 259 passed, 14 skipped, including the dry run.
+  - Golden programs are unchanged.
+  - The golden command logs of the experiment flows changed only by the galvo reset of T58 (justified in the
+    T58 entry).
+- **Branch:** `feat/phase1-execution-parameters`, stacked on the earlier branches. Nothing is pushed.
+- **Open follow-ups:**
+  - T37 (phase B) is no longer blocked by T43.
+  - N082 (writing a structure at the lowest or highest corner height instead of its centre) is open; T44
+    only warns.
+- **To check on the lab PC:**
+  1. 20x (UP) plane fits when two focus ranges are found: the highest range is kept now.
+  2. QR codes with 63x (DOWN): the pixel lines are drawn upwards now.
+  3. The galvo reset before captures (T58) and the tilt warning after the plane fit (T44).
+  4. `sys_args["sample"]["orientation"]` is no longer read.
+  5. An experiment centre outside the resin-drop box now raises an error.
