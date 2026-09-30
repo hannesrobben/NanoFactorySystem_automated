@@ -282,6 +282,9 @@ class Experiment(object):
                 self.log.warning("The UUID of the old experiment could not be recovered; a new one is used.")
         else:
             self.qr_text = str(uuid.uuid4())
+        if self.substrate is not None and not self.experiment_label:
+            # New experiment in an explicit folder: labelled like one in the substrate folder
+            self.experiment_label = self.substrates.next_experiment_label(self.substrate.label)
         self.log.info(f"Experiment {self.qr_text}")
 
         # No plane fitting data yet

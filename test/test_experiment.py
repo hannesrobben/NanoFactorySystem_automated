@@ -363,6 +363,24 @@ def test_two_experiments_on_one_substrate(test_config, dummy_backend, no_sleep, 
     assert index[0]["center_um"] == [1310.0, 19500.0]
 
 
+def test_experiments_in_explicit_folders_are_labelled_on_their_substrate(test_config, dummy_backend, no_sleep,
+                                                                         tmp_path):
+    from nanofactorysystem.storage.substrate_store import SubstrateStore
+
+    root = tmp_path / "root"
+    substrates = SubstrateStore(root)
+    label = substrates.create("Test", "TU").label
+    for name in ("first", "second"):
+        (tmp_path / name).mkdir()
+        with make_experiment(tmp_path / name, dummy_backend, substrate_label=label, data_root=root):
+            pass
+
+    experiments = substrates.get(label).experiments
+    assert [e["label"] for e in experiments] == [f"{label}-A", f"{label}-B"]
+    assert [Path(e["path"]) for e in experiments] == [(tmp_path / n).resolve() for n in ("first", "second")]
+    assert ExperimentStore.open(tmp_path / "second").read().label == f"{label}-B"
+
+
 def test_restart_updates_the_substrate_index(test_config, dummy_backend, no_sleep, tmp_path):
     from nanofactorysystem.storage.substrate_store import SubstrateStore
 
