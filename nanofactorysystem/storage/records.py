@@ -49,8 +49,9 @@ class CaptureRecord:
     offset_um : tuple of float
         (x, y) offset of the capture position from the structure center.
     commanded_um : tuple
-        (X, Y, Z) target of the move before the capture; an axis that was
-        not commanded is None.
+        (X, Y, Z, A, B) target of the moves before the capture; an axis that
+        was not commanded is None (Z is not moved before a capture, the galvo
+        axes are set to 0). Records written before T58 have (X, Y, Z) only.
     actual_um : dict
         Positions of the axes X, Y, Z, A, B read from the controller after
         the move.
@@ -70,7 +71,7 @@ class CaptureRecord:
     image_index: int
     image_count: int
     offset_um: tuple[float, float]
-    commanded_um: tuple[Optional[float], Optional[float], Optional[float]]
+    commanded_um: tuple[Optional[float], ...]
     actual_um: dict[str, float] = field(default_factory=dict)
     time: str = field(default_factory=utc_timestamp)
     file: Optional[str] = None

@@ -1,5 +1,6 @@
 """Tests for Experiment (experiment.py) on the dummy backend."""
 import json
+import re
 from pathlib import Path
 
 import matplotlib
@@ -470,6 +471,27 @@ def test_camera_images_only_on_request(camera_capture, test_config, dummy_backen
     assert json.loads((path / "experiment_summary.json").read_text())["camera_capture"] is camera_capture
     # A restart uses the stored value
     assert Experiment.parameters_from_dictionary(path)["camera_capture"] is camera_capture
+
+
+def test_captures_are_taken_with_the_galvo_at_zero(test_config, dummy_backend, no_sleep, tmp_path):
+    path = tmp_path / "experiment"
+    path.mkdir()
+    with make_experiment(path, dummy_backend) as experiment:
+        experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+        experiment.add_structure(  # written with the galvo (ABZ): the layers leave A and B displaced
+            StructureType.NORMAL, "rect", axes="ABZ", power=0.7,
+            structure=Rectangle3D(Point3D(0, 0, -1), 60, 60, 3, hatch_size=5.0, slice_size=1.0,
+                                  velocity=1000, acceleration=500))
+        experiment.build_programs()
+        experiment.print_experiment()
+
+    layer_programs = "\n".join(open(f).read() for f in experiment.structure_configs[0]["layer_files"])
+    assert re.search(r"LINEAR[^\n]*A-?0\.0[1-9]", layer_programs)  # the layers move the galvo
+    captures = ExperimentStore.open(path).read().captures
+    assert captures and all(c.actual_um["A"] == 0.0 and c.actual_um["B"] == 0.0 for c in captures)
+    assert all(c.commanded_um[2:] == (None, 0.0, 0.0) for c in captures)  # Z is not moved (T58)
+    layer_captures = [c for c in captures if c.phase == "layer"]
+    assert len({round(c.actual_um["Z"], 3) for c in layer_captures}) > 1  # Z stays where each layer ended
 
 
 def test_experiment_default_takes_no_camera_images(test_config, dummy_backend, no_sleep, tmp_path):

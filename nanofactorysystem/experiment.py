@@ -1597,6 +1597,10 @@ class Experiment(object):
                 ) -> list[tuple[Optional[Container], Optional[ImageContainer]]]:
         """ Take DHM and camera captures at one or more positions.
 
+        Before every capture the galvo axes are set to A = B = 0 and the
+        stages move to the capture position in X and Y; Z is not moved and
+        stays where the last layer ended (maintainer decision, T58).
+
         Every capture is stored in the experiment file with a
         :class:`CaptureRecord` that holds the commanded and the actual stage
         position. The returned containers carry the same record as
@@ -1634,9 +1638,11 @@ class Experiment(object):
             target = dict(coordinate)
             target["X"] += dx / 1000
             target["Y"] += dy / 1000
-            commanded = tuple(1000 * target[axis] if axis in target else None for axis in "XYZ")
+            # Z is not commanded (it stays where the last layer ended); the galvo axes are set to 0
+            commanded = tuple(1000 * target[axis] if axis in target else None for axis in "XYZ") + (0.0, 0.0)
 
-            # Move to given absolute coordinate and read back where the stages are
+            # Reset the galvo, move to the given absolute coordinate and read back where the axes are
+            self.a3200.api.LINEAR(A=0.0, B=0.0, F=20)
             self.a3200.api.LINEAR(**target, F=20)
             actual = self.system.current_pos()
 
