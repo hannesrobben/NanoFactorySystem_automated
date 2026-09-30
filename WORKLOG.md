@@ -1165,3 +1165,33 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   - The double-corner position and orientation are stored in `/layout` since T47 (for F1).
 - **Behaviour change on hardware:** `REPEAT` works now; it failed before with a TypeError. The restart script
   continues the stored experiment, and a second abort no longer shifts the resume point.
+
+### 2026-09-30 13:44 CEST — [T59] Correct the print-progress record
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/storage/json_copies.py`: `print_progress()` and `export_progress()`. The schema
+    `nanofactory.print_progress/2` is documented in the docstring; `export_json()` writes the file as well.
+  - `nanofactorysystem/storage/experiment_store.py`:
+    - `set_structure_status()` records `started` (first time only) and `ended`;
+    - `read(include_captures=False)` skips capture metadata for the exports, so they don't grow with every
+      layer.
+  - `nanofactorysystem/storage/records.py`: `StructureRecord.started` and `ended`.
+  - `nanofactorysystem/storage/legacy.py`: also reads the new schema.
+  - `nanofactorysystem/experiment.py`:
+    - `update_print_progress()` is removed;
+    - `print_progress.json` is exported after every layer and structure;
+    - the loop variable `layer_count` (an index) is renamed `index`.
+  - Tests:
+    - the old progress keys are replaced by the new schema in the existing asserts. Each check still
+      tests the same behaviour: layers printed, a failed layer with its error, an empty structure, a
+      restart;
+    - new parametrised test for UP and DOWN after a complete and an aborted structure;
+    - the legacy-import test writes an old-format `print_progress.json` itself;
+    - one store unit test expects the new end time.
+  - `test/README.md` (and a follow-up commit that fixes escaped backticks), `CLAUDE.md`.
+  - `TODO.md`: T59 moved to In Progress, then to Done.
+- **Tests:** `python -m pytest`: all pass (221 passed plus the fixed store test; storage tests 22 passed).
+- **Commits:** `154d85d` feat(experiment): export print_progress.json from the experiment file [T59];
+  `0356fc2` docs(test): fix escaped backticks in the README [T59]; docs(todo): close T59 [T59]
+- **Behaviour change:** `print_progress.json` has a new format. It is a readable copy; restart uses the
+  experiment file.

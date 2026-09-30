@@ -63,15 +63,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
         - Golden files unchanged.
       Notes: The skipped height data (`data`, `height_profile`, N046) stays in T37 and can build on this.
 
-- [ ] T59: Correct the print-progress record (found during T41) [phase: 2]
-      Goal: The progress record states correctly how many layers were printed and when.
-      Priority: low | Depends on: T47
-      Done when:
-        - The number of printed layers is a count (not the loop index), for UP and DOWN.
-        - Every layer and structure entry has a start and end timestamp; the repeated explanatory text is replaced by a documented schema.
-        - Dummy test for UP and DOWN checks the counts after a complete and an aborted structure.
-      Notes: Can be done as part of T47/T50 if the progress record moves into the experiment file.
-
 ### Phase 3 — Experiment scripts and substrate main
 
 - [ ] T51: New template for experiment scripts [phase: 3]
@@ -306,3 +297,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T49: Experiment summary — 2026-09-30 — `storage/summary.py` builds a summary (UUID, one row per user structure with position, slice, hatch, power, velocity, IFOV, DHM, camera, status); written into `/summary` and `experiment_summary.json` after building and after every structure and logged as table. — commits: `92b9bcc`
 
 - [x] T50: Restart and repetitions on the new storage — 2026-09-30 — Restart reads parameters and per-layer progress from `experiment.h5` (resumes correctly after any number of aborts, keeps the UUID); old JSON folders are imported into a new experiment file on restart; `REPEAT` fixed (own grid cell, `<name>_rep<n>`, `repeat_of`). — commits: `7aaee04`
+
+- [x] T59: Correct the print-progress record — 2026-09-30 — `print_progress.json` is exported from the experiment file (schema `nanofactory.print_progress/2`): printed/failed layer counts, start/end time per layer and structure; UP and DOWN tested after a complete and an aborted structure. — commits: `154d85d`
