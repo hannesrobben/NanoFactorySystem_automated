@@ -93,3 +93,20 @@ def test_invalid_layout_creates_nothing(test_config, tmp_path, substrate):
         run_substrate(substrate, planned, backend="dummy")
     assert not (tmp_path / "root").exists()
 
+
+def load_substrate_main(monkeypatch):
+    import importlib.util
+    mains = Path(__file__).parents[2] / "mains"
+    monkeypatch.syspath_prepend(str(mains))  # the main files import Experiments.… from mains/
+    spec = importlib.util.spec_from_file_location("substrate_main", mains / "substrate_main.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_substrate_main_template_has_a_valid_layout(test_config, monkeypatch):
+    from nanofactorysystem.substrate_plan import check_layout
+    module = load_substrate_main(monkeypatch)
+    areas = check_layout(module.SUBSTRATE, module.experiments())
+    assert [a.name for a in areas] == ["power_quadrants", "line_power_gap"]
+
