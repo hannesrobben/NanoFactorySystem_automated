@@ -204,8 +204,8 @@ def read_params(path: str | Path) -> JobParameters:
             for k, v in meta["laser_params"].attrs.items()})
         raw = {k: (v.item() if isinstance(v, np.generic) else v)
                for k, v in meta["slicing_params"].attrs.items()}
-        if "hatch_strategy" in raw:
-            raw["hatch_strategy"] = str(raw["hatch_strategy"])
+        raw = {k: (v.decode() if isinstance(v, bytes) else str(v) if isinstance(v, str) else v)
+               for k, v in raw.items()}
         slicing = SlicingParameters(**raw)
         voxel = tuple(meta.attrs["voxel_size_um"])
     return JobParameters(slicing=slicing, laser=laser, voxel_size_um=voxel)

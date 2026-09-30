@@ -24,6 +24,7 @@ from .optimizer import optimize_job
 from .parameters import JobParameters
 from .timing import MotionParameters, estimate_toolpath
 from .toolpath import ToolpathJob, build_job
+from .voxel import VoxelModel, compensate
 
 log = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ def slice_geometry(
     ground_truth_path: str | Path | None = None,
     optimize: bool = False,
     motion: MotionParameters | None = None,
+    voxel_model: VoxelModel | None = None,
 ) -> ToolpathJob:
     """Full pipeline: any geometry source -> ToolpathJob (IR).
 
@@ -55,11 +57,18 @@ def slice_geometry(
         optimize: Run the path optimizer (order + direction of infill,
             start rotation of contour rings).
         motion: Machine motion model for time estimation/optimization.
+        voxel_model: Voxel sizes for the laser parameters (T54). With data
+            for params.laser the parameters are compensated
+            (voxel.compensate: contour offset, first/last slice, spacing
+            per params.slicing.spacing_mode); the values used are in
+            job.meta["voxel"]. None or no data: unchanged behaviour.
 
     Returns:
         ToolpathJob with time estimate in job.meta["time_estimate"].
     """
     params = params or JobParameters()
+    compensation = compensate(params, voxel_model)
+    params = compensation.params
     motion = motion or MotionParameters(
         mark_speed_um_s=params.laser.scan_speed_um_s)
     t0 = time.perf_counter()
@@ -88,7 +97,7 @@ def slice_geometry(
 
     # --- stages 1+2: slice + hatch -------------------------------------------
     layers = slicing.slice_mesh(mesh, params.slicing)
-    hatching.hatch_layers(layers, params.slicing)
+    hatching.hatch_layers(layers, params.slicing, compensation.context)
 
     # --- stage 3: build IR ----------------------------------------------------
     recipe = [{
@@ -102,6 +111,8 @@ def slice_geometry(
     job = build_job(layers, params, source_file=source_name, recipe=recipe)
     if pre_report is not None:
         job.meta["preprocess"] = pre_report.to_dict()
+    if voxel_model is not None:
+        job.meta["voxel"] = compensation.report
 
     # --- stage 4 (optional): optimize ------------------------------------------
     if optimize:

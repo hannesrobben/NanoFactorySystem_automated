@@ -79,6 +79,8 @@ _SLICING_KWARG_DEFAULTS = {
     "hatch_angle_deg": 0.0,
     "contour_offset_um": 0.0,
     "num_contour_lines": 0,
+    "spacing_mode": "voxel_overlap",
+    "voxel_overlap": 0.3,
 }
 
 
@@ -263,6 +265,15 @@ class Model3D_Slicer(DrawableObject):
     (no per-layer z) remain unrendered; they are counted in
     ``skipped_elements_report`` with a warning.
 
+    Voxel-aware slicing (T54): with ``voxel_model`` (e.g.
+    ``nanofactorysystem.voxel.DatabaseVoxelModel``) and data for ``power`` and
+    ``velocity``, contours are offset inward by half the voxel width, the
+    first and last slice lie half a voxel height inside the part, and
+    ``spacing_mode="voxel_overlap"`` (default) derives hatch and slice size
+    from the voxel size and ``voxel_overlap``; ``"static_hatching"`` keeps
+    ``hatch_size``/``slice_size`` and only warns about gaps. The values used
+    are in ``to_json()["voxel"]``. Without a model or data nothing changes.
+
     Debugging (docs/05): pass ``debug_plot_dir`` to get a per-layer PNG
     flipbook of the sliced IR (grey = design cross-section, blue = contour
     paths → IFOV_PolyLines, orange = infill → IFOV_Lines), written once
@@ -287,6 +298,10 @@ class Model3D_Slicer(DrawableObject):
             hatch_angle_deg: float | object = _UNSET,     # deg, 0 = along X
             contour_offset_um: float | object = _UNSET,   # µm (docs/03 §2)
             num_contour_lines: int | object = _UNSET,     # walls (stage 2)
+            spacing_mode: str | object = _UNSET,          # voxel data: "voxel_overlap" / "static_hatching"
+            voxel_overlap: float | object = _UNSET,       # voxel data: overlap ratio of lines/layers
+            # --- voxel-aware slicing (T54) -------------------------------------
+            voxel_model: Any = None,
             # --- input / behaviour -------------------------------------------
             unit: str = "um",
             pixel_size: Optional[float] = None,           # height maps, in `unit`
@@ -338,6 +353,11 @@ class Model3D_Slicer(DrawableObject):
         self.velocity = velocity
         self.power = power
         self.objective = objective
+        if voxel_model is not None and power is None:
+            raise ValueError("Voxel-aware slicing needs the laser power of the structure (power=...).")
+        self.voxel_model = voxel_model
+        laser = LaserParameters(scan_speed_um_s=self._velocity_um_s(velocity),
+                                **({"power_mw": float(power)} if power is not None else {}))
 
         self.unit = unit
         self.pixel_size = pixel_size
@@ -359,6 +379,8 @@ class Model3D_Slicer(DrawableObject):
             "hatch_angle_deg": hatch_angle_deg,
             "contour_offset_um": contour_offset_um,
             "num_contour_lines": num_contour_lines,
+            "spacing_mode": spacing_mode,
+            "voxel_overlap": voxel_overlap,
         }
         explicitly_passed = {k: v for k, v in passed_kwargs.items()
                              if v is not _UNSET}
@@ -372,11 +394,7 @@ class Model3D_Slicer(DrawableObject):
             if isinstance(params, JobParameters):
                 self.params: JobParameters = params
             elif isinstance(params, SlicingParameters):
-                self.params = JobParameters(
-                    slicing=params,
-                    laser=LaserParameters(
-                        scan_speed_um_s=self._velocity_um_s(velocity)),
-                )
+                self.params = JobParameters(slicing=params, laser=laser)
             else:
                 raise TypeError(
                     "params must be JobParameters or SlicingParameters, "
@@ -396,9 +414,10 @@ class Model3D_Slicer(DrawableObject):
                     hatch_angle_deg=merged["hatch_angle_deg"],
                     contour_offset_um=merged["contour_offset_um"],
                     num_contour_lines=merged["num_contour_lines"],
+                    spacing_mode=merged["spacing_mode"],
+                    voxel_overlap=merged["voxel_overlap"],
                 ),
-                laser=LaserParameters(
-                    scan_speed_um_s=self._velocity_um_s(velocity)),
+                laser=laser,
             )
 
         self.motion = motion or MotionParameters(
@@ -615,6 +634,7 @@ class Model3D_Slicer(DrawableObject):
             self.params,
             optimize=self.optimize,
             motion=self.motion,
+            voxel_model=self.voxel_model,
         )
         job.source_file = source_name
         if pre_report_dict is not None:
@@ -691,6 +711,7 @@ class Model3D_Slicer(DrawableObject):
             "n_groups": len(job.groups),
             "n_elements": job.n_elements,
             "mark_length_um": job.mark_length_um,
+            "voxel": job.meta.get("voxel"),
         }
 
     # ----------------------------------------------------------------------

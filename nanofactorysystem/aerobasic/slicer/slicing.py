@@ -26,14 +26,36 @@ def compute_z_levels(mesh: trimesh.Trimesh, params: SlicingParameters) -> np.nda
 
     The first plane sits z_epsilon above z_min: slicing exactly at the
     mesh minimum touches it tangentially and produces degenerate sections.
+
+    With a voxel height (params.voxel_height_um > 0) the first and the last
+    plane lie half a voxel height inside the bottom and top surface, so the
+    voxels of the outer layers end at the design surfaces; the planes in
+    between are spaced evenly with at most layer_height_um. A part thinner
+    than one voxel gets one plane at mid-height (with a warning).
     """
     z_min, z_max = mesh.bounds[:, 2]
+    if params.voxel_height_um > 0:
+        return _voxel_z_levels(float(z_min), float(z_max), params)
     start = z_min + params.z_epsilon_um
     if start >= z_max:
         raise ValueError(
             f"Model height ({z_max - z_min:.3f} um) smaller than z_epsilon."
         )
     return np.arange(start, z_max, params.layer_height_um)
+
+
+def _voxel_z_levels(z_min: float, z_max: float, params: SlicingParameters) -> np.ndarray:
+    """Slice planes for a known voxel height (see compute_z_levels)."""
+    half = params.voxel_height_um / 2
+    eps = params.z_epsilon_um
+    bottom = max(z_min + half, z_min + eps)
+    top = min(z_max - half, z_max - eps)
+    if top <= bottom:
+        log.warning("Model height %.3f um is not larger than the voxel height %.3f um: one slice at mid-height",
+                    z_max - z_min, params.voxel_height_um)
+        return np.array([(z_min + z_max) / 2])
+    n_planes = int(np.ceil((top - bottom) / params.layer_height_um - 1e-9)) + 1
+    return np.linspace(bottom, top, n_planes)
 
 
 def slice_mesh(mesh: trimesh.Trimesh, params: SlicingParameters) -> list[Layer]:
