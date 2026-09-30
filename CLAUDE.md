@@ -32,7 +32,8 @@ python -m pytest test/test_aerobasic/test_golden_programs.py --update-golden   #
 
 - `nanofactorysystem/config.py` loads `sysConfig`, which has `user:<name>` and `objective:<name>` sections (e.g. `"Zeiss 20x"`, `"Zeiss 63x"`). Lookup order: `use_config(path_or_dict)` (context manager, swaps the content in place), `$NANOFACTORY_CONFIG`, `~/nanofactory.json`, then the built-in `DEFAULT_CONFIG` (devices and both objectives, no users, no calibration file) with a warning.
 - Class defaults of `System`, `A3200`, `Attenuator`, `Camera`, `Dhm` are `ConfigDefaults(section, {...})` descriptors, resolved on access (deep copy), so importing the package never reads config sections.
-- The YAML files in `config/` (Hydra layout) describe the same data but are not currently read by any Python code.
+- The YAML files in `config/` (Hydra layout) describe the same data but are not currently read by any Python code. `config/voxel_seed.csv` is the seed of the voxel database.
+- Data locations: `user:<name>.dataRoot` (experiment data root, default `~/Documents/Femtika_Experiment/<user>`), `system.voxelDatabase` (default `~/Documents/Femtika_Experiment/voxels.sqlite`), `system.syncFolderNames` (folder names refused as data location, default Seafile/OneDrive/Dropbox); `user:<name>.initials` for substrate labels.
 - Runtime parameters are passed as nested dicts (`sys_args` with sections `attenuator`, `controller`, `sample`, `focus`, `layer`, `plane`, `dhm`, `camera`). Each component takes its own section via `popargs`, and `Parameter` subclasses merge these into their `_defaults`. `Parameter` works on a copy of each section, so a `sys_args` dict can be reused.
 
 ## Architecture
@@ -66,6 +67,9 @@ python -m pytest test/test_aerobasic/test_golden_programs.py --update-golden   #
   - `tile_manager.py` (stitching of structures larger than the FOV)
 - The directories `old_to-delete/` and `new/` and the files `*_old.py` are legacy or experimental code, not the active path.
 - `aerobasic/slicer/` is a separate mesh/heightmap → toolpath pipeline (`pipeline.slice_geometry`). It is a self-contained port of `tpp_slicer`, and its layout is described in `tree_overview_slicer.txt`.
+
+**Voxel database** (`voxel/`, design in `docs/design/VOXEL_DATABASE.md`)
+- `VoxelDatabase` (SQLite, schema version in `PRAGMA user_version`, migrations in `voxel/migrations.py`) stores measured voxel widths/heights per material, objective, setup, power and velocity; `voxel_size()` returns an exact hit, a 2-D linear interpolation in (ln P, ln v) inside the convex hull, or a 1-D dose fallback for collinear data, else None (no extrapolation). CSV import/export; `*.sqlite` is not versioned.
 
 **Experiment orchestration** (`experiment.py`)
 - `Experiment` is a context manager that owns a `System`. It lays out a grid of structures inside the resin-drop bounds, adding corner markers plus a QR code (the experiment UUID) unless `skip_corner=True`.
