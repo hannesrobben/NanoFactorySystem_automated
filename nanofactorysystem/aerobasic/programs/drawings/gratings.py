@@ -2,7 +2,7 @@ import numpy as np
 from typing import Iterator
 
 from nanofactorysystem.aerobasic.programs.drawings import DrawableObject, DrawableAeroBasicProgram, SinusoidalGrating
-from nanofactorysystem.aerobasic.programs.drawings.lines import HatchingDirection, Rectangle3D, PolyLines
+from nanofactorysystem.aerobasic.programs.drawings.lines import HatchingDirection, Rectangle3D, PolyLines, step_slice_size
 from nanofactorysystem.aerobasic.programs.drawings.new.tile_creator import TileCalculator
 from nanofactorysystem.devices.coordinate_system import Point2D, Point3D, CoordinateSystem
 
@@ -77,7 +77,7 @@ class StepGrating(DrawableObject):
     def fov_program(self, program, coordinate_system):
         # Add socket
         if self.base_height > 0:
-            slice_size_opt = self.base_height / round(self.base_height / self.slice_size)
+            slice_size_opt = step_slice_size(self.base_height, self.slice_size)
             socket = Rectangle3D(
                 center=self.center,
                 width=self.structure_width,
@@ -91,7 +91,7 @@ class StepGrating(DrawableObject):
             yield from socket.iterate_layers(coordinate_system)
 
         # Add grating
-        slice_size_opt = self.height / round(self.height / self.slice_size)
+        slice_size_opt = step_slice_size(self.height, self.slice_size)
         n_grating = self.full_width_grating / self.period_width
         number_of_periods = int(np.floor(n_grating))
         for step in range(number_of_periods):
@@ -122,8 +122,8 @@ class StepGrating(DrawableObject):
         tile_array = TileCalculator(fov_size=fov, usable_fov_fraction=usable_fov).get_tile_boundaries(
             boundaries_structure)
 
-        slicing_opt_base = self.base_height / round(self.base_height / self.slice_size)
-        slicing_opt = self.height / round(self.height / self.slice_size)
+        slicing_opt_base = step_slice_size(self.base_height, self.slice_size)
+        slicing_opt = step_slice_size(self.height, self.slice_size)
 
         for tile_boundaries in tile_array:
             # printing base

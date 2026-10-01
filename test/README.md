@@ -48,6 +48,7 @@ is longer than 260 characters.
 
 | Module | What it tests | Why it matters (failure it catches) | Requirements |
 |---|---|---|---|
+| `test_aerobasic/test_line_details.py` | Line structures (T35): non-IFOV velocity in µm/s written as mm/s, `Rectangle3D` without height (nothing) or lower than half a slice (one layer), `step_slice_size`, DOEs with zero-height pixels, `IFOV_Lines` velocity handling and the fixed IFOV speeds | Division by zero for flat steps or sockets; wrong speed units in programs | – |
 | `test_aerobasic/test_constants.py` | Parsing and combining axes (`Axis`, `SingleAxis`, `Stages`) | Wrong axis names in `ENABLE`/`HOME`/`LINEAR` commands; invalid axis combinations (`~`, `^`, empty `&`). | – |
 | `test_aerobasic/test_coordinate_system.py` | Plane fit and the local → stage coordinate transformation, azimuth of the plane normal in (-180°, 180°] | Structures written at the wrong height or position on a tilted substrate | – |
 | `test_aerobasic/test_program.py` | `AeroBasicProgram` text output and writing `.pgm` files | Broken program files that the controller rejects | – |

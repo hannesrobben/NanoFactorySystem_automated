@@ -2,7 +2,7 @@ import numpy as np
 from typing import Iterator
 
 from nanofactorysystem.aerobasic.programs.drawings import DrawableObject, DrawableAeroBasicProgram
-from nanofactorysystem.aerobasic.programs.drawings.lines import HatchingDirection, Rectangle3D
+from nanofactorysystem.aerobasic.programs.drawings.lines import HatchingDirection, Rectangle3D, step_slice_size
 from nanofactorysystem.devices.coordinate_system import Point2D, Point3D, CoordinateSystem
 
 
@@ -77,8 +77,7 @@ class DOEstep(DrawableObject):
             for step_y in range(self.y_steps):
                 x_offset = -self.x_steps / 2 * self.feature_width + step_x * self.feature_width + self.feature_width / 2
                 y_offset = -self.y_steps / 2 * self.feature_length + step_y * self.feature_length + self.feature_length / 2
-                slice_size_opt = self.height_profile[step_y][step_x] / round(
-                    self.height_profile[step_y][step_x] / self.slice_size)
+                slice_size_opt = step_slice_size(self.height_profile[step_y][step_x], self.slice_size)
 
                 step_rectangle = Rectangle3D(
                     center=self.center + Point3D(x_offset, y_offset, z_step_offset),
@@ -162,7 +161,7 @@ class Simple_DOE(DrawableObject):
             for j in range(self.columns):
                 height = self.z_profile[i][j]
                 y_offset = self.feature_size * (j - np.ceil(self.columns / 2))
-                slice_size_opt = height / round(height / self.slice_size)
+                slice_size_opt = step_slice_size(height, self.slice_size)
 
                 DOE_pixel = Rectangle3D(
                     center=self.center + Point3D(X=x_offset, Y=y_offset, Z=0),
@@ -236,7 +235,7 @@ class Binary_grating(DrawableObject):
         program = DrawableAeroBasicProgram(coordinate_system)
         # Add socket
         if self.base_height > 0:
-            slice_size_opt = self.base_height / round(self.base_height / self.slice_size)
+            slice_size_opt = step_slice_size(self.base_height, self.slice_size)
             socket = Rectangle3D(
                 center=self.center,
                 width=self.structure_width,
@@ -250,7 +249,7 @@ class Binary_grating(DrawableObject):
             yield from socket.iterate_layers(coordinate_system)
 
         # Add grating
-        slice_size_opt = self.height / round(self.height / self.slice_size)
+        slice_size_opt = step_slice_size(self.height, self.slice_size)
         n_grating = self.full_width_grating/ self.period_width
         number_of_periods = int(np.floor(n_grating))
         for step in range(number_of_periods):

@@ -1,3 +1,4 @@
+import logging
 import math
 from abc import ABC
 from enum import Enum
@@ -10,6 +11,21 @@ from nanofactorysystem.aerobasic.programs.drawings import DrawableAeroBasicProgr
 from nanofactorysystem.aerobasic.programs.drawings.base import IFOV_AeroBasicProgram
 from nanofactorysystem.devices.coordinate_system import CoordinateSystem, Coordinate, Point3D, Point2D
 from nanofactorysystem.devices.power_calibration import PowerCalibration, resolve_power_calibration
+
+log = logging.getLogger(__name__)
+
+
+def step_slice_size(height: float, slice_size: float) -> float:
+    """ Slice size that divides ``height`` into whole layers, close to ``slice_size``.
+
+    Used for the steps of DOEs and gratings. A height of less than half a
+    slice (including 0) has no whole layer; ``slice_size`` is returned then,
+    instead of dividing by zero (N069).
+    """
+
+    n_slices = round(height / slice_size)
+    return height / n_slices if n_slices else slice_size
+
 
 # Writing speed of IFOV programs in mm/s per objective (galvo and stages are coordinated best at these
 # speeds; maintainer decision 2026-10-01, a free IFOV speed is F13) and the z speed in mm/s
@@ -63,7 +79,9 @@ class IFOV_Lines(DrawableObject):
         lines: Has to be a list of tuples where each tuple is (start, end). Start and end point have to be of type
                 Point2D or Point3D. If not then an error will occur.
         velocity: float in unit mm/s. If value is between 500 and 25000 it will be divided with 1000, because it will be
-                assumed that a wrong unit of µm/s was being chosen.
+                assumed that a wrong unit of µm/s was being chosen. The program writes with the fixed IFOV speed of
+                the objective (IFOV_WRITING_SPEED_MM_S, maintainer decision), not with this velocity; it is kept
+                for the metadata.
         power: Possible to set the power at each line/ layer individually.
         calibration: Laser power calibration used to convert power (mW) into the attenuator value. Default: the
                 calibration activated with power_calibration(...) (Experiment.build_programs() activates the one of
@@ -78,7 +96,7 @@ class IFOV_Lines(DrawableObject):
             self.velocity = velocity / 1000
         elif 50 <= velocity < 500:
             self.velocity = 5
-            raise Warning(f"Velocity v={velocity} is too high. Velocity was set to 5mm/s!")
+            log.warning(f"Velocity v={velocity} is too high. Velocity was set to 5mm/s!")
         elif velocity>25000:
             raise ValueError(f"Velocity value {velocity} exceeds 25 mm/s.")
         else:
@@ -606,13 +624,12 @@ class Rectangle3D(DrawableObject):
         return self.center
 
     def iterate_layers(self, coordinate_system: CoordinateSystem) -> Iterator[DrawableAeroBasicProgram]:
-        program = DrawableAeroBasicProgram(coordinate_system)
-        # if self.height == 0 and self.center.Z==0:
+        # A rectangle without height prints nothing (e.g. a zero-height step or socket of a DOE, N069). A height
+        # of less than half a slice gives one layer at the bottom.
         if self.height == 0:
-            yield program
-
+            return
         n_layer = abs(round(self.height / self.slice_size)) + 1
-        slice_size_opt = self.height / (n_layer - 1)
+        slice_size_opt = self.height / (n_layer - 1) if n_layer > 1 else 0.0
 
         hatching_direction = HatchingDirection.X
         for i in range(n_layer):
@@ -694,7 +711,7 @@ class Stair(DrawableObject):
             yield from socket.iterate_layers(coordinate_system)
 
         # Add steps
-        slice_size_opt = self.step_height / round(self.step_height / self.slice_size)
+        slice_size_opt = step_slice_size(self.step_height, self.slice_size)
         for step in range(self.n_steps):
             z_step_offset = self.socket_height + step * self.step_height
             x_offset = (step / 2) * self.step_length

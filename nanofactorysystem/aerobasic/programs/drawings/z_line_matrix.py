@@ -8,7 +8,7 @@ import qrcode
 
 from nanofactorysystem.aerobasic import GalvoLaserOverrideMode, SingleAxis
 from nanofactorysystem.aerobasic.programs.drawings import DrawableAeroBasicProgram, DrawableObject
-from nanofactorysystem.aerobasic.programs.drawings.lines import Rectangle3D
+from nanofactorysystem.aerobasic.programs.drawings.lines import Rectangle3D, step_slice_size
 from nanofactorysystem.devices.coordinate_system import CoordinateSystem, Coordinate, Point3D, Point2D
 
 
@@ -112,7 +112,7 @@ class Stair(DrawableObject):
             yield from socket.iterate_layers(coordinate_system)
 
         # Add steps
-        slice_size_opt = self.step_height / round(self.step_height / self.slice_size)
+        slice_size_opt = step_slice_size(self.step_height, self.slice_size)
         for step in range(self.n_steps):
             z_step_offset = self.socket_height + step * self.step_height
             x_offset = (step / 2) * self.step_length
