@@ -20,6 +20,7 @@ from typing import Callable, Optional
 import numpy as np
 
 from .devices.coordinate_system import ZFunction
+from .experiment import QR_CODE_WIDTH_UM
 from .experiment_spec import ExperimentSpec, run_experiment
 from .resin_drop import drop_outline, has_drop_boundary, rectangle_inside
 from .runtime import getLogger
@@ -27,9 +28,6 @@ from .storage.experiment_store import ExperimentStore
 from .storage.substrate_store import (SubstrateRecord, SubstrateStore, check_not_synced, default_root,
                                       find_experiments, initials)
 
-# Width of the QR code with the experiment UUID (36 characters, error correction Q, pixel pitch 4 µm),
-# centred on the upper edge of the experiment rectangle (Experiment.add_qrcode_structure)
-QR_CODE_WIDTH_UM = 140.0
 
 
 class LayoutError(ValueError):

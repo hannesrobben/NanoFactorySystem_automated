@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 import matplotlib
+import numpy as np
 import pytest
 
 from nanofactorysystem.aerobasic.programs.drawings import Rectangle3D
@@ -776,3 +777,32 @@ def test_expected_and_actual_printing_time(test_config, dummy_backend, no_sleep,
     assert data["structures"][0]["estimated_s"] == pytest.approx(sum(layers))
     assert data["structures"][0]["duration_s"] is not None
     assert Experiment.parameters_from_dictionary(tmp_path)["layer_overhead_s"] == 2.0
+
+
+def test_overview_before_and_after_printing(test_config, dummy_backend, no_sleep, tmp_path):
+    with make_experiment(tmp_path, dummy_backend, overview_capture=True, overview_single_images=True) as experiment:
+        experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+        add_rectangle(experiment)
+        experiment.build_programs()
+        experiment.print_experiment()
+        lower, upper = experiment.overview_area()
+
+    store = ExperimentStore.open(tmp_path)
+    for phase in ("before", "after"):
+        image, metadata = store.read_overview(phase)
+        assert image.dtype == np.uint8 and image.ndim == 2 and (tmp_path / f"overview_{phase}.png").is_file()
+        assert metadata["corners_included"] is False  # skip_corner: only the structure grid
+        assert len(metadata["single_images"]) == len(metadata["positions_um"]) > 1
+    # skip_corner: the area is the structure grid (one 500 um cell around the center)
+    assert np.allclose(lower, [1310 - 250, 19500 - 250]) and np.allclose(upper, [1310 + 250, 19500 + 250])
+    assert Experiment.parameters_from_dictionary(tmp_path)["overview_capture"] is True
+
+
+def test_overview_area_includes_the_corner_markers(test_config, dummy_backend, no_sleep, tmp_path):
+    from nanofactorysystem.experiment import OVERVIEW_BORDER_UM, QR_CODE_WIDTH_UM
+    with make_experiment(tmp_path, dummy_backend, skip_corner=False) as experiment:
+        lower, upper = experiment.overview_area()
+        rectangle_low = np.minimum(experiment.rectangle_tl, experiment.rectangle_br)
+    clearance = max(50, QR_CODE_WIDTH_UM) / 2 + OVERVIEW_BORDER_UM  # corner width 50 um in make_experiment
+    assert np.allclose(lower, rectangle_low - clearance)
+    assert not ExperimentStore.open(tmp_path).read_overview("before")  # overview_capture is off by default

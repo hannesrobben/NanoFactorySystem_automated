@@ -329,6 +329,48 @@ class ExperimentStore:
                 dataset = blobs.create_dataset(name, data=np.frombuffer(content, dtype=np.uint8))
                 dataset.attrs["format"] = "zdc"
 
+    def write_overview(self, phase: str, image: np.ndarray, metadata: dict,
+                       single_images: Optional[np.ndarray] = None) -> None:
+        """ Store an overview image of the experiment (T28) in ``/overview/<phase>``.
+
+        Parameters
+        ----------
+        phase : {"before", "after"}
+            Before or after printing; an earlier overview of the phase is replaced.
+        image : ndarray
+            Stitched grey image.
+        metadata : dict
+            Position and calibration of the image (``origin_um``,
+            ``pixel_matrix_um``, ``positions_um``, ``area_um``, …).
+        single_images : ndarray, optional
+            The camera images (n×H×W) the overview was stitched from, to check
+            the stitching.
+        """
+
+        with self._write() as f:
+            group = _group(f, "overview")
+            if phase in group:
+                del group[phase]
+            target = group.create_group(phase)
+            target.create_dataset("image", data=np.asarray(image), **COMPRESSION)
+            _set_attrs(target, {**metadata, "time": utc_timestamp()})
+            if single_images is not None:
+                single_images = np.asarray(single_images)
+                target.create_dataset("single_images", data=single_images,
+                                      chunks=(1,) + single_images.shape[1:], **COMPRESSION)
+
+    def read_overview(self, phase: str) -> Optional[tuple[np.ndarray, dict]]:
+        """ The overview image of a phase and its metadata, or None. """
+
+        with h5py.File(self.path, "r") as f:
+            if f"overview/{phase}" not in f:
+                return None
+            group = f[f"overview/{phase}"]
+            metadata = _get_json_attrs(group)
+            if "single_images" in group:
+                metadata["single_images"] = group["single_images"][()]
+            return group["image"][()], metadata
+
     def write_time_estimate(self, data: dict) -> None:
         """ Store the expected printing time (``TimeEstimate.to_dict()``) in ``/time_estimate``. """
 

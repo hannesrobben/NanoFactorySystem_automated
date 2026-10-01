@@ -203,6 +203,9 @@ class ExperimentSpec:
         Voxel database; default: ``system.voxelDatabase`` of the configuration.
     layer_overhead_s : float
         Overhead per layer of the expected printing time (T28).
+    overview_capture, overview_single_images : bool
+        Stitched camera overview before and after printing, optionally with
+        the single images (T28).
     """
 
     name: str
@@ -233,6 +236,8 @@ class ExperimentSpec:
     voxel_material: Optional[str] = None
     voxel_database: Optional[Path] = None
     layer_overhead_s: float = 5.0
+    overview_capture: bool = False
+    overview_single_images: bool = False
 
     def voxel_model(self):
         """ The voxel model of the experiment (:class:`~nanofactorysystem.voxel.DatabaseVoxelModel`), or None
@@ -316,7 +321,8 @@ class ExperimentSpec:
             data_root=data_root, tilt_warning_um=spec.tilt_warning_um, camera_capture=spec.camera_capture,
             program_source=spec.program_source,
             resin_edges=[tuple(map(float, e)) for e in edges] if len(edges) == 4 else None,
-            layer_overhead_s=spec.layer_overhead_s,
+            layer_overhead_s=spec.layer_overhead_s, overview_capture=spec.overview_capture,
+            overview_single_images=spec.overview_single_images,
         )
 
 
