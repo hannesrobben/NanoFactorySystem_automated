@@ -70,6 +70,7 @@ def main():
             absolute_grid_center=absolute_grid_center,
             grid=(2, 3),
             n_mid_points=0,
+            camera_capture=True,
             drop_direction=DropDirection.DOWN,
             corner_z=-2,
             corner_width=50,

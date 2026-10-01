@@ -13,10 +13,10 @@ from nanofactorysystem import Dhm, sysConfig, getLogger, mkdir
 import nanofactorysystem.image.functions as image
 
 """
-Idee:
-tmp folder machen, dort die ganzen Bilder speichern und danach wird eine methode aufgerufen,
-die die gesamten aufnahmen speichert (z.B. nach einer Series aufnahme). Bilder werden dann in
-dem .zdc Ordner abgelegt und die zuvor gespeicherten Bilder werden nach Speicherung gelöscht.
+Idea:
+Create a temporary folder and save all images there; afterwards a method is called that stores
+all captures together (e.g. after a series capture). The images are then placed in the .zdc
+folder, and the previously saved single images are deleted once they are stored.
 """
 
 
@@ -36,27 +36,8 @@ class DHMBackend:
         self.objective = sysConfig.objective(objective)
         self.user = user
         self.client = None
-
-        # standard initialisation optical path length motor position
-        if objective == "Zeiss 63x":
-            if motor_pos is None:
-                # self.motor_pos = 190.0  # even older
-                # self.motor_pos = 790.0  # old
-                self.motor_pos = 1800.0
-            else:
-                self.motor_pos = motor_pos
-        elif objective == "Zeiss 20x":
-            # self.motor_pos = 3732.0
-            if motor_pos is None:
-                self.motor_pos = 3100.0
-                self.motor_pos = 100.0
-            else:
-                self.motor_pos = motor_pos
-        elif objective == "Nikon 20x":
-            self.motor_pos = 10.0
-            raise Warning("Motor position not selected. Please run the opl motor scan.")
-        else:
-            raise NotImplementedError(f"Objective {objective} is not implemented. ")
+        self.initial_motor_pos = motor_pos
+        self.motor_pos = self.default_motor_pos(objective, motor_pos)
 
         if save_path is None:
             self.save_path = os.path.join(os.getcwd(), ".output", f"{datetime.now().strftime('%d_%m_%Y-%H:%M')}")
@@ -68,14 +49,55 @@ class DHMBackend:
         self.logger.setLevel(logging.INFO)
         self.init_dhm()
 
-    def reset(self):
+    @staticmethod
+    def default_motor_pos(objective, motor_pos=None):
+        """ Return the OPL motor position to start with: ``motor_pos`` or the default of the objective.
+
+        Raises
+        ------
+        Warning
+            For the Nikon 20x, which has no default; run the OPL motor scan.
+        NotImplementedError
+            For an unknown objective.
         """
-        Resets all necessary variables.
+
+        if objective == "Zeiss 63x":
+            # Earlier defaults: 190.0, 790.0
+            return 1800.0 if motor_pos is None else motor_pos
+        if objective == "Zeiss 20x":
+            # Earlier defaults: 3732.0, 3100.0
+            return 100.0 if motor_pos is None else motor_pos
+        if objective == "Nikon 20x":
+            raise Warning("Motor position not selected. Please run the opl motor scan.")
+        raise NotImplementedError(f"Objective {objective} is not implemented. ")
+
+    def reset(self, reconnect=True):
+        """ Return the helper to the state after construction.
+
+        The DHM client is closed, the OPL motor position goes back to the
+        start value of the current objective, the OPL-scan and calibration
+        flags and the file counter are cleared. The objective and the save
+        folder are kept.
+
+        Parameters
+        ----------
+        reconnect : bool
+            Connect a new DHM client afterwards (as the constructor does);
+            otherwise ``client`` stays None until :meth:`init_dhm` is called.
         """
-        self.client = None
-        self.objective_name = None
-        self.objective = None
-        self.motor_pos = None
+
+        if self.client is not None:
+            try:
+                self.client.close()
+            finally:
+                self.client = None
+        self.motor_pos = self.default_motor_pos(self.objective_name, self.initial_motor_pos)
+        self.opl_scan_done = False
+        self.opt_image_calibration = False
+        self.continuous_saving_variable = 0
+        self.logger.info("DHM helper reset.")
+        if reconnect:
+            self.init_dhm()
 
     def init_dhm(self):
         """

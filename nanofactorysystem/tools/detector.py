@@ -13,7 +13,8 @@
 import logging
 import random
 
-from ..parameter import Orientation, Interface, Result
+from ..devices.coordinate_system import DropDirection
+from ..parameter import Interface, Result
 from .ranges import Range, RangeSet
 
 class Scanner:
@@ -25,9 +26,16 @@ class Scanner:
     Then the total scan range will be exceeded until an undisputed no-focus range (no overlap
     with focus range) of given size is detected beside each requested interface (low, and/or high). """
 
-    def __init__(self, z0, dz, zmin, zmax, orientation, interface, stretch, overlap, jitter, logger=None):
+    def __init__(self, z0, dz, zmin, zmax, drop_direction, interface, stretch, overlap, jitter, logger=None):
 
-        """ Initialize a Scanner object. """
+        """ Initialize a Scanner object.
+
+        ``drop_direction`` decides which of two focus ranges is the resin layer
+        (see :class:`DropDirection`): for DOWN the lowest range is kept and a
+        second range above it (e.g. the interface to the immersion oil) is
+        ignored; for UP the highest range is kept and a second range below it
+        is ignored.
+        """
 
         # Store logger
         self.log = logger or logging
@@ -41,9 +49,9 @@ class Scanner:
         assert (self.z0 > self.zmin and self.z0 < self.zmax)
         assert (self.dz < self.zmax - self.zmin)
 
-        # Sample orientation
-        assert (isinstance(orientation, Orientation))
-        self.orientation = orientation
+        # Drop direction: decides which focus range is the resin layer
+        assert (isinstance(drop_direction, DropDirection))
+        self.drop_direction = drop_direction
 
         # Resin layer interfaces to be detected (low and/or high)
         assert (isinstance(interface, Interface))
@@ -153,10 +161,12 @@ class Scanner:
         else:
             return
 
-        # Skip second layer (e.g. immersion oil layer) by adjusting zmin and zmax.
+        # Skip a second layer by adjusting zmin and zmax. Drop facing down: the resin layer is the
+        # lowest range, a range above it is e.g. the substrate/immersion-oil interface. Drop facing
+        # up: the interface with the higher z is decisive, so a range below is removed.
         if len(self.hit) > 1:
             assert (len(self.hit) == 2)
-            if self.orientation == Orientation.UP:
+            if self.drop_direction == DropDirection.DOWN:
                 self.zmax = self.hit.highest.low
                 self.hit = RangeSet(self.hit.lowest)
                 self.log.info(f"Remove second layer above {self.zmax}")
@@ -316,7 +326,7 @@ class Scanner:
             "dz": self.dz,
             "zMin": self.zmin,
             "zMax": self.zmax,
-            "orientation": self.orientation.name.lower(),
+            "dropDirection": self.drop_direction.name,
             "interface": self.interface.name.lower(),
             "minSize": self.minsize,
             "overlap": self.overlap,

@@ -36,6 +36,17 @@ class SlicingParameters:
         z_epsilon_um: Offset of the first slice plane above z_min. Slicing
             exactly at z_min hits the mesh tangentially and yields
             degenerate sections.
+        voxel_height_um: Axial voxel size. If > 0, the first and the last
+            slice plane lie half of it inside the bottom and top surface
+            and the planes in between are spaced evenly (at most
+            layer_height_um), so the printed part matches the design
+            height. 0 keeps the planes of z_epsilon_um + n * layer_height_um.
+        spacing_mode: How voxel data sets the spacing (voxel.SpacingMode):
+            "voxel_overlap" derives hatch spacing and layer height from the
+            voxel size and voxel_overlap; "static_hatching" keeps them and
+            warns about gaps. Without voxel data it has no effect.
+        voxel_overlap: Overlap ratio of neighbouring lines and layers for
+            "voxel_overlap", in [0, 1).
     """
     layer_height_um: float = 0.2
     hatch_spacing_um: float = 0.2
@@ -44,6 +55,9 @@ class SlicingParameters:
     contour_offset_um: float = 0.0
     num_contour_lines: int = 0
     z_epsilon_um: float = 1e-3
+    voxel_height_um: float = 0.0
+    spacing_mode: str = "voxel_overlap"
+    voxel_overlap: float = 0.3
 
     def __post_init__(self) -> None:
         if self.layer_height_um <= 0:
@@ -52,6 +66,12 @@ class SlicingParameters:
             raise ValueError("hatch_spacing_um must be > 0")
         if self.num_contour_lines < 0:
             raise ValueError("num_contour_lines must be >= 0")
+        if self.voxel_height_um < 0:
+            raise ValueError("voxel_height_um must be >= 0")
+        if self.spacing_mode not in ("voxel_overlap", "static_hatching"):
+            raise ValueError("spacing_mode must be 'voxel_overlap' or 'static_hatching'")
+        if not 0.0 <= self.voxel_overlap < 1.0:
+            raise ValueError("voxel_overlap must be in [0, 1)")
 
 
 @dataclass(frozen=True)

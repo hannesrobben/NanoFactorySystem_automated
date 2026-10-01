@@ -3,190 +3,93 @@
 # <hannes.robben@phoenixd.uni-hannover.de>                               #
 # This program is free software under the terms of the MIT license.      #
 ##########################################################################
+"""Cell geometry: power (rows) x distance between the lines (columns).
 
+Described by ``experiment_spec()`` (T51); ``print_file()`` keeps the former call signature.
+"""
 import datetime
-import os
 from pathlib import Path
-from tkinter import messagebox
-import numpy as np
 
-from nanofactorysystem import mkdir, getLogger
 from nanofactorysystem.aerobasic.programs.drawings.cell import CellGeometry
 from nanofactorysystem.devices.coordinate_system import DropDirection, Point2D, Point3D
-from nanofactorysystem.experiment import Experiment, StructureType
+from nanofactorysystem.experiment_spec import (CornerSpec, ExperimentSpec, StructureSpec, messagebox_confirm,
+                                               run_experiment, script_output)
+from nanofactorysystem.plane_fitting import PlaneFitMode
 
-sys_args = {
-    "attenuator": {
-        "fitKind": "quadratic",
-    },
-    "sample": {
-        "name": "#1",
-        "orientation": "top",
-        "substrate": "boro-silicate glass",
-        "substrateThickness": 700.0,
-        "material": "SZ2080",
-        "materialThickness": 75.0,
-    },
-    "focus": {
-        "OffsetFocusDetection": [120, -80],
-        "minCircularity": 0.6,
-        "exposureValue": 120
-    },
-    "layer": {
-        "dzFineDefault": 25.0,
-        "laserPower": 0.7,
-    },
-    "plane": {},
+OBJECTIVES = {
+    "Zeiss 20x": dict(fov_um=500.0, z_max_um=25700.0, margin_um=200.0, padding_um=100.0,
+                      corner=CornerSpec(width_um=50.0, length_um=300.0, height_um=7.0, hatch_um=0.5, slice_um=0.75)),
+    "Zeiss 63x": dict(fov_um=150.0, z_max_um=25480.0, margin_um=150.0, padding_um=100.0,
+                      corner=CornerSpec(width_um=30.0, length_um=120.0, height_um=7.0, hatch_um=0.3, slice_um=0.75)),
 }
+PARAMETERS = {
+    "Zeiss 20x": {"power": [0.3, 0.5, 0.7], "velocity": [3_000, 5_000, 10_000]},  # velocity in µm/s
+    "Zeiss 63x": {"power": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7], "velocity": [5_000]},
+}
+GAP_SIZES = [0.5, 0.75, 1.0, 1.25, 1.5]  # µm
+STRUCTURE_SIZE = 100.0
+
+
+def runtime_arguments() -> dict:
+    """ Runtime sections for the devices and detection tools of this experiment. """
+
+    return {
+        "attenuator": {"fitKind": "quadratic"},
+        "sample": {"name": "#1", "substrate": "boro-silicate glass", "substrateThickness": 700.0,
+                   "material": "SZ2080", "materialThickness": 75.0},
+        "focus": {"OffsetFocusDetection": [120, -80], "minCircularity": 0.6, "exposureValue": 120},
+        "layer": {"dzFineDefault": 25.0, "laserPower": 0.7},
+        "plane": {},
+    }
+
+
+def experiment_spec(objective="Zeiss 63x", absolute_center=Point2D(0, 0), dhm_usage=True,
+                    setup="IFOV_on") -> ExperimentSpec:
+    """ Grid of cell geometries: one row per power, one column per line distance (first velocity). """
+
+    if objective not in OBJECTIVES:
+        raise ValueError(f"No implemented objective {objective}! Possible objectives are 'Zeiss 20x' and 'Zeiss 63x'.")
+    parameters = PARAMETERS[objective]
+    structures = [
+        StructureSpec(
+            f"cell_p{power}_distance_{gap}um_structuresize_{STRUCTURE_SIZE}",
+            CellGeometry(center=Point3D(0, 0, -2), fov=STRUCTURE_SIZE, velocity=parameters["velocity"][0],
+                         distance_between_lines=gap, edge_margin=0.5, objective=objective, height=3.0, slice_size=0.2),
+            power_mw=power, axes="XYZ")
+        for power in parameters["power"] for gap in GAP_SIZES]
+    return ExperimentSpec(
+        name="power_test_1", objective=objective, center=absolute_center,
+        grid=(len(parameters["power"]), len(GAP_SIZES)), structures=structures, setup=setup,
+        drop_direction=DropDirection.DOWN, plane_fit_mode=PlaneFitMode.GRID, dhm_usage=dhm_usage,
+        camera_capture=True, structure_size_um=STRUCTURE_SIZE, default_power_mw=0.7, low_speed_um_s=1000,
+        high_speed_um_s=10_000, opl_start_um=350.0, sys_args=runtime_arguments(), **OBJECTIVES[objective])
 
 
 def print_file(absolute_center: Point2D, resin_dimension: list, ask_continue_box=True, path=None,
-               objective="Zeiss 63x", user="Hannes", dhm_usage=True, setup="IFOV_on", substrate: dict = None):
+               objective="Zeiss 63x", user="Hannes", dhm_usage=True, setup="IFOV_on", substrate: dict = None,
+               backend=None, plane=None):
+    """ Run the experiment.
+
+    Parameters
+    ----------
+    absolute_center : Point2D
+        Center of the experiment in µm.
+    resin_dimension : list
+        Edges of the resin drop in µm: [[right], [left], [near], [far]].
+    ask_continue_box : bool
+        Confirm every step in a message box.
+    path : Path, optional
+        Root folder; the data go into its subfolder ``power_test_1``, without it into ``.output``.
+    backend, plane : optional
+        Dummy backend and known plane for a dry run.
     """
-        absolute_center: Point2D with x- and y-coordinate of the center of this experiment
-        resin_dimension: list of the coordinates of the edges of the resin
-                [[right edge],   Example:   [[100, 18550],
-                [left edge],                [200, 26300],
-                [near edge],                [-3500, 22400],
-                [far edge]]                 [4000, 22400]]
-        ask_continue_box: bool -> controls the asking box
-        path: Path argument for root directory where the experimental data will be saved in a subdirectory.
-                If nothing is given, the export_path will be in the subdirectory .output
-    """
 
-    if path is None:
-        path = Path(mkdir(f".output/cell_geometry/power_velocity_{datetime.datetime.now():%Y%m%d}", clean=False))
-    else:
-        # assert isinstance(path, Path)
-        path = Path(mkdir(os.path.join(path, "power_test_1"), clean=False))
-    logger = getLogger(logfile=f"{path}/console.log")
-
-    # Size of (oval) resin drop in micrometres
-    edges = np.asarray(resin_dimension)
-    resin_corner_tr = Point2D(*np.max(edges, axis=0))
-    resin_corner_bl = Point2D(*np.min(edges, axis=0))
-    absolute_grid_center = absolute_center
-
-    if objective == "Zeiss 20x":
-        fov = 500
-        zmax = 25700.0
-        c_width = 50
-        c_length = 300
-        c_height = 7
-        c_hatch = 0.5
-        c_slice = 0.75
-        margin = 200
-        padding = 100
-        parameterset = {
-            "power": [0.3, 0.5, 0.7],
-            "velocity": [3_000, 5_000, 10_000],  # µm/s
-        }
-
-    elif objective == "Zeiss 63x":
-        fov = 150
-        zmax = 25480.0
-        c_width = 30
-        c_length = 120
-        c_height = 7
-        c_hatch = 0.3
-        c_slice = 0.75
-        margin = 150
-        padding = 100
-        parameterset = {
-            "power": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
-            "velocity": [5_000]  # [3_000, 5_000, 10_000],  # µm/s
-        }
-
-    else:
-        raise Exception(f"No implemented objective {objective}! Possible objectives are 'Zeiss 20x' and 'Zeiss 63x'.")
-
-    sys_args.update({"controller": {"zMax": zmax}})
-    if "dhm" in sys_args.keys():
-        sys_args["dhm"].update({"usage": dhm_usage})
-    else:
-        sys_args.update({"dhm": {"usage": dhm_usage}})
-
-    structure_size = 100.0
-    gap_sizes = [0.5, 0.75, 1.0, 1.25, 1.5]
-    grid_size = (len(parameterset["power"]), len(gap_sizes))  # 3x3
-
-
-    with Experiment(
-            path=path,
-            user=user,
-            objective=objective,
-            logger=logger,
-            sys_args=sys_args,
-            default_power=0.7,
-            low_speed_um=1000,
-            high_speed_um=10_000,
-            resin_corner_tr=resin_corner_tr,
-            resin_corner_bl=resin_corner_bl,
-            structure_size=structure_size,
-            margin=margin,
-            padding=padding,
-            absolute_grid_center=absolute_grid_center,
-            grid=grid_size,
-            n_mid_points=0,
-            drop_direction=DropDirection.DOWN,
-            corner_z=-2,
-            corner_width=c_width,
-            corner_length=c_length,
-            corner_height=c_height,
-            corner_hatch=c_hatch,
-            corner_slice=c_slice,
-            fov_dim=(fov, fov),
-            plane_fit_mode=0,
-            setup=setup,
-            skip_corner=False) as experiment:
-
-        # Visualize experiment
-        experiment.plot_experiment(show=True)
-
-        # Get substrate surface plane
-        if ask_continue_box and not messagebox.askyesno(message="Run plane fitting?"):
-            return
-
-        experiment.plane_fit(force=False)
-
-        # Optical path max_length for DHM
-        if dhm_usage:
-            if ask_continue_box and not messagebox.askyesno(message="Run OPL motor scan?"): return
-            experiment.opl_scan(m0=350.0, force=False)
-
-        # Add structures — 3x3 grid: power (rows) x velocity (columns)
-        for power in parameterset["power"]:
-            for gap in gap_sizes:
-                experiment.add_structure(
-                    structure_type=StructureType.NORMAL,
-                    name=f"cell_p{power}_distance_{gap}um_structuresize_{structure_size}",
-                    axes="XYZ",
-                    power=power,
-                    structure=CellGeometry(
-                        center=Point3D(0, 0, -2),
-                        fov=structure_size,
-                        velocity=parameterset["velocity"][0],
-                        distance_between_lines=gap,
-                        edge_margin=0.5,
-                        objective=objective,
-                        height=3.0,
-                        slice_size=0.2,
-                    )
-                )
-
-        # Build corner and structure programs
-        if ask_continue_box:
-            if messagebox.askyesno(message="Create programs for all structures?"):
-                experiment.build_programs()
-            else:
-                if messagebox.askyesno(message="Programs already created?"):
-                    experiment.retrieve_programs()
-        else:
-            experiment.build_programs()
-
-        # Print corners and structures
-        if ask_continue_box and not messagebox.askyesno(message="FINAL STEP: Print experiment?"): return
-        experiment.print_experiment()
+    spec = experiment_spec(objective, absolute_center, dhm_usage, setup)
+    root, spec.name = script_output(
+        path, Path(f".output/cell_geometry/power_velocity_{datetime.datetime.now():%Y%m%d}"), "power_test_1")
+    return run_experiment(spec, user=user, resin_edges=resin_dimension, path=root, backend=backend, plane=plane,
+                          confirm=messagebox_confirm if ask_continue_box else None, show_plot=backend is None,
+                          substrate_information=substrate)
 
 
 if __name__ == '__main__':

@@ -22,11 +22,11 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 | Phase | Topic | Todos | Gate before the dependent todos start |
 |---|---|---|---|
 | 0 | Concept: metadata audit, storage and substrate design | T41, T42 | T42 approved by the maintainer |
-| 1 | Consistent execution parameters (independent of phase 0) | T43, T44, T45, T46 | – |
-| 2 | Experiment storage | T47, T48, T49, T50 | – |
+| 1 | Consistent execution parameters (independent of phase 0) | T43, T44, T45, T46, T58 | – |
+| 2 | Experiment storage | T47, T48, T49, T50, T55, T56, T57, T59 | – |
 | 3 | Experiment scripts and substrate main | T51, T52 | – |
 | 4 | Voxel database and voxel-aware slicing (independent of phases 2–3) | T53, T54, T31 | T53 design approved by the maintainer |
-| B | Backlog from T19 (`todo_notes.md`) | T32, T37, T28, T35, T36, T38, T39 | – |
+| B | Backlog from T19 (`todo_notes.md`) | T32, T37, T28, T35, T36, T38, T39, T60, T61, T62, T63 | – |
 
 ### Working rules for Claude Code (in addition to CLAUDE.md)
 1. Pick the first open todo of the lowest unfinished phase whose dependencies are done. Phase 1 may be
@@ -49,173 +49,37 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 
 ### Phase 0 — Concept
 
-- [ ] T41: Audit the experiment metadata [phase: 0]
-      Goal: A documented list of all data an experiment writes today, where it is written, and what is missing or wrong, as input for T42.
-      Priority: high | Depends on: –
-      Done when:
-        - `docs/reviews/METADATA_AUDIT.md` lists every file an experiment writes (at least `experiment_dictionary.json`, `structures.json`, `substrate_information.json`, `calibration_file.npy`, `experiment.png`, `qr_code_image.png`, `plot_<name>.png`, the per-layer `.pgm` files, `A3200.log`, the camera and DHM `.zdc` files from `Experiment.measure()`, the log file) with the writing method, the content and the location.
-        - Each metadata item is rated complete / incomplete / wrong / missing, checked against the files written by a dummy dry run of `default_exp_file.binary_testprint`.
-        - Missing items are listed, at least checked: slicing and hatching parameters, power and velocity per structure, setup (IFOV on/off) per structure, DHM usage, camera usage, plane-fit mode, sample points and fitted plane, drop direction, stage position of every capture, positions of all corners incl. the double corner, user, objective, git commit of the software, timestamps.
-        - Defects that T42–T50 do not cover are added as todos "(found during T41)".
-      Notes: Analysis only, no code changes.
-
-- [ ] T42: Design the experiment storage and substrate model [phase: 0]
-      Goal: An approved design document `docs/design/EXPERIMENT_STORAGE.md` that defines how substrates, experiments and their data are stored.
-      Priority: high | Depends on: T41
-      Done when the document defines:
-        - Hierarchy substrate → experiments → structures → layers and captures; one HDF5 file per experiment; the folder layout below the default root `~/Documents/Femtika_Experiment/<user>/` (user = the `user` argument that is always passed); an explicit `path` still overrides the default.
-        - Self-contained experiment file: all metadata lives inside the experiment HDF5 file (attributes/datasets), so that a later user interface can load and save an experiment from this file alone. The JSON files (`structures.json`, `experiment_dictionary.json`, the summary of T49) are redundant, human-readable copies written from the same data. `structures.json` stays the entry point of an experiment.
-        - Write strategy: open, write, close per event (per layer, per capture); no file handle stays open while printing; state of the file after a crash; exactly one writing process (the DHM PC later delivers data through the storage interface and never writes the file itself); experiment data is not written into synchronised folders (Seafile).
-        - Metadata schema based on T41, including experiment center, all corner positions, position and orientation of the double corner, plane-fit mode and plane, drop direction, setup, objective, user, calibration, software version.
-        - Data groups: camera images, DHM products (hologram and derived data such as phase or amplitude, each with metadata incl. stage XYZ position), slicer outputs (reuse or link the layout of `aerobasic/slicer/storage.py`), AeroBasic layer programs, print progress.
-        - Substrate identification: label written by hand on the substrate (proposal `<initials>-<yy>-<nnn>`, experiments on it `<nnn>-A`, `<nnn>-B`, …), an internal substrate UUID, and the experiment UUID = QR-code UUID as the main ID of an experiment.
-        - Content of the experiment summary (T49).
-        - `schema_version` attribute, and how old JSON-only experiment folders are read (at least for restarts).
-        - API sketch: class names (e.g. `ExperimentStore`, `SubstrateStore`), methods, and which `Experiment` methods use them (`_save_experimental_data`, `_save_exp_dict`, `_save_calibration`, `_save_substrate_information`, `measure`, `_build_programs`, `update_print_progress`, `restart_experiment`).
-        - The maintainer's approval is recorded in the document.
-      Notes: Covers T27 (N003–N005, N011, N024, N025, N077). After writing, move to "Blocked" (waiting for maintainer approval).
-
 ### Phase 1 — Consistent execution parameters
-
-- [ ] T43: Make the drop direction consistent everywhere [phase: 1]
-      Goal: The drop direction is one explicit parameter that flows from the experiment script through `Experiment`, `System`, the tools and the structures; no orientation hotfixes remain.
-      Priority: high | Depends on: –
-      Done when:
-        - Every active experiment script in `mains/` passes `drop_direction` explicitly (N002); no script sets a z sign by hand.
-        - `tools/layer.py` and `tools/detector.py` derive their orientation from `DropDirection` instead of the separate `Orientation` value and the "Top" hotfix; the drop direction is part of `sys_args` where the tools need it (N087, N089). Decision: merge `Orientation` into `DropDirection` or map one to the other.
-        - `QRCode` takes the drop direction into account (N070).
-        - Every place that depends on the sign is listed in the `DropDirection` docstring (coordinate system, layer order in `print_structure`, start z in `plane_fit`, restart, detector) and checked.
-        - The `DropDirection` docstring states that dip-in needs a different computation and is planned (future_todo.md F8); no `DIP_IN` member is added yet.
-        - Dummy tests: UP and DOWN give mirrored z values in the layer programs; existing golden files are unchanged.
-      Notes: Covers N002, N070, N087, N089 (parts of T35 and T37).
-
-- [ ] T44: Restructure how plane fitting is run [phase: 1]
-      Goal: Plane-fit modes are named, documented and selectable per experiment, and a single plane fit can run outside `Experiment`. The fitting algorithms stay unchanged.
-      Priority: high | Depends on: T43
-      Done when:
-        - `plane_fit_mode: int` is replaced by an enum with descriptive names for the current modes 0 and 1; the old integers are still accepted when an `experiment_dictionary.json` is read.
-        - A "border only" mode exists (N026).
-        - A single plane fit can be run outside `experiment.py` (N079).
-        - The `+1` in the sample points for mode 0 is checked (N078); the experiment center is validated against the resin drop edges (N022); for big structures the z deviation between the corners is checked and a warning is logged above a configurable threshold (N082).
-        - Mode, sample points and the fitted plane are stored in the experiment dictionary.
-        - A dummy test per mode checks number and positions of the sample points.
-      Notes: Replaces T29.
-
-- [ ] T45: Take camera images only on request [phase: 1]
-      Goal: `Experiment.measure()` takes a camera image only when this is explicitly enabled.
-      Priority: medium | Depends on: –
-      Done when:
-        - A parameter `camera_capture: bool = False` exists (Decision: `sys_args["camera"]` or `Experiment` argument; document the choice) and is stored in the experiment dictionary.
-        - `measure()` skips `System.getimage()` when it is False and returns `None` for the camera container; `restart_experiment()` uses the stored value.
-        - Experiment scripts that need camera images set it to True explicitly (listed in WORKLOG.md).
-        - Dummy tests for both values.
-      Notes: Video recording in a thread is future_todo.md F3.
-
-- [ ] T46: Record the stage position of every capture [phase: 1]
-      Goal: Every hologram and camera image can be traced to the exact XYZ stage position at which it was taken.
-      Priority: medium | Depends on: –
-      Done when:
-        - `measure()` stores the commanded and the actual position (read from the controller after the move) with each capture, together with structure name, layer id, image index, `image_count` and timestamp.
-        - `measure()` accepts an optional list of offsets relative to the structure center (default: one capture at the center); every capture is stored with its own position. This is only the extension point for speckle averaging (F5) and DHM stitching (F6).
-        - Dummy test with two capture positions checks the stored positions.
 
 ### Phase 2 — Experiment storage
 
-- [ ] T47: Implement the HDF5 experiment store [phase: 2]
-      Goal: All experiment data is written and read through one storage interface as designed in T42.
-      Priority: high | Depends on: T42 (approved)
-      Done when:
-        - The store class of T42 exists in its own module, writes a `schema_version`, and opens and closes the file per write.
-        - `Experiment` writes the experiment dictionary, calibration, structure configurations, layer programs, captures and print progress through the store; `structures.json` and `experiment_dictionary.json` are still written as copies from the same data.
-        - A generic method stores DHM products by name with metadata (hologram, phase, amplitude, …); this is the interface for the DHM PC (F4).
-        - Slicer outputs (`aerobasic/slicer/storage.py`) are stored in, or linked from, the experiment file.
-        - A load function reconstructs all experiment metadata from the HDF5 file alone.
-        - Tests: a dummy dry run writes the file and reading it back matches the JSON copies; an exception in the middle of printing leaves a readable file.
-
-- [ ] T48: Substrate model, default location and experiment index [phase: 2]
-      Goal: Several experiments on one substrate are stored side by side under a default location and can be found again.
-      Priority: high | Depends on: T47
-      Done when:
-        - A substrate record (label, UUID, material, resin drop edges, notes) is stored once per substrate and every experiment references the substrate UUID; it replaces the merge logic of `_save_substrate_information` (old `substrate_information.json` files can still be read).
-        - The default root is `~/Documents/Femtika_Experiment/<user>/`, configurable per user in `nanofactory.json`; an explicit `path` overrides it.
-        - A new print never overwrites an earlier one on the same substrate, also when the same experiment is printed again (N003–N005).
-        - The substrate index lists every experiment with UUID, label, center, double-corner position, file path, date, objective and status; a function finds experiments by substrate, date and objective (N025).
-        - Dummy tests: two experiments on one substrate, one repeated experiment.
-      Notes: Together with T42 and T47 replaces T27.
-
-- [ ] T49: Experiment summary [phase: 2]
-      Goal: A quick check of what was printed in an experiment and with which parameters.
-      Priority: medium | Depends on: T47
-      Done when:
-        - After `build_programs()` and after every printed structure, a summary is written into the experiment file and as `experiment_summary.json`.
-        - It contains the experiment UUID (QR code) and one row per user structure (corner and QR-code structures excluded): name, type, position, slice, hatch, power, velocity, IFOV on/off, DHM yes/no, camera yes/no, status (pending/printed/failed).
-        - It can be printed as a table to the log.
-        - Dummy test checks the rows of the template experiment.
-
-- [ ] T50: Restart and repetitions on the new storage [phase: 2]
-      Goal: An aborted experiment can be resumed repeatedly at the right layer from the experiment file and keeps its identity.
-      Priority: high | Depends on: T47, T48
-      Done when:
-        - `restart_experiment()` and `mains/restart_experiment.py` read from the experiment file; old JSON folders still work.
-        - A restarted experiment keeps its UUID and QR text (N027).
-        - After a second abort, printing resumes at the right layer; a dummy test covers two aborts (N028).
-        - Structure names and repetitions are distinguished, and repetitions work although layer programs move absolutely (N080).
-        - The double-corner position and orientation are stored so that an orientation-checked restart (F1) is possible later.
-      Notes: Replaces T30.
-
 ### Phase 3 — Experiment scripts and substrate main
-
-- [ ] T51: New template for experiment scripts [phase: 3]
-      Goal: One parameterised experiment script replaces the copied scripts; it takes its programs either from stored AeroBasic programs or from the slicer.
-      Priority: high | Depends on: T43, T44, T45, T47
-      Done when:
-        - The experiment is described by one parameter object (e.g. an `ExperimentSpec` dataclass: label, center, grid, structure size, objective, setup, drop direction, plane-fit mode, DHM usage, camera capture, power and speeds, program source) instead of values edited in the script (N001, N006–N008, N013); hardcoded values such as the DHM-paper value are passed or determined (N021).
-        - Program source is an explicit enum: stored hand-written AeroBasic programs, or the slicer with height data (`aerobasic/slicer/pipeline.slice_geometry`); the enum can be extended later (phase data, F2); the source is stored in the metadata.
-        - Dummy dry runs pass for both program sources.
-        - `mains/Experiments/`: scripts the maintainer still uses are migrated (Decision: list from the maintainer); the others are moved to `mains/Experiments/historical/` or listed as historical in a README; German text in migrated scripts is translated.
-      Notes: Replaces T26.
-
-- [ ] T52: Substrate-specific `main.py` [phase: 3]
-      Goal: The main file describes one substrate and the list of experiments printed on it.
-      Priority: high | Depends on: T48, T51
-      Done when:
-        - The main file defines the substrate (label, resin edges, user, objective) and a list of experiments, each with its `ExperimentSpec` and an optional storage path (default location otherwise).
-        - Before printing, experiment areas are checked for overlap with each other and against the resin edges.
-        - Experiments run one after another and are entered into the substrate index; an optional confirmation between experiments.
-        - Dummy dry run: two experiments on one substrate give two experiment files and one substrate index.
 
 ### Phase 4 — Voxel database and voxel-aware slicing
 
-- [ ] T53: Voxel database (SQLite) [phase: 4]
-      Goal: Voxel width and height can be looked up for material, objective, setup, power and velocity, with interpolation between measured points.
-      Priority: high | Depends on: –
-      Done when:
-        - `docs/design/VOXEL_DATABASE.md` defines schema, interpolation and fallback, and is approved by the maintainer.
-        - The SQLite database has at least the tables `material` and `voxel_measurement` (material, objective, setup, power_mW, velocity_um_s, width_um, height_um, method, experiment_uuid, date, notes); the schema version is kept in `PRAGMA user_version` and migrations run in order when the database is opened.
-        - A class (e.g. `VoxelDatabase`) adds measurements, imports CSV files and returns the voxel size for a parameter set, or `None`.
-        - Interpolation per material/objective/setup over a dose-like variable (e.g. P²/v, logarithmic), only inside the convex hull of the measured points and with a configurable minimum number of points; no extrapolation; unknown material or too few points → `None`.
-        - The database path is configured in `nanofactory.json`; the `.sqlite` file is not in git, a CSV or SQL seed file is.
-        - Tests with synthetic data: exact hit, interpolation, outside the hull, unknown material.
-
-- [ ] T54: Voxel-aware slicing and hatching [phase: 4]
-      Goal: With voxel data, the printed geometry matches the designed geometry as closely as possible instead of being enlarged by the voxel size.
-      Priority: high | Depends on: T53, T51
-      Done when:
-        - A `VoxelModel` interface returns voxel width and height for laser parameters; one implementation uses T53, a second one ("no data") reproduces today's behaviour exactly (golden files unchanged when no material is given).
-        - With data: contours are offset inward by half the voxel width (`SlicingParameters.contour_offset_um`), first and last slice are shifted by half the voxel height so that top and bottom surfaces match the design, and a gap between neighbouring lines or layers causes a warning (or spacing is derived from an overlap ratio; Decision in the todo).
-        - The hatching strategies (`hatching.available_strategies()`) receive the voxel model, so that later strategies (F7) can use it.
-        - The voxel model and the values used are stored in the experiment metadata and the summary.
-        - Tests: for a box and a cylinder the envelope of toolpath plus voxel stays within a tolerance of the design; the no-data path is unchanged.
-
-- [ ] T31: Laser power per structure, layer and line (from T19) [phase: 4]
-      Goal: Program generation can change the laser power between structures, layers and lines; this enables adaptive slicing and printing strategies (F7).
-      Priority: medium | Depends on: T54
-      Done when:
-        - Parameter test prints can change the power between structures (N012).
-        - `print_structure` supports a power per layer, and slicer toolpaths can carry a power per segment that the AeroBasic generation emits (N083).
-        - The powers used are stored in the metadata.
-
 ### Phase B — Backlog from T19 (details in `todo_notes.md`)
+
+- [ ] T62: Check experiment areas against the shape of the resin drop (found during T52) [phase: B]
+      Goal: Experiments near the rim of a drop are refused before printing, not only those outside its bounding box.
+      Priority: low | Depends on: –
+      Done when:
+        - `substrate_plan.check_layout` (and the center check of `Experiment`) test the experiment area against a drop outline derived from the four edge points (e.g. an ellipse or their convex hull with a margin; Decision: which outline), instead of their bounding box.
+        - Tests with an area inside the bounding box but outside the outline.
+
+- [ ] T61: Justify the focus-detection threshold and clarify the layer result object (follow-up of T37) [phase: B]
+      Goal: The remaining hotfix and open note of T37 are resolved with lab data and the maintainer's input.
+      Priority: medium | Depends on: –
+      Done when:
+        - The noise threshold `minDiffMax` of the focus detection (`tools/focus.py`, set to 10 ad hoc because noise gave values 1.7–2.5) is replaced by a justified criterion, based on focus scans measured on the lab PC with 20x and 63x (N084, N010).
+        - N088 ("merge with Dominik's result object" in `tools/layer.py`) is clarified by the maintainer and either implemented or dropped.
+      Notes: The code parts of T37 are done (azimuth fix, motor scan loop, capture-time analysis, height profiles); N085/N086 went away with the hotfix line removed in T43.
+
+- [ ] T63: Use the real IFOV writing speed for the voxel lookup (found during T54) [phase: B]
+      Goal: Voxel-aware slicing looks up the voxel size at the speed the IFOV program actually writes with.
+      Priority: medium | Depends on: –
+      Done when:
+        - `IFOV_Lines`/`IFOV_PolyLines` write with the structure velocity, or `Model3D_Slicer` passes the effective speed (today `SET_SPEED F=5` for 63x, `F=10` for 20x, independent of `velocity`) to the voxel model; decided together with T35 (N065–N067).
+        - A test shows that the velocity in `job.meta["voxel"]` equals the speed in the generated program.
 
 - [ ] T32: Clean up the AeroBasic API and task handling (from T19) [phase: B]
       Goal: The AeroBasic API is correct and complete for the commands in use.
@@ -225,23 +89,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
         - Program text: compact variable declarations, header metadata, and a mode check for VELOCITY/ABSOLUTE (N031–N033).
         - IFOV setup: ramp types and the F threshold are investigated and documented (N044, N045).
         - `run_program_as_task`: better task-id choice, cleanup of the previous program, and a decision on the old "delete this function" note (N058, N073, N074).
-
-- [ ] T37: Replace the hotfixes in tools and devices (from T19) [phase: B]
-      Goal: Focus, layer, plane, DHM and serialization code have no open hotfixes.
-      Priority: medium | Depends on: T43
-      Done when:
-        - The focus-detection noise threshold `minDiffMax` is replaced by a justified criterion, and its value is checked for 63x (N084, N010).
-        - Layer: sample dictionary, missing `self.device` and the result object are fixed (N085, N086, N088); the orientation part is done in T43.
-        - The plane angle edge case (-180 vs 180) is handled (N090).
-        - DHM: capture time analysed; motor scan loop with limit checks and an own exception (N075, N076).
-        - `DrawableObject._init_args` stores "data" instead of the hotfix (N046).
-
-- [ ] T28: Overview images and time estimate (from T19) [phase: B]
-      Goal: An experiment documents the whole scene and its expected duration.
-      Priority: low | Depends on: T47
-      Done when:
-        - An overview image of the whole scene is taken before and after printing and stored in the experiment file (N009).
-        - The expected and the actual duration of an experiment are logged and stored (N023).
 
 - [ ] T35: Clarify line and rectangle details (from T19) [phase: B]
       Goal: Line-based structures have checked parameters and no unexplained hotfixes.
@@ -259,24 +106,26 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
         - The camera offset is integrated into `System.zline` (N071); the z-line program uses global variables and is not recompiled every time (N072).
         - `z_line_focal_points.py`: dz split, z recalculation, noise on dz, min_distance, boundary, result dictionary and file-exists check are resolved (N014–N020).
 
-- [ ] T38: Visualization: laser power and axis formatting (from T19) [phase: B]
-      Goal: Movement plots show the laser power and readable axes.
-      Priority: low | Depends on: –
-      Done when:
-        - The laser power is read from the program and shown as colour (N091, N092).
-        - Axis labels are shown without scientific notation (N093).
-
-- [ ] T39: Manual DHM helper: implement reset (from T19) [phase: B]
-      Goal: The interactive DHM helper can reset its state.
-      Priority: low | Depends on: –
-      Done when:
-        - `test/manual/dhm/DHMUserBackend.py` implements its reset method (N094).
-
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
-
+- [ ] T37: Replace the hotfixes in tools and devices (from T19) [phase: B]
+      Goal: Focus, layer, plane, DHM and serialization code have no open hotfixes.
+      Priority: medium | Depends on: T43
+      Done when:
+        - The focus-detection noise threshold `minDiffMax` is replaced by a justified criterion, and its value is checked for 63x (N084, N010).
+        - Layer: sample dictionary, missing `self.device` and the result object are fixed (N085, N086, N088); the orientation part is done in T43.
+        - The plane angle edge case (-180 vs 180) is handled (N090).
+        - DHM: capture time analysed; motor scan loop with limit checks and an own exception (N075, N076).
+        - `DrawableObject._init_args` stores "data" instead of the hotfix (N046).
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
+- [ ] T28: Overview images and time estimate (from T19) [phase: B]
+      Goal: An experiment documents the whole scene and its expected duration.
+      Priority: low | Depends on: T47
+      Done when:
+        - An overview image of the whole scene is taken before and after printing and stored in the experiment file (N009).
+        - The expected and the actual duration of an experiment are logged and stored (N023).
+      Blocked by: Decision. (1) Overview image: proposal: a camera mosaic of the experiment rectangle, stitched with `tools.stitch.Canvas` and stored in the experiment file, before and after printing (alternative: one capture at the experiment center, as the old commented-out `measure(center)` calls did). (2) Expected duration: proposal: estimate each layer program from the path lengths and F values of its moves (plus a configurable per-layer overhead), log the estimate after `build_programs()` and compare it with the stored start/end times of layers and structures. Asked 2026-09-30.
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
@@ -330,3 +179,48 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 
 - [x] T18: Translate German identifiers and comments — 2026-09-29 — German comments/docstrings in the package and test modules translated, `run_testzweck_altesSystem` renamed to `send_with_simple_protocol`, one module per commit; `mains/` and `test/manual/` scripts left (see WORKLOG). — commits: `118a095` … `7d973e9` (15)
 
+- [x] T41: Audit the experiment metadata — 2026-09-29 — `docs/reviews/METADATA_AUDIT.md` lists every file an experiment writes and rates each metadata item, checked against two dummy dry runs of the template; defects outside T42–T50 were added as T55–T60. — commits: `bf5565a`
+
+- [x] T42: Design the experiment storage and substrate model — 2026-09-29 — `docs/design/EXPERIMENT_STORAGE.md` defines one self-contained HDF5 file per experiment below the per-user default root, substrate/experiment labels and UUIDs, write strategy, JSON copies, legacy reading and the store API; approved by the maintainer with all proposals D1–D8. — commits: `ef2ff63`, `3f75e0a`
+
+- [x] T46: Record the stage position of every capture — 2026-09-29 — `measure()` stores a `CaptureRecord` (commanded and actual XYZAB position, structure, phase, layer, image index/count, UTC time) in every camera/DHM container and in `captures.json`, and accepts a list of capture offsets; golden command logs unchanged. — commits: `c16f5ae`
+
+- [x] T47: Implement the HDF5 experiment store — 2026-09-30 — New `nanofactorysystem.storage` (`ExperimentStore`, records, JSON copies, lock file, software info); `Experiment` writes metadata, calibration, plane fit, OPL scan, layout, structures, layer programs, progress and captures (no more `.zdc`/`.npy`) into `experiment.h5`, exports the JSON copies from it, and refuses an existing experiment folder unless `resume=True`. — commits: `bc371eb`, `fe6036a`, `bed280b`
+
+- [x] T55: Store the controller command log with the experiment — 2026-09-30 — `A3200.log` is written into the experiment folder, and the command log and the session's console log are stored per session under `/logs` in `experiment.h5`, also after an exception or abort. — commits: `b624a66`
+
+- [x] T57: Store paths relative to the experiment folder — 2026-09-30 — Layer/structure program files and the log file are stored relative to the experiment folder (file and JSON copies); `parameters_from_dictionary()` uses the given folder, so a moved experiment can be restarted; old absolute entries still work. — commits: `e07db5a`
+
+- [x] T48: Substrate model, default location and experiment index — 2026-09-30 — `SubstrateStore` (substrate.json with record and experiment index, labels `HR-26-001`/`-A`, `find_experiments`, `default_root` with `dataRoot` and refused synced folders); `Experiment(path=None, substrate=...)` creates a new folder per print and keeps the index up to date; `substrate_information.json` merging replaced (old files importable). — commits: `1014892`, `cf5ed05`
+
+- [x] T49: Experiment summary — 2026-09-30 — `storage/summary.py` builds a summary (UUID, one row per user structure with position, slice, hatch, power, velocity, IFOV, DHM, camera, status); written into `/summary` and `experiment_summary.json` after building and after every structure and logged as table. — commits: `92b9bcc`
+
+- [x] T50: Restart and repetitions on the new storage — 2026-09-30 — Restart reads parameters and per-layer progress from `experiment.h5` (resumes correctly after any number of aborts, keeps the UUID); old JSON folders are imported into a new experiment file on restart; `REPEAT` fixed (own grid cell, `<name>_rep<n>`, `repeat_of`). — commits: `7aaee04`
+
+- [x] T59: Correct the print-progress record — 2026-09-30 — `print_progress.json` is exported from the experiment file (schema `nanofactory.print_progress/2`): printed/failed layer counts, start/end time per layer and structure; UP and DOWN tested after a complete and an aborted structure. — commits: `154d85d`
+
+- [x] T56: Make structure serialisation complete and reversible — 2026-09-30 — `to_json()` stores only constructor parameters (with `__module__`, reversible encoding of enums/points/calibrations, lost parameters reported), `structure_from_json()` rebuilds structures; all golden-test structures round-trip to identical programs, golden files unchanged. — commits: `1f379ae`
+
+- [x] T60: Experiment plots: corners, QR code and structure plots — 2026-09-30 — `plot_experiment()` draws corners (double corner highlighted, positions labelled), QR code and the UUID and returns the figure; `build_programs(plot_structures=True)` replaces the hard-coded switch. — commits: `f729324`
+
+- [x] T38: Visualization: laser power and axis formatting — 2026-09-30 — Movements carry the attenuator value read from `$AO[0].A=`, laser-on lines are coloured by power (mW with a calibration) with a colour bar, and mm axes have no offset or scientific notation. — commits: `f688a61`
+
+- [x] T39: Manual DHM helper: implement reset — 2026-09-30 — `DHMBackend.reset()` closes the client, restores the start state (motor position, flags, counter) and reconnects; tested on the dummy DHM. — commits: `b875fe0`
+
+- [x] T43: Make the drop direction consistent everywhere — 2026-09-30 — `Orientation` merged into `DropDirection`: the scanner keeps the lowest focus range for DOWN and the highest for UP (maintainer's description), `Experiment` passes it via `sys_args['layer']['dropDirection']`, QR pixel lines follow it; z coordinates never depend on it (decision), only the order; docstring lists all places. — commits: `97e2345`
+
+- [x] T44: Restructure how plane fitting is run — 2026-09-30 — `PlaneFitMode` (GRID/CORNERS/new BORDER, old integers accepted), `plane_fitting.sample_points/measure_plane` for plane fits outside `Experiment`, center validated against the resin edges, tilt warning with `tilt_warning_um`; the +1 of mode 0 is correct. — commits: `c619b7e`
+
+- [x] T45: Take camera images only on request — 2026-09-30 — `Experiment(camera_capture=False)` (maintainer decision: Experiment argument); `measure()` skips the camera and returns None without it; stored, shown in the summary and used on restart; the 57 existing script calls pass True. — commits: `0315df1`, `314a30b`
+
+- [x] T58: Define the capture position of `measure()` — 2026-09-30 — Before every capture the galvo is set to A = B = 0, Z is not moved (maintainer decision); the commanded position (X, Y, Z=None, A=0, B=0) is stored; golden command logs re-recorded (one added galvo command per capture). — commits: `fc9c425`
+
+- [x] T53: Voxel database (SQLite) — 2026-09-30 — Design approved; `nanofactorysystem.voxel.VoxelDatabase` (tables material/voxel_measurement, PRAGMA user_version with migrations, CSV import/export, `voxel_size()` with exact hit, 2-D (ln P, ln v) interpolation inside the hull, dose fallback, no extrapolation); path `system.voxelDatabase`, seed CSV versioned. — commits: `b45a7d2`, `2de4367`, `9c52f15`
+
+- [x] T51: New template for experiment scripts — 2026-09-30 — `ExperimentSpec`/`StructureSpec` (structure, slicer height data, or a factory of the running experiment; empty cells), `ProgramSource` (DRAWING/SLICER, stored) and `run_experiment()` with `mains/Experiments/experiment_template.py`; the 11 scripts named by the maintainer are ported (dry-run tested), all others moved to `mains/Experiments/historical/`. — commits: `acb2fe2`, `6462705`, `854bc8c`, `6d9afc1`, `905d1c2`
+
+- [x] T52: Substrate-specific `main.py` — 2026-09-30 — `nanofactorysystem/substrate_plan.py` (`SubstrateSpec`, `SubstrateExperiment`, `run_substrate`): overlap, existing-experiment, resin-drop, objective and name checks before printing, sequential runs into the substrate index with optional confirmation; template `mains/substrate_main.py`; dummy dry run with two experiments on one substrate. — commits: `b46bed8`, `1796164`, `ff6d3a0`
+
+- [x] T54: Voxel-aware slicing and hatching — 2026-09-30 — Voxel models (no data, fixed, database) behind the slicer protocol `VoxelModel`; contour offset, first/last slice at half the voxel height, spacing per `spacing_mode` (maintainer decision: `voxel_overlap` default, `static_hatching` with gap warnings); strategies get a `VoxelContext`; values in job metadata, structure JSON and summary; `ExperimentSpec(voxel_material=)`; no-data path and golden files unchanged. — commits: `e5a2173`, `e7ec542`
+
+- [x] T31: Laser power per structure, layer and line — 2026-10-01 — Power per structure shown in a dummy test; `add_structure(layer_power=)`/`StructureSpec.layer_power` let every layer program set its own power (stored as `layer_powers_mw`, summary column); `Model3D_Slicer` prints toolpath elements with a power override (or `power_map(z_um, role)`) in their own IFOV blocks, unchanged without overrides. — commits: `a01c64b`, `1e6cf41`

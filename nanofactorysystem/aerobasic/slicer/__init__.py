@@ -8,6 +8,7 @@ Public API (units strictly um internally; see units.py):
     estimate_toolpath         print time model
     save_job/load_job/read_group/iter_groups/write_dhm/write_surface_scan
     register_strategy         hatching extension point
+    VoxelModel/SpacingMode/compensate   voxel-aware slicing (T54)
 """
 from .parameters import JobParameters, SlicingParameters, LaserParameters
 from .toolpath import (ToolpathJob, ElementGroup, PathElement, build_job,
@@ -24,6 +25,7 @@ from .storage import (save_job, load_job, read_group, iter_groups,
                       num_groups, read_params, read_time_estimate,
                       write_dhm, write_surface_scan)
 from .units import to_um, from_um, UM_PER_UNIT
+from .voxel import SpacingMode, VoxelCompensation, VoxelContext, VoxelModel, compensate
 
 __all__ = [
     "JobParameters", "SlicingParameters", "LaserParameters",
@@ -38,5 +40,6 @@ __all__ = [
     "save_job", "load_job", "read_group", "iter_groups", "num_groups",
     "read_params", "read_time_estimate", "write_dhm", "write_surface_scan",
     "to_um", "from_um", "UM_PER_UNIT",
+    "SpacingMode", "VoxelCompensation", "VoxelContext", "VoxelModel", "compensate",
 ]
 __version__ = "0.3.0"

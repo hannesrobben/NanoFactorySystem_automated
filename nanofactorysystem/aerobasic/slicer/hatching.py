@@ -6,6 +6,11 @@ layer's contours (MultiPolygon) plus context and returns an (N, 4) array
 of hatch segments. New techniques (spiral, adaptive, greyscale, ...) are
 added with @register_strategy — no if/elif chains anywhere.
 
+Every strategy is called with the keyword ``voxel``: a
+``voxel.VoxelContext`` (voxel model, voxel size and laser parameters of the
+job) or None without voxel data. The built-in strategies do not use it; it is
+there for adaptive strategies (F7).
+
 Performance note: all scan lines of a layer are clipped against the
 polygon in a *single* shapely intersection call (vectorized in GEOS),
 instead of one Python-level call per line.
@@ -13,7 +18,7 @@ instead of one Python-level call per line.
 from __future__ import annotations
 
 import logging
-from typing import Callable, Protocol
+from typing import TYPE_CHECKING, Callable, Optional, Protocol
 
 import numpy as np
 import shapely
@@ -23,6 +28,9 @@ from shapely.geometry import LineString, MultiLineString, MultiPolygon
 from .model import Layer, as_multipolygon
 from .parameters import SlicingParameters
 
+if TYPE_CHECKING:
+    from .voxel import VoxelContext
+
 log = logging.getLogger(__name__)
 
 EMPTY = np.empty((0, 4), dtype=np.float64)
@@ -30,7 +38,8 @@ EMPTY = np.empty((0, 4), dtype=np.float64)
 
 class HatchStrategy(Protocol):
     def __call__(self, contours: MultiPolygon, layer_index: int,
-                 params: SlicingParameters) -> np.ndarray: ...
+                 params: SlicingParameters, *,
+                 voxel: Optional["VoxelContext"] = None) -> np.ndarray: ...
 
 
 _REGISTRY: dict[str, HatchStrategy] = {}
@@ -136,26 +145,26 @@ def _rotate_segments(seg: np.ndarray, angle_deg: float, origin) -> np.ndarray:
 # --------------------------------------------------------------------------
 
 @register_strategy("linear_x")
-def hatch_linear_x(contours, layer_index, params):
+def hatch_linear_x(contours, layer_index, params, *, voxel=None):
     return _linear_hatch(contours, params.hatch_spacing_um,
                          params.hatch_angle_deg)
 
 
 @register_strategy("linear_y")
-def hatch_linear_y(contours, layer_index, params):
+def hatch_linear_y(contours, layer_index, params, *, voxel=None):
     return _linear_hatch(contours, params.hatch_spacing_um,
                          params.hatch_angle_deg + 90.0)
 
 
 @register_strategy("alternating")
-def hatch_alternating(contours, layer_index, params):
+def hatch_alternating(contours, layer_index, params, *, voxel=None):
     """X on even layers, Y on odd layers — improves isotropy."""
     angle = params.hatch_angle_deg + (90.0 if layer_index % 2 else 0.0)
     return _linear_hatch(contours, params.hatch_spacing_um, angle)
 
 
 @register_strategy("cross")
-def hatch_cross(contours, layer_index, params):
+def hatch_cross(contours, layer_index, params, *, voxel=None):
     """X and Y in the *same* layer (dense, e.g. for critical layers)."""
     a = _linear_hatch(contours, params.hatch_spacing_um, params.hatch_angle_deg)
     b = _linear_hatch(contours, params.hatch_spacing_um,
@@ -164,7 +173,7 @@ def hatch_cross(contours, layer_index, params):
 
 
 @register_strategy("concentric")
-def hatch_concentric(contours, layer_index, params):
+def hatch_concentric(contours, layer_index, params, *, voxel=None):
     """Inward offset contours (shapely buffer) until the area vanishes."""
     segments: list[np.ndarray] = []
     step = params.hatch_spacing_um
@@ -200,8 +209,12 @@ def extract_contour_paths(contours: MultiPolygon,
     return paths
 
 
-def hatch_layer(layer: Layer, params: SlicingParameters) -> Layer:
-    """Fill one layer in place: contour paths + infill hatches."""
+def hatch_layer(layer: Layer, params: SlicingParameters,
+                voxel: Optional["VoxelContext"] = None) -> Layer:
+    """Fill one layer in place: contour paths + infill hatches.
+
+    ``voxel`` is passed on to the hatching strategy (None without data).
+    """
     region = layer.contours
 
     # optional shrink to compensate the lateral voxel radius
@@ -221,11 +234,13 @@ def hatch_layer(layer: Layer, params: SlicingParameters) -> Layer:
         ))
 
     strategy = get_strategy(params.hatch_strategy)
-    layer.hatches = strategy(region, layer.index, params)
+    layer.hatches = strategy(region, layer.index, params, voxel=voxel)
     return layer
 
 
-def hatch_layers(layers: list[Layer], params: SlicingParameters) -> list[Layer]:
+def hatch_layers(layers: list[Layer], params: SlicingParameters,
+                 voxel: Optional["VoxelContext"] = None) -> list[Layer]:
+    """Hatch all layers in place (see hatch_layer)."""
     for layer in layers:
-        hatch_layer(layer, params)
+        hatch_layer(layer, params, voxel)
     return layers

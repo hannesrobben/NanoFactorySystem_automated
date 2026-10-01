@@ -782,3 +782,1071 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Follow-ups:** German comments remain in the experiment scripts (`mains/`) and in `test/manual/`. Those are
   lab scripts; translating them can be scheduled together with T26 (parameterise the experiment scripts).
 
+
+### 2026-09-29 20:28 CEST — [T41] Audit the experiment metadata
+- **Status:** done
+- **Branch:** `docs/t41-metadata-audit` (new, from `main_HR` at `d2dbd66`)
+- **Changes:**
+  - `docs/reviews/METADATA_AUDIT.md` (new): every file an experiment writes (method, time, content,
+    location), the content of the JSON files and `.zdc` containers, a rating of each metadata item
+    (complete / incomplete / wrong / missing, with the todo that covers it), and the input for T42.
+  - `TODO.md`:
+    - T41 moved to Done.
+    - New todos "(found during T41)": T55 (command log into the experiment), T56 (reversible structure
+      serialisation), T57 (relative paths), T58 (defined capture position, phase 1), T59 (print-progress
+      counts and timestamps), T60 (experiment plots, phase B). The phase table lists them.
+  - `WORKLOG.md`: this entry.
+- **Tests:** no code changed, so the suite was not run. Two dummy dry runs of
+  `default_exp_file.binary_testprint` were run with a scratch script outside the repository:
+  - A: the template as it is (20x, IFOV off, no DHM);
+  - B: 63x, IFOV on, DHM on, plus one `Stair` structure.
+  Both finished. Their files are the basis of the ratings.
+- **Commits:** `bf5565a` docs(reviews): audit the experiment metadata [T41];
+  `3754290` docs(todo): close T41 and add its follow-up todos [T41]
+- **Notes:**
+  - The global Python still fails on the OpenCV/NumPy mismatch (T9 note). I used the venv from an earlier
+    session with `PYTHONPATH` set to the repository.
+  - `TZ=Europe/Berlin date` in Git Bash prints GMT here (no time-zone data). The timestamp of this entry
+    comes from Windows (`W. Europe Standard Time`).
+  - `.claude/settings.local.json` (gitignored, not committed): `Bash` added to the allowed tools, as the
+    maintainer requested.
+- **Follow-ups:** T42 (design of the experiment storage) is next. It ends at a maintainer approval gate.
+
+### 2026-09-29 20:31 CEST — [T42] Design the experiment storage and substrate model
+- **Status:** blocked (draft written; waiting for maintainer approval)
+- **Changes:**
+  - `docs/design/EXPERIMENT_STORAGE.md` (new): the design draft. It covers:
+    - hierarchy, folder layout below `~/Documents/Femtika_Experiment/<user>/`, explicit `path` override
+      and the check against synchronised folders;
+    - IDs: substrate label `<initials>-<yy>-<nnn>`, substrate UUID, experiment label `<substrate>-A`,
+      experiment UUID = QR text;
+    - the HDF5 schema (metadata, calibration, plane fit, OPL scan, layout with corners and the double
+      corner, structures with layer programs, progress and captures, DHM products, slicer outputs,
+      summary, logs), with `schema_version`;
+    - write strategy (open/write/close per event, state after a crash, recovery, lock file, one writing
+      process);
+    - the JSON copies, the substrate record and experiment search, the legacy reader and restart of old
+      folders, the summary content, and an API sketch (`ExperimentStore`, `SubstrateStore`) mapped to
+      every `Experiment` method named in T42.
+  - `TODO.md`: T42 moved to In Progress, then to Blocked ("waiting for maintainer approval").
+  - `WORKLOG.md`: this entry.
+- **Tests:** none; this is a design document only.
+- **Commits:** `ef2ff63` docs(design): draft the experiment storage and substrate model [T42];
+  the TODO/WORKLOG commit docs(todo): block T42 on maintainer approval [T42]
+- **Open decisions (§12 of the document):**
+  - D1: default root, and a hard error for synced folders;
+  - D2: label scheme and counter reset;
+  - D3: folder name;
+  - D4: copy or link slicer outputs;
+  - D5: which power counts as authoritative;
+  - D6: stop writing `.zdc` files;
+  - D7: importing old folders on restart;
+  - D8: console log inside the file.
+- **Follow-ups:** T47–T50 start after the approval. Phase 1 (T43–T46, T58) can proceed meanwhile.
+
+### 2026-09-29 23:04 CEST — [T42] Design the experiment storage and substrate model (approval)
+- **Status:** done
+- **Decision (maintainer, 2026-09-29):** "approve your suggestions at t42". The design is approved, and all
+  proposals D1–D8 in §12 are accepted as written:
+  - D1: a synced root is a hard error;
+  - D2: the substrate counter restarts each year;
+  - D3: the folder name is the label plus the start time;
+  - D4: slicer jobs are copied into the file;
+  - D5: the written power is authoritative;
+  - D6: no more `.zdc` files;
+  - D7: old folders are imported on restart;
+  - D8: the console log is copied into the file.
+- **Changes:**
+  - `docs/design/EXPERIMENT_STORAGE.md`:
+    - status line `Status: approved 2026-09-29`; §12 and §14 record the accepted decisions;
+    - the approval was given in the session, and I wrote it into the document on the maintainer's
+      instruction.
+  - `TODO.md`: T42 moved from Blocked to Done.
+  - `WORKLOG.md`: this entry and the phase 0 summary below.
+- **Tests:** see the phase summary.
+- **Commits:** `3f75e0a` docs(design): record the approval of the experiment storage design [T42];
+  the TODO/WORKLOG commit docs(todo): close T42 and summarise phase 0 [Phase 0]
+- **Follow-ups:** T47–T50 may start; they depend on T42 (done) and the phase order.
+
+### 2026-09-29 23:04 CEST — [Phase 0] Phase summary
+- **Finished todos:**
+  - T41: metadata audit, `docs/reviews/METADATA_AUDIT.md`;
+  - T42: storage design, `docs/design/EXPERIMENT_STORAGE.md`, approved 2026-09-29.
+- **New todos from phase 0 (found during T41):**
+  - T55: command log into the experiment;
+  - T56: reversible structure serialisation;
+  - T57: relative paths;
+  - T58: defined capture position (phase 1);
+  - T59: print-progress counts and timestamps;
+  - T60: experiment plots (phase B).
+- **Tests:** `python -m pytest` in a fresh venv (`pip install ".[test]"`), including the dry run in
+  `test/integration/`: 184 passed, 14 skipped.
+  - The one warning is `plt.show()` under the Agg backend in the dry run of the template. It is harmless.
+  - Environment note: a venv inside the Claude scratchpad folder fails `test_model3d_checks`. The error is
+    "DLL load failed … Der Dateiname oder die Erweiterung ist zu lang": the shapely DLL path exceeds the
+    Windows 260-character limit. A venv at a short path (`%LOCALAPPDATA%\Temp\nfsv`) passes, so this is not
+    a code defect.
+- **Open follow-ups:** T58 is added to phase 1. T55–T57 and T59 are added to phase 2 and follow the approved
+  design.
+- **To check on the lab PC:** nothing yet; phase 0 changed documentation only.
+  - Before T48 is implemented, confirm that `~/Documents` on the lab PC is not inside a Seafile library.
+    If it is, set a `dataRoot` for each user.
+- **Next:** phase 1, starting with T43 (drop direction). T43 contains the decision "merge `Orientation`
+  into `DropDirection` or map one to the other".
+
+### 2026-09-29 23:19 CEST — [T46] Record the stage position of every capture
+- **Status:** done
+- **Branch:** `feat/phase1-capture-positions`, based on `docs/t41-metadata-audit`
+- **Changes:**
+  - `nanofactorysystem/storage/__init__.py` (new): the storage package of the approved design. T47 adds the
+    store to it.
+  - `nanofactorysystem/storage/records.py` (new):
+    - `CaptureRecord` (kind, structure, phase, layer id, image index, image count, offset, commanded
+      X/Y/Z, actual X/Y/Z/A/B, UTC time, relative file);
+    - `utc_timestamp()`.
+  - `nanofactorysystem/experiment.py`:
+    - `measure()` has new keyword arguments `structure`, `phase`, `layer_id` and `offsets_um`.
+    - The actual position is read after every move. It is passed to the camera container, as
+      `System.getimage()` did before, and now also to the DHM container (`data/location.json`).
+    - Each capture record is written to the container (`data/capture.json`) and appended to
+      `captures.json` in the experiment folder.
+    - `print_structure()` passes structure, phase and layer id.
+    - Return value: one `(dhm, camera)` tuple per position; the old version returned one tuple. The only
+      callers are in `print_structure()`, which ignores the return value; the calls in `mains/` are
+      commented out.
+  - `test/test_experiment.py`: two tests. One takes two capture positions with DHM on and checks commanded
+    and actual positions, the records inside the containers and the file names. The other checks the
+    before/layer/after records of a printed structure.
+  - `test/README.md`: `test_experiment.py` row.
+  - `TODO.md`: T46 moved to In Progress, then to Done.
+- **Tests:** `python -m pytest` (short-path venv): 186 passed, 14 skipped. The golden command logs
+  (`test_command_logs.py`) are unchanged: without DHM the controller receives exactly the same commands.
+- **Commits:** `c16f5ae` feat(experiment): record the stage position of every capture [T46];
+  docs(todo): close T46 [T46]
+- **Behaviour change on hardware:** with DHM on, the stage position is read before the DHM capture instead of
+  just before the camera capture. It is the same number of queries, in a different order.
+- **Follow-ups:**
+  - The commanded Z is None because `measure()` does not move Z; T58 defines it.
+  - `captures.json` is the interim storage until T47 moves the records into `experiment.h5`.
+
+### 2026-09-30 08:34 CEST — [T47] Implement the HDF5 experiment store
+- **Status:** done
+- **Branch:** `feat/phase2-experiment-store`, based on `feat/phase1-capture-positions`
+- **Changes:**
+  - `nanofactorysystem/aerobasic/slicer/storage.py`: new `write_job()`, which writes the unchanged `job.h5`
+    schema into an open group. `save_job()` uses it.
+  - `nanofactorysystem/storage/` (package from T46, extended):
+    - `experiment_store.py` (new): `ExperimentStore` with `create`/`open`/`exists`, sessions with a lock,
+      and the write methods of design §11. Read methods: `read`, `read_uuid`, `has_structure`,
+      `read_capture`, `read_dhm_product`, `read_program`, `plane_fit_container`. Export: `export_capture`
+      writes a `.zdc` file on request. Every write opens and closes the file.
+    - `records.py`: `StructureRecord`, `PlaneFitRecord`, `CornerRecord`, `LayoutRecord`, `ExperimentRecord`,
+      `z_function_to_json`/`z_function_from_json`; `CaptureRecord` gets a `capture_id`.
+    - `schema.py` (new): file type, `SCHEMA_VERSION = "1.0"`, status values, and the mapping of constructor
+      argument → JSON key → HDF5 attribute.
+    - `json_copies.py` (new): `experiment_dictionary.json` and `structures.json` built from the record. The
+      old keys stay; vectors are numbers now.
+    - `locking.py` (new): lock file with host, PID and start time. On Windows the PID check uses
+      `OpenProcess`, because `os.kill(pid, 0)` would terminate the process there.
+    - `software.py` (new): package version, git commit/branch/dirty state, library versions.
+  - `nanofactorysystem/experiment.py`:
+    - The constructor creates or opens `experiment.h5`. Each `Experiment` is one session;
+      `__exit__` records how it ended and sets the status to `failed` or `aborted` after an exception.
+    - New keyword `resume`. Without it, an existing experiment file is refused. With it, the stored
+      experiment continues with its UUID; `parameters_from_dictionary()` sets it, and reads vectors as
+      numbers or old strings.
+    - `plot_experiment`, `plane_fit` (given, loaded, measured, incl. the `.zdc` containers),
+      `opl_scan`, `_build_programs`, `print_structure` (status, per-layer progress with start/end time)
+      and `print_experiment`/`restart_experiment` (final status) write through the store.
+    - `measure()` stores the images and holograms in the file and no longer writes `.zdc` files.
+      Its signature is `measure(coordinate, *, structure, phase, layer_id, dhm_image_count, offsets_um)`.
+      Structures printed or measured without `build_programs()` are registered as type `DIRECT`.
+    - `calibration_file.npy`, `_create_experiment_dictionary` and `captures.json` (from T46) were removed.
+  - `test/storage/test_experiment_store.py` (new): 11 unit tests.
+  - `test/test_experiment.py`: the capture tests read from the store. New tests: an exception during
+    printing leaves a readable file with status `failed`; an existing folder is refused; a restart keeps
+    the file and the UUID.
+  - `test/integration/test_dry_run_default_experiment.py`:
+    - it checks `experiment.h5`, and that the JSON copies equal what is exported from the file;
+    - it checks the camera captures inside the file instead of `calibration_file.npy` and `.zdc` files.
+    Justification: design D6, approved 2026-09-29. No assertion was weakened; the file checks were
+    replaced by stronger content checks.
+  - `test/README.md`, `CLAUDE.md`: the storage package and the changed tests.
+  - `TODO.md`: T47 moved to Done.
+- **Tests:** `python -m pytest` (short-path venv): 199 passed, 14 skipped. Golden programs and golden command
+  logs are unchanged.
+  - The suite takes about 80 s instead of about 40 s. The two DHM-on command-log experiments and the dry run
+    are already marked `slow`.
+  - Profiling shows file opens of about 6 ms (plain) and 14 ms (HDF5) on this PC, probably on-access virus
+    scanning of the temp folder, plus about 45 ms of gzip per camera image.
+  - On the lab PC this adds roughly 0.1 s per layer.
+- **Commits:** `bc371eb` refactor(slicer): write a job into an open HDF5 group [T47];
+  `fe6036a` feat(storage): add the HDF5 experiment store [T47];
+  `bed280b` feat(experiment): write all experiment data through the store [T47];
+  docs(todo): close T47 [T47]
+- **Deviations from the design:**
+  - A stale lock (same host, process no longer running) is replaced with a warning, instead of requiring
+    `force=True`. A restart after a crash must not need a manual step, and a dead process cannot be
+    writing.
+  - The layer program files stay in `structures/<name>/programs/`; the design's `programs/` layout comes
+    with the folder layout in T48.
+  - `print_progress.json` is still written, because the restart logic reads it (T50, T59).
+- **Behaviour changes on hardware:**
+  - No `.zdc` files for captures and no `calibration_file.npy`; everything is in `experiment.h5`.
+  - Running a script twice into the same folder now fails with `FileExistsError`. Before, it overwrote the
+    earlier data.
+  - The restart script continues the stored experiment and keeps its UUID (part of N027/T50).
+- **Follow-ups:**
+  - T55 (`/logs/a3200`), T57 (relative paths), T49 (`/summary`) and T48 (folder layout, substrates) build
+    on this.
+  - Suggestion: faster tests with a lower gzip level for dummy images. Not done; the design fixes level 4.
+
+### 2026-09-30 08:38 CEST — [T55] Store the controller command log with the experiment
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/devices/aerotech/__init__.py`: `command_log()` returns the log text; `save_log()` uses it.
+  - `nanofactorysystem/system.py`: new attribute `log_dir`, the folder for `A3200.log` on `close()`.
+    The default is unchanged: the backend's program folder, else the working directory.
+  - `nanofactorysystem/storage/experiment_store.py`: `write_log(kind, text)` and `read_logs(kind)` for
+    `/logs/<kind>/<session>`.
+  - `nanofactorysystem/experiment.py`:
+    - `System.log_dir` is set to the experiment folder.
+    - `__exit__` closes the system first and then calls `_end_session()`. That method stores the command
+      log and the console-log text written since the experiment started (offset remembered in
+      `__init__`, design D8), sets `failed`/`aborted` after an exception, ends the session and exports the
+      JSON copies. It runs in a `finally`, so an aborted run keeps its logs.
+  - `test/test_experiment.py`: two tests (two experiments in a row with separate logs; a
+    KeyboardInterrupt keeps the log and sets `aborted`).
+  - `test/README.md`, `CLAUDE.md`: logs in the experiment.
+  - `TODO.md`: T55 moved to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 201 passed, 14 skipped.
+- **Commits:** `b624a66` feat(experiment): store command and console logs with the experiment [T55];
+  docs(todo): close T55 [T55]
+- **Behaviour change on hardware:**
+  - `A3200.log` of an experiment is now in the experiment folder, not in `mains/`.
+  - `/logs/console` also covers D8 of the approved design.
+- **Follow-ups:** none.
+
+### 2026-09-30 08:42 CEST — [T57] Store paths relative to the experiment folder
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/experiment.py`:
+    - `_relative()` and `_absolute()` convert paths to and from the experiment folder.
+    - The log file, layer files, structure program and layer-program `file` attributes are stored
+      relative to the folder.
+    - `structure_configs` in memory stays absolute (`_with_absolute_paths()`, also used by
+      `retrieve_programs()`), so callers see no change. Print and restart resolve the stored paths.
+    - `parameters_from_dictionary()` uses the given folder and finds the log file there by name.
+  - `nanofactorysystem/storage/json_copies.py`: `"path"` is `"."` in `experiment_dictionary.json`.
+  - `test/test_experiment.py`: a new test builds an experiment, moves its folder and restarts it from the
+    new place. `test_experiment_dictionary` and the restart test now expect relative paths; these asserts
+    changed because T57 requires relative paths.
+  - `test/integration/test_dry_run_default_experiment.py`: the paths in `structures.json` are relative
+    and resolve to existing files.
+  - `test/README.md`, `CLAUDE.md`.
+  - `TODO.md`: T57 moved to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 202 passed, 14 skipped.
+- **Commits:** `e07db5a` feat(experiment): store paths relative to the experiment folder [T57];
+  docs(todo): close T57 [T57]
+- **Follow-ups:** A folder written before T57 still holds absolute paths. They are used as they are, so
+  a legacy folder can only be restarted in its original place. T50 imports legacy folders and can
+  relocate those paths.
+
+### 2026-09-30 08:55 CEST — [T48] Substrate model, default location and experiment index
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/storage/substrate_store.py` (new):
+    - `SubstrateRecord` (label, UUID, created, user, material, resin drops, notes, experiments, extra);
+    - `SubstrateStore`: `create` (label proposed per user and year, D2), `get` by label or UUID,
+      `add_resin_drop`, `next_experiment_label`, `experiment_folder` (D3), `register_experiment` and
+      `update_experiment` (lock file plus atomic write), `import_legacy` for old
+      `substrate_information.json` files;
+    - `find_experiments` (by substrate, objective, date range, status);
+    - `default_root` (`dataRoot` of the user, else `~/Documents/Femtika_Experiment/<user>`) and
+      `check_not_synced` (D1: hard error for Seafile/OneDrive/Dropbox; names configurable as
+      `system.syncFolderNames`).
+  - `nanofactorysystem/experiment.py`:
+    - new keyword arguments `substrate`, `data_root`, `allow_synced_root`.
+    - `path=None` creates the next experiment folder of the substrate and adds `console.log` there.
+    - The experiment is registered in the substrate index once; the status is copied into the index at
+      the end of every session.
+    - The experiment file holds the experiment label, the substrate UUID/label and a copy of the substrate
+      record.
+    - `_save_substrate_information` (merge into the parent folder) is removed; the free dictionary is stored
+      as `/metadata/substrate/information`.
+    - `parameters_from_dictionary()` passes substrate and data root for experiments in a substrate folder.
+  - `nanofactorysystem/storage/experiment_store.py`: `/metadata/substrate`, `read_identification()`,
+    `read_status()`. `records.py`: `ExperimentRecord.substrate`. `json_copies.py`: `substrate` key.
+  - Tests:
+    - `test/storage/test_substrate_store.py` (new): 9 tests.
+    - `test/test_experiment.py`: two experiments on one substrate (the same experiment printed twice);
+      the index after an abort and a restart; path or substrate needed.
+    - `test_substrate_information_is_merged` is replaced by
+      `test_substrate_information_is_stored_in_the_experiment`, because T48 replaces the merge logic.
+    - The dry run checks the substrate information in the file instead of `substrate_information.json`.
+  - `test/README.md`, `CLAUDE.md`.
+  - `TODO.md`: T48 moved to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 214 passed, 14 skipped.
+- **Commits:** `1014892` feat(storage): add substrate records and the experiment index [T48];
+  `cf5ed05` feat(experiment): place experiments on substrates in the default location [T48];
+  docs(todo): close T48 [T48]
+- **Deviations from the design:**
+  - `substrate.json` has an additional `extra` field for keys without a fixed field (old dictionaries).
+  - Material fields are free-form.
+  - The experiment template (`default_exp_file.py`) still uses an explicit `path`; T51/T52 move the scripts to
+    substrates.
+- **Behaviour change on hardware:** `substrate_information.json` is no longer written into the parent folder.
+- **To check on the lab PC:** `~/Documents` must not be inside a Seafile library, otherwise set `dataRoot` per
+  user.
+
+### 2026-09-30 13:17 CEST — [T49] Experiment summary
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/storage/summary.py` (new):
+    - `summary(record)`: experiment fields plus one row per user structure; corners and the QR code are
+      excluded.
+    - `print_parameters(structure)`: slice, hatch, velocity and power are taken from the stored constructor
+      arguments, using the first of the known names. D5 applies: IFOV structures report their own power.
+    - `format_table()` formats the summary for the log.
+  - `nanofactorysystem/storage/experiment_store.py`: `write_summary`, `read_summary` (`/summary`).
+  - `nanofactorysystem/experiment.py`: `_write_summary()` after `build_programs()` and after every structure,
+    also written as `experiment_summary.json`; the table is logged after building and at the end of printing
+    or a restart; `log_summary()`.
+  - Tests:
+    - `test/storage/test_summary.py` (new, 2 tests);
+    - `test/test_experiment.py`: summary of two printed structures; `make_experiment` gets a `grid`
+      parameter;
+    - dry run: the summary exists, equals the file, and has no user rows, because the template adds no
+      user structure.
+  - `test/README.md`, `CLAUDE.md`.
+  - `TODO.md`: T49 moved to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 217 passed, 14 skipped; the dry run passes with the summary check.
+- **Commits:** `92b9bcc` feat(experiment): write an experiment summary [T49]; docs(todo): close T49 [T49]
+- **Notes:**
+  - The template experiment of the todo text has no user structures (the stair is commented out), so the
+    rows are checked with a small experiment of two structures instead.
+  - The velocity unit is `um/s`, or `mm/s` for IFOV classes (T35, N065). A velocity above 500 passed to
+    `IFOV_Lines` is divided by 1000 internally; the summary shows the value as passed.
+  - Camera usage is always "yes" until T45 adds the switch.
+- **Follow-ups:** none new.
+
+### 2026-09-30 13:29 CEST — [T50] Restart and repetitions on the new storage
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/experiment.py`:
+    - `restart_experiment()` reads the progress events from the experiment file. It skips finished
+      structures and every layer with an event from an earlier session; never-started structures get their
+      "before" capture. The final status and summary are written.
+    - `parameters_from_dictionary()` reads `experiment.h5` (`_parameters_from_file`), else the JSON.
+    - A `resume` of a folder without `experiment.h5` imports it (`_import_legacy`, session kind `imported`).
+    - `add_structure()` has a NumPy docstring, a fixed `REPEAT` (names `<name>_rep<n>`, grid check,
+      `repeat_of`), and the duplicate-name check now runs after the type branch, so repeats are covered.
+  - `nanofactorysystem/storage/legacy.py` (new): `read_legacy`, `is_legacy_folder`. The UUID comes from the
+    QR-code structure or the log. Paths are relocated into the folder. Structure types are guessed from the
+    names. Progress comes from `print_progress.json`.
+  - `nanofactorysystem/storage/records.py` and `experiment_store.py`: `StructureRecord.repeat_of`.
+  - `mains/restart_experiment.py`: docstring.
+  - `test/test_experiment.py`:
+    - new helper `abort_after()` makes the controller fail after n layers;
+    - the restart tests and the moved-folder test abort for real instead of writing a fake
+      `print_progress.json`, because the restart no longer reads that file;
+    - new tests: restart after two aborts (every layer printed exactly once), import of an old JSON-only
+      folder with absolute lab paths, repeated structures at their own grid cells.
+  - `test/README.md`, `CLAUDE.md`.
+  - `TODO.md`: T50 moved to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 220 passed, 14 skipped.
+- **Commits:** `7aaee04` feat(experiment): restart and repetitions on the experiment file [T50];
+  docs(todo): close T50 [T50]
+- **Notes:**
+  - A layer interrupted by an abort has no progress event and is printed again on restart. A layer that
+    failed with an `AerotechError` has a `failed` event and is not printed again; this is the behaviour of
+    the old restart logic.
+  - In imported old folders, the layers listed in `print_progress.json` count as printed.
+  - The double-corner position and orientation are stored in `/layout` since T47 (for F1).
+- **Behaviour change on hardware:** `REPEAT` works now; it failed before with a TypeError. The restart script
+  continues the stored experiment, and a second abort no longer shifts the resume point.
+
+### 2026-09-30 13:44 CEST — [T59] Correct the print-progress record
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/storage/json_copies.py`: `print_progress()` and `export_progress()`. The schema
+    `nanofactory.print_progress/2` is documented in the docstring; `export_json()` writes the file as well.
+  - `nanofactorysystem/storage/experiment_store.py`:
+    - `set_structure_status()` records `started` (first time only) and `ended`;
+    - `read(include_captures=False)` skips capture metadata for the exports, so they don't grow with every
+      layer.
+  - `nanofactorysystem/storage/records.py`: `StructureRecord.started` and `ended`.
+  - `nanofactorysystem/storage/legacy.py`: also reads the new schema.
+  - `nanofactorysystem/experiment.py`:
+    - `update_print_progress()` is removed;
+    - `print_progress.json` is exported after every layer and structure;
+    - the loop variable `layer_count` (an index) is renamed `index`.
+  - Tests:
+    - the old progress keys are replaced by the new schema in the existing asserts. Each check still
+      tests the same behaviour: layers printed, a failed layer with its error, an empty structure, a
+      restart;
+    - new parametrised test for UP and DOWN after a complete and an aborted structure;
+    - the legacy-import test writes an old-format `print_progress.json` itself;
+    - one store unit test expects the new end time.
+  - `test/README.md` (and a follow-up commit that fixes escaped backticks), `CLAUDE.md`.
+  - `TODO.md`: T59 moved to In Progress, then to Done.
+- **Tests:** `python -m pytest`: all pass (221 passed plus the fixed store test; storage tests 22 passed).
+- **Commits:** `154d85d` feat(experiment): export print_progress.json from the experiment file [T59];
+  `0356fc2` docs(test): fix escaped backticks in the README [T59]; docs(todo): close T59 [T59]
+- **Behaviour change:** `print_progress.json` has a new format. It is a readable copy; restart uses the
+  experiment file.
+
+### 2026-09-30 13:51 CEST — [T56] Make structure serialisation complete and reversible
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/aerobasic/programs/drawings/base.py`:
+    - `_init_args()`/`to_json()` use `inspect.signature` and the new class attributes `_json_attributes`
+      (parameter → attribute) and `_json_skip` (`data`, `height_profile`, N046).
+    - A lost parameter gives a warning and a `__missing__` entry.
+    - New functions: `encode_json_value`, `decode_json_value`, `structure_from_json`.
+    - `to_json()` adds `__module__`.
+    - Two commented-out former versions of `_init_args` were removed (dead code inside the rewritten
+      function).
+  - `ifov_gratings.py`: `Rectangle2D_IFOV._json_attributes = {"angle": "phi"}`.
+  - `devices/power_calibration.py`: `PowerCalibration.from_json()`.
+  - `test/test_aerobasic/test_structure_json.py` (new, 10 tests): the 8 golden-test structure classes
+    round-trip and render identical programs; value encoding; reporting of lost arguments.
+  - `test/test_aerobasic/test_power_calibration.py`: the calibration inside `IFOV_Lines.to_json()` is now
+    encoded with its class. The old assert (raw `calibration.to_json()`) is replaced by the new encoding
+    plus a check that the rebuilt structure sets the same power. This assert changed because T56 requires
+    a reversible encoding.
+  - `test/README.md`, `CLAUDE.md`.
+  - `TODO.md`: T56 moved to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 232 passed, 14 skipped. The golden files are unchanged.
+- **Commits:** `1f379ae` feat(drawings): make structure serialisation complete and reversible [T56];
+  docs(todo): close T56 [T56]
+- **Notes:**
+  - `structures.json` and `/structures/<name>` configs now contain `__module__` and the new enum/object
+    encoding.
+  - Structure classes outside the golden tests are not checked one by one; if they lose a parameter, they
+    warn at `build_programs()`. No such warning appears in the test suite or the dry run.
+
+### 2026-09-30 13:51 CEST — [Phase 2] Phase summary
+- **Finished todos:**
+  - T47: HDF5 experiment store;
+  - T48: substrates, default location, experiment index;
+  - T49: summary;
+  - T50: restart and repetitions;
+  - T55: command log in the experiment;
+  - T56: reversible structure serialisation;
+  - T57: relative paths;
+  - T59: print progress.
+  - Also T46 (phase 1), which the store builds on.
+- **Branches:**
+  - `feat/phase1-capture-positions` (T46, based on `docs/t41-metadata-audit`);
+  - `feat/phase2-experiment-store` (T47–T59, based on the phase 1 branch).
+  - Nothing is pushed.
+- **Tests:** `python -m pytest` (fresh short-path venv): 232 passed, 14 skipped, including the dry run in
+  `test/integration/`. Golden programs and golden command logs are unchanged.
+  - The suite takes about 105 s now (about 40 s before phase 2): about 15–50 ms per HDF5 write on this PC.
+- **Open follow-ups:**
+  - T45 (camera switch): the summary shows `camera = yes` until then.
+  - T58 (capture Z): the commanded Z is None until then.
+  - T51/T52: move the experiment scripts to substrates and the default location. `default_exp_file.py`
+    still uses an explicit `path`.
+- **To check on the lab PC:**
+  1. `~/Documents` must not be inside a Seafile library; otherwise set `dataRoot` for each user in
+     `nanofactory.json`.
+  2. A dry run of a real script with `backend=None`: `experiment.h5` is written next to the JSON copies,
+     `A3200.log` is in the experiment folder, and there are no `.zdc`/`.npy` files.
+  3. Restart an interrupted print with `mains/restart_experiment.py`, also a second time.
+  4. An old experiment folder (JSON only) can be restarted; it is imported into `experiment.h5`.
+  5. `StructureType.REPEAT` works. It failed before with a TypeError.
+  6. Disk usage: roughly 0.3–0.6 MB per camera image and about 10× more per hologram series. Check the free
+     space on the lab PC for large experiments.
+
+### 2026-09-30 13:52 CEST — [T53] Voxel database (design part)
+- **Status:** blocked (design draft written; waiting for maintainer approval)
+- **Branch:** `docs/phase4-voxel-database`, based on `feat/phase2-experiment-store`
+- **Changes:**
+  - `docs/design/VOXEL_DATABASE.md` (new). It covers:
+    - terms and units;
+    - SQLite schema v1 with `PRAGMA user_version` and migrations;
+    - lookup: exact hit, 2-D interpolation in (ln P, ln v) inside the convex hull, 1-D dose fallback for
+      collinear data, no extrapolation;
+    - the CSV seed, import and export;
+    - the location of the database;
+    - the `VoxelDatabase` API, the tests and the link to T54.
+  - `TODO.md`: T53 moved to In Progress, then to Blocked ("waiting for maintainer approval").
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (design document).
+- **Commits:** `b45a7d2` docs(design): draft the voxel database [T53]; docs(todo): block T53 on approval [T53]
+- **Open decisions (§9):**
+  - V1: interpolation variable;
+  - V2: power reference, and whether to record the calibration file;
+  - V3: existing measurements for the seed file;
+  - V4: location of the database;
+  - V5: minimum numbers of points.
+
+### 2026-09-30 13:57 CEST — [T60] Experiment plots: corners, QR code and structure plots
+- **Status:** done
+- **Branch:** `feat/phaseB-plots`, based on `docs/phase4-voxel-database`
+- **Changes:**
+  - `nanofactorysystem/experiment.py`:
+    - `plot_experiment()` has a NumPy docstring and draws corners, the double corner, the QR code and the
+      UUID/label, using the stored layout. It returns the figure and closes it when not shown.
+    - `build_programs(plot_structures=False)` passes `plot` to `structure_program()`. This replaces the
+      hard-coded `plotting_structure = False` and its commented-out switch.
+  - `test/test_experiment.py`: two tests (plot content; structure plot only on request).
+  - `test/README.md`.
+  - `TODO.md`: T60 moved to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 234 passed, 14 skipped.
+- **Commits:** `f729324` feat(experiment): show corners and QR code in the experiment plot [T60]; docs(todo): close T60 [T60]
+- **Notes:**
+  - The plot uses a y axis pointing up, and the corner names follow the experiment's `rectangle_*`
+    properties, where "top" is the smaller Y. Whether that matches the camera view on the lab PC is not
+    verified.
+
+### 2026-09-30 14:06 CEST — [T38] Visualization: laser power and axis formatting
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/utils/visualization.py`:
+    - `ATTENUATOR_PATTERN`; `Movement.attenuator`;
+    - `read_text()` tracks `$AO[0].A=` (N091);
+    - `plot_movements_fast(calibration=...)` colours laser-on lines by power with a colour bar on the
+      second axes (N092);
+    - `_axis_formatter()` uses `ScalarFormatter(useOffset=False)` with scientific notation off for mm
+      (N093); the commented-out calls are removed;
+    - docstrings.
+  - `nanofactorysystem/experiment.py`: structure plots use the attenuator calibration.
+  - `test/test_utils/test_visualization.py`: two tests (power colours with and without calibration; mm axes
+    without offset and scientific notation).
+  - `test/README.md`.
+  - `TODO.md`: T38 moved to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 236 passed, 14 skipped. A first version put the colour bar on both axes,
+  which made `tight_layout()` in the drawing tests warn; it is on the second axes now.
+- **Commits:** `f688a61` feat(visualization): colour movements by laser power, plain axis labels [T38];
+  docs(todo): close T38 [T38]
+- **Open question (not changed):** IFOV programs switch the laser without `GALVO LASEROVERRIDE`; presumably
+  `LINEAR` moves in IFOV mode are exposures and `RAPID` moves are not. The reader still treats all
+  movements of IFOV programs as laser off, as before. Whether IFOV `LINEAR` should count as laser on needs
+  confirmation from the maintainer.
+
+### 2026-09-30 14:09 CEST — [T39] Manual DHM helper: implement reset
+- **Status:** done
+- **Changes:**
+  - `test/manual/dhm/DHMUserBackend.py`:
+    - `reset(reconnect=True)` closes the client, restores the start state and reconnects (N094);
+    - the default motor positions moved into `default_motor_pos()`, which the constructor uses too;
+    - earlier values are kept as a comment;
+    - the German module note is translated.
+  - `test/dhm/test_manual_helper.py` (new, 2 tests on the dummy DHM).
+  - `test/README.md`.
+  - `TODO.md`: T39 moved to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 238 passed, 14 skipped.
+- **Commits:** `b875fe0` feat(dhm): implement reset of the manual DHM helper [T39]; docs(todo): close T39 [T39]
+- **Note:** the old Zeiss 20x default had two assignments (3100.0, then 100.0); the effective value 100.0 is kept.
+
+### 2026-09-30 14:10 CEST — [T28] Overview images and time estimate (evaluated, blocked)
+- **Status:** blocked (decision needed)
+- **Changes:**
+  - `TODO.md`: T28 moved to Blocked, with proposals for the overview image (mosaic or center capture) and the
+    time estimate (path length / F per layer program plus overhead).
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (no code change).
+- **Commits:** docs(todo): block T28 on decisions [T28]
+- **Notes:**
+  - The actual durations are already stored since T47/T59: session, structure and layer start/end times.
+  - Only the estimate and the overview image are missing.
+
+### 2026-09-30 18:38 CEST — [T43] Make the drop direction consistent everywhere
+- **Status:** done
+- **Branch:** `feat/phase1-execution-parameters`, based on `feat/phaseB-plots`
+- **Decisions (maintainer, 2026-09-30):**
+  - Physics: for a drop facing down, the substrate/polymer interface is the lower one, and an
+    oil/substrate interface can appear above it (objective raised too high) and must not be used. For a
+    drop facing up, the interface with the higher z is decisive; below it is polymer/air. Dip-in behaves
+    like UP without an upper end.
+  - "The z coordinate should NOT be changed. Only the order changes in regards to how the droplet is
+    oriented." So the criterion "mirrored z values" of the todo reads as: identical layer programs, printed
+    in opposite order.
+- **Changes:**
+  - `nanofactorysystem/parameter.py`: `Orientation` removed; its only users were the scanner and the
+    layer.
+  - `nanofactorysystem/tools/detector.py`: `Scanner(drop_direction=...)`. DOWN keeps the lowest focus
+    range, UP the highest; the result reports `dropDirection`.
+  - `nanofactorysystem/tools/layer.py`: new parameter `dropDirection` (default `"DOWN"`, which is the former
+    hard-coded behaviour); the hotfix and the commented `sampleOrientation` are removed (N087, N089).
+  - `nanofactorysystem/experiment.py`: `_with_drop_direction()` makes a copy of `sys_args` with
+    `layer.dropDirection`, rejects a contradicting value, and is used for `System` and the tools; the value
+    is stored with the experiment.
+  - `nanofactorysystem/aerobasic/programs/drawings/qr_code.py`: the pixel lines are drawn upwards for DOWN
+    (N070).
+  - `nanofactorysystem/devices/coordinate_system.py`: the `DropDirection` docstring lists every place that
+    depends on it and the dip-in plan (F8).
+  - `test/test_drop_direction.py` (new, 6 tests); `test/README.md`; `CLAUDE.md` (separate commit, because
+    the first edit did not apply).
+  - `TODO.md`: T43 moved from Blocked to In Progress (with the decision), then to Done.
+- **Tests:** `python -m pytest`: 244 passed, 14 skipped; golden programs and command logs are unchanged.
+  - A script check finds all 58 `Experiment` calls in `mains/` passing `drop_direction`, and no hand-made
+    z sign.
+- **Commits:** `97e2345` feat(tools): derive the resin-layer choice from the drop direction [T43];
+  `5a8402d` docs(claude): describe what the drop direction changes [T43]; docs(todo): close T43 [T43]
+- **Behaviour changes on hardware (to check on the lab PC):**
+  1. 20x (UP) plane fits: when two focus ranges are found, the highest one is now kept (before: always the
+     lowest). With one focus range nothing changes.
+  2. 63x (DOWN): unchanged, because the old hard-coded rule is the DOWN rule.
+  3. QR codes printed with 63x (DOWN): the vertical pixel lines are now drawn from the anchor upwards
+     instead of downwards.
+- **Follow-ups:** `sys_args["sample"]["orientation"] = "top"` in the scripts is no longer read by any code;
+  T51 can drop it when the scripts are migrated.
+
+### 2026-09-30 18:47 CEST — [T44] Restructure how plane fitting is run
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/plane_fitting.py` (new):
+    - `PlaneFitMode`: `GRID` = 0, `CORNERS` = 1, new `BORDER` = 2 (N026); `parse()` takes a member, a name or an
+      integer.
+    - `sample_points()`; `measure_plane()` (the former body of `Experiment.plane_fit`, now usable from scripts,
+      N079); `interface_for()`; `structure_tilt()`.
+  - `nanofactorysystem/experiment.py`:
+    - `plane_fit_mode` accepts a member, a name or an integer, and is stored by name;
+    - new `tilt_warning_um` (default 1 µm) and `_check_tilt()` after every plane fit (N082);
+    - the centre is checked against the resin edges (N022, `ValueError`);
+    - `plane_fit()` uses `measure_plane()`; the commented-out old sample-point function is removed;
+    - the unused imports `Plane` and `PlaneFit` are removed;
+    - reading from the file and from old dictionaries: `PlaneFitMode.parse`, and parameters missing from older
+      files keep the constructor default.
+  - `nanofactorysystem/storage/schema.py`: `plane_fit_mode` has kind "enum"; new parameter `tilt_warning_um`.
+  - `test/test_plane_fitting.py` (new, 11 tests); `test/test_experiment.py`: `make_experiment(center=...)`;
+    `test/README.md`; `CLAUDE.md`.
+  - `TODO.md`: T44 moved to Done.
+- **Tests:** `python -m pytest`: 255 passed, 14 skipped.
+- **Commits:** `c619b7e` feat(experiment): named plane-fit modes and a stand-alone plane fit [T44]; docs(todo): close T44 [T44]
+- **Notes:**
+  - N078: the `+1` is correct. There are rows + 1 and cols + 1 grid lines (before, between and after the
+    cells).
+  - The tilt check only warns. N082 also suggested placing a structure at the lowest or highest corner height
+    instead of its centre; that is not implemented, because it would change the printed z (open for the
+    maintainer).
+  - `measure_plane()` cannot run on the dummy backend, which does not simulate plane detection. It is tested
+    with a stand-in for `tools.plane.Plane`.
+- **Behaviour change on hardware:** an experiment centre outside the resin-drop box now fails at construction.
+  The dictionaries store the mode name instead of the integer.
+
+### 2026-09-30 18:51 CEST — [T45] Take camera images only on request
+- **Status:** done
+- **Decision (maintainer, 2026-09-30):**
+  - The switch is `Experiment(camera_capture=False)`, an argument of the experiment, not `sys_args["camera"]`.
+  - The existing experiment scripts get `camera_capture=True`, so that they keep their behaviour.
+- **Changes:**
+  - `nanofactorysystem/experiment.py`: argument `camera_capture` with a docstring. `measure()` takes camera
+    images only with it and otherwise returns None as camera container. It is stored in the parameters, and
+    `parameters_from_dictionary()` restores it for the restart.
+  - `nanofactorysystem/storage/schema.py`: parameter `camera_capture`. `summary.py`: comment (files written
+    before T45 always had camera images).
+  - `test/test_experiment.py`: tests for both values (captures, camera calls, stored value, summary, restart)
+    and for the default. `make_experiment` keeps camera images on by default for the tests written before
+    T45.
+  - `test/README.md`, `CLAUDE.md`.
+  - Scripts with `camera_capture=True` added, one line each before `drop_direction=` (57 calls in 57 files):
+    - `mains/Experiments/Big_substrate_20x/grating_ifov_test.py`
+    - `mains/Experiments/DHM_tomography/hollow_rect_first_print_63xobj.py`
+    - `mains/Experiments/Grating_20x/grating_big_stitching.py`
+    - `mains/Experiments/Grating_20x/plane_fitting_20x.py`
+    - `mains/Experiments/Grating_20x/zumLaufBringen_20x.py`
+    - `mains/Experiments/Grating_20x/zumLaufBringen_20x_grating.py`
+    - `mains/Experiments/Grating_63/Angle_test_NO_hatching.py`
+    - `mains/Experiments/Grating_63/Angle_test_with_hatching.py`
+    - `mains/Experiments/Grating_63/FOV_Stitch_test.py`
+    - `mains/Experiments/Grating_63/binary_grating_test1.py`
+    - `mains/Experiments/Grating_63/coordinate_test.py`
+    - `mains/Experiments/Grating_63/grating_test_claude.py`
+    - `mains/Experiments/Grating_63/grid_point_test.py`
+    - `mains/Experiments/Grating_63/parameter_test.py`
+    - `mains/Experiments/Grating_63/parameter_test_hatching_slicing.py`
+    - `mains/Experiments/Grating_63/realignment_grating.py`
+    - `mains/Experiments/Grating_63/test_program_cycle.py`
+    - `mains/Experiments/Grating_63/test_stitching.py`
+    - `mains/Experiments/IFOV_63/ifov_test.py`
+    - `mains/Experiments/Kailas/Quadrants_line_power_gap.py`
+    - `mains/Experiments/Kailas/Rectangle_plane_fitting.py`
+    - `mains/Experiments/Kailas/Voxel_row_on_pad.py`
+    - `mains/Experiments/Kailas/grating_ifov_big.py`
+    - `mains/Experiments/Kailas/ifovGrating_diffPower_500um.py`
+    - `mains/Experiments/Kailas/ifovGrating_diffPower_75um.py`
+    - `mains/Experiments/Kailas/ifovGrating_noPower_differentSize.py`
+    - `mains/Experiments/Kailas/ifovLens_diffSlice_75um.py`
+    - `mains/Experiments/Kailas/lens_surface_test.py`
+    - `mains/Experiments/Kailas/lenses.py`
+    - `mains/Experiments/Kailas/padding_test_0_5mm.py`
+    - `mains/Experiments/Kailas/parametric_4q.py`
+    - `mains/Experiments/Kailas/power_z_pitch_lines.py`
+    - `mains/Experiments/Kailas/voxel_dose_test.py`
+    - `mains/Experiments/Kailas/zoffset_voxel__dose_test.py`
+    - `mains/Experiments/Model_3D_experiment.py`
+    - `mains/Experiments/default_exp_file.py`
+    - `mains/Experiments/dhm/dhm_img_4_SEM.py`
+    - `mains/Experiments/dhm/dhm_paper.py`
+    - `mains/Experiments/dhm/dhm_paper_aligning_DHM_camera.py`
+    - `mains/Experiments/dhm/dhm_paper_power_refractiveIndex.py`
+    - `mains/Experiments/dhm/dhm_paper_voxel_axial.py`
+    - `mains/Experiments/other/dhm_paper_print.py`
+    - `mains/Experiments/other/parameter_testprint.py`
+    - `mains/Experiments/other/parameter_testprint_slicing_hatching.py`
+    - `mains/Experiments/other/qr_code_investigation.py`
+    - `mains/Experiments/other/testprint_dhm.py`
+    - `mains/Experiments/other/testprint_dhm2.py`
+    - `mains/Experiments/other/testprint_dhm3.py`
+    - `mains/Experiments/other/z_line_focal_points.py`
+    - `mains/Experiments/parameter_study/line_test/Power_speed_line_test.py`
+    - `mains/Experiments/parameter_study/parameter_testprint_power_speed.py`
+    - `mains/Experiments/parameter_study/parameter_testprint_power_speed_test4orientation.py`
+    - `mains/Experiments/parameter_study/parameter_testprint_slicing_hatching.py`
+    - `mains/Experiments/refractive_index/refractive_index_vel_power.py`
+    - `mains/Experiments/stacked/stacked_lenses_test.py`
+    - `mains/dhm_paper.py`
+    - `mains/dhm_paper_pillowProblem_63.py`
+    `mains/restart_experiment.py` passes the stored value (`**parameters`) and needs no change.
+  - `TODO.md`: T45 moved from Blocked (with the decision) to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 258 passed, 14 skipped.
+- **Commits:** `0315df1` feat(experiment): take camera images only on request [T45];
+  `314a30b` chore(mains): keep camera images in the existing experiment scripts [T45]; docs(todo): close T45 [T45]
+- **Behaviour change:** new scripts take no camera images unless they pass `camera_capture=True`. The
+  existing scripts are unchanged.
+
+### 2026-09-30 18:57 CEST — [T58] Define the capture position of `measure()`
+- **Status:** done
+- **Decision (maintainer, 2026-09-30):** before every capture only the galvo axes are set to A = B = 0; Z stays
+  where it is.
+- **Changes:**
+  - `nanofactorysystem/experiment.py`: `measure()` sends `LINEAR A0 B0 F20` before the X/Y move; docstring.
+  - `nanofactorysystem/storage/records.py`: `commanded_um` is (X, Y, Z, A, B) with Z = None and A = B = 0.
+    Records written before T58 have three values.
+  - `test/golden/commands_experiment_ifov_off.txt`, `commands_experiment_ifov_on.txt`: re-recorded with
+    `--update-golden`. The diff consists only of 65 added lines `LINEAR A0.0000000000 B0.0000000000 F20.000000`
+    per file, one before each capture move. T58 requires this change of the commands sent.
+  - `test/test_experiment.py`: new test. After galvo layers every capture has A = B = 0 and Z is not
+    commanded. Without the reset the test fails (A = 30 µm, B = 2030 µm), which was checked.
+  - `test/README.md`.
+  - `TODO.md`: T58 moved from Blocked (with the decision) to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 259 passed, 14 skipped.
+- **Commits:** `fc9c425` feat(experiment): set the galvo to zero before every capture [T58]; docs(todo): close T58 [T58]
+- **Behaviour change on hardware:** one extra galvo move to A = B = 0 before every camera/DHM capture.
+
+### 2026-09-30 18:57 CEST — [Phase 1] Phase summary
+- **Finished todos:**
+  - T46: capture positions (before phase 2);
+  - T43: drop direction;
+  - T44: plane-fit modes and stand-alone plane fit;
+  - T45: camera images only on request;
+  - T58: galvo at zero before captures.
+- **Maintainer decisions used:** the drop-direction physics and "z never changes, only the order" (T43);
+  `camera_capture` as an `Experiment` argument, with True in the existing scripts (T45); only A = B = 0 before
+  captures (T58).
+- **Tests:** `python -m pytest` (short-path venv): 259 passed, 14 skipped, including the dry run.
+  - Golden programs are unchanged.
+  - The golden command logs of the experiment flows changed only by the galvo reset of T58 (justified in the
+    T58 entry).
+- **Branch:** `feat/phase1-execution-parameters`, stacked on the earlier branches. Nothing is pushed.
+- **Open follow-ups:**
+  - T37 (phase B) is no longer blocked by T43.
+  - N082 (writing a structure at the lowest or highest corner height instead of its centre) is open; T44
+    only warns.
+- **To check on the lab PC:**
+  1. 20x (UP) plane fits when two focus ranges are found: the highest range is kept now.
+  2. QR codes with 63x (DOWN): the pixel lines are drawn upwards now.
+  3. The galvo reset before captures (T58) and the tilt warning after the plane fit (T44).
+  4. `sys_args["sample"]["orientation"]` is no longer read.
+  5. An experiment centre outside the resin-drop box now raises an error.
+
+### 2026-09-30 19:02 CEST — [T53] Voxel database (SQLite)
+- **Status:** done
+- **Branch:** `feat/phase4-voxel-database`, based on `feat/phase1-execution-parameters`
+- **Decision (maintainer, 2026-09-30):** the design is approved with all proposals V1–V5. For V2 this means
+  the power as set in the software, without recording the calibration file. V3: the seed file has the header
+  only.
+- **Changes:**
+  - `docs/design/VOXEL_DATABASE.md`: approval recorded.
+  - `nanofactorysystem/voxel/` (new):
+    - `database.py`: `VoxelDatabase` with `create`, `default`, `add_material`, `add_measurement`,
+      `import_csv` (atomic), `export_csv`, `measurements`, `voxel_size`; also `VoxelSize` and
+      `default_path`;
+    - `interpolation.py`: the lookup rules of design §4;
+    - `migrations.py`: schema version 1 with `PRAGMA user_version`. The statements run one by one, because
+      `executescript()` would commit the migration transaction halfway.
+  - `config/voxel_seed.csv` (new, header only); `.gitignore`: `*.sqlite`.
+  - `test/voxel/test_voxel_database.py` (new, 10 tests); `test/README.md`; `CLAUDE.md` (voxel section; data
+    locations in the configuration section).
+  - `TODO.md`: T53 moved from Blocked to In Progress, then to Done.
+- **Tests:** `python -m pytest`: 269 passed, 14 skipped.
+- **Commits:** `b45a7d2` docs(design): draft the voxel database [T53];
+  `2de4367` docs(design): record the approval of the voxel database design [T53];
+  `9c52f15` feat(voxel): add the voxel database [T53]; docs(todo): close T53 [T53]
+- **Follow-ups:** T54 (voxel-aware slicing) needs T51 as well.
+
+### 2026-09-30 19:14 CEST — [T51] New template for experiment scripts (core)
+- **Status:** partial (the script migration waits for the maintainer's list)
+- **Branch:** `feat/phase3-experiment-spec`, based on `feat/phase4-voxel-database`
+- **Changes:**
+  - `nanofactorysystem/experiment_spec.py` (new):
+    - `ExperimentSpec`, `StructureSpec`, `CornerSpec`, and `OBJECTIVE_DEFAULTS` (the per-objective values of
+      `default_exp_file.py`);
+    - `default_sys_args()` (N001);
+    - `resolved()` fills in the defaults and validates;
+    - `experiment_arguments()`; `run_experiment(confirm=...)`.
+    - The OPL start (the former `m0=350`, N021), the structure size separate from the FOV (N006), the grid and
+      `n_mid_points` (N007, N008, N013) are parameters.
+  - `nanofactorysystem/experiment.py`: `ProgramSource` (DRAWING, SLICER) and the argument `program_source`,
+    stored in the file and the dictionary. `storage/schema.py`: parameter. `storage/summary.py`: the program
+    source is an experiment field.
+  - `nanofactorysystem/backends/dummy/a3200.py`: axis speed statements `BF…`, `ZF…` are accepted. Every IFOV
+    setup program contains them; the slicer dry run showed they were missing (separate fix commit).
+  - `mains/Experiments/experiment_template.py` (new): template with a DRAWING and a SLICER example; `main()`
+    uses message boxes on the lab PC.
+  - `test/integration/test_dry_run_spec.py` (new, 5 tests, marked `slow` where they print): dry runs for DRAWING
+    and SLICER, spec validation, and the template examples (reduced to one coarse structure).
+  - `test/README.md`, `CLAUDE.md`.
+  - `TODO.md`: T51 moved to In Progress, with a status note and the open decision.
+- **Tests:** `python -m pytest`: 274 passed, 14 skipped.
+- **Commits:** `6462705` fix(backends): accept axis speed statements for all axes in the fake controller [T51];
+  `acb2fe2` feat(experiment): describe experiments with ExperimentSpec [T51]; docs(todo): T51 status [T51]
+- **Remaining gap:**
+  - Migrate the scripts the maintainer still uses; move the others to `mains/Experiments/historical/` (or
+    list them in a README); translate German text in the migrated scripts.
+  - Confirm the program-source reading: DRAWING = the drawing classes.
+- **Notes:**
+  - The dummy does not simulate exposures in IFOV mode, so the slicer dry run checks the programs instead of
+    exposures.
+  - `default_exp_file.py` stays, because the older dry run and the lab use it.
+
+### 2026-09-30 19:20 CEST — [T37] Replace the hotfixes in tools and devices
+- **Status:** partial (the focus threshold needs lab data; N088 needs the maintainer)
+- **Branch:** `fix/phaseB-tools-hotfixes`, based on `feat/phase3-experiment-spec`
+- **Changes:**
+  - N090: `(phi % 360) - 180` from commit f91fe30 rotated the reported azimuth by 180° instead of
+    normalising it.
+    - Fix: new `coordinate_system.normalize_angle()`, used by `PlaneFit.phi_degree` and `tools/plane.py`; tests
+      added. Separate `fix:` commit.
+    - Only the reported azimuth changes; no coordinate depends on it.
+  - N076: `dhm/motorscan.py` has a new `bisectAroundMax()`: a loop over the widening factors 1, 2, 4 and 8, with
+    a motor-range check (`MotorMinPos`/`MotorMaxPos`) and the dedicated `MotorScanError`.
+    `test/dhm/test_motorscan.py` (new, 3 tests).
+  - N075: analysis, no code bug. The capture time in `Dhm.container()` covers only `getimage()`: with
+    `opt=False` this is one `CameraImage` request, i.e. mainly the network transfer. The pause between series
+    images is not included. A comment documents it.
+  - N046: `DrawableObject` no longer skips `data`/`height_profile`. `DOEstep` keeps `feature_size` and stores
+    its height profile; a round-trip test was added.
+  - N085/N086: resolved in T43; the hotfix line with `self.device` and the sample dictionary was removed there.
+  - `test/README.md`; `TODO.md`: T37 moved to In Progress; new follow-up T61 (`minDiffMax` with lab data, N088).
+- **Tests:** `python -m pytest`: all pass (282 passed plus the new tests; test_aerobasic 75 passed).
+- **Commits:** `8444d70` fix(tools): report the plane azimuth without a 180 degree shift [T37];
+  `b396a38` feat(dhm): widen the OPL scan bracket in a loop within the motor range [T37];
+  `040e831` feat(drawings): store height profiles with the structure [T37]; docs(todo): T37 status and T61 [T37]
+- **Remaining gap (T61):**
+  1. A justified focus-detection threshold for 20x and 63x (N084, N010).
+  2. N088 (Dominik's result object): what is meant?
+- **Observation:** `DOEstep` fails with a height-profile pixel of 0: a zero-height `Rectangle3D` gives NaN
+  layers. This belongs to T35 (the "`Z == 0` hotfix" in `Rectangle3D`).
+- **Behaviour change on hardware:**
+  - The reported plane azimuth is rotated by 180° compared with before; it is now correct.
+  - The OPL motor scan tries up to 8× the bracket (before: 2×) and stops at the motor limits.
+
+### 2026-09-30 21:59 CEST — [T51] Port the experiment scripts in use, move the others to historical/
+- **Status:** done
+- **Branch:** `feat/phase3-ported-scripts`, based on `fix/phaseB-tools-hotfixes`
+- **Changes:**
+  - `nanofactorysystem/experiment_spec.py`: `StructureSpec.factory(experiment)` for structures that need the
+    running experiment (controller acceleration); `StructureSpec.empty()` for a skipped grid cell
+    (`run_experiment` calls `skip_structure`); `run_experiment(substrate_information=)`; `script_output()`
+    (output folder convention of the older scripts) and `messagebox_confirm()`.
+  - Ported to `experiment_spec()` + `run_experiment()` (maintainer's list). The former entry function keeps its
+    signature and gains `backend=`/`plane=`. Objective values unchanged; `sample.orientation` dropped (T43);
+    an objective without a parameter set raises `ValueError`; German text translated:
+    - `mains/Experiments/Kailas/parametric_4q.py`, `Quadrants_line_power_gap.py`, `lens_surface_test.py`,
+      `zoffset_voxel__dose_test.py`, `Voxel_row_on_pad.py`
+    - `mains/Experiments/parameter_study/parameter_testprint_power_speed.py`,
+      `parameter_testprint_power_speed_test4orientation.py`, `parameter_testprint_slicing_hatching.py`,
+      `line_test/Power_speed_line_test.py`
+    - `mains/Experiments/refractive_index/refractive_index_vel_power.py`
+    - `mains/Experiments/DHM_tomography/hollow_rect_first_print_63xobj.py`
+  - Renamed → `mains/Experiments/historical/…` (unchanged content): `Big_substrate_20x/`, `Grating_20x/`,
+    `Grating_63/`, `IFOV_63/`, `dhm/`, `other/`, `stacked/`, `Model_3D_experiment.py`, and
+    `Kailas/{Rectangle_plane_fitting, grating_ifov_big, ifovGrating_diffPower_500um, ifovGrating_diffPower_75um,
+    ifovGrating_noPower_differentSize, ifovLens_diffSlice_75um, lenses, padding_test_0_5mm, power_z_pitch_lines,
+    voxel_dose_test}.py`.
+  - `mains/Experiments/historical/README.md` (new): status, content, how to port a script.
+  - `mains/main.py`, `mains/main_IFOV.py`, `mains/main_3D_model.py`, `mains/grating_try.py`: imports from
+    `Experiments.historical`; two already stale commented imports corrected.
+  - `test/integration/test_ported_scripts.py` (new): every ported script builds a valid spec for its objectives
+    and refuses the others; dry run of the DHM tomography script (grid 1 × 2, coarse hatch, no corners; 6 s).
+  - `test/README.md`, `CLAUDE.md`: scripts in use vs. historical.
+  - `TODO.md`: T51 moved to Done.
+- **Tests:** `python -m pytest`: 295 passed, 14 skipped. The five active imports of the entry scripts import
+  from `mains/`.
+- **Commits:** `854bc8c` feat(experiment): structure factories and empty cells in specs [T51];
+  `6d9afc1` refactor(mains): port the current experiment scripts to ExperimentSpec [T51];
+  `905d1c2` chore(mains): move the unported experiment scripts to historical/ [T51];
+  docs(todo): close T51 [T51]
+- **Follow-ups:**
+  - The active import of `mains/main.py` (`power_z_pitch_lines`) and of `main_IFOV.py` now point to historical
+    scripts, which still set `sample.orientation`; the maintainer should port them if they are used again.
+  - `todo_notes.md` still lists the old paths of the moved scripts (notes file, left unchanged).
+- **Behaviour change on hardware:** none for the ported scripts' parameters; 20x runs of scripts without a 20x
+  parameter set now stop before the hardware starts.
+
+### 2026-09-30 23:27 CEST — [T52] Substrate-specific main file
+- **Status:** done
+- **Branch:** `feat/phase3-substrate-main`, based on `feat/phase3-ported-scripts`
+- **Changes:**
+  - `nanofactorysystem/experiment.py`: a new experiment with `substrate=` and an explicit `path=` gets the
+    next free experiment label. Before, it was entered into the index with an empty label, and a second one on
+    the same substrate failed. Separate `fix:` commit with a regression test in `test/test_experiment.py`.
+  - `nanofactorysystem/substrate_plan.py` (new):
+    - `SubstrateSpec` (label, user, objective, resin edges, material, notes, data root) and
+      `SubstrateExperiment` (`ExperimentSpec` + optional folder);
+    - `experiment_area`: the same geometry as `Experiment` (grid + margin), widened by the QR code (140 µm,
+      centred on the upper edge) and the corners when markers are printed;
+    - `existing_areas`: rectangles of the experiments already in the substrate index, read from their files;
+    - `check_layout`: resin-drop bounding box, overlaps, existing experiments, objective, unique names; every
+      problem in one `LayoutError`;
+    - `plot_substrate`, `open_substrate` (creates the substrate and records the resin drop once);
+    - `run_substrate`: checks first, then runs the experiments one after another via `run_experiment` into
+      the substrate index, with optional `confirm_between`.
+  - `nanofactorysystem/experiment_spec.py`: `run_experiment(allow_synced_root=)`.
+  - `mains/substrate_main.py` (new): template with two ported Kailas experiments (63x); `mains/main.py` is
+    unchanged.
+  - `test/test_substrate_plan.py` (new, 7 tests); `test/integration/test_dry_run_substrate.py` (new, 4 tests:
+    two experiments on one substrate give two experiment files and one index, planned areas equal the printed
+    rectangles, a repeated run is refused, optional folder, confirmation between experiments, an invalid layout
+    creates nothing, the template's layout is valid).
+  - `test/README.md`, `CLAUDE.md`; `TODO.md`: T52 moved to Done, new T62.
+- **Tests:** `python -m pytest`: 307 passed, 14 skipped. A full dry run of the template took 7 minutes (real 63x
+  structures with DHM). It was run once, passed, and is not part of the suite; the suite checks the
+  template's layout only.
+- **Commits:** `b46bed8` fix(experiment): label experiments in explicit folders on their substrate [T52];
+  `1796164` feat(experiment): run several experiments on one substrate [T52];
+  `ff6d3a0` feat(mains): add a substrate main template [T52]; docs(todo): close T52, phase 3 summary [T52]
+- **Follow-ups:** T62 (phase B, low): the resin check uses the bounding box of the four edge points, like the
+  centre check of `Experiment`. An area near the rim of a round drop passes the check.
+
+### 2026-09-30 23:27 CEST — [Phase 3] Phase summary
+- **Finished todos:**
+  - T51: `ExperimentSpec`/`run_experiment`, program sources DRAWING and SLICER, 11 scripts ported, the others
+    moved to `mains/Experiments/historical/`;
+  - T52: substrate main files with layout checks.
+- **Maintainer decisions used:** DRAWING = the drawing classes; the list of scripts still in use; all other
+  scripts go to `historical/`.
+- **Tests:** `python -m pytest` (short-path venv): 307 passed, 14 skipped, including the dry runs.
+  Golden files are unchanged.
+- **Branches:** `feat/phase3-experiment-spec` → `fix/phaseB-tools-hotfixes` (T37) → `feat/phase3-ported-scripts`
+  → `feat/phase3-substrate-main`, stacked on the earlier branches. Nothing is pushed.
+- **Open follow-ups:** T62 (resin-drop outline). The active imports of `mains/main.py`
+  (`power_z_pitch_lines`) and `mains/main_IFOV.py` point to historical scripts that still set
+  `sample.orientation`.
+- **To check on the lab PC:**
+  1. One ported script per objective, e.g. `DHM_tomography/hollow_rect_first_print_63xobj.print_file`: the same
+     values as before (zMax, margin, corners, plane-fit mode).
+  2. `mains/substrate_main.py` with a real substrate label: the layout plot, the message boxes between the
+     experiments, and `substrate.json` afterwards.
+  3. Scripts without a 20x parameter set now stop with `ValueError` before the hardware starts.
+
+### 2026-09-30 23:46 CEST — [T54] Voxel-aware slicing and hatching
+- **Status:** done
+- **Branch:** `feat/phase4-voxel-slicing`, based on `feat/phase3-substrate-main`
+- **Decision (maintainer, 2026-09-30):** option (b) is the default: with voxel data the hatch spacing and layer
+  height are derived from the voxel size and an overlap ratio. Option (a) stays available as `static_hatching`
+  (given spacing, gaps only warned about), e.g. for very dense spacing later.
+- **Changes:**
+  - `nanofactorysystem/aerobasic/slicer/voxel.py` (new):
+    - `SpacingMode` (`voxel_overlap`, `static_hatching`);
+    - the `VoxelModel` protocol, so the slicer stays self-contained;
+    - `VoxelContext`;
+    - `compensate()`: contour offset = width / 2 (an explicit offset is kept), `voxel_height_um` = height, and
+      the spacing per mode; the report goes into `job.meta["voxel"]`.
+  - `slicer/parameters.py`: `voxel_height_um` (0 = the old planes), `spacing_mode`, `voxel_overlap` (0.3).
+  - `slicer/slicing.py`: with a voxel height, the first and last plane lie half a voxel height inside the
+    part, with even spacing (at most `layer_height_um`) in between. A part thinner than one voxel gets one plane
+    at mid-height and a warning.
+  - `slicer/hatching.py`: the strategies get `voxel=` (a `VoxelContext` or None).
+  - `slicer/pipeline.py`: `slice_geometry(voxel_model=)`.
+  - `slicer/storage.py`: string parameters are read back as `str`. `slicer/__init__.py`: exports.
+  - `aerobasic/programs/drawings/model3d.py`: `voxel_model`, `spacing_mode`, `voxel_overlap`. A voxel model
+    needs `power`. The power is recorded in `LaserParameters`. `to_json()["voxel"]`.
+  - `nanofactorysystem/voxel/model.py` (new): `NoVoxelData`, `FixedVoxelModel`, `DatabaseVoxelModel`.
+    `voxel/__init__.py`: exports.
+  - `nanofactorysystem/experiment_spec.py`: `ExperimentSpec.voxel_material`, `voxel_database`, `voxel_model()`.
+    SLICER structures then get the model and their power.
+  - `nanofactorysystem/storage/summary.py`:
+    - new columns `voxel_width_um`, `voxel_height_um`;
+    - slice and hatch size of `Model3D_Slicer` structures come from their stored job parameters (before, the
+      summary showed none);
+    - the velocity unit follows their IFOV convention.
+  - Tests:
+    - `test/slicer/test_voxel_slicing.py` (new, 10 tests);
+    - `test/integration/test_dry_run_spec.py`: SLICER dry run with a voxel database;
+    - `test/storage/test_summary.py`: the expected `print_parameters` result gains the two new keys (new
+      output, no assertion weakened), plus a slicer case.
+  - `test/README.md`, `CLAUDE.md`; `TODO.md`: T54 moved to Done, new T63.
+- **Tests:** `python -m pytest`: 319 passed, 14 skipped. The golden files are unchanged, so the no-data path is
+  identical.
+- **Commits:** `e5a2173` feat(slicer): slice with the voxel size of the laser parameters [T54];
+  `e7ec542` feat(experiment): voxel material in experiment specs and summary [T54]; docs(todo): close T54 [T54]
+- **Follow-ups:**
+  - T63: `IFOV_Lines` writes with `F=5` (63x) or `F=10` (20x) mm/s regardless of `velocity`, so the voxel lookup
+    uses the nominal velocity, not the real writing speed.
+  - The default overlap of 0.3 is a proposal; the maintainer should check it with the first lab prints.
+- **Behaviour change on hardware:** none without `voxel_material` or `voxel_model`. With them, SLICER programs
+  set the structure power themselves (`SET_POWER`), and hatch and slice size come from the voxel data.
+
+### 2026-10-01 00:18 CEST — [T31] Laser power per structure, layer and line
+- **Status:** done
+- **Branch:** `feat/phase4-voxel-slicing` (after T54)
+- **Changes:**
+  - N012 (power per structure): this worked already with `add_structure(power=)`; a dummy test now shows the
+    exposures at two powers.
+  - `nanofactorysystem/experiment.py`: `add_structure(layer_power=)` takes a list or a function of the layer id.
+    - `structure_program` writes `POWER(ptoa(p))` with a comment at the start of every layer program, so a
+      restart replays the powers from the stored programs.
+    - A wrong list length raises `ValueError`. Repetitions inherit the layer powers.
+  - `storage/records.py`, `storage/experiment_store.py`: `StructureRecord.layer_powers_mw` (optional attribute
+    `layer_powers_json`; older files read back as empty, so the schema version is unchanged).
+  - `storage/json_copies.py`: `layer_powers` in `structures.json`.
+  - `storage/summary.py`: column `layer_power_mw` (range).
+  - `experiment_spec.py`: `StructureSpec.layer_power`.
+  - `aerobasic/programs/drawings/model3d.py` (N083, per segment):
+    - elements with `PathElement.power_mw` go into their own IFOV blocks; consecutive equal powers share one,
+      so the programs are unchanged without overrides;
+    - `power_map(z_um, role)` sets overrides; existing overrides are kept;
+    - overrides need the structure power;
+    - `element_powers_mw` in `to_json()`.
+  - Tests:
+    - `test/test_experiment.py`: 3 tests (per structure, per layer with a repetition, function and wrong
+      length);
+    - `test/slicer/test_segment_power.py` (new, 4 tests);
+    - `test/integration/test_dry_run_spec.py`: layer powers of a repetition.
+  - `test/README.md`, `CLAUDE.md`; `TODO.md`: T31 moved to Done.
+- **Tests:** `python -m pytest`: 326 passed, 14 skipped. Golden files are unchanged.
+- **Commits:** `a01c64b` feat(experiment): laser power per layer [T31];
+  `1e6cf41` feat(drawings): laser power per segment in slicer structures [T31]; docs(todo): close T31, phase 4
+  summary [T31]
+- **Follow-ups:** The hand-written drawing classes (`Rectangle3D`, …) have no power per line; so far only the
+  slicer IR carries it. This is not required by T31; adaptive strategies (F7) will build on the IR.
+- **Behaviour change on hardware:** none without `layer_power` or power overrides.
+
+### 2026-10-01 00:18 CEST — [Phase 4] Phase summary
+- **Finished todos:**
+  - T53: voxel database;
+  - T54: voxel-aware slicing;
+  - T31: power per structure, layer and segment.
+- **Maintainer decisions used:**
+  - T53: V1–V5 approved;
+  - T54: `voxel_overlap` is the default spacing mode, and `static_hatching` stays available.
+- **Tests:** `python -m pytest` (short-path venv): 326 passed, 14 skipped, including the dry runs. Golden files
+  are unchanged.
+- **Branch:** `feat/phase4-voxel-slicing`, stacked on `feat/phase3-substrate-main` and the earlier branches.
+  Nothing is pushed.
+- **Open follow-ups:**
+  - T63: the real IFOV writing speed for the voxel lookup;
+  - the default overlap of 0.3 is to be checked in the lab;
+  - the voxel database is still empty: the seed CSV has the header only.
+- **To check on the lab PC:**
+  1. Fill the voxel database with the first measurements (CSV import).
+  2. Print a SLICER structure with `voxel_material`, then compare its size with the design (SEM/DHM).
+  3. Print a structure with `layer_power` and check that the attenuator value changes between the layers.
+  4. Print a slicer structure with `power_map` (contours at another power).

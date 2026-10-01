@@ -349,19 +349,44 @@ def motorScan(
     if result is None:
         raise RuntimeError("Long OPL scan detected no interference!")
 
-    m0, m1, m2 = result
-    dm0 = m1 - m0
-    dm2 = m2 - m1
-    try:
-        m = bisectMax(dhm, result, minc, minm, opt, logger=logger)
-    except MotorScanError:
-        result = (m1-2*dm0, m1, m1+2*dm2)
-        m = bisectMax(dhm, result, minc, minm, opt, logger=logger)
-
+    m = bisectAroundMax(dhm, result, minc, minm, opt, logger=logger)
     dhm.device.MotorPos = m
     return m, init
 
 
+def bisectAroundMax(dhm, triple, minc=0.005, minm=5.0, opt=True, widening=(1, 2, 4, 8), logger=None):
+
+    """ Find the contrast maximum in the bracket ``triple`` = (m0, m1, m2).
+
+    If the bisection finds no maximum, the bracket around m1 is widened by
+    the next factor of ``widening`` and the bisection is repeated, as long as
+    the bracket stays inside the motor range (MotorMinPos, MotorMaxPos).
+
+    Raises
+    ------
+    MotorScanError
+        If the widened bracket leaves the motor range or no factor gives a
+        maximum.
+    """
+
+    m0, m1, m2 = triple
+    dm0 = m1 - m0
+    dm2 = m2 - m1
+    min_pos = float(dhm.device.MotorMinPos)
+    max_pos = float(dhm.device.MotorMaxPos)
+    for factor in widening:
+        bracket = (m1 - factor * dm0, m1, m1 + factor * dm2)
+        if bracket[0] < min_pos or bracket[2] > max_pos:
+            raise MotorScanError(f"OPL scan bracket {bracket[0]:.1f} - {bracket[2]:.1f} um exceeds the motor range "
+                                 f"{min_pos:.1f} - {max_pos:.1f} um")
+        try:
+            return bisectMax(dhm, bracket, minc, minm, opt, logger=logger)
+        except MotorScanError:
+            if logger is not None:
+                logger.info(f"No contrast maximum in {bracket[0]:.1f} - {bracket[2]:.1f} um; widening the bracket")
+    raise MotorScanError(f"No contrast maximum within {widening[-1]} times the initial bracket around {m1:.1f} um")
+
+
 class MotorScanError(Exception):
 
-    pass
+    """ The OPL motor scan found no contrast maximum inside the motor range. """

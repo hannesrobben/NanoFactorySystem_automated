@@ -23,6 +23,7 @@ class DOEstep(DrawableObject):
     ):
         super().__init__()
         self.center = center
+        self.feature_size = feature_size  # kept as given, so that to_json() can store it
         if isinstance(feature_size, float):
             self.feature_width = feature_size
             self.feature_length = feature_size

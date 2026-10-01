@@ -376,7 +376,7 @@ class FakeA3200Transport:
             return ""
         if re.fullmatch(r'REMOVEPROGRAM\s+"(.*)"', s, re.IGNORECASE):
             return ""
-        if re.fullmatch(rf"A?F{_NUMBER}", u):  # connected speed, e.g. "F10"
+        if re.fullmatch(rf"[XYZAB]?F{_NUMBER}", u):  # connected speed "F10" or axis speed "AF5", "BF5", "ZF1"
             return ""
         if u.startswith(_NOOP_PREFIXES):
             return ""
