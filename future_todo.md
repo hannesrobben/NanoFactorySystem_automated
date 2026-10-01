@@ -183,3 +183,16 @@ first), **Watch out for** (pitfalls and constraints), **Open questions** (for th
 - **Watch out for:** Programs need the speed in mm/s (a speed in µm/s is too large and the controller
   raises an error); the voxel size depends on the speed (T63).
 - **Open questions:** Which speeds are stable in IFOV mode for each objective?
+
+## F14: Camera offset in `System.zline`
+- **Goal:** `System.zline` takes the camera offset into account itself (N071), instead of every caller adding
+  `zCameraOffset` before and after the exposure.
+- **Context:** From T36 (maintainer decision 2026-10-01: nothing may change the normal behaviour of the
+  system or the plane fitting). `System.zline` is the exposure of the focus detection (`tools/focus.py`) and
+  therefore of every plane fit, so the change was not made. N072 (global variables, no recompiling) was
+  already done: the z-line program reads `$global[0..2]` and is loaded once per session.
+- **Prerequisites:** F10 (focus detection reworked with known data), so that the change can be checked
+  against measured focus scans.
+- **Watch out for:** `Focus.zline` and the focal-point script both add the offset today; moving it must not
+  apply it twice. The z-line is centred on z (z - dz/2 to z + dz/2).
+- **Open questions:** Should the offset also be applied for dots (dz = 0)?
