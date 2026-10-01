@@ -1932,3 +1932,25 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Follow-ups:** automatic outline detection is F9.
 - **Behaviour change on hardware:** an experiment whose center (or, in a substrate plan, whose area) lies in
   the box of the edge points but outside the ellipse is now refused before printing.
+
+### 2026-10-01 13:38 CEST — [T35] Clarify line and rectangle details
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/aerobasic/programs/drawings/lines.py`:
+    - new `step_slice_size()`;
+    - `Rectangle3D`: height 0 prints nothing (before: an empty program, then division by zero); a height
+      below half a slice gives one layer;
+    - `IFOV_Lines`: velocities 50–500 log a warning instead of raising `Warning`; the docstring states the
+      fixed IFOV writing speed;
+    - `Stair` uses `step_slice_size`.
+  - `DOE.py`, `gratings.py`, `Stacked_lens.py`, `z_line_matrix.py`: `step_slice_size()` instead of
+    `h / round(h / slice)` (a flat step or socket divided by zero; this is the base-height problem the
+    maintainer remembered).
+  - `test/test_aerobasic/test_line_details.py` (new, 6 tests); `test/README.md`; `TODO.md`: T35 moved to Done.
+- **Tests:** `python -m pytest`: 340 passed, 14 skipped. Golden programs are unchanged: the new code gives
+  the same values wherever the old formula worked.
+- **Commits:** `3edbae7` fix(drawings): handle flat steps and validate IFOV velocities [T35]; docs(todo):
+  close T35 [T35]
+- **Follow-ups:** N068 (shell printing) is F12; a free IFOV speed is F13.
+- **Behaviour change on hardware:** none for working structures. Structures with a flat step, pixel or socket
+  can now be built.

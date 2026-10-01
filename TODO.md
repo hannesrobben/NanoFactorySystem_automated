@@ -74,15 +74,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
         - `Kailas/power_z_pitch_lines.py` and `Big_substrate_20x/grating_ifov_test.py` are moved back from `historical/` and ported to `experiment_spec()` like the other scripts (maintainer decision 2026-10-01), without `sample.orientation`.
         - `mains/main.py` and `mains/main_IFOV.py` import them from their new place; `test/integration/test_ported_scripts.py` checks them.
 
-- [ ] T35: Clarify line and rectangle details (from T19) [phase: B]
-      Goal: Line-based structures have checked parameters and no unexplained hotfixes.
-      Priority: low | Depends on: –
-      Done when:
-        - `IFOV_Lines`: the writing speed stays fixed per objective (maintainer decision 2026-10-01; free speed is F13); the `velocity` argument is documented as not changing the IFOV writing speed (N065–N067).
-        - Non-IFOV structures take their velocity independently; the velocity unit is consistent: programs get mm/s (a value in µm/s is too large and the controller raises an error), and every conversion between µm/s and mm/s is explicit and tested.
-        - The `Z == 0` hotfix in `Rectangle3D` is understood and replaced or documented (N069; maintainer: probably related to the base height of another structure that uses `Rectangle3D`).
-      Notes: The QR-code drop direction (N070) moved to T43. Vector (shell) printing (N068) moved to F12.
-
 - [ ] T36: Z-line: offset, global variables and focal-point script (from T19) [phase: B]
       Decision (maintainer, 2026-10-01): finish the focal-point script; nothing may change the normal behaviour of the system or the plane fitting.
       Goal: Z-line programs are consistent and the focal-point study script is complete.
@@ -202,3 +193,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T63: Use the real IFOV writing speed for the voxel lookup (found during T54) — 2026-10-01 — The job of `Model3D_Slicer` records the fixed IFOV writing speed (5/10 mm/s), so the voxel lookup and the time estimate use it; the speeds are defined once in `lines.IFOV_WRITING_SPEED_MM_S`. — commits: `b2b07cd`
 
 - [x] T62: Check experiment areas against the shape of the resin drop (found during T52) — 2026-10-01 — Experiment areas (substrate plan) and the experiment center (`Experiment(resin_edges=)`) are checked against the ellipse through the four edge points (`resin_drop.py`); no check for dip-in; the edges are stored with the experiment. — commits: `b9d8cfd`
+
+- [x] T35: Clarify line and rectangle details (from T19) — 2026-10-01 — IFOV writing speed stays fixed and is documented; non-IFOV velocities (µm/s → mm/s in programs) are pinned by a test; the N069 hotfix is replaced: flat rectangles print nothing, steps use `step_slice_size` (no division by zero); `IFOV_Lines` no longer raises `Warning`. N068 moved to F12. — commits: `3edbae7`
