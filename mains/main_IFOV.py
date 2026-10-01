@@ -13,7 +13,7 @@ from nanofactorysystem.devices.coordinate_system import Point2D
 # from Experiments.historical.Grating_63.FOV_Stitch_test import binary_testprint as print_program
 # from Experiments.historical.Grating_20x.plane_fitting_20x import binary_testprint as print_program
 # from Experiments.historical.Grating_20x.zumLaufBringen_20x_grating import binary_testprint as print_program
-from Experiments.historical.Big_substrate_20x.grating_ifov_test import binary_testprint as print_program
+from Experiments.Big_substrate_20x.grating_ifov_test import binary_testprint as print_program
 # from Experiments.historical.Grating_20x.grating_big_stitching import binary_testprint as print_program
 # from Experiments.historical.Grating_63.test_stitching import binary_testprint as print_program
 # from Experiments.historical.Grating_63.test_program_cycle import binary_testprint as print_program

@@ -8,7 +8,7 @@ from nanofactorysystem.devices.coordinate_system import Point2D
 # from Experiments.historical.Kailas.ifovGrating_diffPower_500um import print_file as print_program
 # from Experiments.Kailas.parametric_4q import print_file as print_program
 #from Experiments.historical.Kailas.Rectangle_plane_fitting import print_file as print_program
-from Experiments.historical.Kailas.power_z_pitch_lines import testprint as print_program
+from Experiments.Kailas.power_z_pitch_lines import testprint as print_program
 
 
 # from Experiments.historical.IFOV_63.ifov_test import print_file as print_program

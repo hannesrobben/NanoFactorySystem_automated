@@ -13,11 +13,10 @@ To reuse one of these experiments, port it the same way: move it back to `mains/
 
 | Folder / file | Content |
 |---|---|
-| `Big_substrate_20x/` | IFOV grating test on a large substrate (20x) |
 | `Grating_20x/` | Gratings, stitching and plane fitting with the 20x objective |
 | `Grating_63/` | Binary gratings, angle, stitching and parameter tests with the 63x objective |
 | `IFOV_63/` | First IFOV test (63x) |
-| `Kailas/` | IFOV gratings and lenses, plane fitting, padding, z pitch lines, voxel dose |
+| `Kailas/` | IFOV gratings and lenses, plane fitting, padding, voxel dose |
 | `dhm/` | Prints for the DHM paper (SEM, alignment, refractive index, axial voxel size) |
 | `other/` | Older parameter and DHM test prints, QR code and focal point investigations |
 | `stacked/` | Stacked lenses |
