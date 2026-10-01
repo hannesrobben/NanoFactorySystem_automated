@@ -1954,3 +1954,28 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Follow-ups:** N068 (shell printing) is F12; a free IFOV speed is F13.
 - **Behaviour change on hardware:** none for working structures. Structures with a flat step, pixel or socket
   can now be built.
+
+### 2026-10-01 13:40 CEST — [T64] Port the scripts the entry files import
+- **Status:** done
+- **Changes:**
+  - `mains/Experiments/historical/Kailas/power_z_pitch_lines.py` (renamed →
+    `mains/Experiments/Kailas/power_z_pitch_lines.py`):
+    - ported to `experiment_spec()`; drop direction DOWN for both objectives, plane fit CORNERS, objective
+      values as before;
+    - checks kept; the attenuator range is checked in the structure factory;
+    - plane-fit duration logged;
+    - `__main__` called a missing function and now calls `testprint`.
+  - `mains/Experiments/historical/Big_substrate_20x/grating_ifov_test.py` (renamed →
+    `mains/Experiments/Big_substrate_20x/grating_ifov_test.py`): ported.
+    - Entry functions `binary_testprint` and `print_file`: `main_IFOV.py` imported `binary_testprint`, which did
+      not exist, so it failed on import.
+    - The output folder `grating_nach_debuggen` is now `grating_after_debugging`, and the substrate text is
+      translated.
+  - `mains/main.py`, `mains/main_IFOV.py`: imports. `mains/Experiments/historical/README.md`: table.
+  - `test/integration/test_ported_scripts.py`: both scripts; the stand-in experiment gets an attenuator.
+  - `TODO.md`: T64 moved to Done.
+- **Tests:** `test/integration/test_ported_scripts.py`: 14 passed. Both modules import from `mains/`.
+- **Commits:** `b90d42f` refactor(mains): port the scripts the entry files import [T64]; docs(todo): close T64 [T64]
+- **Follow-ups:** none.
+- **Behaviour change on hardware:** `grating_ifov_test` writes into `<path>/grating_after_debugging` instead
+  of `grating_nach_debuggen`.

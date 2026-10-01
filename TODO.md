@@ -67,13 +67,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
         - The expected and the actual duration of an experiment are logged and stored (N023).
       Decisions (maintainer, 2026-09-30/2026-10-01): (1) a camera mosaic stitched with `tools.stitch.Canvas`, stored in the experiment file before and after printing; it covers the experiment rectangle including the corners (the defined boundaries), or only the structure grid with `skip_corner`; by default only the stitched image is stored, optionally also every single image (to check the stitching). (2) Expected duration from the path lengths and F values of every layer program plus an overhead of 5 s per layer (configurable; covers capturing and future reconstruction), logged after `build_programs()` and compared with the stored start/end times.
 
-- [ ] T64: Port the experiment scripts imported by `main.py` and `main_IFOV.py` (found during T51) [phase: B]
-      Goal: The two scripts the entry files still import run with the current code.
-      Priority: medium | Depends on: –
-      Done when:
-        - `Kailas/power_z_pitch_lines.py` and `Big_substrate_20x/grating_ifov_test.py` are moved back from `historical/` and ported to `experiment_spec()` like the other scripts (maintainer decision 2026-10-01), without `sample.orientation`.
-        - `mains/main.py` and `mains/main_IFOV.py` import them from their new place; `test/integration/test_ported_scripts.py` checks them.
-
 - [ ] T36: Z-line: offset, global variables and focal-point script (from T19) [phase: B]
       Decision (maintainer, 2026-10-01): finish the focal-point script; nothing may change the normal behaviour of the system or the plane fitting.
       Goal: Z-line programs are consistent and the focal-point study script is complete.
@@ -195,3 +188,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T62: Check experiment areas against the shape of the resin drop (found during T52) — 2026-10-01 — Experiment areas (substrate plan) and the experiment center (`Experiment(resin_edges=)`) are checked against the ellipse through the four edge points (`resin_drop.py`); no check for dip-in; the edges are stored with the experiment. — commits: `b9d8cfd`
 
 - [x] T35: Clarify line and rectangle details (from T19) — 2026-10-01 — IFOV writing speed stays fixed and is documented; non-IFOV velocities (µm/s → mm/s in programs) are pinned by a test; the N069 hotfix is replaced: flat rectangles print nothing, steps use `step_slice_size` (no division by zero); `IFOV_Lines` no longer raises `Warning`. N068 moved to F12. — commits: `3edbae7`
+
+- [x] T64: Port the experiment scripts imported by `main.py` and `main_IFOV.py` (found during T51) — 2026-10-01 — `Kailas/power_z_pitch_lines.py` and `Big_substrate_20x/grating_ifov_test.py` are back in `mains/Experiments/`, ported to `experiment_spec()` and tested; `main.py`/`main_IFOV.py` import them (main_IFOV.py failed on import before). — commits: `b90d42f`
