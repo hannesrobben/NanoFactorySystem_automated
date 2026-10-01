@@ -1850,3 +1850,36 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   2. Print a SLICER structure with `voxel_material`, then compare its size with the design (SEM/DHM).
   3. Print a structure with `layer_power` and check that the attenuator value changes between the layers.
   4. Print a slicer structure with `power_map` (contours at another power).
+
+### 2026-10-01 13:03 CEST — [T37, T61, T32] Maintainer answers on the open todos
+- **Status:** done (bookkeeping, no code change)
+- **Branch:** `feat/phaseB-followups`, based on `feat/phase4-voxel-slicing` (the branch of the open PR stays
+  unchanged)
+- **Decisions (maintainer, 2026-10-01):**
+  - T28: 5 s overhead per layer; the mosaic shows the corners (only the structure grid with `skip_corner`);
+    by default only the stitched image is stored, optionally every single image.
+  - T62: an ellipse through the edge points; no check for dip-in; automatic detection later (F9).
+  - T63/T35: the IFOV writing speed stays fixed per objective; non-IFOV velocities are independent; programs
+    get mm/s.
+  - N069: probably related to the base height of another structure that uses `Rectangle3D`.
+  - N068: shell ("vector") printing, detailed in F12.
+  - T61: the focus detection is reworked later with example data (F10); N088 is dropped and kept in
+    `todo_notes.md`.
+  - T32: moved to F11, to be done with the A3200 manual.
+  - T36: finish the focal-point script without changing the system behaviour or the plane fitting.
+  - Voxel overlap: no value known yet. Without voxel data the slicer behaves as before, so the default (0.3)
+    has no effect for now.
+  - Port the scripts imported by `main.py` and `main_IFOV.py` (new T64). Close T37.
+- **Changes:**
+  - `TODO.md`:
+    - T37, T61 and T32 moved to Done (T61 and T32 without code change);
+    - T28 unblocked with the decisions;
+    - T62, T63, T35 and T36 updated with the decisions;
+    - new T64.
+  - `future_todo.md`: new F9 (drop outline detection), F10 (focus detection with data), F11 (AeroBasic API
+    with the manual, formerly T32, with all notes and locations), F12 (shell printing), F13 (free IFOV speed);
+    F7 and F8 cross-references.
+  - `todo_notes.md`: N088 status (dropped, where it was).
+- **Tests:** none (documentation only).
+- **Commits:** docs(todo): record the maintainer answers on the open todos [T61]
+- **Follow-ups:** T28, T62, T63, T35, T36 and T64 are worked on next.

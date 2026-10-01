@@ -1407,6 +1407,10 @@ Meaning: Layer: merge the result with Dominik's result object.
 
 Locations: `nanofactorysystem/tools/layer.py:145`
 
+Status 2026-10-01: dropped from T61 (maintainer decision); the maintainer will look at it individually
+later. The comment stood in `Layer` in `tools/layer.py`, at the place where the result of the layer
+detection is assembled.
+
 ### N089 — T37
 
 Original:
