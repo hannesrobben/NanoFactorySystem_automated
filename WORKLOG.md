@@ -2038,3 +2038,21 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Commits:** `9498bee` feat(mains): finish the focal-point z-line script [T36]; docs(todo): close T36 [T36]
 - **Follow-ups:** F14.
 - **Behaviour change on hardware:** none outside the script.
+
+### 2026-10-01 14:40 CEST — [Phase B] Phase summary
+- **Finished todos:**
+  - earlier: T60, T38, T39, T37;
+  - today: T63, T62, T35, T64, T28, T36;
+  - closed without code change by maintainer decision: T61 (→ F10) and T32 (→ F11).
+- **Open todos:** none. Future todos added: F9 (drop outline detection), F10 (focus detection with data),
+  F11 (AeroBasic API with the manual), F12 (shell printing), F13 (free IFOV speed), F14 (camera offset in
+  `System.zline`).
+- **Tests:** `python -m pytest`: 354 passed, 14 skipped, including the dry runs. Golden files are unchanged.
+- **Branch:** `feat/phaseB-followups`, on top of `feat/phase4-voxel-slicing`. Nothing is pushed.
+- **To check on the lab PC:**
+  1. An experiment near the rim of the drop is refused (ellipse, T62).
+  2. Expected vs. actual printing time in the log (T28).
+  3. The overview mosaic with `overview_capture=True`: alignment and the camera calibration.
+  4. The focal-point script with a few points (T36).
+  5. `main.py` (`power_z_pitch_lines`) and `main_IFOV.py` (`grating_ifov_test`, output folder now
+     `grating_after_debugging`).
