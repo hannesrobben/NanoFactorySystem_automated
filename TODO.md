@@ -82,13 +82,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
         - Dip-in has no drop boundary: the check is skipped there (F8); automatic detection of the outline is F9.
         - Tests with an area inside the bounding box but outside the ellipse.
 
-- [ ] T63: Use the real IFOV writing speed for the voxel lookup (found during T54) [phase: B]
-      Goal: Voxel-aware slicing looks up the voxel size at the speed the IFOV program actually writes with.
-      Priority: medium | Depends on: –
-      Done when:
-        - `Model3D_Slicer` passes the effective IFOV speed (`SET_SPEED F=5` for 63x, `F=10` for 20x, in mm/s) to the voxel model; the IFOV speed stays fixed (maintainer decision 2026-10-01, free speed is F13).
-        - A test shows that the velocity in `job.meta["voxel"]` equals the speed in the generated program.
-
 - [ ] T35: Clarify line and rectangle details (from T19) [phase: B]
       Goal: Line-based structures have checked parameters and no unexplained hotfixes.
       Priority: low | Depends on: –
@@ -213,3 +206,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T61: Justify the focus-detection threshold and clarify the layer result object — 2026-10-01 — Closed without code change (maintainer decision): the focus detection is reworked later with example data (F10); N088 is dropped and kept in `todo_notes.md` for the maintainer.
 
 - [x] T32: Clean up the AeroBasic API and task handling — 2026-10-01 — Closed without code change (maintainer decision): moved to F11, to be done with the A3200 manual.
+
+- [x] T63: Use the real IFOV writing speed for the voxel lookup (found during T54) — 2026-10-01 — The job of `Model3D_Slicer` records the fixed IFOV writing speed (5/10 mm/s), so the voxel lookup and the time estimate use it; the speeds are defined once in `lines.IFOV_WRITING_SPEED_MM_S`. — commits: `b2b07cd`

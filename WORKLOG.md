@@ -1883,3 +1883,23 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** none (documentation only).
 - **Commits:** docs(todo): record the maintainer answers on the open todos [T61]
 - **Follow-ups:** T28, T62, T63, T35, T36 and T64 are worked on next.
+
+### 2026-10-01 13:15 CEST — [T63] Look up voxels at the IFOV writing speed
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/aerobasic/programs/drawings/lines.py`: the fixed IFOV speeds (`IFOV_WRITING_SPEED_MM_S`
+    = 5/10 mm/s, z 1 mm/s) are defined once, with `ifov_writing_speed_mm_s()` and `set_ifov_speeds()`.
+    `IFOV_Lines` uses them; its output is unchanged (golden files).
+  - `nanofactorysystem/aerobasic/programs/drawings/model3d.py`:
+    - `IFOV_PolyLines` uses `set_ifov_speeds()`;
+    - `Model3D_Slicer` writes the effective IFOV speed into `params.laser.scan_speed_um_s`, so the voxel
+      lookup and the time estimate use it; `velocity` is stored as given;
+    - an unsupported objective now fails at construction.
+  - `test/slicer/test_voxel_slicing.py`: for both objectives, the lookup speed equals the speed in the
+    program.
+  - `TODO.md`: T63 moved to Done.
+- **Tests:** `test/slicer`, `test/test_aerobasic` (golden files), `test/integration/test_dry_run_spec.py`: pass.
+- **Commits:** `b2b07cd` fix(slicer): look up voxels at the IFOV writing speed [T63]; docs(todo): close T63 [T63]
+- **Follow-ups:** none. A free IFOV speed is F13.
+- **Behaviour change on hardware:** no program changes. The time estimate of slicer structures now uses the
+  real IFOV speed.
