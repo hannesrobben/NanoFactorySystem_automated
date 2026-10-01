@@ -74,14 +74,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
         - `Kailas/power_z_pitch_lines.py` and `Big_substrate_20x/grating_ifov_test.py` are moved back from `historical/` and ported to `experiment_spec()` like the other scripts (maintainer decision 2026-10-01), without `sample.orientation`.
         - `mains/main.py` and `mains/main_IFOV.py` import them from their new place; `test/integration/test_ported_scripts.py` checks them.
 
-- [ ] T62: Check experiment areas against the shape of the resin drop (found during T52) [phase: B]
-      Goal: Experiments near the rim of a drop are refused before printing, not only those outside its bounding box.
-      Priority: low | Depends on: –
-      Done when:
-        - `substrate_plan.check_layout` (and the center check of `Experiment`) test the experiment area against an ellipse through the four edge points instead of their bounding box (maintainer decision 2026-10-01).
-        - Dip-in has no drop boundary: the check is skipped there (F8); automatic detection of the outline is F9.
-        - Tests with an area inside the bounding box but outside the ellipse.
-
 - [ ] T35: Clarify line and rectangle details (from T19) [phase: B]
       Goal: Line-based structures have checked parameters and no unexplained hotfixes.
       Priority: low | Depends on: –
@@ -208,3 +200,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T32: Clean up the AeroBasic API and task handling — 2026-10-01 — Closed without code change (maintainer decision): moved to F11, to be done with the A3200 manual.
 
 - [x] T63: Use the real IFOV writing speed for the voxel lookup (found during T54) — 2026-10-01 — The job of `Model3D_Slicer` records the fixed IFOV writing speed (5/10 mm/s), so the voxel lookup and the time estimate use it; the speeds are defined once in `lines.IFOV_WRITING_SPEED_MM_S`. — commits: `b2b07cd`
+
+- [x] T62: Check experiment areas against the shape of the resin drop (found during T52) — 2026-10-01 — Experiment areas (substrate plan) and the experiment center (`Experiment(resin_edges=)`) are checked against the ellipse through the four edge points (`resin_drop.py`); no check for dip-in; the edges are stored with the experiment. — commits: `b9d8cfd`

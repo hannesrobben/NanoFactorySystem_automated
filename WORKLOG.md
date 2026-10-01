@@ -1903,3 +1903,32 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Follow-ups:** none. A free IFOV speed is F13.
 - **Behaviour change on hardware:** no program changes. The time estimate of slicer structures now uses the
   real IFOV speed.
+
+### 2026-10-01 13:23 CEST — [T62] Check experiment areas against the drop ellipse
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/resin_drop.py` (new):
+    - `Ellipse` and `ellipse_through()`: an axis-parallel conic through the four points; the inscribed
+      box ellipse with a warning if the points define none;
+    - `rectangle_inside()` (all four corners);
+    - `drop_outline()`;
+    - `has_drop_boundary()`: False for a drop direction named `DIP_IN`, ready for F8.
+  - `nanofactorysystem/substrate_plan.py`: experiment areas are checked against the ellipse, not for dip-in;
+    the plot draws the ellipse.
+  - `nanofactorysystem/experiment.py`: `resin_edges=`; `_check_center()` uses the ellipse, else the old box;
+    the edges are stored (`resin_edges_um`) and restored by `parameters_from_dictionary()`.
+  - `nanofactorysystem/storage/schema.py`: parameter `resin_edges_um` (kind `points`; older files have none,
+    so the box check applies on their restart).
+  - `nanofactorysystem/experiment_spec.py`: passes four edge points as `resin_edges`.
+  - Tests:
+    - `test/test_resin_drop.py` (new, 5 tests);
+    - `test/test_experiment.py`: center check and restart;
+    - `test/test_substrate_plan.py`: the plot test expects 4 patches instead of 3, because of the added
+      ellipse (no assertion weakened).
+  - `test/README.md`, `CLAUDE.md`; `TODO.md`: T62 moved to Done.
+- **Tests:** `python -m pytest`: 328 passed before the new tests, plus 6 new tests passing.
+- **Commits:** `b9d8cfd` feat(experiment): check experiment areas against the drop ellipse [T62]; docs(todo):
+  close T62 [T62]
+- **Follow-ups:** automatic outline detection is F9.
+- **Behaviour change on hardware:** an experiment whose center (or, in a substrate plan, whose area) lies in
+  the box of the edge points but outside the ellipse is now refused before printing.
