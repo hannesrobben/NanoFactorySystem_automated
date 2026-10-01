@@ -78,4 +78,4 @@ def test_plot_substrate():
     matplotlib.use("Agg")
     figure = plot_substrate(substrate(), [experiment_area(spec("a", 0, 20000))],
                             existing=[Area("old", (1000, 20000), (1500, 20500))])
-    assert len(figure.axes[0].patches) == 3
+    assert len(figure.axes[0].patches) == 4  # drop box, drop ellipse (T62), planned and existing area

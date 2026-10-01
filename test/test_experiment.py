@@ -732,3 +732,23 @@ def test_power_per_layer_as_function_and_wrong_length(test_config, dummy_backend
         with pytest.raises(ValueError, match="layer"):
             experiment.build_programs()
     assert ExperimentStore.open(tmp_path).read().structure("ramp").layer_powers_mw == [0.5, 1.0, 1.5, 2.0]
+
+
+RESIN_EDGES = [[5720, 22330], [-3333, 22420], [1660, 17212], [1200, 27190]]  # right, left, near, far
+
+
+def test_experiment_center_is_checked_against_the_ellipse(test_config, dummy_backend, no_sleep, tmp_path):
+    (tmp_path / "a").mkdir()
+    with pytest.raises(ValueError, match="ellipse"):
+        make_experiment(tmp_path / "a", dummy_backend, center=Point2D(5000, 18000), resin_edges=RESIN_EDGES)
+    # Without the edge points only the bounding box is checked, as before
+    (tmp_path / "b").mkdir()
+    with make_experiment(tmp_path / "b", dummy_backend, center=Point2D(5000, 18000)):
+        pass
+
+    (tmp_path / "c").mkdir()
+    with make_experiment(tmp_path / "c", dummy_backend, resin_edges=RESIN_EDGES) as experiment:
+        experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+    # The edges are stored and come back on a restart
+    parameters = Experiment.parameters_from_dictionary(tmp_path / "c")
+    assert parameters["resin_edges"] == [tuple(map(float, e)) for e in RESIN_EDGES]

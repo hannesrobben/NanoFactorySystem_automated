@@ -40,6 +40,7 @@ from nanofactorysystem.storage import (CaptureRecord, CornerRecord, ExperimentRe
 from nanofactorysystem.storage.json_copies import export_progress, structures_list, write_json
 from nanofactorysystem.storage.legacy import LegacyExperiment, is_legacy_folder, read_legacy
 from nanofactorysystem.storage.summary import SUMMARY_NAME, format_table, summary
+from nanofactorysystem.resin_drop import drop_outline, has_drop_boundary
 from nanofactorysystem.storage.substrate_store import (SubstrateRecord, SubstrateStore, check_not_synced,
                                                        default_root)
 from nanofactorysystem.storage import schema
@@ -129,6 +130,7 @@ class Experiment(object):
                  backend: BackendLike = None,
                  resume: bool = False,
                  substrate: Optional[str] = None,
+                 resin_edges=None,
                  data_root: Optional[Path] = None,
                  allow_synced_root: bool = False,
                  tilt_warning_um: float = 1.0,
@@ -151,6 +153,11 @@ class Experiment(object):
         substrate_information : dict, optional
             Free information about the substrate (older scripts); stored in
             the experiment file. Use ``substrate`` for substrate records.
+        resin_edges : sequence of (x, y), optional
+            The four edge points of the resin drop in µm. The experiment
+            center must then lie inside the ellipse through them (T62),
+            otherwise inside the box ``resin_corner_bl``–``resin_corner_tr``.
+            No drop check for dip-in.
         substrate : str, optional
             Label or UUID of a substrate created with
             :class:`SubstrateStore`. The experiment gets the next experiment
@@ -237,10 +244,9 @@ class Experiment(object):
         self.margin = float(margin)
         self.padding = float(padding)
         self.absolute_grid_center = np.array(absolute_grid_center.as_tuple(), dtype=float)
-        if not (np.all(self.resin_corner_bl <= self.absolute_grid_center)
-                and np.all(self.absolute_grid_center <= self.resin_corner_tr)):
-            raise ValueError(f"The experiment center {self.absolute_grid_center.tolist()} lies outside the resin "
-                             f"drop edges {self.resin_corner_bl.tolist()} - {self.resin_corner_tr.tolist()}.")
+        self.resin_edges = [tuple(map(float, e)) for e in resin_edges] if resin_edges is not None and len(
+            resin_edges) else None
+        self._check_center(drop_direction)
         self.fov_dimensions = fov_dim
 
         self.grid = np.array(grid, dtype=int)
@@ -452,10 +458,11 @@ class Experiment(object):
             "corner_slice": self.corner_slice, "fov_dim": self.fov_dimensions, "skip_corner": self.skip_corner,
             "plane_fit_mode": self.plane_fit_mode.name, "setup": self.setup,
             "tilt_warning_um": self.tilt_warning_um, "camera_capture": self.camera_capture,
-            "program_source": self.program_source.name,
+            "program_source": self.program_source.name, "resin_edges": self.resin_edges,
         }
         converters = {"float": float, "int": int, "bool": bool, "str": str, "enum": str,
-                      "vector": lambda v: np.asarray(v, dtype=float), "ivector": lambda v: np.asarray(v, dtype=int)}
+                      "vector": lambda v: np.asarray(v, dtype=float), "ivector": lambda v: np.asarray(v, dtype=int),
+                      "points": lambda v: np.asarray(v if v else np.empty((0, 2)), dtype=float).reshape(-1, 2)}
         parameters = {name: converters[kind](values[argument]) for argument, _, name, kind in schema.PARAMETERS}
         parameters["log_file"] = self._relative(self._log_file()) if self._log_file() else ""
         parameters["dhm_usage"] = self.system.dhm is not None
@@ -586,6 +593,8 @@ class Experiment(object):
                 value = tuple(float(v) for v in value)
             elif kind == "ivector":
                 value = tuple(int(v) for v in value)
+            elif kind == "points":
+                value = [tuple(float(c) for c in point) for point in value] or None
             elif argument == "drop_direction":
                 value = DropDirection[value]
             elif argument == "plane_fit_mode":
@@ -682,6 +691,21 @@ class Experiment(object):
             "resume": True,
             **substrate,
         }
+
+    def _check_center(self, drop_direction) -> None:
+        """ Refuse an experiment center outside the resin drop (ellipse through the edges, else their box). """
+
+        if not has_drop_boundary(drop_direction):
+            return
+        outline = drop_outline(self.resin_edges)
+        if outline is not None:
+            if not outline.contains(self.absolute_grid_center)[0]:
+                raise ValueError(f"The experiment center {self.absolute_grid_center.tolist()} lies outside the resin "
+                                 f"drop (ellipse through the edges {self.resin_edges}).")
+        elif not (np.all(self.resin_corner_bl <= self.absolute_grid_center)
+                  and np.all(self.absolute_grid_center <= self.resin_corner_tr)):
+            raise ValueError(f"The experiment center {self.absolute_grid_center.tolist()} lies outside the resin "
+                             f"drop edges {self.resin_corner_bl.tolist()} - {self.resin_corner_tr.tolist()}.")
 
     def iter_experiment_locations(self) -> Iterator[tuple[float, float]]:
         """ Return experiment locations in um """

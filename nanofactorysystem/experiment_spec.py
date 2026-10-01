@@ -283,7 +283,9 @@ class ExperimentSpec:
         user : str
             User key.
         resin_edges : sequence of (x, y)
-            Edges of the resin drop in µm (at least two points); their bounding box is used.
+            Edges of the resin drop in µm (at least two points). Their bounding
+            box is passed on; four points also as ``resin_edges`` for the
+            ellipse check of the experiment center (T62).
         logger : logging.Logger
         backend : {"real", "dummy"}, Backend or None
         path, substrate, data_root
@@ -310,6 +312,7 @@ class ExperimentSpec:
             plane_fit_mode=spec.plane_fit_mode, setup=spec.setup, backend=backend, substrate=substrate,
             data_root=data_root, tilt_warning_um=spec.tilt_warning_um, camera_capture=spec.camera_capture,
             program_source=spec.program_source,
+            resin_edges=[tuple(map(float, e)) for e in edges] if len(edges) == 4 else None,
         )
 
 
