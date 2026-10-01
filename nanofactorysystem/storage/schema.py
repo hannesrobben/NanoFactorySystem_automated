@@ -48,6 +48,7 @@ PARAMETERS = (
     ("camera_capture", "camera_capture", "camera_capture", "bool"),
     ("program_source", "program_source", "program_source", "enum"),
     ("resin_edges", "resin_edges", "resin_edges_um", "points"),
+    ("layer_overhead_s", "layer_overhead_s", "layer_overhead_s", "float"),
 )
 
 

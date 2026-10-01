@@ -201,6 +201,8 @@ class ExperimentSpec:
         default ``"voxel_overlap"``). None: no voxel compensation.
     voxel_database : Path, optional
         Voxel database; default: ``system.voxelDatabase`` of the configuration.
+    layer_overhead_s : float
+        Overhead per layer of the expected printing time (T28).
     """
 
     name: str
@@ -230,6 +232,7 @@ class ExperimentSpec:
     sys_args: dict = field(default_factory=default_sys_args)
     voxel_material: Optional[str] = None
     voxel_database: Optional[Path] = None
+    layer_overhead_s: float = 5.0
 
     def voxel_model(self):
         """ The voxel model of the experiment (:class:`~nanofactorysystem.voxel.DatabaseVoxelModel`), or None
@@ -313,6 +316,7 @@ class ExperimentSpec:
             data_root=data_root, tilt_warning_um=spec.tilt_warning_um, camera_capture=spec.camera_capture,
             program_source=spec.program_source,
             resin_edges=[tuple(map(float, e)) for e in edges] if len(edges) == 4 else None,
+            layer_overhead_s=spec.layer_overhead_s,
         )
 
 

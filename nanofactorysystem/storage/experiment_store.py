@@ -329,6 +329,16 @@ class ExperimentStore:
                 dataset = blobs.create_dataset(name, data=np.frombuffer(content, dtype=np.uint8))
                 dataset.attrs["format"] = "zdc"
 
+    def write_time_estimate(self, data: dict) -> None:
+        """ Store the expected printing time (``TimeEstimate.to_dict()``) in ``/time_estimate``. """
+
+        with self._write() as f:
+            group = _group(f, "time_estimate")
+            group.attrs.clear()
+            _set_attrs(group, {"layer_overhead_s": float(data["layer_overhead_s"]), "total_s": float(data["total_s"]),
+                               "time": utc_timestamp()})
+            group.attrs["structures_json"] = _json(data["structures"])
+
     def write_opl_scan(self, motor_pos_um: float, source: str) -> None:
         """ Store the OPL motor position of the DHM (``source``: ``"measured"``/``"loaded"``). """
 
@@ -633,6 +643,8 @@ class ExperimentStore:
                 record.opl_scan = _get_json_attrs(f["opl_scan"])
             if "layout" in f:
                 record.layout = self._read_layout(f["layout"])
+            if "time_estimate" in f:
+                record.time_estimate = _get_json_attrs(f["time_estimate"])
             for name, group in f.get("structures", {}).items():
                 record.structures.append(self._read_structure(group))
                 record.progress[name] = [_get_json_attrs(g) for _, g in sorted(group["progress"].items())]

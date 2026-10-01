@@ -295,6 +295,8 @@ class ExperimentRecord:
     progress : dict
         Layer events per structure name (list of dicts).
     captures : list of CaptureRecord
+    time_estimate : dict, optional
+        Expected printing time (``time_estimate.TimeEstimate.to_dict()``).
     """
 
     uuid: str
@@ -319,6 +321,7 @@ class ExperimentRecord:
     structures: list[StructureRecord] = field(default_factory=list)
     progress: dict[str, list[dict]] = field(default_factory=dict)
     captures: list[CaptureRecord] = field(default_factory=list)
+    time_estimate: Optional[dict] = None
 
     def structure(self, name: str) -> StructureRecord:
         """ Return the structure with the given name. """

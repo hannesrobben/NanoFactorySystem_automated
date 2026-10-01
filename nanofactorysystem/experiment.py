@@ -41,6 +41,8 @@ from nanofactorysystem.storage.json_copies import export_progress, structures_li
 from nanofactorysystem.storage.legacy import LegacyExperiment, is_legacy_folder, read_legacy
 from nanofactorysystem.storage.summary import SUMMARY_NAME, format_table, summary
 from nanofactorysystem.resin_drop import drop_outline, has_drop_boundary
+from nanofactorysystem.time_estimate import (DEFAULT_LAYER_OVERHEAD_S, TimeEstimate, estimate_program_s,
+                                             format_duration)
 from nanofactorysystem.storage.substrate_store import (SubstrateRecord, SubstrateStore, check_not_synced,
                                                        default_root)
 from nanofactorysystem.storage import schema
@@ -131,6 +133,7 @@ class Experiment(object):
                  resume: bool = False,
                  substrate: Optional[str] = None,
                  resin_edges=None,
+                 layer_overhead_s: float = DEFAULT_LAYER_OVERHEAD_S,
                  data_root: Optional[Path] = None,
                  allow_synced_root: bool = False,
                  tilt_warning_um: float = 1.0,
@@ -153,6 +156,9 @@ class Experiment(object):
         substrate_information : dict, optional
             Free information about the substrate (older scripts); stored in
             the experiment file. Use ``substrate`` for substrate records.
+        layer_overhead_s : float
+            Overhead per layer of the expected printing time (T28; default
+            5 s for loading, captures and future reconstruction).
         resin_edges : sequence of (x, y), optional
             The four edge points of the resin drop in µm. The experiment
             center must then lie inside the ellipse through them (T62),
@@ -247,6 +253,7 @@ class Experiment(object):
         self.resin_edges = [tuple(map(float, e)) for e in resin_edges] if resin_edges is not None and len(
             resin_edges) else None
         self._check_center(drop_direction)
+        self.layer_overhead_s = float(layer_overhead_s)
         self.fov_dimensions = fov_dim
 
         self.grid = np.array(grid, dtype=int)
@@ -459,6 +466,7 @@ class Experiment(object):
             "plane_fit_mode": self.plane_fit_mode.name, "setup": self.setup,
             "tilt_warning_um": self.tilt_warning_um, "camera_capture": self.camera_capture,
             "program_source": self.program_source.name, "resin_edges": self.resin_edges,
+            "layer_overhead_s": self.layer_overhead_s,
         }
         converters = {"float": float, "int": int, "bool": bool, "str": str, "enum": str,
                       "vector": lambda v: np.asarray(v, dtype=float), "ivector": lambda v: np.asarray(v, dtype=int),
@@ -686,7 +694,8 @@ class Experiment(object):
             "fov_dim": tuple(vector(data["fov_dim"])),
             "skip_corner": bool(data["skip_corner"]),
             "plane_fit_mode": PlaneFitMode.parse(data["plane_fit_mode"]),
-            **{key: data[key] for key in ("tilt_warning_um", "camera_capture", "program_source") if key in data},
+            **{key: data[key] for key in ("tilt_warning_um", "camera_capture", "program_source", "layer_overhead_s")
+               if key in data},
             "setup": data["setup"] or "IFOV_off",
             "resume": True,
             **substrate,
@@ -1464,11 +1473,36 @@ class Experiment(object):
             self._store_structure(structure_dict, config, index=len(self.structure_programs) - 1,
                                   grid_index=grid_index, reference=(x, y))
 
+        self._write_time_estimate()
+
         # structures.json is a copy of the structures in the experiment file
         self.store.set_status(schema.STATUS_BUILT)
         self._save_exp_dict()
         self.log.info("Experiment summary:\n" + format_table(self._write_summary()))
         self.structure_configs = self._with_absolute_paths(structures_list(self.store.read()))
+
+    def _write_time_estimate(self) -> TimeEstimate:
+        """ Estimate the printing time of every built structure, store and log it (T28). """
+
+        estimate = TimeEstimate(self.layer_overhead_s)
+        for paths in self.structure_programs:
+            if not paths:
+                continue
+            name = Path(paths[0]).parent.parent.name
+            estimate.structures[name] = [estimate_program_s(Path(p).read_text()) + self.layer_overhead_s
+                                         for p in paths]
+        self.store.write_time_estimate(estimate.to_dict())
+        n_layers = sum(len(layers) for layers in estimate.structures.values())
+        self.log.info(f"Expected printing time: {format_duration(estimate.total_s)} for {n_layers} layers "
+                      f"({self.layer_overhead_s:g} s overhead per layer)")
+        return estimate
+
+    def log_duration(self) -> None:
+        """ Log the actual printing time next to the expected one (T28). """
+
+        data = summary(self.store.read(include_captures=False))
+        self.log.info(f"Printing took {format_duration(data['duration_s'])}, expected "
+                      f"{format_duration(data['estimated_s'])}")
 
     def _layer_order(self) -> int:
         """ +1 if layers are printed with ascending ids (drop direction UP), -1 otherwise. """
@@ -1634,6 +1668,7 @@ class Experiment(object):
         self.store.set_status(schema.STATUS_FINISHED)
         self._save_exp_dict()
         self.log.info("Experiment summary:\n" + format_table(self._write_summary()))
+        self.log_duration()
 
     def restart_experiment(self):
         """ Print what an aborted run of this experiment left over.

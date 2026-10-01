@@ -752,3 +752,27 @@ def test_experiment_center_is_checked_against_the_ellipse(test_config, dummy_bac
     # The edges are stored and come back on a restart
     parameters = Experiment.parameters_from_dictionary(tmp_path / "c")
     assert parameters["resin_edges"] == [tuple(map(float, e)) for e in RESIN_EDGES]
+
+
+def test_expected_and_actual_printing_time(test_config, dummy_backend, no_sleep, tmp_path, caplog):
+    import logging
+    from nanofactorysystem.storage.summary import summary
+    with caplog.at_level(logging.INFO):
+        with make_experiment(tmp_path, dummy_backend, layer_overhead_s=2.0) as experiment:
+            experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+            add_rectangle(experiment)
+            experiment.build_programs()
+            estimate = ExperimentStore.open(tmp_path).read().time_estimate
+            experiment.print_experiment()
+
+    # One value per layer: program time plus the overhead
+    layers = estimate["structures"]["rect"]
+    assert len(layers) == 4 and all(t > 2.0 for t in layers) and estimate["layer_overhead_s"] == 2.0
+    assert estimate["total_s"] == pytest.approx(sum(layers))
+    assert "Expected printing time" in caplog.text and "Printing took" in caplog.text
+    record = ExperimentStore.open(tmp_path).read()
+    data = summary(record)
+    assert data["estimated_s"] == pytest.approx(sum(layers)) and data["duration_s"] is not None
+    assert data["structures"][0]["estimated_s"] == pytest.approx(sum(layers))
+    assert data["structures"][0]["duration_s"] is not None
+    assert Experiment.parameters_from_dictionary(tmp_path)["layer_overhead_s"] == 2.0
