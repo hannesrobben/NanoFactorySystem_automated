@@ -59,14 +59,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 
 ### Phase B — Backlog from T19 (details in `todo_notes.md`)
 
-- [ ] T36: Z-line: offset, global variables and focal-point script (from T19) [phase: B]
-      Decision (maintainer, 2026-10-01): finish the focal-point script; nothing may change the normal behaviour of the system or the plane fitting.
-      Goal: Z-line programs are consistent and the focal-point study script is complete.
-      Priority: low | Depends on: –
-      Done when:
-        - The camera offset is integrated into `System.zline` (N071); the z-line program uses global variables and is not recompiled every time (N072).
-        - `z_line_focal_points.py`: dz split, z recalculation, noise on dz, min_distance, boundary, result dictionary and file-exists check are resolved (N014–N020).
-
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
 ## Blocked
@@ -184,3 +176,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T64: Port the experiment scripts imported by `main.py` and `main_IFOV.py` (found during T51) — 2026-10-01 — `Kailas/power_z_pitch_lines.py` and `Big_substrate_20x/grating_ifov_test.py` are back in `mains/Experiments/`, ported to `experiment_spec()` and tested; `main.py`/`main_IFOV.py` import them (main_IFOV.py failed on import before). — commits: `b90d42f`
 
 - [x] T28: Overview images and time estimate (from T19) — 2026-10-01 — Expected printing time (path length / speed per layer program + 5 s per layer) logged after building, stored and shown next to the actual time; `overview_capture=True` stores a stitched camera mosaic (with corners, or only the grid with `skip_corner`) before and after printing, optionally with the single images. — commits: `6dca352`, `909d2e7`
+
+- [x] T36: Z-line: offset, global variables and focal-point script (from T19) — 2026-10-01 — The focal-point script is finished (`mains/Experiments/focal_points/`; z-lines with FocusDetect containers, only via `Focus.run`); N014–N020 resolved; N072 was already done; N071 would change the plane fitting and moved to F14 (maintainer decision). — commits: `9498bee`

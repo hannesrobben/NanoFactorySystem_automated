@@ -2014,3 +2014,27 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   - Does the mosaic line up? The camera offset of `Transform` is not applied, because all images share it.
   - Is the camera calibration (`cameraPitch`) right for both objectives?
 - **Behaviour change on hardware:** without `overview_capture`, only the time estimate is logged and stored.
+
+### 2026-10-01 14:39 CEST — [T36] Z-line focal-point script
+- **Status:** done (N071 moved to F14 by the maintainer decision)
+- **Changes:**
+  - `mains/Experiments/historical/other/z_line_focal_points.py` (renamed →
+    `mains/Experiments/focal_points/z_line_focal_points.py`): finished.
+    - Flow: plane fit, z-lines at random points inside the structure grid via `tools.focus.Focus.run`, then
+      corners and QR code.
+    - Output: one `FocusDetect` container per point, plus `focal_points.json` (parameters, seed, points).
+    - N014/N018: all variables at the top.
+    - N015: more result information.
+    - N016/N017: the z-line program writes z − dz/2 to z + dz/2, so no recalculation is needed (documented).
+    - N019: a new folder per run.
+    - N020: noise on the line lengths.
+    - `min_distance`: rejection in x and y.
+    - Removed: the draft's stair (power 700) and the scidatacontainer test block.
+  - `future_todo.md`: F14 (camera offset in `System.zline`, N071). The change would affect every plane fit;
+    N072 was already done (global variables, loaded once).
+  - `test/integration/test_focal_points.py` (new): sampling and lengths; slow dry run with 3 z-lines.
+  - `test/README.md`, `CLAUDE.md`, `mains/Experiments/historical/README.md`; `TODO.md`: T36 moved to Done.
+- **Tests:** `python -m pytest`: 354 passed, 14 skipped.
+- **Commits:** `9498bee` feat(mains): finish the focal-point z-line script [T36]; docs(todo): close T36 [T36]
+- **Follow-ups:** F14.
+- **Behaviour change on hardware:** none outside the script.

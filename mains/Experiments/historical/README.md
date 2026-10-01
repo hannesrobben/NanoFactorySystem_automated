@@ -18,6 +18,6 @@ To reuse one of these experiments, port it the same way: move it back to `mains/
 | `IFOV_63/` | First IFOV test (63x) |
 | `Kailas/` | IFOV gratings and lenses, plane fitting, padding, voxel dose |
 | `dhm/` | Prints for the DHM paper (SEM, alignment, refractive index, axial voxel size) |
-| `other/` | Older parameter and DHM test prints, QR code and focal point investigations |
+| `other/` | Older parameter and DHM test prints, QR code investigation |
 | `stacked/` | Stacked lenses |
 | `Model_3D_experiment.py` | Printing a 3D model through the slicer (used by `mains/main_3D_model.py`) |
