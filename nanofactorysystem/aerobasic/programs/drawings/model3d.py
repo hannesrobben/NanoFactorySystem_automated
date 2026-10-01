@@ -36,6 +36,7 @@ both bundled into one yielded layer program (docs/01 §6).
 """
 from __future__ import annotations
 
+import dataclasses
 import logging
 from pathlib import Path
 from typing import Any, Callable, Iterator, Optional
@@ -46,7 +47,7 @@ import trimesh
 # Leaf classes / geometry types of the drawings package (relative imports so
 # this file only depends on its own package neighbourhood).
 from .base import DrawableAeroBasicProgram, DrawableObject
-from .lines import IFOV_Lines
+from .lines import IFOV_Lines, ifov_writing_speed_mm_s, set_ifov_speeds
 
 from nanofactorysystem.devices.coordinate_system import (
     CoordinateSystem, Point2D, Point3D,
@@ -174,18 +175,7 @@ class IFOV_PolyLines(IFOV_Lines):
             power_val = self._get_power_val(self.power)
             program.comment(f"Power set to {self.power} mW")
             program.SET_POWER(power=float(power_val))
-        if objective == "Zeiss 63x":
-            program.SET_SPEED(F=5)
-            program.SET_SPEED(F=5, ax="A")
-            program.SET_SPEED(F=5, ax="B")
-            program.SET_SPEED(F=1, ax="Z")
-        elif objective == "Zeiss 20x":
-            program.SET_SPEED(F=10)
-            program.SET_SPEED(F=10, ax="A")
-            program.SET_SPEED(F=10, ax="B")
-            program.SET_SPEED(F=1, ax="Z")
-        else:
-            raise ValueError(f"Objective {objective} is not supported.")
+        set_ifov_speeds(program, objective)
         program.COMPENSATE_GALVO_ROTATION(axis=SingleAxis.A)
         program.ABSOLUTE()
         if isinstance(self.reference_point, Point3D):
@@ -422,6 +412,15 @@ class Model3D_Slicer(DrawableObject):
                 ),
                 laser=laser,
             )
+
+        # The job records the speed the IFOV programs write with (fixed per objective, T63): the voxel
+        # lookup and the time estimate use it; `velocity` is kept as given
+        writing_speed = float(ifov_writing_speed_mm_s(objective)) * 1000.0
+        if self.params.laser.scan_speed_um_s != writing_speed:
+            log.info("Model3D_Slicer: IFOV writes with %g um/s (%s), not with velocity=%g",
+                     writing_speed, objective, velocity)
+            self.params = dataclasses.replace(
+                self.params, laser=dataclasses.replace(self.params.laser, scan_speed_um_s=writing_speed))
 
         self.motion = motion or MotionParameters(
             mark_speed_um_s=self.params.laser.scan_speed_um_s)

@@ -11,6 +11,40 @@ from nanofactorysystem.aerobasic.programs.drawings.base import IFOV_AeroBasicPro
 from nanofactorysystem.devices.coordinate_system import CoordinateSystem, Coordinate, Point3D, Point2D
 from nanofactorysystem.devices.power_calibration import PowerCalibration, resolve_power_calibration
 
+# Writing speed of IFOV programs in mm/s per objective (galvo and stages are coordinated best at these
+# speeds; maintainer decision 2026-10-01, a free IFOV speed is F13) and the z speed in mm/s
+IFOV_WRITING_SPEED_MM_S = {"Zeiss 63x": 5, "Zeiss 20x": 10}
+IFOV_Z_SPEED_MM_S = 1
+
+
+def ifov_writing_speed_mm_s(objective: str) -> float:
+    """ The writing speed of IFOV programs for an objective in mm/s.
+
+    Parameters
+    ----------
+    objective : str
+        Objective key, e.g. ``"Zeiss 63x"``.
+
+    Raises
+    ------
+    ValueError
+        For an objective without IFOV support.
+    """
+
+    if objective not in IFOV_WRITING_SPEED_MM_S:
+        raise ValueError(f"Objective {objective} is not supported.")
+    return IFOV_WRITING_SPEED_MM_S[objective]
+
+
+def set_ifov_speeds(program, objective: str) -> None:
+    """ Set the fixed IFOV writing speed (vector, A and B) and the z speed of an IFOV program. """
+
+    speed = ifov_writing_speed_mm_s(objective)
+    program.SET_SPEED(F=speed)
+    program.SET_SPEED(F=speed, ax="A")
+    program.SET_SPEED(F=speed, ax="B")
+    program.SET_SPEED(F=IFOV_Z_SPEED_MM_S, ax="Z")
+
 
 class IFOV_Lines(DrawableObject):
     fitKind = "polynomial"  # "polynomial" and "spline" possible
@@ -71,21 +105,8 @@ class IFOV_Lines(DrawableObject):
             power_val = self._get_power_val(self.power)
             program.comment(f"Power set to {self.power} mW")
             program.SET_POWER(power=float(power_val))
-        # set velocity - standard value ifov_size*100 -- has to be near maximum or low - bad results at middle values
-        # if self.velocity is None: # then the usual settings here:
-        #     pass
-        if objective == "Zeiss 63x":
-            program.SET_SPEED(F=5)
-            program.SET_SPEED(F=5, ax="A")
-            program.SET_SPEED(F=5, ax="B")
-            program.SET_SPEED(F=1, ax="Z")
-        elif objective == "Zeiss 20x":
-            program.SET_SPEED(F=10)
-            program.SET_SPEED(F=10, ax="A")
-            program.SET_SPEED(F=10, ax="B")
-            program.SET_SPEED(F=1, ax="Z")
-        else:
-            raise ValueError(f"Objective {objective} is not supported.")
+        # The writing speed is fixed per objective (not self.velocity)
+        set_ifov_speeds(program, objective)
 
         # Initialize Galvo - not necessary needed?! Already in IFOV Setup done
         program.COMPENSATE_GALVO_ROTATION(axis=SingleAxis.A)
