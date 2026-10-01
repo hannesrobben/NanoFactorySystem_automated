@@ -47,6 +47,11 @@ PARAMETERS = (
     ("tilt_warning_um", "tilt_warning_um", "tilt_warning_um", "float"),
     ("camera_capture", "camera_capture", "camera_capture", "bool"),
     ("program_source", "program_source", "program_source", "enum"),
+    ("resin_edges", "resin_edges", "resin_edges_um", "points"),
+    ("layer_overhead_s", "layer_overhead_s", "layer_overhead_s", "float"),
+    ("overview_capture", "overview_capture", "overview_capture", "bool"),
+    ("overview_single_images", "overview_single_images", "overview_single_images", "bool"),
+    ("overview_pixel_um", "overview_pixel_um", "overview_pixel_um", "float"),
 )
 
 

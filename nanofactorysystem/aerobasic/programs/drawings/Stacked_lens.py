@@ -4,7 +4,7 @@ import numpy as np
 
 from nanofactorysystem.aerobasic.programs.drawings import DrawableAeroBasicProgram, DrawableObject
 from nanofactorysystem.devices.coordinate_system import CoordinateSystem, Point3D, Point2D
-from nanofactorysystem.aerobasic.programs.drawings.lines import Rectangle3D
+from nanofactorysystem.aerobasic.programs.drawings.lines import Rectangle3D, step_slice_size
 from nanofactorysystem.aerobasic.programs.drawings.lens import AsphericalLens, SphericalLens
 
 
@@ -87,7 +87,7 @@ class StackedSphericalLens(DrawableObject):
             yield from socket.iterate_layers(coordinate_system)
 
         for i in range(self.number_of_lenses):
-            opt_slicing = self.lenses_heights[i] / round(self.lenses_heights[i] / self.slice_size)
+            opt_slicing = step_slice_size(self.lenses_heights[i], self.slice_size)
             # slice_opt_lenses.append(opt_slicing)
 
             lens = SphericalLens(
@@ -211,7 +211,7 @@ class StackedAsphericalLens(DrawableObject):
 
         current_height = self.socket_height
         for i in range(self.number_of_lenses):
-            opt_slicing = self.lenses_heights[i] / round(self.lenses_heights[i] / self.slice_size)
+            opt_slicing = step_slice_size(self.lenses_heights[i], self.slice_size)
             # slice_opt_lenses.append(opt_slicing)
 
             aspherical_lens = AsphericalLens(
@@ -334,7 +334,7 @@ class StackedRectangle(DrawableObject):
 
         current_height = self.socket_height
         for i in range(self.n_rect):
-            opt_slicing = self.height / round(self.height / self.slice_size)
+            opt_slicing = step_slice_size(self.height, self.slice_size)
             # slice_opt_lenses.append(opt_slicing)
 
             rect = Rectangle3D(
@@ -413,7 +413,7 @@ class test_stack(DrawableAeroBasicProgram):
 
         current_height = self.socket_height
         for i in range(self.number_of_lenses):
-            opt_slicing = self.lenses_heights[i] / round(self.lenses_heights[i] / self.slice_size)
+            opt_slicing = step_slice_size(self.lenses_heights[i], self.slice_size)
             # slice_opt_lenses.append(opt_slicing)
 
             aspherical_lens = AsphericalLens(

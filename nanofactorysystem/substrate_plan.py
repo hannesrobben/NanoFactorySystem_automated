@@ -20,15 +20,14 @@ from typing import Callable, Optional
 import numpy as np
 
 from .devices.coordinate_system import ZFunction
+from .experiment import QR_CODE_WIDTH_UM
 from .experiment_spec import ExperimentSpec, run_experiment
+from .resin_drop import drop_outline, has_drop_boundary, rectangle_inside
 from .runtime import getLogger
 from .storage.experiment_store import ExperimentStore
 from .storage.substrate_store import (SubstrateRecord, SubstrateStore, check_not_synced, default_root,
                                       find_experiments, initials)
 
-# Width of the QR code with the experiment UUID (36 characters, error correction Q, pixel pitch 4 µm),
-# centred on the upper edge of the experiment rectangle (Experiment.add_qrcode_structure)
-QR_CODE_WIDTH_UM = 140.0
 
 
 class LayoutError(ValueError):
@@ -47,7 +46,8 @@ class SubstrateSpec:
         Objective of all experiments, e.g. ``"Zeiss 63x"``.
     resin_edges : sequence of (x, y)
         Edges of the resin drop in µm, e.g. [[right], [left], [near], [far]];
-        their bounding box is the printable area.
+        the ellipse through four points is the printable area (T62), with
+        fewer points their bounding box.
     label : str, optional
         Label of the substrate, e.g. ``"HR-26-001"``. A substrate that does
         not exist yet is created; without a label the next free label of the
@@ -197,7 +197,8 @@ def check_layout(substrate: SubstrateSpec, experiments: list[SubstrateExperiment
     ------
     LayoutError
         If an experiment uses another objective than the substrate, leaves the
-        bounding box of the resin drop, or overlaps another experiment of the
+        resin drop (the ellipse through its four edge points, T62, else
+        their bounding box; not checked for dip-in), or overlaps another experiment of the
         list or one that is already on the substrate (``existing``). The
         message lists every problem.
 
@@ -218,8 +219,15 @@ def check_layout(substrate: SubstrateSpec, experiments: list[SubstrateExperiment
                             f"substrate objective {substrate.objective!r}")
     areas = [experiment_area(e.spec) for e in experiments]
     lower, upper = substrate.bounds()
-    for area in areas:
-        if not area.inside(lower, upper):
+    outline = drop_outline(substrate.resin_edges)
+    for experiment, area in zip(experiments, areas):
+        if not has_drop_boundary(experiment.spec.resolved().drop_direction):
+            continue  # dip-in: no drop boundary (F8)
+        if outline is not None:
+            if not rectangle_inside(outline, area.lower, area.upper):
+                problems.append(f"{area.name}: area {area.lower} - {area.upper} leaves the resin drop "
+                                f"(ellipse through the edge points)")
+        elif not area.inside(lower, upper):
             problems.append(f"{area.name}: area {area.lower} - {area.upper} leaves the resin drop "
                             f"{tuple(lower.tolist())} - {tuple(upper.tolist())}")
     for i, area in enumerate(areas):
@@ -250,6 +258,10 @@ def plot_substrate(substrate: SubstrateSpec, areas: list[Area], existing: Option
     lower, upper = substrate.bounds()
     edges = np.asarray(substrate.resin_edges, dtype=float)
     ax.add_patch(Rectangle(lower, *(upper - lower), fill=False, linestyle="--", color="grey"))
+    outline = drop_outline(substrate.resin_edges)
+    if outline is not None:
+        from matplotlib.patches import Ellipse as EllipsePatch
+        ax.add_patch(EllipsePatch((outline.cx, outline.cy), 2 * outline.a, 2 * outline.b, fill=False, color="grey"))
     ax.plot(edges[:, 0], edges[:, 1], "x", color="grey", label="resin edges")
     for area, color in [(a, "tab:grey") for a in existing or []] + [(a, "tab:blue") for a in areas]:
         size = np.subtract(area.upper, area.lower)

@@ -1,5 +1,6 @@
 """The experiment scripts ported to ExperimentSpec (T51) build valid experiments."""
 import importlib.util
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -22,6 +23,8 @@ PORTED = {
     "parameter_study/line_test/Power_speed_line_test.py": ("Zeiss 63x",),
     "refractive_index/refractive_index_vel_power.py": ("Zeiss 63x",),
     "DHM_tomography/hollow_rect_first_print_63xobj.py": ("Zeiss 20x", "Zeiss 63x"),
+    "Kailas/power_z_pitch_lines.py": ("Zeiss 20x", "Zeiss 63x"),
+    "Big_substrate_20x/grating_ifov_test.py": ("Zeiss 20x", "Zeiss 63x"),
 }
 
 
@@ -38,6 +41,8 @@ class FakeExperiment:
     accel_a_um = 500_000.0
     accel_x_um = 1_000_000.0
     accel_z_um = 100_000.0
+    # power range of the attenuator calibration (checked by power_z_pitch_lines)
+    system = SimpleNamespace(controller=SimpleNamespace(attenuator={"powerMin": 0.0, "powerMax": 20.0}))
 
 
 @pytest.mark.parametrize("script", sorted(PORTED))

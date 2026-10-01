@@ -168,3 +168,32 @@ def test_job_file_keeps_the_voxel_parameters(tmp_path):
     job = slice_geometry(box(), params(spacing_mode="static_hatching"), voxel_model=FixedVoxelModel(WIDTH, HEIGHT))
     save_job(job, tmp_path / "job.h5")
     assert read_params(tmp_path / "job.h5") == job.params
+
+
+@pytest.mark.parametrize("objective, speed_mm_s", [("Zeiss 63x", 5), ("Zeiss 20x", 10)])
+def test_voxel_lookup_uses_the_ifov_writing_speed(objective, speed_mm_s, tmp_path):
+    from nanofactorysystem.aerobasic.programs.drawings.model3d import Model3D_Slicer
+    from nanofactorysystem.backends.dummy.attenuator import write_calibration_file
+    from nanofactorysystem.backends.dummy.world import SimulatedWorld
+    from nanofactorysystem.devices.coordinate_system import CoordinateSystem, Point3D, Unit
+    from nanofactorysystem.devices.power_calibration import PowerCalibration, power_calibration
+
+    queried = []
+
+    class Recording(FixedVoxelModel):
+        def voxel_size(self, power_mw, velocity_um_s):
+            queried.append(velocity_um_s)
+            return super().voxel_size(power_mw, velocity_um_s)
+
+    # velocity=1000 does not change the IFOV writing speed (fixed per objective, T63)
+    structure = Model3D_Slicer(Point3D(0, 0, 0), box(), velocity=1000, power=1.0, objective=objective,
+                               hatch_size=1.0, slice_size=1.0, voxel_model=Recording(WIDTH, HEIGHT))
+    calibration = write_calibration_file(tmp_path / "calibration.dat", SimulatedWorld())
+    with power_calibration(PowerCalibration.from_file(calibration)):
+        program = "\n".join(map(str, next(structure.iterate_layers(
+            CoordinateSystem(offset_x=0.0, offset_y=0.0, z_function=0.0, unit=Unit.um))).lines))
+
+    assert queried == [speed_mm_s * 1000.0]
+    assert structure.to_json()["voxel"]["velocity_um_s"] == speed_mm_s * 1000.0
+    assert f"F{speed_mm_s}" in program.replace(" ", "")
+    assert structure.to_json()["velocity"] == 1000

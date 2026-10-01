@@ -4,8 +4,10 @@
 # This program is free software under the terms of the MIT license.      #
 ##########################################################################
 """Experiment summary: what was printed with which parameters (design §10, T49)."""
+import datetime
 from typing import Any, Optional
 
+from ..time_estimate import format_duration
 from .records import ExperimentRecord, StructureRecord
 
 SUMMARY_NAME = "experiment_summary.json"
@@ -20,7 +22,7 @@ VELOCITY_KEYS = ("velocity", "scan_speed_um_s", "horizontal_velocity", "F")
 POWER_KEYS = ("power", "power_val")
 
 COLUMNS = ("name", "type", "x_um", "y_um", "slice_um", "hatch_um", "power_mw", "layer_power_mw", "velocity",
-           "velocity_unit",
+           "velocity_unit", "estimated_s", "duration_s",
            "voxel_width_um", "voxel_height_um", "ifov", "dhm", "camera", "n_layers", "printed_layers", "status")
 
 
@@ -30,6 +32,24 @@ def _first_number(arguments: dict, keys) -> Optional[float]:
         if isinstance(value, (int, float)) and not isinstance(value, bool):
             return float(value)
     return None
+
+
+def _seconds_between(start: str, end: str) -> Optional[float]:
+    """ Seconds between two ISO 8601 timestamps, None if one is missing. """
+
+    if not start or not end:
+        return None
+    parse = lambda text: datetime.datetime.fromisoformat(text.replace("Z", "+00:00"))  # noqa: E731
+    return (parse(end) - parse(start)).total_seconds()
+
+
+def _estimated(record: ExperimentRecord, name: str) -> Optional[float]:
+    """ Expected seconds of a structure from the stored time estimate (T28), None without estimate. """
+
+    if not record.time_estimate:
+        return None
+    layers = record.time_estimate.get("structures", {}).get(name)
+    return float(sum(layers)) if layers is not None else None
 
 
 def _power_range(powers: list[float]) -> Optional[str]:
@@ -91,6 +111,16 @@ def print_parameters(structure: StructureRecord) -> dict[str, Any]:
     }
 
 
+def _printing_duration(record: ExperimentRecord) -> Optional[float]:
+    """ Seconds from the start of the first printed structure to the end of the last one, None before. """
+
+    started = [s.started for s in record.structures if s.started]
+    ended = [s.ended for s in record.structures if s.ended]
+    if not started or not ended:
+        return None
+    return _seconds_between(min(started), max(ended))
+
+
 def summary(record: ExperimentRecord) -> dict[str, Any]:
     """ Return the summary of an experiment.
 
@@ -104,7 +134,8 @@ def summary(record: ExperimentRecord) -> dict[str, Any]:
         Experiment fields (``experiment_uuid``, ``experiment_label``,
         ``substrate_label``, ``objective``, ``setup``, ``drop_direction``,
         ``plane_fit_mode``, ``program_source``, ``dhm_usage``, ``camera_capture``, ``started``,
-        ``status``) and ``structures``, one row per user structure (corners
+        ``status``, ``estimated_s`` and ``duration_s``: expected and actual
+        printing time, T28) and ``structures``, one row per user structure (corners
         and QR code excluded) with the keys in :data:`COLUMNS`.
     """
 
@@ -123,6 +154,8 @@ def summary(record: ExperimentRecord) -> dict[str, Any]:
             "y_um": structure.center_um[1],
             **print_parameters(structure),
             "layer_power_mw": _power_range(structure.layer_powers_mw),
+            "estimated_s": _estimated(record, structure.name),
+            "duration_s": _seconds_between(structure.started, structure.ended),
             "ifov": structure.setup == "IFOV_on",
             "dhm": dhm,
             "camera": camera,
@@ -143,6 +176,8 @@ def summary(record: ExperimentRecord) -> dict[str, Any]:
         "camera_capture": camera,
         "started": record.created,
         "status": record.status,
+        "estimated_s": float(record.time_estimate["total_s"]) if record.time_estimate else None,
+        "duration_s": _printing_duration(record),
         "structures": [{column: row[column] for column in COLUMNS} for row in rows],
     }
 
@@ -172,6 +207,9 @@ def format_table(data: dict[str, Any]) -> str:
 
     header = (f"Experiment {data['experiment_uuid']} {data['experiment_label']} ({data['objective']}, "
               f"{data['setup']}, drop {data['drop_direction']}, status {data['status']})")
+    if data.get("estimated_s") is not None:
+        header += (f"; printing time expected {format_duration(data['estimated_s'])}, actual "
+                   f"{format_duration(data.get('duration_s'))}")
     rows = [[text(row[column]) for column in COLUMNS] for row in data["structures"]]
     widths = [max([len(column)] + [len(row[i]) for row in rows]) for i, column in enumerate(COLUMNS)]
     lines = [header, "  ".join(column.ljust(w) for column, w in zip(COLUMNS, widths))]

@@ -1850,3 +1850,209 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   2. Print a SLICER structure with `voxel_material`, then compare its size with the design (SEM/DHM).
   3. Print a structure with `layer_power` and check that the attenuator value changes between the layers.
   4. Print a slicer structure with `power_map` (contours at another power).
+
+### 2026-10-01 13:03 CEST — [T37, T61, T32] Maintainer answers on the open todos
+- **Status:** done (bookkeeping, no code change)
+- **Branch:** `feat/phaseB-followups`, based on `feat/phase4-voxel-slicing` (the branch of the open PR stays
+  unchanged)
+- **Decisions (maintainer, 2026-10-01):**
+  - T28: 5 s overhead per layer; the mosaic shows the corners (only the structure grid with `skip_corner`);
+    by default only the stitched image is stored, optionally every single image.
+  - T62: an ellipse through the edge points; no check for dip-in; automatic detection later (F9).
+  - T63/T35: the IFOV writing speed stays fixed per objective; non-IFOV velocities are independent; programs
+    get mm/s.
+  - N069: probably related to the base height of another structure that uses `Rectangle3D`.
+  - N068: shell ("vector") printing, detailed in F12.
+  - T61: the focus detection is reworked later with example data (F10); N088 is dropped and kept in
+    `todo_notes.md`.
+  - T32: moved to F11, to be done with the A3200 manual.
+  - T36: finish the focal-point script without changing the system behaviour or the plane fitting.
+  - Voxel overlap: no value known yet. Without voxel data the slicer behaves as before, so the default (0.3)
+    has no effect for now.
+  - Port the scripts imported by `main.py` and `main_IFOV.py` (new T64). Close T37.
+- **Changes:**
+  - `TODO.md`:
+    - T37, T61 and T32 moved to Done (T61 and T32 without code change);
+    - T28 unblocked with the decisions;
+    - T62, T63, T35 and T36 updated with the decisions;
+    - new T64.
+  - `future_todo.md`: new F9 (drop outline detection), F10 (focus detection with data), F11 (AeroBasic API
+    with the manual, formerly T32, with all notes and locations), F12 (shell printing), F13 (free IFOV speed);
+    F7 and F8 cross-references.
+  - `todo_notes.md`: N088 status (dropped, where it was).
+- **Tests:** none (documentation only).
+- **Commits:** docs(todo): record the maintainer answers on the open todos [T61]
+- **Follow-ups:** T28, T62, T63, T35, T36 and T64 are worked on next.
+
+### 2026-10-01 13:15 CEST — [T63] Look up voxels at the IFOV writing speed
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/aerobasic/programs/drawings/lines.py`: the fixed IFOV speeds (`IFOV_WRITING_SPEED_MM_S`
+    = 5/10 mm/s, z 1 mm/s) are defined once, with `ifov_writing_speed_mm_s()` and `set_ifov_speeds()`.
+    `IFOV_Lines` uses them; its output is unchanged (golden files).
+  - `nanofactorysystem/aerobasic/programs/drawings/model3d.py`:
+    - `IFOV_PolyLines` uses `set_ifov_speeds()`;
+    - `Model3D_Slicer` writes the effective IFOV speed into `params.laser.scan_speed_um_s`, so the voxel
+      lookup and the time estimate use it; `velocity` is stored as given;
+    - an unsupported objective now fails at construction.
+  - `test/slicer/test_voxel_slicing.py`: for both objectives, the lookup speed equals the speed in the
+    program.
+  - `TODO.md`: T63 moved to Done.
+- **Tests:** `test/slicer`, `test/test_aerobasic` (golden files), `test/integration/test_dry_run_spec.py`: pass.
+- **Commits:** `b2b07cd` fix(slicer): look up voxels at the IFOV writing speed [T63]; docs(todo): close T63 [T63]
+- **Follow-ups:** none. A free IFOV speed is F13.
+- **Behaviour change on hardware:** no program changes. The time estimate of slicer structures now uses the
+  real IFOV speed.
+
+### 2026-10-01 13:23 CEST — [T62] Check experiment areas against the drop ellipse
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/resin_drop.py` (new):
+    - `Ellipse` and `ellipse_through()`: an axis-parallel conic through the four points; the inscribed
+      box ellipse with a warning if the points define none;
+    - `rectangle_inside()` (all four corners);
+    - `drop_outline()`;
+    - `has_drop_boundary()`: False for a drop direction named `DIP_IN`, ready for F8.
+  - `nanofactorysystem/substrate_plan.py`: experiment areas are checked against the ellipse, not for dip-in;
+    the plot draws the ellipse.
+  - `nanofactorysystem/experiment.py`: `resin_edges=`; `_check_center()` uses the ellipse, else the old box;
+    the edges are stored (`resin_edges_um`) and restored by `parameters_from_dictionary()`.
+  - `nanofactorysystem/storage/schema.py`: parameter `resin_edges_um` (kind `points`; older files have none,
+    so the box check applies on their restart).
+  - `nanofactorysystem/experiment_spec.py`: passes four edge points as `resin_edges`.
+  - Tests:
+    - `test/test_resin_drop.py` (new, 5 tests);
+    - `test/test_experiment.py`: center check and restart;
+    - `test/test_substrate_plan.py`: the plot test expects 4 patches instead of 3, because of the added
+      ellipse (no assertion weakened).
+  - `test/README.md`, `CLAUDE.md`; `TODO.md`: T62 moved to Done.
+- **Tests:** `python -m pytest`: 328 passed before the new tests, plus 6 new tests passing.
+- **Commits:** `b9d8cfd` feat(experiment): check experiment areas against the drop ellipse [T62]; docs(todo):
+  close T62 [T62]
+- **Follow-ups:** automatic outline detection is F9.
+- **Behaviour change on hardware:** an experiment whose center (or, in a substrate plan, whose area) lies in
+  the box of the edge points but outside the ellipse is now refused before printing.
+
+### 2026-10-01 13:38 CEST — [T35] Clarify line and rectangle details
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/aerobasic/programs/drawings/lines.py`:
+    - new `step_slice_size()`;
+    - `Rectangle3D`: height 0 prints nothing (before: an empty program, then division by zero); a height
+      below half a slice gives one layer;
+    - `IFOV_Lines`: velocities 50–500 log a warning instead of raising `Warning`; the docstring states the
+      fixed IFOV writing speed;
+    - `Stair` uses `step_slice_size`.
+  - `DOE.py`, `gratings.py`, `Stacked_lens.py`, `z_line_matrix.py`: `step_slice_size()` instead of
+    `h / round(h / slice)` (a flat step or socket divided by zero; this is the base-height problem the
+    maintainer remembered).
+  - `test/test_aerobasic/test_line_details.py` (new, 6 tests); `test/README.md`; `TODO.md`: T35 moved to Done.
+- **Tests:** `python -m pytest`: 340 passed, 14 skipped. Golden programs are unchanged: the new code gives
+  the same values wherever the old formula worked.
+- **Commits:** `3edbae7` fix(drawings): handle flat steps and validate IFOV velocities [T35]; docs(todo):
+  close T35 [T35]
+- **Follow-ups:** N068 (shell printing) is F12; a free IFOV speed is F13.
+- **Behaviour change on hardware:** none for working structures. Structures with a flat step, pixel or socket
+  can now be built.
+
+### 2026-10-01 13:40 CEST — [T64] Port the scripts the entry files import
+- **Status:** done
+- **Changes:**
+  - `mains/Experiments/historical/Kailas/power_z_pitch_lines.py` (renamed →
+    `mains/Experiments/Kailas/power_z_pitch_lines.py`):
+    - ported to `experiment_spec()`; drop direction DOWN for both objectives, plane fit CORNERS, objective
+      values as before;
+    - checks kept; the attenuator range is checked in the structure factory;
+    - plane-fit duration logged;
+    - `__main__` called a missing function and now calls `testprint`.
+  - `mains/Experiments/historical/Big_substrate_20x/grating_ifov_test.py` (renamed →
+    `mains/Experiments/Big_substrate_20x/grating_ifov_test.py`): ported.
+    - Entry functions `binary_testprint` and `print_file`: `main_IFOV.py` imported `binary_testprint`, which did
+      not exist, so it failed on import.
+    - The output folder `grating_nach_debuggen` is now `grating_after_debugging`, and the substrate text is
+      translated.
+  - `mains/main.py`, `mains/main_IFOV.py`: imports. `mains/Experiments/historical/README.md`: table.
+  - `test/integration/test_ported_scripts.py`: both scripts; the stand-in experiment gets an attenuator.
+  - `TODO.md`: T64 moved to Done.
+- **Tests:** `test/integration/test_ported_scripts.py`: 14 passed. Both modules import from `mains/`.
+- **Commits:** `b90d42f` refactor(mains): port the scripts the entry files import [T64]; docs(todo): close T64 [T64]
+- **Follow-ups:** none.
+- **Behaviour change on hardware:** `grating_ifov_test` writes into `<path>/grating_after_debugging` instead
+  of `grating_nach_debuggen`.
+
+### 2026-10-01 14:33 CEST — [T28] Overview images and time estimate
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/time_estimate.py` (new): `estimate_program_s()` (LINEAR/RAPID, modal and default speed,
+    INCREMENTAL, DWELL, galvo plus stage; acceleration ignored), `TimeEstimate`, `format_duration()`.
+  - `nanofactorysystem/overview.py` (new): `field_of_view_um()`, `grid_positions()` (overlap 20 %),
+    `stitch()` (`tools.stitch.Canvas`, placement with `Transform.P2D`, scaled to `overview_pixel_um`), `Mosaic`.
+  - `nanofactorysystem/experiment.py`:
+    - new arguments `layer_overhead_s` (5 s), `overview_capture`, `overview_single_images`,
+      `overview_pixel_um`, all stored as parameters;
+    - estimate after `build_programs()`, `log_duration()` after printing;
+    - `overview_area()` and `capture_overview()`, called before and after printing (restart: "before" only if
+      missing);
+    - `QR_CODE_WIDTH_UM` and `OVERVIEW_BORDER_UM`.
+  - `storage/experiment_store.py`: `write_time_estimate`, `write_overview`, `read_overview`;
+    `storage/records.py`: `ExperimentRecord.time_estimate`; `storage/schema.py`: new parameters;
+    `storage/summary.py`: `estimated_s`/`duration_s` per structure and in total, header line.
+  - `experiment_spec.py`: `layer_overhead_s`, `overview_capture`, `overview_single_images`.
+    `substrate_plan.py`: imports `QR_CODE_WIDTH_UM`.
+  - Tests:
+    - `test/test_time_estimate.py` (new, 4 tests) and `test/test_overview.py` (new, 3 tests, with stitching
+      of a synthetic scene and a mirrored y axis);
+    - `test/test_experiment.py`: 3 tests (estimate and log, overview before and after, area with corners).
+  - `test/README.md`, `CLAUDE.md`; `TODO.md`: T28 moved to Done.
+- **Tests:** `python -m pytest`: 352 passed, 14 skipped. Golden files are unchanged.
+- **Commits:** `6dca352` feat(experiment): estimate and log the printing time [T28]; `909d2e7`
+  feat(experiment): stitched camera overview before and after printing [T28]; docs(todo): close T28 [T28]
+- **Decision taken without asking:** the overview is off by default (`overview_capture=False`), like
+  `camera_capture` (T45). The maintainer can switch the default.
+- **Follow-ups:** none.
+- **To check on the lab PC:**
+  - Does the mosaic line up? The camera offset of `Transform` is not applied, because all images share it.
+  - Is the camera calibration (`cameraPitch`) right for both objectives?
+- **Behaviour change on hardware:** without `overview_capture`, only the time estimate is logged and stored.
+
+### 2026-10-01 14:39 CEST — [T36] Z-line focal-point script
+- **Status:** done (N071 moved to F14 by the maintainer decision)
+- **Changes:**
+  - `mains/Experiments/historical/other/z_line_focal_points.py` (renamed →
+    `mains/Experiments/focal_points/z_line_focal_points.py`): finished.
+    - Flow: plane fit, z-lines at random points inside the structure grid via `tools.focus.Focus.run`, then
+      corners and QR code.
+    - Output: one `FocusDetect` container per point, plus `focal_points.json` (parameters, seed, points).
+    - N014/N018: all variables at the top.
+    - N015: more result information.
+    - N016/N017: the z-line program writes z − dz/2 to z + dz/2, so no recalculation is needed (documented).
+    - N019: a new folder per run.
+    - N020: noise on the line lengths.
+    - `min_distance`: rejection in x and y.
+    - Removed: the draft's stair (power 700) and the scidatacontainer test block.
+  - `future_todo.md`: F14 (camera offset in `System.zline`, N071). The change would affect every plane fit;
+    N072 was already done (global variables, loaded once).
+  - `test/integration/test_focal_points.py` (new): sampling and lengths; slow dry run with 3 z-lines.
+  - `test/README.md`, `CLAUDE.md`, `mains/Experiments/historical/README.md`; `TODO.md`: T36 moved to Done.
+- **Tests:** `python -m pytest`: 354 passed, 14 skipped.
+- **Commits:** `9498bee` feat(mains): finish the focal-point z-line script [T36]; docs(todo): close T36 [T36]
+- **Follow-ups:** F14.
+- **Behaviour change on hardware:** none outside the script.
+
+### 2026-10-01 14:40 CEST — [Phase B] Phase summary
+- **Finished todos:**
+  - earlier: T60, T38, T39, T37;
+  - today: T63, T62, T35, T64, T28, T36;
+  - closed without code change by maintainer decision: T61 (→ F10) and T32 (→ F11).
+- **Open todos:** none. Future todos added: F9 (drop outline detection), F10 (focus detection with data),
+  F11 (AeroBasic API with the manual), F12 (shell printing), F13 (free IFOV speed), F14 (camera offset in
+  `System.zline`).
+- **Tests:** `python -m pytest`: 354 passed, 14 skipped, including the dry runs. Golden files are unchanged.
+- **Branch:** `feat/phaseB-followups`, on top of `feat/phase4-voxel-slicing`. Nothing is pushed.
+- **To check on the lab PC:**
+  1. An experiment near the rim of the drop is refused (ellipse, T62).
+  2. Expected vs. actual printing time in the log (T28).
+  3. The overview mosaic with `overview_capture=True`: alignment and the camera calibration.
+  4. The focal-point script with a few points (T36).
+  5. `main.py` (`power_z_pitch_lines`) and `main_IFOV.py` (`grating_ifov_test`, output folder now
+     `grating_after_debugging`).

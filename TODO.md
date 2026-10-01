@@ -26,7 +26,7 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 | 2 | Experiment storage | T47, T48, T49, T50, T55, T56, T57, T59 | – |
 | 3 | Experiment scripts and substrate main | T51, T52 | – |
 | 4 | Voxel database and voxel-aware slicing (independent of phases 2–3) | T53, T54, T31 | T53 design approved by the maintainer |
-| B | Backlog from T19 (`todo_notes.md`) | T32, T37, T28, T35, T36, T38, T39, T60, T61, T62, T63 | – |
+| B | Backlog from T19 (`todo_notes.md`) | T32, T37, T28, T35, T36, T38, T39, T60, T61, T62, T63, T64 | – |
 
 ### Working rules for Claude Code (in addition to CLAUDE.md)
 1. Pick the first open todo of the lowest unfinished phase whose dependencies are done. Phase 1 may be
@@ -59,74 +59,10 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 
 ### Phase B — Backlog from T19 (details in `todo_notes.md`)
 
-- [ ] T62: Check experiment areas against the shape of the resin drop (found during T52) [phase: B]
-      Goal: Experiments near the rim of a drop are refused before printing, not only those outside its bounding box.
-      Priority: low | Depends on: –
-      Done when:
-        - `substrate_plan.check_layout` (and the center check of `Experiment`) test the experiment area against a drop outline derived from the four edge points (e.g. an ellipse or their convex hull with a margin; Decision: which outline), instead of their bounding box.
-        - Tests with an area inside the bounding box but outside the outline.
-
-- [ ] T61: Justify the focus-detection threshold and clarify the layer result object (follow-up of T37) [phase: B]
-      Goal: The remaining hotfix and open note of T37 are resolved with lab data and the maintainer's input.
-      Priority: medium | Depends on: –
-      Done when:
-        - The noise threshold `minDiffMax` of the focus detection (`tools/focus.py`, set to 10 ad hoc because noise gave values 1.7–2.5) is replaced by a justified criterion, based on focus scans measured on the lab PC with 20x and 63x (N084, N010).
-        - N088 ("merge with Dominik's result object" in `tools/layer.py`) is clarified by the maintainer and either implemented or dropped.
-      Notes: The code parts of T37 are done (azimuth fix, motor scan loop, capture-time analysis, height profiles); N085/N086 went away with the hotfix line removed in T43.
-
-- [ ] T63: Use the real IFOV writing speed for the voxel lookup (found during T54) [phase: B]
-      Goal: Voxel-aware slicing looks up the voxel size at the speed the IFOV program actually writes with.
-      Priority: medium | Depends on: –
-      Done when:
-        - `IFOV_Lines`/`IFOV_PolyLines` write with the structure velocity, or `Model3D_Slicer` passes the effective speed (today `SET_SPEED F=5` for 63x, `F=10` for 20x, independent of `velocity`) to the voxel model; decided together with T35 (N065–N067).
-        - A test shows that the velocity in `job.meta["voxel"]` equals the speed in the generated program.
-
-- [ ] T32: Clean up the AeroBasic API and task handling (from T19) [phase: B]
-      Goal: The AeroBasic API is correct and complete for the commands in use.
-      Priority: medium | Depends on: –
-      Done when:
-        - `PROGRAM_ASSOCIATE` sends the correct syntax (N029); reading system parameters is possible (N030).
-        - Program text: compact variable declarations, header metadata, and a mode check for VELOCITY/ABSOLUTE (N031–N033).
-        - IFOV setup: ramp types and the F threshold are investigated and documented (N044, N045).
-        - `run_program_as_task`: better task-id choice, cleanup of the previous program, and a decision on the old "delete this function" note (N058, N073, N074).
-
-- [ ] T35: Clarify line and rectangle details (from T19) [phase: B]
-      Goal: Line-based structures have checked parameters and no unexplained hotfixes.
-      Priority: low | Depends on: –
-      Done when:
-        - `IFOV_Lines`: velocity unit (mm/s), validation, default maximum speed (100 × IFOV size) and the speed values from parameters (N065–N067).
-        - Vector printing functionality is designed (N068).
-        - The `Z == 0` hotfix in `Rectangle3D` is understood and replaced or documented (N069).
-      Notes: The QR-code drop direction (N070) moved to T43.
-
-- [ ] T36: Z-line: offset, global variables and focal-point script (from T19) [phase: B]
-      Goal: Z-line programs are consistent and the focal-point study script is complete.
-      Priority: low | Depends on: –
-      Done when:
-        - The camera offset is integrated into `System.zline` (N071); the z-line program uses global variables and is not recompiled every time (N072).
-        - `z_line_focal_points.py`: dz split, z recalculation, noise on dz, min_distance, boundary, result dictionary and file-exists check are resolved (N014–N020).
-
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
-- [ ] T37: Replace the hotfixes in tools and devices (from T19) [phase: B]
-      Goal: Focus, layer, plane, DHM and serialization code have no open hotfixes.
-      Priority: medium | Depends on: T43
-      Done when:
-        - The focus-detection noise threshold `minDiffMax` is replaced by a justified criterion, and its value is checked for 63x (N084, N010).
-        - Layer: sample dictionary, missing `self.device` and the result object are fixed (N085, N086, N088); the orientation part is done in T43.
-        - The plane angle edge case (-180 vs 180) is handled (N090).
-        - DHM: capture time analysed; motor scan loop with limit checks and an own exception (N075, N076).
-        - `DrawableObject._init_args` stores "data" instead of the hotfix (N046).
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
-- [ ] T28: Overview images and time estimate (from T19) [phase: B]
-      Goal: An experiment documents the whole scene and its expected duration.
-      Priority: low | Depends on: T47
-      Done when:
-        - An overview image of the whole scene is taken before and after printing and stored in the experiment file (N009).
-        - The expected and the actual duration of an experiment are logged and stored (N023).
-      Blocked by: Decision. (1) Overview image: proposal: a camera mosaic of the experiment rectangle, stitched with `tools.stitch.Canvas` and stored in the experiment file, before and after printing (alternative: one capture at the experiment center, as the old commented-out `measure(center)` calls did). (2) Expected duration: proposal: estimate each layer program from the path lengths and F values of its moves (plus a configurable per-layer overhead), log the estimate after `build_programs()` and compare it with the stored start/end times of layers and structures. Asked 2026-09-30.
-
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
 - [x] T1: Record baseline and review the code — 2026-09-28 — Recorded the test baseline (global env: all 40 files fail on a NumPy ABI mismatch; clean venv: 16 passed / 20 failed / 16 errors over `test/`) in WORKLOG.md and wrote `docs/reviews/CODE_REVIEW_2026-09-28.md`; follow-ups T9–T18 added. — commits: `bf98f78`
@@ -224,3 +160,21 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T54: Voxel-aware slicing and hatching — 2026-09-30 — Voxel models (no data, fixed, database) behind the slicer protocol `VoxelModel`; contour offset, first/last slice at half the voxel height, spacing per `spacing_mode` (maintainer decision: `voxel_overlap` default, `static_hatching` with gap warnings); strategies get a `VoxelContext`; values in job metadata, structure JSON and summary; `ExperimentSpec(voxel_material=)`; no-data path and golden files unchanged. — commits: `e5a2173`, `e7ec542`
 
 - [x] T31: Laser power per structure, layer and line — 2026-10-01 — Power per structure shown in a dummy test; `add_structure(layer_power=)`/`StructureSpec.layer_power` let every layer program set its own power (stored as `layer_powers_mw`, summary column); `Model3D_Slicer` prints toolpath elements with a power override (or `power_map(z_um, role)`) in their own IFOV blocks, unchanged without overrides. — commits: `a01c64b`, `1e6cf41`
+
+- [x] T37: Replace the hotfixes in tools and devices — 2026-10-01 — Azimuth fix, motor-scan loop with limits, capture-time analysis and stored height profiles; the focus threshold and N088 went to T61 (maintainer decision: close T37). — commits: `8444d70`, `b396a38`, `040e831`, `72114eb`
+
+- [x] T61: Justify the focus-detection threshold and clarify the layer result object — 2026-10-01 — Closed without code change (maintainer decision): the focus detection is reworked later with example data (F10); N088 is dropped and kept in `todo_notes.md` for the maintainer.
+
+- [x] T32: Clean up the AeroBasic API and task handling — 2026-10-01 — Closed without code change (maintainer decision): moved to F11, to be done with the A3200 manual.
+
+- [x] T63: Use the real IFOV writing speed for the voxel lookup (found during T54) — 2026-10-01 — The job of `Model3D_Slicer` records the fixed IFOV writing speed (5/10 mm/s), so the voxel lookup and the time estimate use it; the speeds are defined once in `lines.IFOV_WRITING_SPEED_MM_S`. — commits: `b2b07cd`
+
+- [x] T62: Check experiment areas against the shape of the resin drop (found during T52) — 2026-10-01 — Experiment areas (substrate plan) and the experiment center (`Experiment(resin_edges=)`) are checked against the ellipse through the four edge points (`resin_drop.py`); no check for dip-in; the edges are stored with the experiment. — commits: `b9d8cfd`
+
+- [x] T35: Clarify line and rectangle details (from T19) — 2026-10-01 — IFOV writing speed stays fixed and is documented; non-IFOV velocities (µm/s → mm/s in programs) are pinned by a test; the N069 hotfix is replaced: flat rectangles print nothing, steps use `step_slice_size` (no division by zero); `IFOV_Lines` no longer raises `Warning`. N068 moved to F12. — commits: `3edbae7`
+
+- [x] T64: Port the experiment scripts imported by `main.py` and `main_IFOV.py` (found during T51) — 2026-10-01 — `Kailas/power_z_pitch_lines.py` and `Big_substrate_20x/grating_ifov_test.py` are back in `mains/Experiments/`, ported to `experiment_spec()` and tested; `main.py`/`main_IFOV.py` import them (main_IFOV.py failed on import before). — commits: `b90d42f`
+
+- [x] T28: Overview images and time estimate (from T19) — 2026-10-01 — Expected printing time (path length / speed per layer program + 5 s per layer) logged after building, stored and shown next to the actual time; `overview_capture=True` stores a stitched camera mosaic (with corners, or only the grid with `skip_corner`) before and after printing, optionally with the single images. — commits: `6dca352`, `909d2e7`
+
+- [x] T36: Z-line: offset, global variables and focal-point script (from T19) — 2026-10-01 — The focal-point script is finished (`mains/Experiments/focal_points/`; z-lines with FocusDetect containers, only via `Focus.run`); N014–N020 resolved; N072 was already done; N071 would change the plane fitting and moved to F14 (maintainer decision). — commits: `9498bee`

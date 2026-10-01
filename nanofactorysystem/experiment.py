@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Iterator, Optional, Literal
 from enum import Enum
 
+import cv2 as cv
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Ellipse, Rectangle
@@ -40,11 +41,22 @@ from nanofactorysystem.storage import (CaptureRecord, CornerRecord, ExperimentRe
 from nanofactorysystem.storage.json_copies import export_progress, structures_list, write_json
 from nanofactorysystem.storage.legacy import LegacyExperiment, is_legacy_folder, read_legacy
 from nanofactorysystem.storage.summary import SUMMARY_NAME, format_table, summary
+from nanofactorysystem.overview import Mosaic, field_of_view_um, grid_positions, stitch
+from nanofactorysystem.resin_drop import drop_outline, has_drop_boundary
+from nanofactorysystem.time_estimate import (DEFAULT_LAYER_OVERHEAD_S, TimeEstimate, estimate_program_s,
+                                             format_duration)
 from nanofactorysystem.storage.substrate_store import (SubstrateRecord, SubstrateStore, check_not_synced,
                                                        default_root)
 from nanofactorysystem.storage import schema
 from nanofactorysystem.dhm.optimage import optImageMedian
 from nanofactorysystem.utils.visualization import read_file, plot_movements
+
+
+# Width of the QR code with the experiment UUID (36 characters, error correction Q, pixel pitch 4 µm), centred on
+# the upper edge of the experiment rectangle (add_qrcode_structure)
+QR_CODE_WIDTH_UM = 140.0
+# Extra border of the overview image around the corner markers in µm (T28)
+OVERVIEW_BORDER_UM = 20.0
 
 
 class CornerPosition(Enum):
@@ -129,6 +141,11 @@ class Experiment(object):
                  backend: BackendLike = None,
                  resume: bool = False,
                  substrate: Optional[str] = None,
+                 resin_edges=None,
+                 layer_overhead_s: float = DEFAULT_LAYER_OVERHEAD_S,
+                 overview_capture: bool = False,
+                 overview_single_images: bool = False,
+                 overview_pixel_um: float = 1.0,
                  data_root: Optional[Path] = None,
                  allow_synced_root: bool = False,
                  tilt_warning_um: float = 1.0,
@@ -151,6 +168,23 @@ class Experiment(object):
         substrate_information : dict, optional
             Free information about the substrate (older scripts); stored in
             the experiment file. Use ``substrate`` for substrate records.
+        layer_overhead_s : float
+            Overhead per layer of the expected printing time (T28; default
+            5 s for loading, captures and future reconstruction).
+        overview_capture : bool
+            Take a stitched camera overview of the experiment before and after
+            printing (T28, see :meth:`capture_overview`); off by default, like
+            ``camera_capture``.
+        overview_single_images : bool
+            Also store the single camera images of the overview (to check the
+            stitching).
+        overview_pixel_um : float
+            Pixel size of the stitched overview in µm.
+        resin_edges : sequence of (x, y), optional
+            The four edge points of the resin drop in µm. The experiment
+            center must then lie inside the ellipse through them (T62),
+            otherwise inside the box ``resin_corner_bl``–``resin_corner_tr``.
+            No drop check for dip-in.
         substrate : str, optional
             Label or UUID of a substrate created with
             :class:`SubstrateStore`. The experiment gets the next experiment
@@ -237,10 +271,13 @@ class Experiment(object):
         self.margin = float(margin)
         self.padding = float(padding)
         self.absolute_grid_center = np.array(absolute_grid_center.as_tuple(), dtype=float)
-        if not (np.all(self.resin_corner_bl <= self.absolute_grid_center)
-                and np.all(self.absolute_grid_center <= self.resin_corner_tr)):
-            raise ValueError(f"The experiment center {self.absolute_grid_center.tolist()} lies outside the resin "
-                             f"drop edges {self.resin_corner_bl.tolist()} - {self.resin_corner_tr.tolist()}.")
+        self.resin_edges = [tuple(map(float, e)) for e in resin_edges] if resin_edges is not None and len(
+            resin_edges) else None
+        self._check_center(drop_direction)
+        self.layer_overhead_s = float(layer_overhead_s)
+        self.overview_capture = bool(overview_capture)
+        self.overview_single_images = bool(overview_single_images)
+        self.overview_pixel_um = float(overview_pixel_um)
         self.fov_dimensions = fov_dim
 
         self.grid = np.array(grid, dtype=int)
@@ -452,10 +489,13 @@ class Experiment(object):
             "corner_slice": self.corner_slice, "fov_dim": self.fov_dimensions, "skip_corner": self.skip_corner,
             "plane_fit_mode": self.plane_fit_mode.name, "setup": self.setup,
             "tilt_warning_um": self.tilt_warning_um, "camera_capture": self.camera_capture,
-            "program_source": self.program_source.name,
+            "program_source": self.program_source.name, "resin_edges": self.resin_edges,
+            "layer_overhead_s": self.layer_overhead_s, "overview_capture": self.overview_capture,
+            "overview_single_images": self.overview_single_images, "overview_pixel_um": self.overview_pixel_um,
         }
         converters = {"float": float, "int": int, "bool": bool, "str": str, "enum": str,
-                      "vector": lambda v: np.asarray(v, dtype=float), "ivector": lambda v: np.asarray(v, dtype=int)}
+                      "vector": lambda v: np.asarray(v, dtype=float), "ivector": lambda v: np.asarray(v, dtype=int),
+                      "points": lambda v: np.asarray(v if v else np.empty((0, 2)), dtype=float).reshape(-1, 2)}
         parameters = {name: converters[kind](values[argument]) for argument, _, name, kind in schema.PARAMETERS}
         parameters["log_file"] = self._relative(self._log_file()) if self._log_file() else ""
         parameters["dhm_usage"] = self.system.dhm is not None
@@ -586,6 +626,8 @@ class Experiment(object):
                 value = tuple(float(v) for v in value)
             elif kind == "ivector":
                 value = tuple(int(v) for v in value)
+            elif kind == "points":
+                value = [tuple(float(c) for c in point) for point in value] or None
             elif argument == "drop_direction":
                 value = DropDirection[value]
             elif argument == "plane_fit_mode":
@@ -677,11 +719,28 @@ class Experiment(object):
             "fov_dim": tuple(vector(data["fov_dim"])),
             "skip_corner": bool(data["skip_corner"]),
             "plane_fit_mode": PlaneFitMode.parse(data["plane_fit_mode"]),
-            **{key: data[key] for key in ("tilt_warning_um", "camera_capture", "program_source") if key in data},
+            **{key: data[key] for key in ("tilt_warning_um", "camera_capture", "program_source", "layer_overhead_s",
+                                          "overview_capture", "overview_single_images", "overview_pixel_um")
+               if key in data},
             "setup": data["setup"] or "IFOV_off",
             "resume": True,
             **substrate,
         }
+
+    def _check_center(self, drop_direction) -> None:
+        """ Refuse an experiment center outside the resin drop (ellipse through the edges, else their box). """
+
+        if not has_drop_boundary(drop_direction):
+            return
+        outline = drop_outline(self.resin_edges)
+        if outline is not None:
+            if not outline.contains(self.absolute_grid_center)[0]:
+                raise ValueError(f"The experiment center {self.absolute_grid_center.tolist()} lies outside the resin "
+                                 f"drop (ellipse through the edges {self.resin_edges}).")
+        elif not (np.all(self.resin_corner_bl <= self.absolute_grid_center)
+                  and np.all(self.absolute_grid_center <= self.resin_corner_tr)):
+            raise ValueError(f"The experiment center {self.absolute_grid_center.tolist()} lies outside the resin "
+                             f"drop edges {self.resin_corner_bl.tolist()} - {self.resin_corner_tr.tolist()}.")
 
     def iter_experiment_locations(self) -> Iterator[tuple[float, float]]:
         """ Return experiment locations in um """
@@ -1440,11 +1499,95 @@ class Experiment(object):
             self._store_structure(structure_dict, config, index=len(self.structure_programs) - 1,
                                   grid_index=grid_index, reference=(x, y))
 
+        self._write_time_estimate()
+
         # structures.json is a copy of the structures in the experiment file
         self.store.set_status(schema.STATUS_BUILT)
         self._save_exp_dict()
         self.log.info("Experiment summary:\n" + format_table(self._write_summary()))
         self.structure_configs = self._with_absolute_paths(structures_list(self.store.read()))
+
+    def overview_area(self) -> tuple[np.ndarray, np.ndarray]:
+        """ Lower-left and upper-right corner (µm) of the area the overview shows (T28).
+
+        With corner markers: the experiment rectangle including the corners
+        (half their width lies outside) and the QR code (centred on the upper
+        edge), the defined boundaries of the experiment. Without markers
+        (``skip_corner``): the structure grid only.
+        """
+
+        lower = np.minimum(self.rectangle_tl, self.rectangle_br)
+        upper = np.maximum(self.rectangle_tl, self.rectangle_br)
+        if self.skip_corner:
+            return lower + self.margin, upper - self.margin
+        clearance = max(self.corner_width, QR_CODE_WIDTH_UM) / 2 + OVERVIEW_BORDER_UM
+        return lower - clearance, upper + clearance
+
+    def capture_overview(self, phase: str, *, overlap: float = 0.2) -> Mosaic:
+        """ Take a camera mosaic of the experiment area and store the stitched overview (T28).
+
+        Before every image the galvo is set to A = B = 0 and the stages move
+        to the image position in X and Y; Z is not moved (as in
+        :meth:`measure`). The stitched image goes into ``/overview/<phase>``
+        of the experiment file and into ``overview_<phase>.png``; the single
+        images are stored as well with ``overview_single_images``.
+
+        Parameters
+        ----------
+        phase : {"before", "after"}
+        overlap : float
+            Overlap of neighbouring images (fraction of the field of view).
+
+        Returns
+        -------
+        Mosaic
+        """
+
+        camera = self.system.camera
+        width, height = int(camera.device["Width"]), int(camera.device["Height"])
+        pixel_matrix = np.array(self.system.transform.P2D, dtype=float)
+        lower, upper = self.overview_area()
+        positions = grid_positions(lower, upper, field_of_view_um(pixel_matrix, width, height), overlap)
+        self.log.info(f"Overview {phase}: {len(positions)} camera images of {tuple(lower.round(1))} - "
+                      f"{tuple(upper.round(1))} um")
+        images = []
+        for x, y in positions:
+            self.a3200.api.LINEAR(A=0.0, B=0.0, F=20)
+            self.a3200.api.LINEAR(X=x / 1000, Y=y / 1000, F=20)
+            images.append(np.asarray(camera.getimage()))
+        mosaic = stitch(images, positions, pixel_matrix, self.overview_pixel_um)
+        metadata = {"origin_um": np.asarray(mosaic.origin_um), "pixel_matrix_um": mosaic.pixel_matrix_um,
+                    "positions_um": np.asarray(positions), "area_um": np.array([lower, upper]),
+                    "camera_pixel_matrix_um": pixel_matrix, "overlap": float(overlap),
+                    "corners_included": not self.skip_corner}
+        self.store.write_overview(phase, mosaic.image, metadata,
+                                  np.stack(images) if self.overview_single_images else None)
+        cv.imwrite(str(self.path / f"overview_{phase}.png"), mosaic.image)
+        self.log.info(f"Overview {phase}: {mosaic.image.shape[1]} x {mosaic.image.shape[0]} px stored")
+        return mosaic
+
+    def _write_time_estimate(self) -> TimeEstimate:
+        """ Estimate the printing time of every built structure, store and log it (T28). """
+
+        estimate = TimeEstimate(self.layer_overhead_s)
+        for paths in self.structure_programs:
+            if not paths:
+                continue
+            name = Path(paths[0]).parent.parent.name
+            estimate.structures[name] = [estimate_program_s(Path(p).read_text()) + self.layer_overhead_s
+                                         for p in paths]
+        self.store.write_time_estimate(estimate.to_dict())
+        n_layers = sum(len(layers) for layers in estimate.structures.values())
+        self.log.info(f"Expected printing time: {format_duration(estimate.total_s)} for {n_layers} layers "
+                      f"({self.layer_overhead_s:g} s overhead per layer)")
+        return estimate
+
+    def log_duration(self) -> None:
+        """ Log the actual printing time next to the expected one (T28). """
+
+        data = summary(self.store.read(include_captures=False))
+        self.log.info(f"Printing took {format_duration(data['duration_s'])}, expected "
+                      f"{format_duration(data['estimated_s'])}")
 
     def _layer_order(self) -> int:
         """ +1 if layers are printed with ascending ids (drop direction UP), -1 otherwise. """
@@ -1598,6 +1741,9 @@ class Experiment(object):
         if self.structure_configs is None:
             raise ValueError("No programs!")
 
+        if self.overview_capture:
+            self.capture_overview("before")
+
         for structure_config in self.structure_configs:
             self.print_structure(
                 [self._absolute(p) for p in structure_config["layer_files"]],
@@ -1607,9 +1753,12 @@ class Experiment(object):
                 power=structure_config["power"],
                 dhm_image_count=structure_config["number of dhm images"]
             )
+        if self.overview_capture:
+            self.capture_overview("after")
         self.store.set_status(schema.STATUS_FINISHED)
         self._save_exp_dict()
         self.log.info("Experiment summary:\n" + format_table(self._write_summary()))
+        self.log_duration()
 
     def restart_experiment(self):
         """ Print what an aborted run of this experiment left over.
@@ -1632,6 +1781,8 @@ class Experiment(object):
         if not structures:
             raise ValueError("No programs: the experiment has no built structures to restart.")
         self.structure_configs = [configs[s.name] for s in structures]
+        if self.overview_capture and self.store.read_overview("before") is None:
+            self.capture_overview("before")
 
         for structure in structures:
             if structure.status in ("printed", "failed"):
@@ -1652,6 +1803,8 @@ class Experiment(object):
                 dhm_image_count=config["number of dhm images"],
                 restart=started
             )
+        if self.overview_capture:
+            self.capture_overview("after")
         self.store.set_status(schema.STATUS_FINISHED)
         self._save_exp_dict()
         self.log.info("Experiment summary:\n" + format_table(self._write_summary()))

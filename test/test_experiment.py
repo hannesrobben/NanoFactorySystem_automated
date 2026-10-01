@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 import matplotlib
+import numpy as np
 import pytest
 
 from nanofactorysystem.aerobasic.programs.drawings import Rectangle3D
@@ -732,3 +733,76 @@ def test_power_per_layer_as_function_and_wrong_length(test_config, dummy_backend
         with pytest.raises(ValueError, match="layer"):
             experiment.build_programs()
     assert ExperimentStore.open(tmp_path).read().structure("ramp").layer_powers_mw == [0.5, 1.0, 1.5, 2.0]
+
+
+RESIN_EDGES = [[5720, 22330], [-3333, 22420], [1660, 17212], [1200, 27190]]  # right, left, near, far
+
+
+def test_experiment_center_is_checked_against_the_ellipse(test_config, dummy_backend, no_sleep, tmp_path):
+    (tmp_path / "a").mkdir()
+    with pytest.raises(ValueError, match="ellipse"):
+        make_experiment(tmp_path / "a", dummy_backend, center=Point2D(5000, 18000), resin_edges=RESIN_EDGES)
+    # Without the edge points only the bounding box is checked, as before
+    (tmp_path / "b").mkdir()
+    with make_experiment(tmp_path / "b", dummy_backend, center=Point2D(5000, 18000)):
+        pass
+
+    (tmp_path / "c").mkdir()
+    with make_experiment(tmp_path / "c", dummy_backend, resin_edges=RESIN_EDGES) as experiment:
+        experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+    # The edges are stored and come back on a restart
+    parameters = Experiment.parameters_from_dictionary(tmp_path / "c")
+    assert parameters["resin_edges"] == [tuple(map(float, e)) for e in RESIN_EDGES]
+
+
+def test_expected_and_actual_printing_time(test_config, dummy_backend, no_sleep, tmp_path, caplog):
+    import logging
+    from nanofactorysystem.storage.summary import summary
+    with caplog.at_level(logging.INFO):
+        with make_experiment(tmp_path, dummy_backend, layer_overhead_s=2.0) as experiment:
+            experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+            add_rectangle(experiment)
+            experiment.build_programs()
+            estimate = ExperimentStore.open(tmp_path).read().time_estimate
+            experiment.print_experiment()
+
+    # One value per layer: program time plus the overhead
+    layers = estimate["structures"]["rect"]
+    assert len(layers) == 4 and all(t > 2.0 for t in layers) and estimate["layer_overhead_s"] == 2.0
+    assert estimate["total_s"] == pytest.approx(sum(layers))
+    assert "Expected printing time" in caplog.text and "Printing took" in caplog.text
+    record = ExperimentStore.open(tmp_path).read()
+    data = summary(record)
+    assert data["estimated_s"] == pytest.approx(sum(layers)) and data["duration_s"] is not None
+    assert data["structures"][0]["estimated_s"] == pytest.approx(sum(layers))
+    assert data["structures"][0]["duration_s"] is not None
+    assert Experiment.parameters_from_dictionary(tmp_path)["layer_overhead_s"] == 2.0
+
+
+def test_overview_before_and_after_printing(test_config, dummy_backend, no_sleep, tmp_path):
+    with make_experiment(tmp_path, dummy_backend, overview_capture=True, overview_single_images=True) as experiment:
+        experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+        add_rectangle(experiment)
+        experiment.build_programs()
+        experiment.print_experiment()
+        lower, upper = experiment.overview_area()
+
+    store = ExperimentStore.open(tmp_path)
+    for phase in ("before", "after"):
+        image, metadata = store.read_overview(phase)
+        assert image.dtype == np.uint8 and image.ndim == 2 and (tmp_path / f"overview_{phase}.png").is_file()
+        assert metadata["corners_included"] is False  # skip_corner: only the structure grid
+        assert len(metadata["single_images"]) == len(metadata["positions_um"]) > 1
+    # skip_corner: the area is the structure grid (one 500 um cell around the center)
+    assert np.allclose(lower, [1310 - 250, 19500 - 250]) and np.allclose(upper, [1310 + 250, 19500 + 250])
+    assert Experiment.parameters_from_dictionary(tmp_path)["overview_capture"] is True
+
+
+def test_overview_area_includes_the_corner_markers(test_config, dummy_backend, no_sleep, tmp_path):
+    from nanofactorysystem.experiment import OVERVIEW_BORDER_UM, QR_CODE_WIDTH_UM
+    with make_experiment(tmp_path, dummy_backend, skip_corner=False) as experiment:
+        lower, upper = experiment.overview_area()
+        rectangle_low = np.minimum(experiment.rectangle_tl, experiment.rectangle_br)
+    clearance = max(50, QR_CODE_WIDTH_UM) / 2 + OVERVIEW_BORDER_UM  # corner width 50 um in make_experiment
+    assert np.allclose(lower, rectangle_low - clearance)
+    assert not ExperimentStore.open(tmp_path).read_overview("before")  # overview_capture is off by default
