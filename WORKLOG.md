@@ -1979,3 +1979,38 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Follow-ups:** none.
 - **Behaviour change on hardware:** `grating_ifov_test` writes into `<path>/grating_after_debugging` instead
   of `grating_nach_debuggen`.
+
+### 2026-10-01 14:33 CEST — [T28] Overview images and time estimate
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/time_estimate.py` (new): `estimate_program_s()` (LINEAR/RAPID, modal and default speed,
+    INCREMENTAL, DWELL, galvo plus stage; acceleration ignored), `TimeEstimate`, `format_duration()`.
+  - `nanofactorysystem/overview.py` (new): `field_of_view_um()`, `grid_positions()` (overlap 20 %),
+    `stitch()` (`tools.stitch.Canvas`, placement with `Transform.P2D`, scaled to `overview_pixel_um`), `Mosaic`.
+  - `nanofactorysystem/experiment.py`:
+    - new arguments `layer_overhead_s` (5 s), `overview_capture`, `overview_single_images`,
+      `overview_pixel_um`, all stored as parameters;
+    - estimate after `build_programs()`, `log_duration()` after printing;
+    - `overview_area()` and `capture_overview()`, called before and after printing (restart: "before" only if
+      missing);
+    - `QR_CODE_WIDTH_UM` and `OVERVIEW_BORDER_UM`.
+  - `storage/experiment_store.py`: `write_time_estimate`, `write_overview`, `read_overview`;
+    `storage/records.py`: `ExperimentRecord.time_estimate`; `storage/schema.py`: new parameters;
+    `storage/summary.py`: `estimated_s`/`duration_s` per structure and in total, header line.
+  - `experiment_spec.py`: `layer_overhead_s`, `overview_capture`, `overview_single_images`.
+    `substrate_plan.py`: imports `QR_CODE_WIDTH_UM`.
+  - Tests:
+    - `test/test_time_estimate.py` (new, 4 tests) and `test/test_overview.py` (new, 3 tests, with stitching
+      of a synthetic scene and a mirrored y axis);
+    - `test/test_experiment.py`: 3 tests (estimate and log, overview before and after, area with corners).
+  - `test/README.md`, `CLAUDE.md`; `TODO.md`: T28 moved to Done.
+- **Tests:** `python -m pytest`: 352 passed, 14 skipped. Golden files are unchanged.
+- **Commits:** `6dca352` feat(experiment): estimate and log the printing time [T28]; `909d2e7`
+  feat(experiment): stitched camera overview before and after printing [T28]; docs(todo): close T28 [T28]
+- **Decision taken without asking:** the overview is off by default (`overview_capture=False`), like
+  `camera_capture` (T45). The maintainer can switch the default.
+- **Follow-ups:** none.
+- **To check on the lab PC:**
+  - Does the mosaic line up? The camera offset of `Transform` is not applied, because all images share it.
+  - Is the camera calibration (`cameraPitch`) right for both objectives?
+- **Behaviour change on hardware:** without `overview_capture`, only the time estimate is logged and stored.

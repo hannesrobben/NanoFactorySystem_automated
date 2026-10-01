@@ -59,14 +59,6 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 
 ### Phase B — Backlog from T19 (details in `todo_notes.md`)
 
-- [ ] T28: Overview images and time estimate (from T19) [phase: B]
-      Goal: An experiment documents the whole scene and its expected duration.
-      Priority: low | Depends on: T47
-      Done when:
-        - An overview image of the whole scene is taken before and after printing and stored in the experiment file (N009).
-        - The expected and the actual duration of an experiment are logged and stored (N023).
-      Decisions (maintainer, 2026-09-30/2026-10-01): (1) a camera mosaic stitched with `tools.stitch.Canvas`, stored in the experiment file before and after printing; it covers the experiment rectangle including the corners (the defined boundaries), or only the structure grid with `skip_corner`; by default only the stitched image is stored, optionally also every single image (to check the stitching). (2) Expected duration from the path lengths and F values of every layer program plus an overhead of 5 s per layer (configurable; covers capturing and future reconstruction), logged after `build_programs()` and compared with the stored start/end times.
-
 - [ ] T36: Z-line: offset, global variables and focal-point script (from T19) [phase: B]
       Decision (maintainer, 2026-10-01): finish the focal-point script; nothing may change the normal behaviour of the system or the plane fitting.
       Goal: Z-line programs are consistent and the focal-point study script is complete.
@@ -190,3 +182,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T35: Clarify line and rectangle details (from T19) — 2026-10-01 — IFOV writing speed stays fixed and is documented; non-IFOV velocities (µm/s → mm/s in programs) are pinned by a test; the N069 hotfix is replaced: flat rectangles print nothing, steps use `step_slice_size` (no division by zero); `IFOV_Lines` no longer raises `Warning`. N068 moved to F12. — commits: `3edbae7`
 
 - [x] T64: Port the experiment scripts imported by `main.py` and `main_IFOV.py` (found during T51) — 2026-10-01 — `Kailas/power_z_pitch_lines.py` and `Big_substrate_20x/grating_ifov_test.py` are back in `mains/Experiments/`, ported to `experiment_spec()` and tested; `main.py`/`main_IFOV.py` import them (main_IFOV.py failed on import before). — commits: `b90d42f`
+
+- [x] T28: Overview images and time estimate (from T19) — 2026-10-01 — Expected printing time (path length / speed per layer program + 5 s per layer) logged after building, stored and shown next to the actual time; `overview_capture=True` stores a stitched camera mosaic (with corners, or only the grid with `skip_corner`) before and after printing, optionally with the single images. — commits: `6dca352`, `909d2e7`
