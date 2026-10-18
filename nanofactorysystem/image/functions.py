@@ -170,7 +170,8 @@ def contour_mask(shape, contour):
     """ Return boolean array with True for all elements inside the
     contour. """
 
-    img = np.zeros(shape, dtype=int)
+    # uint8: dtype=int is int64 on Windows with NumPy 2, which OpenCV rejects
+    img = np.zeros(shape, dtype=np.uint8)
     cv.drawContours(img, [contour], -1, 255, -1)
     return img.astype(bool)
 

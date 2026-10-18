@@ -2056,3 +2056,25 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   4. The focal-point script with a few points (T36).
   5. `main.py` (`power_z_pitch_lines`) and `main_IFOV.py` (`grating_ifov_test`, output folder now
      `grating_after_debugging`).
+
+### 2026-10-18 14:30 CEST — [T65] Contour mask as uint8 for OpenCV
+- **Status:** done
+- **Context:** First lab-PC run of `main.py` (`parametric_4q`) after the update. Two setup problems were solved
+  on the lab PC without code change: mvIMPACT was not on the path of the old venv (added via a `.pth` file
+  pointing to `C:\Program Files\Balluff\ImpactAcquire\LanguageBindings\Python\Output\lib.win-amd64-cpython-312`),
+  and `pip install -e .` upgraded the venv to NumPy 2.2.6 / OpenCV 4.12. The plane fit then stopped in
+  `cv.drawContours` ("Layout of the output array image is incompatible with cv::Mat").
+- **Cause:** `image.functions.contour_mask` used `dtype=int`, which NumPy 2 makes int64 on Windows (int32 with
+  NumPy 1); OpenCV does not accept int64 images. The dummy dry runs pass a known plane and never call the
+  focus detection, so no test covered it. The other `dtype=int` places in the package are NumPy-only.
+- **Changes:**
+  - `nanofactorysystem/image/functions.py`: `contour_mask` allocates the mask as uint8.
+  - `test/test_image_functions.py` (new): `contour_mask` on a square found by `get_contours`; fails without
+    the fix (same cv2 error), passes with it.
+  - `test/README.md`: new test module listed.
+  - `TODO.md`: T65 added to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest` in a fresh venv (NumPy 2.5.4, OpenCV 5.0.0): 355 passed, 14 skipped.
+- **Commits:** `31b77fd` fix(image): build the contour mask as uint8 for OpenCV [T65]; docs(todo): log T65 [T65]
+- **Follow-ups:** the plane fit / focus detection on the lab PC still has to be confirmed after this fix.
+  Branch `fix/contour-mask-uint8` (from `main_HR`), not pushed.

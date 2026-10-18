@@ -178,3 +178,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T28: Overview images and time estimate (from T19) — 2026-10-01 — Expected printing time (path length / speed per layer program + 5 s per layer) logged after building, stored and shown next to the actual time; `overview_capture=True` stores a stitched camera mosaic (with corners, or only the grid with `skip_corner`) before and after printing, optionally with the single images. — commits: `6dca352`, `909d2e7`
 
 - [x] T36: Z-line: offset, global variables and focal-point script (from T19) — 2026-10-01 — The focal-point script is finished (`mains/Experiments/focal_points/`; z-lines with FocusDetect containers, only via `Focus.run`); N014–N020 resolved; N072 was already done; N071 would change the plane fitting and moved to F14 (maintainer decision). — commits: `9498bee`
+
+- [x] T65: Contour mask fails in OpenCV with NumPy 2 on Windows (found during the first lab-PC run) — 2026-10-18 — `contour_mask` builds its mask as uint8 instead of `int` (int64 under NumPy 2), so the focus detection of the plane fit runs again; unit test added. — commits: `31b77fd`
