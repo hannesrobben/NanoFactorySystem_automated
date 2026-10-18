@@ -46,6 +46,7 @@ test = ["pytest>=8"]
 
 [tool.pytest.ini_options]
 testpaths = ["test"]
+pythonpath = ["analysis"]  # the analysis tools are not part of the package
 norecursedirs = [
     "_programs",
     "manual",
