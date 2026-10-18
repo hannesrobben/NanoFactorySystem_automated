@@ -195,3 +195,10 @@ def test_stale_lock_is_replaced(tmp_path):
     assert json.loads(lock_file.read_text())["pid"] == os.getpid()
     lock.release()
     assert pid_alive(os.getpid())
+
+
+def test_reads_without_file_locking(store):
+    # A reader of another process (analysis while printing) reads without the HDF5 file lock
+    reader = ExperimentStore.open(store.folder, read_locking=False)
+    assert reader.read_locking is False and ExperimentStore.open(store.folder).read_locking is None
+    assert reader.read().uuid == record().uuid and reader.read_status() == schema.STATUS_CREATED
