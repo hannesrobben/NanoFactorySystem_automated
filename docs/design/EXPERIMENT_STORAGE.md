@@ -267,6 +267,24 @@ slots of each slicer group stay unused; captures are stored as in §5.6 and refe
 | `/logs/a3200` | the controller command log (T55), appended per session (variable-length string per session) |
 | `/logs/console` | copy of `console.log` for each session, written at the end of the session (the file on disk is the live copy) |
 
+### 5.9 Analysis results (added with T66)
+
+Written only by the analysis tools in `analysis/experiment_analysis` (`ExperimentFile.save_result()`), never
+by the printing process; a minor schema addition (§9), so `schema_version` stays `"1.0"`.
+
+| Path | Content |
+|---|---|
+| `/analysis/experiment/<name>` | result of the experiment |
+| `/analysis/structures/<structure>/<name>` | result of one structure |
+| `/analysis/captures/<capture id>/<name>` | result of one capture |
+
+Each result is a group: datasets (`data`, or one per key of a dict), attributes for scalar results and
+parameters (nested values as `<x>_json`), plus `created`, `updated` and `source` (script name). An
+analysis writer holds `experiment.lock` for the duration of one write and refuses to write while an
+experiment process holds it (§6.3). Readers in other processes open the file without HDF5 file locking
+(`ExperimentStore(read_locking=False)`) and repeat a read that fails, so they never block a write of the
+printing process.
+
 ## 6. Write strategy
 
 ### 6.1 Open, write, close

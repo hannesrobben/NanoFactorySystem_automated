@@ -105,12 +105,17 @@ class ExperimentStore:
         Experiment folder that contains ``experiment.h5``.
     logger : logging.Logger, optional
         Logger for warnings.
+    read_locking : bool, optional
+        HDF5 file locking for reads (h5py ``locking``). None keeps the h5py
+        default. A reader in another process (analysis while printing) passes
+        False, so that it never blocks a write of the printing process.
     """
 
-    def __init__(self, folder: Path, logger=None):
+    def __init__(self, folder: Path, logger=None, read_locking: Optional[bool] = None):
         self.folder = Path(folder)
         self.path = self.folder / schema.FILE_NAME
         self.log = logger or logging.getLogger(__name__)
+        self.read_locking = read_locking
         self._lock: Optional[ExperimentLock] = None
         self._session: Optional[str] = None
 
@@ -161,8 +166,16 @@ class ExperimentStore:
         return store
 
     @classmethod
-    def open(cls, folder: Path, logger=None) -> "ExperimentStore":
+    def open(cls, folder: Path, logger=None, read_locking: Optional[bool] = None) -> "ExperimentStore":
         """ Open an existing experiment file.
+
+        Parameters
+        ----------
+        folder : Path
+            Experiment folder.
+        logger : logging.Logger, optional
+        read_locking : bool, optional
+            HDF5 file locking for reads, see :class:`ExperimentStore`.
 
         Raises
         ------
@@ -173,8 +186,8 @@ class ExperimentStore:
             schema version.
         """
 
-        store = cls(folder, logger)
-        with h5py.File(store.path, "r") as f:
+        store = cls(folder, logger, read_locking)
+        with store._read() as f:
             if _attr(f, "file_type") != schema.FILE_TYPE:
                 raise ValueError(f"Not an experiment file: {store.path}")
             version = _attr(f, "schema_version")
@@ -187,6 +200,11 @@ class ExperimentStore:
         """ Return True if the folder contains an experiment file. """
 
         return (Path(folder) / schema.FILE_NAME).is_file()
+
+    def _read(self) -> h5py.File:
+        if self.read_locking is None:
+            return h5py.File(self.path, "r")
+        return h5py.File(self.path, "r", locking=self.read_locking)
 
     @contextmanager
     def _write(self) -> Iterator[h5py.File]:
@@ -262,7 +280,7 @@ class ExperimentStore:
     def read_logs(self, kind: str) -> dict[str, str]:
         """ Return the logs of one kind, keyed by session id. """
 
-        with h5py.File(self.path, "r") as f:
+        with self._read() as f:
             group = f.get(f"logs/{kind}")
             return {} if group is None else {name: _text(dataset[()]) for name, dataset in sorted(group.items())}
 
@@ -362,7 +380,7 @@ class ExperimentStore:
     def read_overview(self, phase: str) -> Optional[tuple[np.ndarray, dict]]:
         """ The overview image of a phase and its metadata, or None. """
 
-        with h5py.File(self.path, "r") as f:
+        with self._read() as f:
             if f"overview/{phase}" not in f:
                 return None
             group = f[f"overview/{phase}"]
@@ -534,7 +552,7 @@ class ExperimentStore:
     def read_summary(self) -> Optional[dict]:
         """ Return the stored summary, or None if none was written. """
 
-        with h5py.File(self.path, "r") as f:
+        with self._read() as f:
             if "summary" not in f:
                 return None
             data = _get_json_attrs(f["summary"])
@@ -621,20 +639,20 @@ class ExperimentStore:
     def read_identification(self) -> dict[str, str]:
         """ Return UUID and label of the experiment and of its substrate. """
 
-        with h5py.File(self.path, "r") as f:
+        with self._read() as f:
             return {name: _attr(f, name, "") for name in ("experiment_uuid", "experiment_label",
                                                           "substrate_uuid", "substrate_label")}
 
     def read_status(self) -> str:
         """ Return the experiment status. """
 
-        with h5py.File(self.path, "r") as f:
+        with self._read() as f:
             return _attr(f, "status", "")
 
     def has_structure(self, name: str) -> bool:
         """ Return True if a structure of that name is stored. """
 
-        with h5py.File(self.path, "r") as f:
+        with self._read() as f:
             return f"structures/{name}" in f
 
     def read(self, include_captures: bool = True) -> ExperimentRecord:
@@ -651,7 +669,7 @@ class ExperimentStore:
         ExperimentRecord
         """
 
-        with h5py.File(self.path, "r") as f:
+        with self._read() as f:
             meta = f["metadata"]
             record = ExperimentRecord(
                 uuid=_attr(f, "experiment_uuid"),
@@ -746,7 +764,7 @@ class ExperimentStore:
     def read_capture(self, capture_id: str) -> tuple[CaptureRecord, np.ndarray, dict]:
         """ Return metadata, image data and device parameters of a capture. """
 
-        with h5py.File(self.path, "r") as f:
+        with self._read() as f:
             group = f[_attr(f["capture_index"], capture_id)]
             name = "image" if _attr(group, "kind") == "camera" else "holograms"
             return self._read_capture(group), group[name][()], json.loads(_attr(group, "device_json"))
@@ -754,20 +772,20 @@ class ExperimentStore:
     def read_dhm_product(self, capture_id: str, name: str) -> tuple[np.ndarray, dict]:
         """ Return data and metadata of a DHM product. """
 
-        with h5py.File(self.path, "r") as f:
+        with self._read() as f:
             dataset = f[_attr(f["capture_index"], capture_id)]["products"][name]
             return dataset[()], json.loads(_attr(dataset, "metadata_json"))
 
     def read_program(self, structure: str, layer_id: int) -> str:
         """ Return the text of a stored layer program. """
 
-        with h5py.File(self.path, "r") as f:
+        with self._read() as f:
             return _text(f[f"structures/{structure}/programs/layer_{layer_id:03d}"][()])
 
     def plane_fit_container(self, name: str) -> bytes:
         """ Return a stored plane-fit container file (e.g. ``"plane.zdc"``) as bytes. """
 
-        with h5py.File(self.path, "r") as f:
+        with self._read() as f:
             return f[f"plane_fit/containers/{name}"][()].tobytes()
 
     # ---------------------------------------------------------------- exports
@@ -811,6 +829,6 @@ class ExperimentStore:
         return Path(path)
 
     def _capture_times(self, capture_id: str) -> list[float]:
-        with h5py.File(self.path, "r") as f:
+        with self._read() as f:
             group = f[_attr(f["capture_index"], capture_id)]
             return group["capture_times_s"][()].tolist() if "capture_times_s" in group else [0.0]

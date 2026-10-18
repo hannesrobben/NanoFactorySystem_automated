@@ -59,6 +59,16 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 
 ### Phase B — Backlog from T19 (details in `todo_notes.md`)
 
+- [ ] T67: Evaluation pipeline on top of `ExperimentFile` (follow-up of T66) [phase: B]
+  - Priority: medium
+  - Depends on: T66
+  - Done when:
+    - the maintainer has named the first evaluations (e.g. structure heights from DHM products, camera
+      image comparison before/after, voxel sizes for the voxel database);
+    - each evaluation reads its inputs with `ExperimentFile` and stores its results under `/analysis` with
+      its parameters, with a test on a dummy experiment;
+    - results can be compared over several experiments of a substrate (`find_experiments`).
+
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
 ## Blocked
@@ -180,3 +190,5 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
 - [x] T36: Z-line: offset, global variables and focal-point script (from T19) — 2026-10-01 — The focal-point script is finished (`mains/Experiments/focal_points/`; z-lines with FocusDetect containers, only via `Focus.run`); N014–N020 resolved; N072 was already done; N071 would change the plane fitting and moved to F14 (maintainer decision). — commits: `9498bee`
 
 - [x] T65: Contour mask fails in OpenCV with NumPy 2 on Windows (found during the first lab-PC run) — 2026-10-18 — `contour_mask` builds its mask as uint8 instead of `int` (int64 under NumPy 2), so the focus detection of the plane fit runs again; unit test added. — commits: `31b77fd`
+
+- [x] T66: Unpacker and live access for experiment files (maintainer request) — 2026-10-18 — New folder `analysis/` with `unpack_experiment()` (whole `experiment.h5` as PNG/CSV/TXT/JSON/ZDC plus summary and tables, optional zip, snapshot while printing) and `ExperimentFile` (reading at any time without HDF5 lock, results stored under `/analysis` with the lock file, refused while an experiment process holds it); the store can read without file locking. — commits: `6b26274`, `4687c0a`

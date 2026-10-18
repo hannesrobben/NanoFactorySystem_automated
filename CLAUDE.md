@@ -92,6 +92,10 @@ python -m pytest test/test_aerobasic/test_golden_programs.py --update-golden   #
 - The summary (`storage/summary.py`) lists every user structure with slice, hatch, power, velocity, IFOV, DHM, camera and status; it is written after `build_programs()` and after every structure into `/summary` and `experiment_summary.json`, and logged as table.
 - `storage/records.py` holds the plain data records (`ExperimentRecord`, `StructureRecord`, `CaptureRecord`, …); `ExperimentStore.read()` rebuilds all metadata from the file alone.
 
+**Analysis tools** (`analysis/`, not part of the installed package; README there)
+- `analysis/experiment_analysis/` (on the pytest `pythonpath`): `unpack_experiment(h5, target)` mirrors the experiment file into common formats (PNG for images and hologram series, CSV for arrays and tables, TXT for programs and logs, JSON for attributes, stored `.zdc`/`.png` blobs; plus summary, JSON copies and `tables/*.csv`; a snapshot copy while a process holds the lock); `ExperimentFile` reads at any time without HDF5 file locking (retries) and stores results under `/analysis/...` while holding `experiment.lock` for one write (refused while an experiment process holds it; design §5.9).
+- `analysis/unpack_experiment.py` and `analysis/analysis_template.py` are the scripts to copy/run (settings at the top); `python -m experiment_analysis unpack|info|tree` from `analysis/`.
+
 **Experiment scripts** (`mains/`)
 - `mains/Experiments/**` holds one script per experiment in use. Each describes its experiment in `experiment_spec(objective, absolute_center, ...)` (objective values: FOV, zMax, drop direction, margins, corners) and keeps its former entry function (`print_file`/`testprint`, with `backend=` and `plane=` for dry runs), which runs it with `run_experiment()`. `test/integration/test_ported_scripts.py` checks all of them.
 - `mains/Experiments/focal_points/z_line_focal_points.py` exposes z-lines at random points with camera images before and after (one `FocusDetect` container each, training data for a classifier; T36). It only calls `tools.focus.Focus.run`.

@@ -2078,3 +2078,55 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Commits:** `31b77fd` fix(image): build the contour mask as uint8 for OpenCV [T65]; docs(todo): log T65 [T65]
 - **Follow-ups:** the plane fit / focus detection on the lab PC still has to be confirmed after this fix.
   Branch `fix/contour-mask-uint8` (from `main_HR`), not pushed.
+
+### 2026-10-18 18:22 CEST — [T66] Unpacker and live access for experiment files
+- **Status:** done
+- **Context:** Maintainer request: the data of `experiment.h5` must be usable before the planned automated
+  access exists. (1) Quick fix: an unpacker that takes the path of the file and an output path and writes
+  everything in formats a Windows PC opens without extra software. (2) An interface for live access that
+  reads the file, lets analyses compute, and stores their results back in the file, as basis of a later
+  evaluation (T67). New folder `analysis/` next to `mains/`, `docs/`, `config/`; not part of the installed
+  package.
+- **Design decisions:**
+  - The unpacker mirrors the HDF5 tree generically (one folder per group), so new groups of later schema
+    versions are unpacked without code change; only a dataset type without a common format would become
+    `.npy` (none in the current schema, checked by a test).
+  - CSV default `de` (`;`, decimal comma, UTF-8 with BOM) so that German Excel opens it by double click;
+    `en` optional. To be confirmed by the maintainer.
+  - Analysis results only under `/analysis/{experiment,structures,captures}/<name>`; groups of the printing
+    process are never changed (a rebuild replaces structure groups, which would delete results stored
+    there). DHM products use the existing `add_dhm_product()` (design §5.6, F4).
+  - Writes hold `experiment.lock` for one write and are refused while an experiment process holds it
+    (design §6.3: one writer). Readers use no HDF5 file lock and retry, so they never block a write of the
+    printing process; the unpacker copies the file first while it is locked.
+  - The output folder must not contain the experiment file, because `overwrite` deletes the output folder.
+- **Changes:**
+  - `nanofactorysystem/storage/experiment_store.py`: `read_locking` argument (constructor, `open()`),
+    `_read()` used by every read; default behaviour unchanged.
+  - `test/storage/test_experiment_store.py`: test of reading without file locking.
+  - `analysis/README.md` (new): usage, output layout, rules for live access.
+  - `analysis/unpack_experiment.py` (new): unpack script (settings at the top, or command line).
+  - `analysis/analysis_template.py` (new): template for an analysis that stores results.
+  - `analysis/experiment_analysis/__init__.py` (new): public API.
+  - `analysis/experiment_analysis/__main__.py` (new): `python -m experiment_analysis unpack|info|tree`.
+  - `analysis/experiment_analysis/convert.py` (new): dataset → PNG/CSV/TXT/JSON/blob rules, CSV styles,
+    Windows-safe names.
+  - `analysis/experiment_analysis/unpack.py` (new): `unpack_experiment()` with README, summary, JSON copies,
+    `tables/*.csv`, optional zip and `.zdc` export, snapshot while locked.
+  - `analysis/experiment_analysis/access.py` (new): `ExperimentFile`, `lock_holder`, `ExperimentBusyError`.
+  - `test/analysis/test_experiment_analysis.py` (new): 12 tests (10 marked `slow`, they print a dummy
+    experiment with camera, DHM and overview).
+  - `pyproject.toml`: `analysis` on the pytest `pythonpath`.
+  - `test/README.md`: new test module, store test mentioned.
+  - `docs/design/EXPERIMENT_STORAGE.md`: §5.9 analysis results (minor schema addition, version stays 1.0).
+  - `CLAUDE.md`: analysis tools in the architecture section.
+  - `TODO.md`: T66 added to Done, T67 (evaluation pipeline) added to Open.
+  - `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest` in a fresh short-path venv (`%LOCALAPPDATA%\Temp\nfsv`, NumPy 2.5.4, h5py
+  3.16.0 / HDF5 2.0.0): 368 passed, 14 skipped (the old venv there was empty and was recreated). An unpacked
+  dummy experiment was inspected by hand: 98 PNG, 17 CSV, 44 JSON, 9 TXT files, 20 MB.
+- **Commits:** `6b26274` refactor(storage): optional read without HDF5 file locking [T66]; `4687c0a`
+  feat(analysis): unpack experiment files and live access for analyses [T66]; docs(todo): log T66 [T66]
+- **Follow-ups:** T67 (evaluation pipeline). On the lab PC: unpack a real experiment and open it in Excel
+  (CSV style), check the size for experiments with many DHM captures. Branch `feat/analysis-unpack`, created
+  from `fix/contour-mask-uint8` (contains T65, not yet merged into `main_HR`), not pushed.
