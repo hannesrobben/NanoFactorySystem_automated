@@ -69,6 +69,15 @@ has a short summary. Structures are sliced with measured voxel dimensions from a
       its parameters, with a test on a dummy experiment;
     - results can be compared over several experiments of a substrate (`find_experiments`).
 
+- [ ] T69: Run the lab check of the new features on the lab PC (follow-up of T68) [phase: B]
+  - Priority: high
+  - Depends on: T68
+  - Done when:
+    - `mains/lab_checks/new_features_check.py` has run on the lab PC and every point of its checklist is
+      recorded in WORKLOG.md as working or as a new todo;
+    - in particular: the overview before printing is in focus (it is taken at the Z where the plane fit
+      ended; if not, a todo for a defined overview Z), and a restart after Ctrl+C prints only the missing layers.
+
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
 ## Blocked
