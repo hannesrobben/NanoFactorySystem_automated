@@ -1,8 +1,10 @@
 # Software plan — real-time feedback 2PP system: overview
 
-Status: v0.2, 2026-11-15. v0.1 (draft of the same day) plus the maintainer decisions G1 and the
-todo format below. The per-repository plans `01_…`–`04_…` of v0.1 are absorbed into the `CLAUDE.md`
-(role, rules) and `TODO.md` (todos, open decisions) of each repository.
+Status: v0.3, 2026-11-16. v0.2 (2026-11-15: v0.1 plus decision G1 and the todo format below) plus
+the OffAxisHolo handover of 2026-11-16: G2 decided, G9 partly decided, new global decision G10
+(reference mask, averaging, stitching; planning session K18), facts about the DHM-PC (§8), progress
+of S1. The per-repository plans `01_…`–`04_…` of v0.1 are absorbed into the `CLAUDE.md` (role, rules)
+and `TODO.md` (todos, open decisions) of each repository.
 
 This file exists as an identical copy in all four repositories under `docs/system/`.
 **Master copy:** `NanoFactorySystem_automated/docs/system/SOFTWARE_PLAN_OVERVIEW.md`. Change the master
@@ -77,28 +79,30 @@ depend on the decision (see the partial-work rule in §7).
 | ID | Decision | Status / recommendation | Blocks |
 |---|---|---|---|
 | G1 | Home and name of the communication code. | **Decided 2026-11-15:** own repository `DHMConnect`, Python package `dhmconnect`. Todo IDs stay `DL-…`. | – |
-| G2 | Home of the shared contracts. | Recommendation: JSON Schema plus example messages in `dhmconnect/schemas/`; other packages vendor the examples as test fixtures. | K4, DL-A3, T71, MI-10 |
+| G2 | Home of the shared contracts. | **Decided 2026-11-16 (maintainer, as recommended):** JSON Schema plus example messages in `dhmconnect/schemas/`; the other repositories vendor the examples as test fixtures. | – |
 | G3 | One GUI framework for the OffAxisHolo GUI and the system GUI. Legacy `DHM_User_Interface` uses PyQt5 with matplotlib canvases. | Recommendation: PySide6 with pyqtgraph for images. | L0, T74, F15 |
 | G4 | Result plane (hologram or focus plane), propagation distance (preset 0.11 µm against measured about −2.6 µm), medium index, sign convention phase to height. Same as H1–H3 of OffAxisHolo. | open | K9, K10, MI-51 |
 | G5 | Where fusion and stitching run. | Recommendation: DHM-PC, as a worker process started by the service, CPU first. | DL-B9, MI-60 |
 | G6 | Where the target comparison runs. | Recommendation: Working-PC, because the target lives there and products are small. | T90, MI-53 |
 | G7 | Single source of truth for material data (refractive indices). | Recommendation: material registry in nanofactorysystem; a snapshot travels in `CaptureContext`; OffAxisHolo presets remain a fallback for offline use. | T75, K9, MI-51 |
 | G8 | Hardware access without Koala. See D1 in `DHMConnect/TODO.md`. | Decide after the inventory DL-H1. | DL-H2 |
-| G9 | Python baseline and installation on both PCs; repositories with `.git` inside Seafile sync folders (B5, B10). | Recommendation: Python 3.12, NumPy 2; one virtual environment per PC with editable installs of all four packages; repositories outside the sync folders. | S0 |
+| G9 | Python baseline and installation on both PCs; repositories with `.git` inside Seafile sync folders (B5, B10). | Recommendation: Python 3.12, NumPy 2; one virtual environment per PC with editable installs of all four packages; repositories outside the sync folders. **Partly decided 2026-11-16:** the maintainer keeps `.git`, `.venv` and `build/` of OffAxisHolo inside the Seafile folder knowingly (risks known); Python 3.12 stays the recommendation. | S0 |
+| G10 | Reference mask, averaging and stitching (SA1–SA7 in OffAxisHolo `docs/stitching_and_averaging.md`): source of the structure-free reference region per capture (a priori from the print job's `LayerTarget` footprint, SA1, or a posteriori from MIRA, SA3), its format and coordinates in the contract (SA2), who levels products and tiles (SA5), unwrapping across tiles (SA6). | Open; to be decided in the cross-repository planning session OffAxisHolo K18. Proposals: SA1 a priori mask (the maintainer finds it very sensible), SA2 stage µm in `CaptureContext` or the recipe, SA5 OffAxisHolo only aligns the frames of one measurement and MIRA levels. | K8, T72, T89, MI-21, MI-40 |
 
 ## 6. Cross-package milestones
 
 | Step | Content | Result | Hardware |
 |---|---|---|---|
 | S0 | Repository hygiene in all four, project files (`CLAUDE.md`, `TODO.md`, `WORKLOG.md`, done 2026-11-15), contracts v0 (DL-A3), decisions G2–G9. | Clean baselines. | no |
-| S1 | OffAxisHolo product API (K2–K8), dhmconnect protocol and service on sim/replay (DL-A, DL-B1–B7, DL-C), nanofactorysystem adapter with fake (T82–T84). | Dry run of an experiment through the service without hardware. | no |
+| S1 | OffAxisHolo product API (K2–K8), dhmconnect protocol and service on sim/replay (DL-A, DL-B1–B7, DL-C), nanofactorysystem adapter with fake (T82–T84). Progress 2026-11-16: OffAxisHolo K2–K7 done (K8 blocked by K18). | Dry run of an experiment through the service without hardware. | no |
 | S2 | Hardware inventory and gateway (DL-H1–H3), GPU validation (K14), experiment in service mode (T86, T87). | Masterplan stage R1. | yes |
+| P1 | Planning session K18 (OffAxisHolo, with all four repositories): decision G10 (SA1–SA7). Input from nanofactorysystem: T100. | Decided reference mask, levelling and stitching rules. | no |
 | S3 | Information model and operating modes (T75–T81, T88–T91), MIRA product model and comparison (MI-10, MI-50–MI-53). | Masterplan stage R2 (monitor, shadow). | partly |
 | S4 | Frame selection study (K13), speckle fusion and stitching (MI-20–MI-42, DL-B9, T85). | Known noise floor, large structures. | partly |
 | S5 | OffAxisHolo GUI (L0–L8), camera live feed (T93–T95), system GUI (F15). | Usability. | partly |
 | S6 | Process model and controller (F16). | Masterplan stage R3. Separate plan. | yes |
 
-S3 can start in parallel to S2. S5 can start once S1 exists.
+S3 can start in parallel to S2. P1 takes place before S3 and S4. S5 can start once S1 exists.
 
 ## 7. Working rules for Claude Code in all four repositories
 
@@ -120,3 +124,10 @@ S3 can start in parallel to S2. S5 can start once S1 exists.
    `legacy/`) folder after approval.
 9. A change to a shared contract is made in `dhmconnect/schemas/` first; the other repositories update
    their vendored examples in their own commits and reference the DHMConnect commit.
+
+## 8. Facts about the machines
+
+| Date | Machine | Fact | Source |
+|---|---|---|---|
+| 2026-11-16 | DHM-PC | The GPU driver supports CUDA 13 (OffAxisHolo uses `cupy-cuda13x`). | OffAxisHolo handover 2026-11-16 |
+| 2026-11-16 | DHM-PC | Python is not installed yet; the PC was only reached through the C server (`DhmServ.exe`). All Python packages need a fresh install (Python 3.12). | OffAxisHolo handover 2026-11-16 |
