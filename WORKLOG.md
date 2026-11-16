@@ -2258,3 +2258,28 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** none (documentation only).
 - **Commits:** `42313ef` docs(design): approve the information model v2 [T70]; docs(todo): close T70 [T70]
 - **Follow-ups:** phase 6 is open (T75 first, T101 on the lab PC). Next by working rule 1: T71.
+
+### 2026-11-16 18:33 CET — [T71] Design the DHM service integration and measurement recipes
+- **Status:** blocked (design written; waiting for maintainer approval, working rule 2)
+- **Context:** Investigated `devices/dhm.py`, `backends/protocols.py` (`DhmRole`, `DhmDriver`),
+  `Experiment.measure()`, `opl_scan()`, the print loop and the hologram counts in `build_programs()`
+  (grid structures 10 / 10 / 20, corners and QR code 1 / 1 / 11 for before / layer / after),
+  `ExperimentStore.add_capture()` / `add_dhm_product()` (the latter has no caller) and
+  `EXPERIMENT_STORAGE.md` §5.3/§5.6. DHMConnect DL-A2/DL-A3 are not reachable from this working copy; field
+  names follow the system plan and the OffAxisHolo draft 0.3.
+- **Changes:**
+  - `docs/design/DHM_SERVICE_INTEGRATION.md` (new): role protocol `DhmMeasurement` (configure, calibrate,
+    acquire_background, measure, result, acknowledge, sync, close), adapters legacy / service / fake, adapter
+    selection by recipe mode, `DhmRecipe` fields with defaults, `CaptureContext` incl. z hint, capture
+    sequence with `reserve_capture()`, job states, single-writer queue, back pressure (`maxPending`, default 1
+    until measured), store-then-acknowledge, restart with `sync`, calibration and background policy,
+    decisions D1–D4, tests, todo mapping.
+  - `docs/design/EXPERIMENT_STORAGE.md`: proposed §15 (capture job fields, raw reference, `frames` table,
+    product traceability attributes, `/dhm_groups`, `/calibration/dhm`, `/metadata/dhm`, `/dhm_orphans`,
+    unpack tool).
+  - `TODO.md`: T71 via In Progress to Blocked (waiting for approval).
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (documentation only).
+- **Commits:** `8118e4c` docs(design): DHM service integration and measurement recipes [T71]; `9f09c68`
+  docs(design): propose storage of DHM service results [T71]; docs(todo): log the T71 design [T71]
+- **Follow-ups:** maintainer answers D1–D4 and approves. Next: T72.

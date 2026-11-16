@@ -90,25 +90,6 @@ test fixtures. Background of the 2026-11-16 changes: `docs/system/handover/from_
 
 ### Phase 5 — Concept
 
-- [ ] T71: Design the DHM service integration and measurement recipes [phase: 5]
-  - Priority: high
-  - Size: M
-  - Depends on: – (reads DHMConnect DL-A2 if it exists; G2 decided 2026-11-16)
-  - Done when:
-    - `docs/design/DHM_SERVICE_INTEGRATION.md` defines the role protocol `DhmMeasurement`, the
-      adapters (legacy, service, fake), the recipe (fields in "Reference: DHM recipe fields" below),
-      the capture sequence with `reserve_capture()`, asynchronous jobs, acknowledgement and `sync`
-      after a restart;
-    - it defines the background policy of the recipe (a background never expires, an optional maximum
-      age only warns; proposal: once per objective and session, plus after optical changes) and how the
-      z hint of `CaptureContext` is filled;
-    - `docs/design/EXPERIMENT_STORAGE.md` gets a proposed amendment for `raw_ref`, `job_id`, frame
-      records (metrics, `used`, `reject_reason`), `/dhm_groups`, the per-product fields `schema_version`,
-      `config_hash`, `background_id`, `warnings`, `quality`, `pixel_pitch_um`, `z_um`, and the schema
-      version (`ReconstructionResult` draft 0.3, handover §3);
-    - Decision: behaviour when the DHM-PC is unreachable (`abort`, `continue`, `legacy`).
-    - Decision: may the next layer print while the DHM-PC still computes?
-
 - [ ] T72: Design the operating modes and feedback hooks [phase: 5]
   - Priority: high
   - Size: M
@@ -502,6 +483,26 @@ fraction and peak position, piston phase, phase noise). The propagation distance
 <!-- Claude Code moves a todo here when starting work. -->
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
+- [ ] T71: Design the DHM service integration and measurement recipes [phase: 5]
+  - Priority: high
+  - Size: M
+  - Depends on: – (reads DHMConnect DL-A2 if it exists; G2 decided 2026-11-16)
+  - Done when:
+    - `docs/design/DHM_SERVICE_INTEGRATION.md` defines the role protocol `DhmMeasurement`, the
+      adapters (legacy, service, fake), the recipe (fields in "Reference: DHM recipe fields" below),
+      the capture sequence with `reserve_capture()`, asynchronous jobs, acknowledgement and `sync`
+      after a restart;
+    - it defines the background policy of the recipe (a background never expires, an optional maximum
+      age only warns; proposal: once per objective and session, plus after optical changes) and how the
+      z hint of `CaptureContext` is filled;
+    - `docs/design/EXPERIMENT_STORAGE.md` gets a proposed amendment for `raw_ref`, `job_id`, frame
+      records (metrics, `used`, `reject_reason`), `/dhm_groups`, the per-product fields `schema_version`,
+      `config_hash`, `background_id`, `warnings`, `quality`, `pixel_pitch_um`, `z_um`, and the schema
+      version (`ReconstructionResult` draft 0.3, handover §3);
+    - Decision: behaviour when the DHM-PC is unreachable (`abort`, `continue`, `legacy`).
+    - Decision: may the next layer print while the DHM-PC still computes?
+  - Blocked by: waiting for maintainer approval of `docs/design/DHM_SERVICE_INTEGRATION.md` and of the
+    proposed §15 of `EXPERIMENT_STORAGE.md` (draft 2026-11-16, decisions D1–D4 with proposals in §10).
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
 - [x] T70: Design the information model v2 — 2026-11-16 — `docs/design/INFORMATION_MODEL.md` defines material (registry in the voxel SQLite, M1), substrate record v2 (material per resin drop, M3), experiment spec as project file and structures with their own settings; setup per structure, sent before every structure, default `IFOV_on` (M2), camera only before/after a structure (M6); approved by the maintainer. — commits: `2709356`, `2f72064`, `c68d2a3`, `893202c`, `42313ef`
