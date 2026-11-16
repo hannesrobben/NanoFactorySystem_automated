@@ -48,6 +48,7 @@ from nanofactorysystem.time_estimate import (DEFAULT_LAYER_OVERHEAD_S, TimeEstim
 from nanofactorysystem.storage.substrate_store import (SubstrateRecord, SubstrateStore, check_not_synced,
                                                        default_root)
 from nanofactorysystem.storage import schema
+from nanofactorysystem.voxel.materials import MaterialRegistry, material_names, unregistered_snapshot
 from nanofactorysystem.dhm.optimage import optImageMedian
 from nanofactorysystem.utils.visualization import read_file, plot_movements
 
@@ -150,7 +151,9 @@ class Experiment(object):
                  allow_synced_root: bool = False,
                  tilt_warning_um: float = 1.0,
                  camera_capture: bool = False,
-                 program_source: ProgramSource | str = ProgramSource.DRAWING):
+                 program_source: ProgramSource | str = ProgramSource.DRAWING,
+                 materials: Optional[dict[str, str]] = None,
+                 material_registry=None):
         """ Experiment on one substrate.
 
         Only the newer parameters are documented here; see the class
@@ -208,6 +211,17 @@ class Experiment(object):
         program_source : ProgramSource or str
             Where the programs of the structures come from; stored with the
             experiment.
+        materials : dict, optional
+            Registry names per role (``"resin"``, ``"substrate"``,
+            ``"medium"``). Roles not given come from the substrate record's
+            material, then from ``sys_args["sample"]``. A snapshot of each
+            material is stored in a new experiment file (T75); names given
+            here or by the substrate are also written into
+            ``sys_args["sample"]`` (decision M4).
+        material_registry : MaterialRegistry, Path or False, optional
+            Registry for the snapshots. None: the voxel database at its
+            default path if that file exists (it is never created here);
+            False: no registry (snapshots keep only the names).
         backend : {"real", "dummy"}, Backend or None
             Hardware backend passed to :class:`System`. None or ``"real"``
             (default) uses the lab hardware, ``"dummy"`` or a
@@ -259,6 +273,11 @@ class Experiment(object):
         self.substrate_information = substrate_information
         # Runtime arguments as stored with the experiment; the tools get the drop direction from here
         self.sys_args = self._with_drop_direction(sys_args, drop_direction)
+        self.material_names = material_names(
+            materials=materials, substrate_material=self.substrate.material if self.substrate is not None else None,
+            sample=self.sys_args.get("sample"))
+        self._material_registry = material_registry
+        self._with_material_names(self.sys_args, self.material_names)
         log_file = self._log_file()
         self._log_offset = Path(log_file).stat().st_size if log_file and Path(log_file).exists() else 0
         self.default_power = float(default_power)
@@ -413,6 +432,48 @@ class Experiment(object):
             self._update_substrate_index()
 
     @staticmethod
+    def _with_material_names(sys_args: dict, names: dict[str, tuple[str, str, str]]) -> None:
+        """ Write resin and substrate names that do not come from ``sys_args`` into ``sys_args["sample"]`` (M4). """
+
+        for role, key in (("resin", "material"), ("substrate", "substrate")):
+            if role in names and names[role][2] != "sys_args":
+                sys_args.setdefault("sample", {})[key] = names[role][0]
+
+    def _material_snapshots(self) -> dict[str, dict]:
+        """ Snapshots of the experiment's materials for a new experiment file (T75).
+
+        A registry that cannot be opened only gives a warning; the snapshots
+        then keep the names (``known = False``).
+        """
+
+        registry, owned = self._material_registry, False
+        if registry is None:
+            try:
+                registry, owned = MaterialRegistry.open_existing(), True
+            except Exception as error:  # e.g. a configured path in a synchronised folder
+                self.log.warning(f"Material registry not available: {error}")
+                registry = None
+        elif registry is False:
+            registry = None
+        elif not isinstance(registry, MaterialRegistry):
+            registry, owned = MaterialRegistry(Path(registry)), True
+        try:
+            snapshots = {}
+            for role, (name, batch, source) in self.material_names.items():
+                if registry is None:
+                    snapshot = unregistered_snapshot(name, role, batch=batch, name_source=source)
+                else:
+                    snapshot = registry.snapshot(name, role, batch=batch, name_source=source)
+                    if not snapshot.known:
+                        self.log.warning(f"Material {name!r} ({role}) is not in the material registry; "
+                                         f"only its name is stored.")
+                snapshots[role] = snapshot.to_dict()
+            return snapshots
+        finally:
+            if owned and registry is not None:
+                registry.close()
+
+    @staticmethod
     def _with_drop_direction(sys_args: dict, drop_direction: DropDirection) -> dict:
         """ Return a copy of ``sys_args`` with ``layer.dropDirection`` set to the drop direction.
 
@@ -448,6 +509,7 @@ class Experiment(object):
         try:
             attenuator = self.system.controller.attenuator
             store.write_calibration(attenuator.data, attenuator["fitKind"], attenuator["calibrationFile"])
+            store.write_materials(self._material_snapshots())
             store.write_layout(self._layout())
             if legacy is not None:
                 self._import_legacy(store, legacy)

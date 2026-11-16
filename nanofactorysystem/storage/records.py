@@ -297,6 +297,10 @@ class ExperimentRecord:
     captures : list of CaptureRecord
     time_estimate : dict, optional
         Expected printing time (``time_estimate.TimeEstimate.to_dict()``).
+    materials : dict
+        Material snapshots per role (``"resin"``, ``"substrate"``, ``"medium"``)
+        as written by ``MaterialSnapshot.to_dict()`` (T75); empty for files
+        written before.
     """
 
     uuid: str
@@ -322,6 +326,7 @@ class ExperimentRecord:
     progress: dict[str, list[dict]] = field(default_factory=dict)
     captures: list[CaptureRecord] = field(default_factory=list)
     time_estimate: Optional[dict] = None
+    materials: dict[str, dict] = field(default_factory=dict)
 
     def structure(self, name: str) -> StructureRecord:
         """ Return the structure with the given name. """

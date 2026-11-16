@@ -94,6 +94,50 @@ def _group(parent: h5py.Group, name: str) -> h5py.Group:
     return parent.require_group(name)
 
 
+# Columns of the material property table (/metadata/materials/<role>/properties, T75)
+PROPERTY_COLUMNS = (("key", TEXT), ("value_real", "f8"), ("value_text", TEXT), ("unit", TEXT),
+                    ("wavelength_nm", "f8"), ("state", TEXT), ("temperature_c", "f8"), ("uncertainty", "f8"),
+                    ("source", TEXT), ("date", TEXT), ("notes", TEXT))
+
+
+def _nan_if_none(value) -> float:
+    return np.nan if value is None else float(value)
+
+
+def _none_if_nan(value) -> Optional[float]:
+    value = float(value)
+    return None if np.isnan(value) else value
+
+
+def _property_table(properties: list[dict]) -> np.ndarray:
+    """ Material properties (``MaterialProperty.to_dict()``) as a compound array. """
+
+    rows = []
+    for p in properties:
+        text = isinstance(p["value"], str)
+        rows.append((p["key"], np.nan if text else float(p["value"]), p["value"] if text else "", p.get("unit", ""),
+                     _nan_if_none(p.get("wavelength_nm")), p.get("state", "any"),
+                     _nan_if_none(p.get("temperature_c")), _nan_if_none(p.get("uncertainty")),
+                     p.get("source", ""), p.get("date", ""), p.get("notes", "")))
+    return np.array(rows, dtype=list(PROPERTY_COLUMNS))
+
+
+def _properties_from_table(table: np.ndarray) -> list[dict]:
+    """ Inverse of :func:`_property_table`. """
+
+    properties = []
+    for row in table:
+        value_text = _text(row["value_text"])
+        properties.append({
+            "key": _text(row["key"]),
+            "value": value_text if np.isnan(row["value_real"]) else float(row["value_real"]),
+            "unit": _text(row["unit"]), "wavelength_nm": _none_if_nan(row["wavelength_nm"]),
+            "state": _text(row["state"]), "temperature_c": _none_if_nan(row["temperature_c"]),
+            "uncertainty": _none_if_nan(row["uncertainty"]), "source": _text(row["source"]),
+            "date": _text(row["date"]), "notes": _text(row["notes"])})
+    return properties
+
+
 class ExperimentStore:
     """ The HDF5 file of one experiment.
 
@@ -303,6 +347,61 @@ class ExperimentStore:
                 group = _group(meta, name)
                 group.attrs.clear()
                 _set_attrs(group, values)
+
+    def write_materials(self, materials: dict[str, dict]) -> None:
+        """ Write the material snapshots of the experiment (T75).
+
+        Parameters
+        ----------
+        materials : dict
+            ``{role: MaterialSnapshot.to_dict()}``. Each role becomes
+            ``/metadata/materials/<role>`` with the snapshot fields as
+            attributes and the material's properties as table ``properties``.
+            Existing snapshots are replaced.
+        """
+
+        with self._write() as f:
+            if "metadata/materials" in f:
+                del f["metadata/materials"]
+            group = _group(f, "metadata/materials")
+            for role, snapshot in materials.items():
+                entry = group.create_group(role)
+                material = snapshot.get("material") or {}
+                _set_attrs(entry, {
+                    "schema": snapshot.get("schema", ""), "role": role, "name": snapshot["name"],
+                    "known": bool(snapshot.get("known", False)), "batch": snapshot.get("batch", ""),
+                    "name_source": snapshot.get("name_source", ""),
+                    "registry_file": snapshot.get("registry_file", ""),
+                    "registry_schema_version": int(snapshot.get("registry_schema_version", 0)),
+                    "taken": snapshot.get("taken", ""),
+                    "kind": material.get("kind", ""), "supplier": material.get("supplier", ""),
+                    "notes": material.get("notes", ""), "created": material.get("created", ""),
+                })
+                entry.create_dataset("properties", data=_property_table(material.get("properties", [])))
+
+    def read_materials(self) -> dict[str, dict]:
+        """ Return the material snapshots as written by :meth:`write_materials` (empty for older files). """
+
+        with self._read() as f:
+            return self._read_materials(f)
+
+    @staticmethod
+    def _read_materials(f: h5py.File) -> dict[str, dict]:
+        materials = {}
+        for role, entry in f.get("metadata/materials", {}).items():
+            attrs = _get_json_attrs(entry)
+            snapshot = {key: attrs.get(key, "") for key in ("schema", "name", "batch", "name_source",
+                                                            "registry_file", "taken")}
+            snapshot |= {"role": role, "known": bool(attrs.get("known", False)),
+                         "registry_schema_version": int(attrs.get("registry_schema_version", 0))}
+            snapshot["material"] = None
+            if snapshot["known"]:
+                snapshot["material"] = {"name": snapshot["name"], "kind": attrs.get("kind", ""),
+                                        "supplier": attrs.get("supplier", ""), "notes": attrs.get("notes", ""),
+                                        "created": attrs.get("created", ""),
+                                        "properties": _properties_from_table(entry["properties"][()])}
+            materials[role] = snapshot
+        return materials
 
     def set_status(self, status: str) -> None:
         """ Set the experiment status (``schema.STATUS_*``). """
@@ -705,6 +804,7 @@ class ExperimentStore:
                 record.layout = self._read_layout(f["layout"])
             if "time_estimate" in f:
                 record.time_estimate = _get_json_attrs(f["time_estimate"])
+            record.materials = self._read_materials(f)
             for name, group in f.get("structures", {}).items():
                 record.structures.append(self._read_structure(group))
                 record.progress[name] = [_get_json_attrs(g) for _, g in sorted(group["progress"].items())]

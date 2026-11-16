@@ -15,7 +15,7 @@ index (``substrate.json``).
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 
 import numpy as np
 
@@ -24,6 +24,7 @@ from .experiment import QR_CODE_WIDTH_UM
 from .experiment_spec import ExperimentSpec, run_experiment
 from .resin_drop import drop_outline, has_drop_boundary, rectangle_inside
 from .runtime import getLogger
+from .voxel.materials import as_material_dict
 from .storage.experiment_store import ExperimentStore
 from .storage.substrate_store import (SubstrateRecord, SubstrateStore, check_not_synced, default_root,
                                       find_experiments, initials)
@@ -52,8 +53,12 @@ class SubstrateSpec:
         Label of the substrate, e.g. ``"HR-26-001"``. A substrate that does
         not exist yet is created; without a label the next free label of the
         user is used.
-    material : dict
-        Substrate and resin (stored when the substrate is created).
+    material : str or dict
+        Resin and substrate (stored when the substrate is created): a
+        material registry name of the resin, or a dictionary as in older
+        mains (``resin``, ``substrate``, ``medium``, ``batch``, thicknesses,
+        …; registry names in ``resin`` / ``substrate`` / ``medium`` are
+        used for the material snapshots of the experiments, T75).
     notes : str
         Free text (stored when the substrate is created).
     data_root : Path, optional
@@ -66,7 +71,7 @@ class SubstrateSpec:
     objective: str
     resin_edges: list
     label: Optional[str] = None
-    material: dict = field(default_factory=dict)
+    material: Union[str, dict] = field(default_factory=dict)
     notes: str = ""
     data_root: Optional[Path] = None
     allow_synced_root: bool = False
@@ -287,7 +292,7 @@ def open_substrate(substrate: SubstrateSpec, store: SubstrateStore) -> Substrate
         record = store.get(substrate.label)
     else:
         record = store.create(substrate.user, initials(sysConfig.user(substrate.user)), label=substrate.label,
-                              material=substrate.material, notes=substrate.notes)
+                              material=as_material_dict(substrate.material), notes=substrate.notes)
     edges = [list(map(float, e)) for e in substrate.resin_edges]
     if not any(drop.get("edges_um") == edges for drop in record.resin_drops):
         record = store.add_resin_drop(record.label, edges)
@@ -297,7 +302,7 @@ def open_substrate(substrate: SubstrateSpec, store: SubstrateStore) -> Substrate
 def run_substrate(substrate: SubstrateSpec, experiments: list[SubstrateExperiment], *, backend=None,
                   plane: Optional[ZFunction] = None, confirm: Optional[Callable[[str], bool]] = None,
                   confirm_between: Optional[Callable[[str], bool]] = None, show_plot: bool = False,
-                  logger: Optional[logging.Logger] = None) -> list[Path]:
+                  logger: Optional[logging.Logger] = None, material_registry=None) -> list[Path]:
     """ Check the layout, then run the experiments of a substrate one after another.
 
     Parameters
@@ -318,6 +323,9 @@ def run_substrate(substrate: SubstrateSpec, experiments: list[SubstrateExperimen
     show_plot : bool
         Show the substrate layout and each experiment plot.
     logger : logging.Logger, optional
+    material_registry : MaterialRegistry, Path or False, optional
+        Registry for the material snapshots of the experiments (see
+        :class:`~nanofactorysystem.experiment.Experiment`).
 
     Returns
     -------
@@ -352,5 +360,6 @@ def run_substrate(substrate: SubstrateSpec, experiments: list[SubstrateExperimen
         folders.append(run_experiment(
             experiment.spec, user=substrate.user, resin_edges=substrate.resin_edges, path=experiment.path,
             substrate=record.label, data_root=store.root, backend=backend, plane=plane, confirm=confirm,
-            show_plot=show_plot, allow_synced_root=substrate.allow_synced_root))
+            show_plot=show_plot, allow_synced_root=substrate.allow_synced_root,
+            material_registry=material_registry))
     return folders

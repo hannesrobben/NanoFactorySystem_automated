@@ -134,7 +134,7 @@ Attributes of `/`:
 | Attribute | Content |
 |---|---|
 | `file_type` | `"nanofactory.experiment"` |
-| `schema_version` | `"1.0"` (§9) |
+| `schema_version` | `"1.0"`; `"1.1"` since T75 (`/metadata/materials`) (§9) |
 | `experiment_uuid`, `experiment_label` | §4 |
 | `substrate_uuid`, `substrate_label` | §4 (empty strings if no substrate is given) |
 | `created` | first write |
@@ -151,6 +151,7 @@ Attributes of `/`:
 | `/metadata/system` | `sys_args_json` (as passed); `devices_json`: `System.items()` (controller, camera, DHM, system parameters) at start; `acceleration_x_mm_s2`, `acceleration_a_mm_s2`, `acceleration_z_mm_s2` (read from the controller) and `acceleration_a_rule` (`"controller"` or `"x/2 (IFOV workaround)"`); `backend` (`"real"` or `"dummy"`, so that dry-run files are never mistaken for prints) |
 | `/metadata/software` | `package_version` (from `importlib.metadata`), `git_commit`, `git_dirty` (bool), `git_branch` (empty if not a git checkout), `python_version`, `versions_json` (numpy, h5py, SciDataContainer, OpenCV) |
 | `/metadata/substrate` | copy of the substrate record at experiment start (§8), so the file stays self-contained |
+| `/metadata/materials/<role>` | since 1.1 (T75): material snapshot per role (`resin`, `substrate`, `medium`): attributes `schema`, `name`, `known`, `batch`, `name_source` (`argument`, `substrate`, `sys_args`), `registry_file`, `registry_schema_version`, `taken`, and of a known material `kind`, `supplier`, `notes`, `created`; table `properties` (`key`, `value_real` (NaN for text), `value_text`, `unit`, `wavelength_nm`, `state`, `temperature_c`, `uncertainty`, `source`, `date`, `notes`). Written once when the file is created; a restart keeps it |
 | `/metadata/sessions` | table (compound dataset, one row per run of the process on this file): `started`, `ended`, `kind` (`new`/`restart`), `end_reason` (`finished`/`aborted`/`exception`), `software_git_commit` |
 
 ### 5.3 Calibration, plane fit and OPL scan

@@ -41,6 +41,20 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(skip_hardware)
 
 
+@pytest.fixture(autouse=True)
+def no_default_material_registry(monkeypatch, tmp_path):
+    """ Keep tests away from the voxel/material database of the PC (T75).
+
+    ``Experiment`` opens the registry at its default path if that file
+    exists, and opening it migrates its schema. Every test therefore sees a
+    non-existing default file; tests that need a registry pass one
+    explicitly (``material_registry=``).
+    """
+
+    monkeypatch.setattr("nanofactorysystem.voxel.materials.default_path",
+                        lambda: tmp_path / "no_default_registry.sqlite")
+
+
 def dummy_sys_args():
     """ Return runtime arguments for ``System`` on the dummy backend. """
 

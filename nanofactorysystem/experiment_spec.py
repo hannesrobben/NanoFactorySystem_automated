@@ -206,6 +206,10 @@ class ExperimentSpec:
     overview_capture, overview_single_images : bool
         Stitched camera overview before and after printing, optionally with
         the single images (T28).
+    materials : dict
+        Material registry names per role (``"resin"``, ``"substrate"``,
+        ``"medium"``); roles not given come from the substrate, then from
+        ``sys_args["sample"]``. Snapshots are stored with the experiment (T75).
     """
 
     name: str
@@ -238,6 +242,7 @@ class ExperimentSpec:
     layer_overhead_s: float = 5.0
     overview_capture: bool = False
     overview_single_images: bool = False
+    materials: dict = field(default_factory=dict)
 
     def voxel_model(self):
         """ The voxel model of the experiment (:class:`~nanofactorysystem.voxel.DatabaseVoxelModel`), or None
@@ -322,7 +327,7 @@ class ExperimentSpec:
             program_source=spec.program_source,
             resin_edges=[tuple(map(float, e)) for e in edges] if len(edges) == 4 else None,
             layer_overhead_s=spec.layer_overhead_s, overview_capture=spec.overview_capture,
-            overview_single_images=spec.overview_single_images,
+            overview_single_images=spec.overview_single_images, materials=dict(spec.materials) or None,
         )
 
 
@@ -330,7 +335,7 @@ def run_experiment(spec: ExperimentSpec, *, user: str, resin_edges, path: Option
                    substrate: Optional[str] = None, data_root: Optional[Path] = None, backend=None,
                    plane: Optional[ZFunction] = None, confirm: Optional[Callable[[str], bool]] = None,
                    show_plot: bool = False, substrate_information: Optional[dict] = None,
-                   allow_synced_root: bool = False) -> Path:
+                   allow_synced_root: bool = False, material_registry=None) -> Path:
     """ Run an experiment: plot, plane fit, OPL scan (DHM), structures, build and print.
 
     Parameters
@@ -359,6 +364,8 @@ def run_experiment(spec: ExperimentSpec, *, user: str, resin_edges, path: Option
         Free substrate information of older scripts, stored in the experiment file.
     allow_synced_root : bool
         Accept a data root inside a synchronised folder.
+    material_registry : MaterialRegistry, Path or False, optional
+        Registry for the material snapshots (see :class:`Experiment`).
 
     Returns
     -------
@@ -377,6 +384,7 @@ def run_experiment(spec: ExperimentSpec, *, user: str, resin_edges, path: Option
                                           path=folder, substrate=substrate, data_root=data_root)
     arguments["substrate_information"] = substrate_information
     arguments["allow_synced_root"] = allow_synced_root
+    arguments["material_registry"] = material_registry
 
     def ask(question: str) -> bool:
         return confirm is None or confirm(question)

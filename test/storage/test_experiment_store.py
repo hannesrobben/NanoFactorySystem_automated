@@ -202,3 +202,28 @@ def test_reads_without_file_locking(store):
     reader = ExperimentStore.open(store.folder, read_locking=False)
     assert reader.read_locking is False and ExperimentStore.open(store.folder).read_locking is None
     assert reader.read().uuid == record().uuid and reader.read_status() == schema.STATUS_CREATED
+
+
+def test_material_snapshots_round_trip(store):
+    assert store.read_materials() == {}  # files written before T75 have none
+    resin = {"schema": "nanofactory.material_snapshot/1", "role": "resin", "name": "ResinX", "known": True,
+             "batch": "L42", "name_source": "substrate", "registry_file": "materials.sqlite",
+             "registry_schema_version": 2, "taken": "2026-11-16T18:00:00.000Z",
+             "material": {"name": "ResinX", "kind": "resin", "supplier": "Lab", "notes": "", "created": "",
+                          "properties": [
+                              {"key": "refractive_index", "value": 1.52, "unit": "1", "wavelength_nm": 633.0,
+                               "state": "cured", "temperature_c": None, "uncertainty": 0.002,
+                               "source": "datasheet", "date": "2026-01-01", "notes": ""},
+                              {"key": "photoinitiator", "value": "Irgacure 369", "unit": "", "wavelength_nm": None,
+                               "state": "any", "temperature_c": None, "uncertainty": None, "source": "",
+                               "date": "2026-01-02", "notes": "per data sheet"}]}}
+    unknown = {"schema": "nanofactory.material_snapshot/1", "role": "substrate", "name": "glass", "known": False,
+               "batch": "", "name_source": "sys_args", "registry_file": "", "registry_schema_version": 0,
+               "taken": "2026-11-16T18:00:00.000Z", "material": None}
+
+    store.write_materials({"resin": resin, "substrate": unknown})
+
+    assert store.read_materials() == {"resin": resin, "substrate": unknown}
+    assert store.read().materials["resin"]["material"]["properties"][0]["value"] == 1.52
+    store.write_materials({"resin": resin})  # replaces, never merges
+    assert set(store.read_materials()) == {"resin"}
