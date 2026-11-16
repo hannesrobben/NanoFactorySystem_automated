@@ -2130,3 +2130,42 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Follow-ups:** T67 (evaluation pipeline). On the lab PC: unpack a real experiment and open it in Excel
   (CSV style), check the size for experiments with many DHM captures. Branch `feat/analysis-unpack`, created
   from `fix/contour-mask-uint8` (contains T65, not yet merged into `main_HR`), not pushed.
+
+
+### 2026-11-15 23:15 CET — [Reorganisation] Project files for the four-repository system plan
+- **Status:** done
+- **Context:** Maintainer request: create `CLAUDE.md` and `TODO.md` for OffAxisHolo, DHMConnect and MIRA in
+  the style of this repository and sort the todos of all four. The maintainer had moved this repository's
+  project files into `todo_claude/` together with the plans `00_SOFTWARE_PLAN_OVERVIEW.md` and
+  `03_NANOFACTORYSYSTEM_PLAN.md`; they are back at the root (content unchanged except where listed).
+  Decisions taken with the maintainer: G1 — the communication repository is DHMConnect, package
+  `dhmconnect` (the plan said `dhmlink`); the system plan is copied into every repository, master copy here;
+  all four repositories use the format of this `TODO.md`.
+- **Changes:**
+  - `docs/system/SOFTWARE_PLAN_OVERVIEW.md` (new): system plan v0.2 (G1 decided, `dhmlink` → `dhmconnect`,
+    unified todo rules, rule for contract changes); master copy.
+  - `CLAUDE.md`: project files listed (incl. `future_todo.md`, `todo_notes.md`, `docs/system/`), new section
+    "System context", legacy DHM path described, language rule extended, session start step 4, commit rules
+    (feature branch from `main_HR`, topic split, messages for human readers), `dhmconnect`/`mira` in the
+    testing rule, empty sections `## Current Status` / `## Status Update Anchor` added for the status
+    review routine (they were referenced but missing).
+  - `TODO.md`: phase plan extended by phases 5–10 (T70–T97 from the plan), working rules 7–9, table of open
+    global decisions, recipe field reference under phase 7, T98 and T99 added (found during the
+    reorganisation), field "Size" added to the format, T68 added to Done (it had been committed in `ed4e769`
+    but not logged).
+  - `future_todo.md`: F3, F4, F5, F6, F7, F12 marked as scheduled (→ T…, or moved to MIRA / DHMConnect);
+    F15 (system GUI), F16 (controller and mode `correct`), F17 (dynamic slicing) added.
+  - `WORKLOG.md`: this entry. Note: T68 has no entry of its own in this log; its commit message documents it.
+  - `todo_notes.md`, `TODO_default_origin.md`, `Information_Mehrere_Experimente.txt`: restored unchanged at
+    the root (T98 turns the last one into an English guide).
+- **Tests:** none (documentation only).
+- **Commits:** uncommitted — proposed messages (one per topic, on a branch `docs/system-plan` from the
+  current branch `feat/lab-check`):
+  1. `docs(system): add the plan for the four cooperating repositories`
+     Files: `docs/system/SOFTWARE_PLAN_OVERVIEW.md` (new)
+  2. `docs(claude): describe the system context and tighten the commit rules`
+     Files: `CLAUDE.md`
+  3. `docs(todo): schedule phases 5–10 for DHM service, operating modes and GUI`
+     Files: `TODO.md`, `future_todo.md`, `WORKLOG.md`
+- **Follow-ups:** T70–T74 (designs) are next; T69 (lab check) on the lab PC; the untracked folder
+  `todo_claude/` can be removed once the maintainer has reviewed the files.

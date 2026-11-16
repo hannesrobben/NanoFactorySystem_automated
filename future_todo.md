@@ -34,7 +34,8 @@ first), **Watch out for** (pitfalls and constraints), **Open questions** (for th
   OffAxisHolo.
 - **Open questions:** Is the conversion done in the slicer or before it? Which refractive-index model?
 
-## F3: Camera video recording in a thread
+## F3: Camera video recording in a thread → T73, T93, T94, T95
+- **Scheduled (2026-11-15):** camera live feed and recording are phase 9 of `TODO.md` (design T73).
 - **Goal:** The camera records the printing process as video in a background thread.
 - **Context:** Useful for illustration only, no value for production. Lowest priority.
 - **Prerequisites:** T45 (camera capture only on request), T47.
@@ -43,7 +44,8 @@ first), **Watch out for** (pitfalls and constraints), **Open questions** (for th
   frames to layers.
 - **Open questions:** Frame rate, codec, storage location.
 
-## F4: DHM reconstruction on the DHM PC and interplay of the two PCs
+## F4: DHM reconstruction on the DHM PC and interplay of the two PCs → T71, T82–T87
+- **Scheduled (2026-11-15):** phase 7 of `TODO.md`; reconstruction itself is OffAxisHolo (K-todos), transport and the DHM service are DHMConnect (DL-todos). See `docs/system/SOFTWARE_PLAN_OVERVIEW.md`.
 - **Goal:** Holograms are reconstructed on the fly on the GPU of the PC that controls the DHM, using the
   OffAxisHolo library; the printing PC receives reconstructed data (phase, amplitude, derived values)
   instead of or in addition to the raw holograms.
@@ -56,7 +58,8 @@ first), **Watch out for** (pitfalls and constraints), **Open questions** (for th
 - **Open questions:** Transport protocol; which products are sent; who triggers a capture; where are raw
   holograms kept, and for how long?
 
-## F5: Multiple holograms at shifted positions for speckle reduction
+## F5: Multiple holograms at shifted positions for speckle reduction → T85 (planning and capture)
+- **Scheduled (2026-11-15):** capture planning is T85 here; registration and fusion moved to MIRA (MI-20–MI-31), group handling to DHMConnect (DL-B9). The open questions stay with T85 ("Decision:").
 - **Goal:** Several holograms of the same structure are taken at slightly shifted stage positions, aligned
   and averaged after reconstruction to reduce speckle noise.
 - **Context:** T46 stores the stage position of every capture and allows a list of capture offsets.
@@ -67,7 +70,8 @@ first), **Watch out for** (pitfalls and constraints), **Open questions** (for th
 - **Open questions:** Number and pattern of positions; shift amplitude; which averaging (complex field or
   phase)?
 
-## F6: DHM stitching for structures larger than the DHM field of view
+## F6: DHM stitching for structures larger than the DHM field of view → T85 (planning and capture)
+- **Scheduled (2026-11-15):** the raster is planned in T85 here; registration and stitching moved to MIRA (MI-20, MI-40–MI-42), group handling to DHMConnect (DL-B9).
 - **Goal:** Structures larger than the DHM FOV (which is smaller than the production FOV) are captured as
   a grid of holograms and stitched, so that large structures can be evaluated.
 - **Context:** Capture grid = structure size / (DHM FOV × (1 − overlap)); T46 provides positions per
@@ -78,7 +82,8 @@ first), **Watch out for** (pitfalls and constraints), **Open questions** (for th
   the stitched result and the tiles should both be stored.
 - **Open questions:** Stitching on the DHM PC or offline? Required overlap?
 
-## F7: Slicing, hatching and adaptive printing strategies
+## F7: Slicing, hatching and adaptive printing strategies (extension point → T81)
+- **Scheduled (2026-11-15):** only the extension point (strategy name and parameters per structure) is scheduled as T81; the strategies stay here.
 - **Goal:** The slicer offers several slicing and hatching strategies and adaptive printing (e.g. power
   or spacing adapted per layer or line).
 - **Context:** Includes the open slicer roadmap items (formerly T40, N095): contour as polyline, tilted
@@ -158,7 +163,8 @@ first), **Watch out for** (pitfalls and constraints), **Open questions** (for th
 - **Open questions:** Which system parameters are needed (N030)? What was the symptom of the bug of
   26.02.26 (N074)?
 
-## F12: Shell ("vector") printing in the slicer
+## F12: Shell ("vector") printing in the slicer (extension point → T81)
+- **Scheduled (2026-11-15):** only the extension point is scheduled as T81.
 - **Goal:** A slicing strategy that first prints the outer shell of a part as continuous 3-D paths and
   then fills the inside with planar slices.
 - **Context:** N068 "vector printing" (maintainer explanation 2026-10-01): the shell is written as one
@@ -196,3 +202,34 @@ first), **Watch out for** (pitfalls and constraints), **Open questions** (for th
 - **Watch out for:** `Focus.zline` and the focal-point script both add the offset today; moving it must not
   apply it twice. The z-line is centred on z (z - dz/2 to z + dz/2).
 - **Open questions:** Should the offset also be applied for dots (dz = 0)?
+
+## F15: GUI for the whole system
+- **Goal:** One application to define substrates, experiments and structures, see the layout, run
+  and supervise prints, with live camera and DHM views.
+- **Context:** Details follow separately from the maintainer. The core is prepared by T77, T80,
+  T93–T97. The DHM analysis and live GUI is OffAxisHolo L0–L8.
+- **Prerequisites:** T74, T96, T97; decision G3 (same framework as the OffAxisHolo GUI).
+- **Watch out for:** The GUI process must respect the single writer of `experiment.h5`; hardware
+  stays the default backend; a GUI crash must not stop a running print uncontrolled.
+- **Open questions:** Scope of the first version; one application with the DHM GUI or two.
+
+## F16: Controller and operating mode `correct`
+- **Goal:** A measured deviation changes the following layers: power or dose, z offset, local
+  re-exposure, additional or skipped layer.
+- **Context:** Masterplan phases P4 and P5. T88–T92 provide modes, targets, reports and the
+  `Controller` protocol; `shadow` stores plans without applying them.
+- **Prerequisites:** T91; a measured noise floor (N-study OffAxisHolo K13, speckle fusion MIRA MI-30);
+  a process model from dose to in-situ phase to final height.
+- **Watch out for:** Layer programs are built before the print today, so late generation per layer
+  is needed; global corrections can use controller variables, local ones need a new layer program;
+  over-exposure cannot be undone; every correction needs hard limits and a stop rule.
+- **Open questions:** First demonstration structure and objective; comparison in the phase or in
+  the height domain; does the print wait for the evaluation?
+
+## F17: Dynamic slicing and hatching per structure
+- **Goal:** Slicing and hatching adapt within a structure, for example to geometry or measured
+  deviations.
+- **Context:** Extension point T81; related to F7 and F12.
+- **Prerequisites:** T78, T81, F7.
+- **Watch out for:** Reproducibility: the algorithm, its version and parameters go into the metadata.
+- **Open questions:** Which algorithms first, and which quality metric decides between them?
