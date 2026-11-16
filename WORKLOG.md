@@ -2227,3 +2227,24 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Follow-ups:** maintainer answers M1–M6 and approves (line `Status: approved <date>`); T101 on the lab PC.
   Next todo without approval dependency: T71 (design of the DHM service integration).
   Branch `docs/t70-information-model` on top of `docs/system-plan` (from `main_HR`); nothing pushed.
+
+### 2026-11-16 18:00 CET — [T70] Maintainer decisions M1–M6 worked into the information model
+- **Status:** blocked (decisions recorded; the approval line `Status: approved <date>` is still missing)
+- **Context:** The maintainer answered M1–M6: M1, M3 (several materials per substrate unlikely), M4, M5 as
+  proposed; M2: setup sent for every structure, unchanged within a structure, changeable between
+  structures, default `IFOV_on` (non-IFOV is outdated but stays selectable); M6: camera per structure only
+  before and after, no layer captures. Future camera wishes: video of the structure while printing (→ T94)
+  and a stitched overview of the experiment before and after printing by stage xy positions (exists since
+  T28, `overview_capture=True`).
+- **Changes:**
+  - `docs/design/INFORMATION_MODEL.md`: status line, §3.2 (M3 note), §4 (`setup` default `IFOV_on`,
+    `camera_capture` before/after only), §7 (decision M2 replaces the options; new §7.1 with the default
+    change, five scripts that need an explicit `setup="IFOV_off"`, re-recorded golden command logs, camera
+    behaviour change), §11 (decisions), §13.
+  - `TODO.md`: T78 acceptance criteria follow M2/M6; T101 asks for the resets of both setup programs; T94
+    note on the structure video; T70 blocked reason updated.
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (documentation only).
+- **Commits:** `c68d2a3` docs(design): record the maintainer's decisions M1-M6 in the info model [T70];
+  docs(todo): log the T70 decisions [T70]
+- **Follow-ups:** maintainer writes the approval line; then phase 6 (T75 first). T101 on the lab PC.

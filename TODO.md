@@ -199,9 +199,14 @@ test fixtures. Background of the 2026-11-16 changes: `docs/system/handover/from_
     - a structure can set program source, slicing and hatching parameters, power, velocity, voxel
       model, DHM recipe and operating mode itself; unset values come from the experiment;
     - `spec.resolved()` shows the effective values per structure and validates combinations;
-    - setup per structure is implemented as far as T70 allows, otherwise a follow-up todo exists
-      (the switch from IFOV to non-IFOV programs needs the result of T101);
-    - existing specs give identical programs (golden files unchanged).
+    - setup per structure as decided in T70 (M2): default `IFOV_on`, the structure's setup program is
+      sent before its first printed layer in every session (also after a restart), never changed within
+      a structure, IFOV layer programs refused under `IFOV_off`; accelerations per structure setup;
+      resets in the setup programs as found by T101;
+    - camera captures per structure only before and after the structure, no layer captures (M6);
+    - the ported scripts that rely on today's default get an explicit `setup="IFOV_off"`; existing specs
+      give identical programs (golden program files unchanged); the golden command logs are re-recorded
+      with the reason (one setup per structure).
 
 - [ ] T79: Experiment configuration record [phase: 6]
   - Priority: medium
@@ -238,7 +243,8 @@ test fixtures. Background of the 2026-11-16 changes: `docs/system/handover/from_
       `METRIC` (IFOV layer programs) persist after a program task ends, into the next program and into the
       next experiment of the same controller session (`DefaultSetup` resets none of them);
     - the result is recorded in `docs/design/INFORMATION_MODEL.md` §7 and WORKLOG.md, and the reset
-      commands a switch to non-IFOV programs needs are listed for T78;
+      commands that `DefaultSetup` and `SetupIFOV` each need to reach a defined state regardless of what
+      ran before are listed for T78 (the setup is sent before every structure, decision M2);
     - if a state leaks into `IFOV_off` experiments today, a `fix:` todo exists.
 
 ### Phase 7 — DHM service integration
@@ -416,6 +422,7 @@ fraction and peak position, piston phase, phase noise). The propagation distance
     - a recording can be started per experiment or structure, is written next to the experiment
       file, and a table in `experiment.h5` maps frame times to structures and layers;
     - the recording stops cleanly on abort.
+  - Note: the maintainer wants a video of each structure while it prints (2026-11-16, with T70 M6).
 
 - [ ] T95: Live feed interface [phase: 9]
   - Priority: medium
@@ -510,8 +517,8 @@ fraction and peak position, piston phase, phase noise). The propagation distance
       details can be added at any time (G7).
     - Decision: can structures with IFOV on and IFOV off be mixed in one experiment? Today `setup`
       is a field of the experiment. Investigate the setup programs first and report.
-  - Blocked by: waiting for maintainer approval of `docs/design/INFORMATION_MODEL.md` (draft 2026-11-16,
-    decisions M1–M6; M1 = material store, M2 = IFOV mixing, both with a recommendation in §7 and §8).
+  - Blocked by: waiting for the approval line in `docs/design/INFORMATION_MODEL.md`; decisions M1–M6 were
+    answered on 2026-11-16 and are worked into the document.
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
 - [x] T1: Record baseline and review the code — 2026-09-28 — Recorded the test baseline (global env: all 40 files fail on a NumPy ABI mismatch; clean venv: 16 passed / 20 failed / 16 errors over `test/`) in WORKLOG.md and wrote `docs/reviews/CODE_REVIEW_2026-09-28.md`; follow-ups T9–T18 added. — commits: `bf98f78`
