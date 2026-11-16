@@ -1,6 +1,7 @@
 # Design: Information model v2 (material, substrate, experiment, structure)
 
-Status: draft 2026-11-16, waiting for maintainer approval (T70). Implementation todos: T75–T81.
+Status: draft 2026-11-16; decisions M1–M6 answered by the maintainer on 2026-11-16 (§11) and worked in;
+waiting for the approval line (T70). Implementation todos: T75–T81, T101.
 
 Builds on `EXPERIMENT_STORAGE.md` (approved 2026-09-29) and `VOXEL_DATABASE.md` (approved 2026-09-30).
 Neither is replaced; this document adds the material level, settings per structure and a stored
@@ -114,8 +115,10 @@ DHM capture (G7). The snapshot has `schema_version`, `registry_file`, `registry_
 | `resin_drops[]` | extended | Per drop: `edges_um`, `added` (unchanged), plus `material` (registry name), `batch`, `thickness_um`, `application` (`drop` \| `dip_in`). |
 | `material` | kept | The v1 free dict; still written when a script passes it, so nothing is lost. |
 
-Material per drop instead of per substrate: a substrate can carry several drops (`resin_drops` is a list
-today), and dip-in (no drop boundary, T62) is a property of the application, not of the substrate.
+Material per drop instead of per substrate (decision M3): a substrate can carry several drops
+(`resin_drops` is a list today), and dip-in (no drop boundary, T62) is a property of the application, not
+of the substrate. Several materials on one substrate are unlikely (maintainer); the per-drop field costs
+nothing in that case, and the experiment takes the material of its drop by default.
 
 **Experiment index entry** (T76): unchanged fields plus `status` with the values `planned` (written by a
 substrate main before the run, no experiment file yet), and the file statuses `created`, `built`,
@@ -162,7 +165,7 @@ An experiment is described by `ExperimentSpec` (what should be printed and how) 
 
 | Setting | Today | Experiment default | Per structure | Validation |
 |---|---|---|---|---|
-| `setup` (`IFOV_off` / `IFOV_on`) | experiment | yes | yes, derived from the geometry if not set (§7) | IFOV needs an objective with IFOV support |
+| `setup` (`IFOV_on` / `IFOV_off`) | experiment | yes, default **`IFOV_on`** (M2) | yes; sent before every structure, fixed within a structure (§7) | IFOV needs an objective with IFOV support; IFOV layer programs are refused with `IFOV_off` |
 | `program_source` (`DRAWING` / `SLICER`) | experiment | yes (shortcut) | derived from the geometry kind | `SLICER` ⇒ `IFOV_on` |
 | `axes` (`ABZ` / `XYZ`) | structure | yes | yes | ignored by IFOV programs (warning if set) |
 | `slicing` (`slice_size`, `spacing_mode`, `voxel_overlap`, `strategy`, …) | `StructureSpec.slicer` | yes | yes, merged key by key | only for `SLICER`; `strategy` from the registry of T81 |
@@ -172,7 +175,7 @@ An experiment is described by `ExperimentSpec` (what should be printed and how) 
 | `velocity_um_s` | `low/high_speed_um_s`, drawing arguments, slicer `velocity` | yes | yes | IFOV writes with the fixed speed of the objective (F13): a different value is refused for IFOV structures |
 | `voxel_model` (`none` / `fixed` / `database`) + parameters | `voxel_material` | yes (default `database` with the drop's resin if data exist, else `none`) | yes | `database` needs a material |
 | `dhm_recipe` | `dhm_usage` + counts per structure type | yes (T71) | yes, per phase (before / layer / after) | needs `dhm_usage` |
-| `camera_capture` | experiment | yes | yes (decision M6) | |
+| `camera_capture` | experiment (before, every layer, after) | yes | yes (decision M6) | only **before and after** the structure, no layer captures (M6; behaviour change, see §7.1) |
 | `feedback_mode` (`off` / `monitor` / `shadow` / `correct`) | – | yes (`off`) | yes | `correct` refused without controller (T88); modes other than `off` need a DHM recipe with products |
 
 **Resolution** (`spec.resolved()`, T78): built-in defaults < objective defaults (`OBJECTIVE_DEFAULTS`) <
@@ -322,18 +325,44 @@ Conclusion: technically the experiment already mixes both kinds of programs; wha
 defined controller state at the start of every non-IFOV program, (b) per-structure accelerations and
 reporting, (c) knowing which states persist.
 
-Options:
-- **A (recommended): per-structure setup.** `setup` becomes a structure setting, derived from the
-  geometry (IFOV structures → `IFOV_on`, everything else → `IFOV_off`) unless set. The experiment-wide
-  setup is still sent at the start (legacy behaviour, golden logs unchanged). In addition, before the
-  first non-IFOV structure that follows an IFOV structure, the experiment sends `DefaultSetup` plus the
-  resets that T101 identifies; experiments without a switch send nothing new. Both accelerations are read
-  once before the IFOV setup, and each structure gets the one of its own setup. Voxel lookup, records and
-  summary use the structure's setup. Lab check needed (T101) before T78 implements the switch.
-- **B: keep one setup per experiment** and only report corners / QR code correctly. Simple, but mixed
-  experiments (e.g. IFOV gratings next to stage-written reference blocks) stay impossible.
-- **C: a setup header in every layer program.** Most robust, but changes every golden program file and
-  makes each layer program longer.
+Options considered: A — setup per structure, sent only when switching; B — one setup per experiment;
+C — a setup header in every layer program.
+
+**Decision M2 (maintainer, 2026-11-16):** setup per structure, and to prevent errors the setup is **always
+sent for every structure**, not only on a switch:
+
+- `setup` is a structure setting with the experiment default **`IFOV_on`**. Everything that can be written
+  without IFOV can also be written with IFOV, not the other way round; `IFOV_off` is therefore considered
+  outdated but stays selectable (per experiment or per structure).
+- Before the first printed layer of every structure (in every session, so also after a restart in the
+  middle of a structure) the experiment sends the structure's setup program (`SetupIFOV` or
+  `DefaultSetup`) through the immediate interface. The layer programs themselves stay unchanged (no
+  header, golden program files unchanged).
+- Within a structure the setup never changes: all its layers run under the one setup. An IFOV layer
+  program (`IFOV_AeroBasicProgram`) in a structure with `IFOV_off` is refused when the programs are built;
+  non-IFOV programs are allowed under both setups (as corners and QR code are today).
+- Corners and QR code take the experiment default like every other structure.
+- `DefaultSetup` and `SetupIFOV` must each bring the controller into a defined state regardless of what
+  ran before; which resets they need (galvo rotation, ramp, look-ahead, laser override) is found out by
+  T101. Until then the setup programs stay as they are.
+- Accelerations: the A, X and Z accelerations are read once from the controller before any IFOV setup;
+  each structure's `BuildContext` gets `accel_a_um` by its own setup (`IFOV_on`: `accel_x / 2`, the
+  workaround of 2026-05-07; `IFOV_off`: the controller value). Voxel lookup, `StructureRecord.setup` and
+  the summary use the structure's setup.
+
+### 7.1 Consequences for existing data and tests
+
+- **Default change:** `ExperimentSpec.setup` and `Experiment(setup=)` change their default from `IFOV_off`
+  to `IFOV_on`. The ported scripts that rely on today's default (`parameter_testprint_power_speed.py`,
+  `parameter_testprint_power_speed_test4orientation.py`, `parameter_testprint_slicing_hatching.py`,
+  `Power_speed_line_test.py`, `z_line_focal_points.py`) get an explicit `setup="IFOV_off"` in T78, so their
+  programs stay identical.
+- **Command logs:** one setup per structure adds immediate commands; the golden command logs
+  (`commands_experiment_ifov_on.txt`, `commands_experiment_ifov_off.txt`) are re-recorded in T78 with this
+  reason. The golden program files do not change.
+- **Camera (M6):** `measure(phase="layer")` no longer takes camera images; camera captures are taken only
+  before and after a structure whose `camera_capture` is on. DHM layer captures are not affected. Dummy
+  tests that count camera captures per layer are adapted in T78.
 
 ## 8. Material store (decision M1)
 
@@ -373,16 +402,22 @@ Options:
 - `/structures/<name>`: `settings_json`, `settings_source_json`; `setup` becomes the structure's own setup.
 - Substrate index entry: `status` values incl. `planned`, `area_um`, `resin_drop` (§3.2).
 
-## 11. Decisions for the maintainer
+## 11. Decisions (answered by the maintainer on 2026-11-16)
 
-| ID | Question | Proposal |
+| ID | Question | Decision |
 |---|---|---|
-| M1 | Where is the material registry stored? | Option A of §8: extend the voxel SQLite database (migration 1 → 2), seed CSV in `config/`. |
-| M2 | Can structures with IFOV on and off be mixed in one experiment? | Yes, option A of §7: setup per structure, derived from the geometry; a `DefaultSetup` (plus resets from T101) only when switching from IFOV to non-IFOV; implementation of the switch only after the lab check T101. |
-| M3 | Material per substrate or per resin drop? | Per resin drop (with batch); the substrate material separately. |
-| M4 | What happens to `sys_args["sample"]`? | Kept for the tools; `material` / `substrate` filled from the registry names when known. |
-| M5 | Where are slicer inputs (meshes, height maps) stored? | Copied into `inputs/` of the experiment folder and into `/inputs` of the file, with SHA-256. |
-| M6 | Camera capture per structure? | Yes, as a structure setting (cheap, useful for test structures). |
+| M1 | Where is the material registry stored? | As proposed: option A of §8, extend the voxel SQLite database (migration 1 → 2), seed CSV in `config/`. |
+| M2 | Can structures with IFOV on and off be mixed in one experiment? | Yes, between structures; never within a structure. The setup is sent for every structure. Default `IFOV_on`; `IFOV_off` is outdated but stays selectable (§7). |
+| M3 | Material per substrate or per resin drop? | As proposed: per resin drop (with batch), the substrate material separately; several materials on one substrate are unlikely. |
+| M4 | What happens to `sys_args["sample"]`? | As proposed: kept for the tools; `material` / `substrate` filled from the registry names when known. |
+| M5 | Where are slicer inputs (meshes, height maps) stored? | As proposed: copied into `inputs/` of the experiment folder and into `/inputs` of the file, with SHA-256. |
+| M6 | Camera capture per structure? | Yes, but only before and after the structure, no layer captures (§7.1). |
+
+Camera plans named with M6 (not part of this model): a video of the structure while it prints is T94
+(recording per experiment or structure, after the camera service T93); the overview of the whole
+experiment before and after printing, stitched by the stage xy positions, exists since T28
+(`overview_capture=True`, `overview.py`: images placed with the camera calibration at their stage
+positions); improvements to it go into a new todo when the lab check T69 shows what is missing.
 
 ## 12. Mapping to the todos
 
@@ -399,5 +434,5 @@ Options:
 
 ## 13. Approval
 
-Waiting for maintainer approval. Implementation (T75–T81) starts only when this line reads
-`Status: approved <date>` at the top of the document, with the answers to M1–M6.
+Decisions M1–M6 are answered (§11). Implementation (T75–T81) starts when the status line at the top of
+the document reads `Status: approved <date>` (written by the maintainer).
