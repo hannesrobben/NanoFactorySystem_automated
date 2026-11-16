@@ -538,3 +538,68 @@ proposal are answered by the proposal itself (D1: hard error; D2: `nnn` restarts
 
 Approved by the maintainer on 2026-09-29 (all proposals in §12 accepted); recorded in the status line
 at the top.
+
+## 15. Proposed amendment: DHM service results (T71, not yet approved)
+
+Proposed with `docs/design/DHM_SERVICE_INTEGRATION.md` (T71); implemented in T83 once both are approved.
+Minor schema addition: legacy captures and every existing group stay unchanged, readers of 1.0 files keep
+working. The version number is set when T83 is implemented (1.1, or the next minor if the information
+model additions of `INFORMATION_MODEL.md` §10 come first). OffAxisHolo K12 reads the file by this
+document, so this section is binding for it once approved.
+
+### 15.1 DHM capture (`/structures/<name>/captures/<nnnn>`, `kind = "dhm"`)
+
+New attributes:
+
+| Attribute | Content |
+|---|---|
+| `job_id` | job id of the DHM service (empty in legacy mode) |
+| `job_state` | `reserved`, `sent`, `acquired`, `stored`, `acknowledged`, `failed`, `missing` (legacy: `stored`) |
+| `error` | reason of a failed job, else empty |
+| `recipe_json` | effective recipe of this capture (incl. unknown keys passed to the service) |
+| `context_json` | `CaptureContext` as sent (incl. material snapshot reference and `z_hint_um`) |
+| `raw_ref_json` | raw frames that stayed on the DHM-PC: `host`, `path`, `sha256`, `n_frames`, `keep_raw`; empty if the frames are stored here |
+
+Datasets:
+- `holograms`, `capture_times_s`: as today, only when the raw frames are transferred (`legacy_raw`,
+  `products_and_raw`). A capture may have products and no `holograms` (as already allowed in §5.6).
+- `frames`: compound table, one row per frame: `index` (int), `used` (bool), `reject_reason` (str), one
+  float column per metric (`saturated_count`, `black_count`, `intensity_q01`, `intensity_q50`,
+  `intensity_q99`, `sideband_fraction`, `sideband_peak_x`, `sideband_peak_y`, `piston_rad`,
+  `phase_noise_rad`, …; unknown metrics become extra columns, a missing one NaN); attribute
+  `acquisition_json` (per-frame acquisition data passed through unchanged).
+
+### 15.2 Products (`…/captures/<nnnn>/products/<name>`)
+
+`<name>` is `phase_rad`, `intensity`, `field` (complex64) or a further product. Existing attributes stay
+(`source`, `created`, `parameters_json`, `unit`); new attributes:
+
+| Attribute | Content |
+|---|---|
+| `schema_version` | version of the `ReconstructionResult` / `ProductSet` contract |
+| `config_hash`, `config_json` | parameter set of the reconstruction |
+| `background_id`, `background_created`, `background_age_s` | background used |
+| `pixel_pitch_um` | after the sideband crop (not the camera pitch) |
+| `z_um`, `wavelength_um`, `n_medium` | propagation distance, wavelength, medium index used |
+| `quality_json` | `n_obj`, `n_effective`, `n_bg`, `piston_std_rad`, selection summary |
+| `timings_json`, `versions_json`, `warnings_json` | stage timings, software versions, warnings |
+| `job_id` | redundant back-reference |
+
+Products are stored as delivered (aligned, not levelled; levelling belongs to MIRA if G10 / SA5 is
+decided as proposed).
+
+### 15.3 Groups, calibration, orphans
+
+| Path | Content |
+|---|---|
+| `/dhm_groups/<group_id>` | attributes `kind` (`speckle`, `stitching`), `structure`, `phase`, `layer_id`, `recipe_json`, `job_id`, `job_state`; dataset `members` (capture ids); group `products/<name>` like §15.2; dataset `member_transforms` (one row per member, as delivered by MIRA) |
+| `/calibration/dhm/<kind>/<id>` | `kind` = `exposure`, `opl_scan`, `background`: attributes `parameters_json`, `result_json`, `time`, `session`, `job_id`; backgrounds only metadata (frames stay on the DHM-PC unless `keep_raw` asks otherwise). `/opl_scan` (§5.3) keeps the latest OPL result. |
+| `/metadata/dhm` | once per session (T79): service and software versions, parameter-set name and hash, camera, pixel size and its source, adapter (`legacy`, `service`, `fake`) |
+| `/dhm_orphans/<job_id>` | results that arrived for an unknown capture (restart after a crash), stored like a capture's products with the context they carried |
+
+### 15.4 JSON copies and unpack tool
+
+The JSON copies (`experiment_dictionary.json`, `structures.json`, `print_progress.json`) list no captures
+and stay unchanged. `analysis/experiment_analysis` unpacks `frames` as CSV and the new attributes as JSON
+without code change (generic mirroring); its `tables/captures.csv` gets the columns `job_id`, `job_state`
+and `products`; a test with a fake-service experiment checks it (T83).
