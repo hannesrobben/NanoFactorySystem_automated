@@ -603,3 +603,18 @@ The JSON copies (`experiment_dictionary.json`, `structures.json`, `print_progres
 and stay unchanged. `analysis/experiment_analysis` unpacks `frames` as CSV and the new attributes as JSON
 without code change (generic mirroring); its `tables/captures.csv` gets the columns `job_id`, `job_state`
 and `products`; a test with a fake-service experiment checks it (T83).
+
+## 16. Proposed amendment: feedback results (T72, not yet approved)
+
+Proposed with `docs/design/OPERATING_MODES.md` (T72, §5 there); implemented in T88–T91 once approved.
+Minor schema addition.
+
+- §5.9 changes: besides the analysis tools, the printing process writes results under
+  `/analysis/captures/<capture id>/deviation` with `source = "nanofactorysystem.feedback"` (it holds the
+  experiment lock anyway). Analysis tools never overwrite or delete results of that source.
+- New group `/feedback/<structure>`: attributes `mode`, `evaluator`, `controller`, `rules_json`,
+  `limits_json`, `target_json`; dataset `events` (table: `layer_id`, `capture_id`, `time`, `rmse`, `mae`,
+  `validity`, `status`, `action`); subgroups `plans/<layer_id>` with the `CorrectionPlan` (`actions_json`,
+  `rationale`, `limits_applied_json`, `controller`, `applied`, `applied_at_layer`).
+- `StructureRecord.status` gets the value `stopped` (stopped by a monitor rule); `print_progress.json`
+  reports it like `failed`, with the reason.
