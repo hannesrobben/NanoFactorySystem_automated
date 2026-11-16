@@ -90,16 +90,6 @@ test fixtures. Background of the 2026-11-16 changes: `docs/system/handover/from_
 
 ### Phase 5 — Concept
 
-- [ ] T74: Design the headless core for a GUI [phase: 5]
-  - Priority: medium
-  - Size: S
-  - Depends on: –
-  - Done when:
-    - `docs/design/GUI_READINESS.md` lists every blocking call in the run path (message boxes,
-      `plt.show()`), defines progress events, pause, resume and abort between layers, and the
-      threading rule towards the single-writer experiment file;
-    - Decision: GUI framework (G3).
-
 - [ ] T100: Prepare the nanofactorysystem input for the planning session K18 (from the OffAxisHolo handover 2026-11-16) [phase: 5]
   - Priority: medium
   - Size: S
@@ -472,6 +462,17 @@ fraction and peak position, piston phase, phase noise). The propagation distance
 <!-- Claude Code moves a todo here when starting work. -->
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
+- [ ] T74: Design the headless core for a GUI [phase: 5]
+  - Priority: medium
+  - Size: S
+  - Depends on: –
+  - Done when:
+    - `docs/design/GUI_READINESS.md` lists every blocking call in the run path (message boxes,
+      `plt.show()`), defines progress events, pause, resume and abort between layers, and the
+      threading rule towards the single-writer experiment file;
+    - Decision: GUI framework (G3).
+  - Blocked by: waiting for maintainer approval of `docs/design/GUI_READINESS.md` (draft 2026-11-16,
+    decisions P1–P3 with proposals in §7; G3 not needed for it).
 - [ ] T73: Design the camera live feed and recording [phase: 5]
   - Priority: medium
   - Size: S

@@ -2323,3 +2323,21 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Commits:** `d690f28` docs(design): camera live feed, recording and single camera owner [T73];
   docs(todo): log the T73 design and add T102 [T73]
 - **Follow-ups:** maintainer answers C1–C5 and approves; T102 (lab PC confirms the exposure unit). Next: T74.
+
+### 2026-11-16 18:40 CET — [T74] Design the headless core for a GUI
+- **Status:** blocked (design written; waiting for maintainer approval, working rule 2)
+- **Context:** Searched the package for calls that wait for a person (`messagebox`, `plt.show()`, `input()`,
+  `imshow`) and for pyplot use; read `plot_experiment()`, the substrate plot, `print_experiment()`,
+  `Experiment.__exit__` / `_end_session`, `_stop_failed_task` and `AerotechTask.wait_to_finish`.
+  `confirm` is already injectable in `run_experiment()` / `run_substrate()` (16 scripts import
+  `messagebox_confirm`); `plt.show()` in the run path only runs with `show=True`.
+- **Changes:**
+  - `docs/design/GUI_READINESS.md` (new): inventory of blocking calls and pyplot use, thread and ownership
+    rules (one worker thread owns all devices and is the only writer), `RunEvent` kinds and `EventBus`,
+    `RunControl` with pause / resume / abort / `stop_now` at checkpoints, runner API, decisions P1–P3, tests.
+  - `TODO.md`: T74 to Blocked (waiting for approval).
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (documentation only).
+- **Commits:** `2a2b0a6` docs(design): headless core with run control and progress events [T74];
+  docs(todo): log the T74 design [T74]
+- **Follow-ups:** maintainer answers P1–P3 and approves. Next: T100 (K18 input), then phase 6 (T75).
