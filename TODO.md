@@ -42,7 +42,7 @@ with an evaluation after every layer capture; a camera live feed; a core that a 
 | 8 | Operating modes | T88, T89, T90, T91, T92 | T72 approved; T89 needs G10 (K18) for the mask part; T90 needs MIRA MI-53 for the real evaluator |
 | 9 | Camera live feed | T93, T94, T95 | T73 approved |
 | 10 | Core ready for a GUI | T96, T97 | T74 approved |
-| B | Backlog (from T19 `todo_notes.md`, lab checks, follow-ups) | T67, T69, T98, T99 | – |
+| B | Backlog (from T19 `todo_notes.md`, lab checks, follow-ups) | T67, T69, T98, T99, T102 | – |
 
 Phases 6, 9 and 10 are independent of each other. Phase 7 can start with T82 and T83 before `dhmconnect`
 exists. Phase 8 needs T83 and T85.
@@ -89,15 +89,6 @@ test fixtures. Background of the 2026-11-16 changes: `docs/system/handover/from_
 ## Open
 
 ### Phase 5 — Concept
-
-- [ ] T73: Design the camera live feed and recording [phase: 5]
-  - Priority: medium
-  - Size: S
-  - Depends on: –
-  - Done when:
-    - `docs/design/CAMERA_LIVE.md` defines the single owner of the camera, how `measure()`, the
-      overview and the focus tools get frames while the feed runs, exposure conflicts, stop on abort;
-    - Decision: frame rate, codec, resolution, storage location and size limit of recordings.
 
 - [ ] T74: Design the headless core for a GUI [phase: 5]
   - Priority: medium
@@ -432,6 +423,17 @@ fraction and peak position, piston phase, phase noise). The propagation distance
     - in particular: the overview before printing is in focus (it is taken at the Z where the plane fit
       ended; if not, a todo for a defined overview Z), and a restart after Ctrl+C prints only the missing layers.
 
+- [ ] T102: Camera image timeout uses the exposure in µs as if it were ms (found during T73) [phase: B]
+  - Priority: medium
+  - Size: S
+  - Depends on: – (verification on the lab PC)
+  - Done when:
+    - `CameraDevice.getimage()` waits at most a bounded time derived from the exposure in ms (e.g. twice the
+      exposure plus a transfer margin, at least 50 ms) instead of `2000 × ExposureTime[µs]` ms (≈ 11 h at
+      20 ms); the unit of `ExposureTime` returned by mvIMPACT is confirmed on the lab PC;
+    - a missed frame raises a clear error instead of blocking; a unit test with the dummy driver checks
+      the computed timeout; the camera service (T93) relies on it for its stop bound.
+
 - [ ] T67: Evaluation pipeline on top of `ExperimentFile` (follow-up of T66) [phase: B]
   - Priority: medium
   - Size: M
@@ -470,6 +472,16 @@ fraction and peak position, piston phase, phase noise). The propagation distance
 <!-- Claude Code moves a todo here when starting work. -->
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
+- [ ] T73: Design the camera live feed and recording [phase: 5]
+  - Priority: medium
+  - Size: S
+  - Depends on: –
+  - Done when:
+    - `docs/design/CAMERA_LIVE.md` defines the single owner of the camera, how `measure()`, the
+      overview and the focus tools get frames while the feed runs, exposure conflicts, stop on abort;
+    - Decision: frame rate, codec, resolution, storage location and size limit of recordings.
+  - Blocked by: waiting for maintainer approval of `docs/design/CAMERA_LIVE.md` (draft 2026-11-16,
+    decisions C1–C5 with proposals in §8).
 - [ ] T72: Design the operating modes and feedback hooks [phase: 5]
   - Priority: high
   - Size: M

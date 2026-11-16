@@ -2304,3 +2304,22 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Commits:** `e6df488` docs(design): operating modes, feedback hooks and layer targets [T72]; `8e0934d`
   docs(design): propose storage of feedback results [T72]; docs(todo): log the T72 design [T72]
 - **Follow-ups:** maintainer answers O1–O5 and approves. Next: T73.
+
+### 2026-11-16 18:38 CET — [T73] Design the camera live feed and recording
+- **Status:** blocked (design written; waiting for maintainer approval, working rule 2)
+- **Context:** Investigated `devices/camera.py`, `camera/camera.py` (single image requests),
+  `camera/optexpose.py`, `System.getimage()` / `optexpose()` and their consumers (`measure()`, `overview.py`,
+  `tools/focus.py`, `tools/layer.py`, `tools/grid.py`), the dummy camera driver, F3. Found that the image
+  wait timeout is `2000 × ExposureTime` with the exposure in µs, i.e. about 11 h at 20 ms (→ T102).
+- **Changes:**
+  - `docs/design/CAMERA_LIVE.md` (new): `CameraService` with direct mode (feed off, unchanged device calls)
+    and threaded mode (one owner, snapshots preempt the feed, separate measurement and feed settings,
+    bounded subscriber queues, stop on abort), frame-to-layer mapping by times, recording per structure or
+    experiment next to the experiment file with `/recordings` table and limits, live feed interface, dummy
+    support, decisions C1–C5, tests.
+  - `TODO.md`: T73 to Blocked (waiting for approval); T102 added (found during T73); phase table lists T102.
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (documentation only).
+- **Commits:** `d690f28` docs(design): camera live feed, recording and single camera owner [T73];
+  docs(todo): log the T73 design and add T102 [T73]
+- **Follow-ups:** maintainer answers C1–C5 and approves; T102 (lab PC confirms the exposure unit). Next: T74.
