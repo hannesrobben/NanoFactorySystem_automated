@@ -1,7 +1,7 @@
 # Design: Information model v2 (material, substrate, experiment, structure)
 
-Status: draft 2026-11-16; decisions M1–M6 answered by the maintainer on 2026-11-16 (§11) and worked in;
-waiting for the approval line (T70). Implementation todos: T75–T81, T101.
+Status: approved 2026-11-16 (maintainer; line entered by Claude Code at the maintainer's request).
+Decisions M1–M6 in §11. Implementation todos: T75–T81, T101.
 
 Builds on `EXPERIMENT_STORAGE.md` (approved 2026-09-29) and `VOXEL_DATABASE.md` (approved 2026-09-30).
 Neither is replaced; this document adds the material level, settings per structure and a stored
