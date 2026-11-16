@@ -90,19 +90,6 @@ test fixtures. Background of the 2026-11-16 changes: `docs/system/handover/from_
 
 ### Phase 5 — Concept
 
-- [ ] T100: Prepare the nanofactorysystem input for the planning session K18 (from the OffAxisHolo handover 2026-11-16) [phase: 5]
-  - Priority: medium
-  - Size: S
-  - Depends on: – (uses the draft of T72 if it exists)
-  - Done when:
-    - a note `docs/system/handover/to_offaxisholo_k18_<date>.md` answers from this side: when and where
-      the `LayerTarget` footprint of a structure after layer n exists (before the print, in
-      `experiment.h5`, at capture time in the service?), its coordinate system (stage µm, which origin,
-      which z plane), who sets the pose tolerance / safety margin (recipe or material / process data),
-      and proposals for SA1, SA2 and SA5;
-    - the note lists what this side needs from MIRA for the stage µm ↔ camera pixel mapping (MI-41,
-      MI-50); the maintainer has reviewed it before the session.
-
 ### Phase 6 — Information model
 
 - [ ] T75: Material registry for photopolymers [phase: 6]
@@ -462,6 +449,20 @@ fraction and peak position, piston phase, phase noise). The propagation distance
 <!-- Claude Code moves a todo here when starting work. -->
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
+- [ ] T100: Prepare the nanofactorysystem input for the planning session K18 (from the OffAxisHolo handover 2026-11-16) [phase: 5]
+  - Priority: medium
+  - Size: S
+  - Depends on: – (uses the draft of T72 if it exists)
+  - Done when:
+    - a note `docs/system/handover/to_offaxisholo_k18_<date>.md` answers from this side: when and where
+      the `LayerTarget` footprint of a structure after layer n exists (before the print, in
+      `experiment.h5`, at capture time in the service?), its coordinate system (stage µm, which origin,
+      which z plane), who sets the pose tolerance / safety margin (recipe or material / process data),
+      and proposals for SA1, SA2 and SA5;
+    - the note lists what this side needs from MIRA for the stage µm ↔ camera pixel mapping (MI-41,
+      MI-50); the maintainer has reviewed it before the session.
+  - Blocked by: waiting for the maintainer's review of `docs/system/handover/to_offaxisholo_k18_2026-11-16.md`
+    (written 2026-11-16; the remaining criterion of this todo).
 - [ ] T74: Design the headless core for a GUI [phase: 5]
   - Priority: medium
   - Size: S

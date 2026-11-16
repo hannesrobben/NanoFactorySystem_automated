@@ -2341,3 +2341,19 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Commits:** `2a2b0a6` docs(design): headless core with run control and progress events [T74];
   docs(todo): log the T74 design [T74]
 - **Follow-ups:** maintainer answers P1–P3 and approves. Next: T100 (K18 input), then phase 6 (T75).
+
+### 2026-11-16 18:41 CET — [T100] Input for the planning session K18
+- **Status:** blocked (note written; the todo asks for the maintainer's review before the session)
+- **Changes:**
+  - `docs/system/handover/to_offaxisholo_k18_2026-11-16.md` (new): when and where footprints are known,
+    coordinate frame, proposals for SA1 (a priori with a posteriori check), SA2 (`reference_mask.occupied_um`
+    polygons in `CaptureContext`, union of everything printed in the field of view), margin split
+    (`pose_tolerance_um` here, `optical_margin_um` from OffAxisHolo), SA5, SA6; needs from MIRA and
+    OffAxisHolo; questions for the session.
+  - `TODO.md`: T100 to Blocked (review).
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (documentation only).
+- **Commits:** `2345a36` docs(system): nanofactorysystem input for the planning session K18 [T100];
+  docs(todo): log T100 [T100]
+- **Follow-ups:** maintainer reviews the note and takes it to K18. Phase 5 has no open todo left (T71–T74,
+  T100 wait for the maintainer); phase 6 can start with T75 (T70 approved).
