@@ -2248,3 +2248,13 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Commits:** `c68d2a3` docs(design): record the maintainer's decisions M1-M6 in the info model [T70];
   docs(todo): log the T70 decisions [T70]
 - **Follow-ups:** maintainer writes the approval line; then phase 6 (T75 first). T101 on the lab PC.
+
+### 2026-11-16 18:29 CET — [T70] Information model approved
+- **Status:** done
+- **Changes:**
+  - `docs/design/INFORMATION_MODEL.md`: status line `approved 2026-11-16`, entered at the maintainer's request.
+  - `TODO.md`: T70 moved from Blocked to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (documentation only).
+- **Commits:** `42313ef` docs(design): approve the information model v2 [T70]; docs(todo): close T70 [T70]
+- **Follow-ups:** phase 6 is open (T75 first, T101 on the lab PC). Next by working rule 1: T71.

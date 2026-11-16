@@ -502,25 +502,10 @@ fraction and peak position, piston phase, phase noise). The propagation distance
 <!-- Claude Code moves a todo here when starting work. -->
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
-- [ ] T70: Design the information model v2 (material, substrate, experiment, structure) [phase: 5]
-  - Priority: high
-  - Size: M
-  - Depends on: –
-  - Done when:
-    - `docs/design/INFORMATION_MODEL.md` defines the four levels, their fields, where each is stored
-      (config, SQLite, `substrate.json`, `experiment.h5`) and how old data is read;
-    - it defines which settings live on the structure (setup IFOV on / off, program source, slicing,
-      hatching, power, velocity, voxel model, DHM recipe, operating mode) with experiment defaults;
-    - it defines the serialised form of an experiment (project file) and of a structure;
-    - Decision: material store. Proposal: extend the voxel SQLite database (`material` plus a
-      `material_property` table with key, value, unit, wavelength, state, source, date) so that
-      details can be added at any time (G7).
-    - Decision: can structures with IFOV on and IFOV off be mixed in one experiment? Today `setup`
-      is a field of the experiment. Investigate the setup programs first and report.
-  - Blocked by: waiting for the approval line in `docs/design/INFORMATION_MODEL.md`; decisions M1–M6 were
-    answered on 2026-11-16 and are worked into the document.
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T70: Design the information model v2 — 2026-11-16 — `docs/design/INFORMATION_MODEL.md` defines material (registry in the voxel SQLite, M1), substrate record v2 (material per resin drop, M3), experiment spec as project file and structures with their own settings; setup per structure, sent before every structure, default `IFOV_on` (M2), camera only before/after a structure (M6); approved by the maintainer. — commits: `2709356`, `2f72064`, `c68d2a3`, `893202c`, `42313ef`
+
 - [x] T1: Record baseline and review the code — 2026-09-28 — Recorded the test baseline (global env: all 40 files fail on a NumPy ABI mismatch; clean venv: 16 passed / 20 failed / 16 errors over `test/`) in WORKLOG.md and wrote `docs/reviews/CODE_REVIEW_2026-09-28.md`; follow-ups T9–T18 added. — commits: `bf98f78`
 
 - [x] T2: Design the dummy hardware backend — 2026-09-28 — Wrote `docs/design/DUMMY_BACKEND.md` (seam/role protocols, explicit `backend=` switch, socket-level fake controller, deterministic simulated world with call log); approved by the maintainer with three decisions (controller merge later as T20, no env var, `plane_fit(plane=...)` instead of simulated detection). — commits: `46ae4b1`, `b6340a4`
