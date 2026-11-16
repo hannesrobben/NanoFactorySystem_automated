@@ -2357,3 +2357,41 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   docs(todo): log T100 [T100]
 - **Follow-ups:** maintainer reviews the note and takes it to K18. Phase 5 has no open todo left (T71–T74,
   T100 wait for the maintainer); phase 6 can start with T75 (T70 approved).
+
+### 2026-11-16 19:04 CET — [T75] Material registry for photopolymers
+- **Status:** done
+- **Context:** First implementation todo of phase 6 (design T70 approved, decision M1: registry in the voxel
+  SQLite; M3: batch belongs to the use; M4: names into `sys_args["sample"]`). The old test venv was gone; a fresh
+  one was created at `%LOCALAPPDATA%\Temp\nfsv` (`pip install -e ".[test]"`: NumPy 2.5.5, h5py 3.16.0, OpenCV 5.0.0).
+  The global Python still has the NumPy/OpenCV mismatch of T1.
+- **Changes:**
+  - `nanofactorysystem/voxel/migrations.py`: `migrate_1_to_2` (`material.kind`, `material.created`,
+    table `material_property` with constraints and index).
+  - `nanofactorysystem/voxel/materials.py` (new): `MaterialProperty`, `Material` (lookup by key, wavelength,
+    state), `MaterialSnapshot`, `MaterialRegistry` (add, query, CSV import/export, `open_existing`, `snapshot`),
+    `material_names` (argument > substrate > sys_args), `as_material_dict`, `UnitWarning`.
+  - `nanofactorysystem/voxel/__init__.py`: exports.
+  - `config/material_seed.csv` (new): seed, header only (no invented values).
+  - `nanofactorysystem/storage/records.py`: `ExperimentRecord.materials`.
+  - `nanofactorysystem/storage/experiment_store.py`: `write_materials` / `read_materials`, property table;
+    `read()` fills `materials`.
+  - `nanofactorysystem/storage/schema.py`: schema version 1.1.
+  - `nanofactorysystem/experiment.py`: `materials=`, `material_registry=`, snapshots written into a new file,
+    M4 for `sys_args["sample"]`.
+  - `nanofactorysystem/experiment_spec.py`: `ExperimentSpec.materials`, `run_experiment(material_registry=)`.
+  - `nanofactorysystem/substrate_plan.py`: `SubstrateSpec.material` as registry name or dict,
+    `run_substrate(material_registry=)`.
+  - `test/conftest.py`: autouse fixture `no_default_material_registry` (opening the default database would
+    migrate the PC's file).
+  - `test/voxel/test_material_registry.py` (new, 10 tests); `test/voxel/test_voxel_database.py`: expected schema
+    version 2 instead of 1 (the migration raises it; the assertion is as strict as before) and the new table;
+    `test/storage/test_experiment_store.py`: snapshot round trip; `test/integration/test_dry_run_materials.py`
+    (new, 2 slow dry runs).
+  - `docs/design/VOXEL_DATABASE.md`, `docs/design/EXPERIMENT_STORAGE.md`, `test/README.md`, `CLAUDE.md`: documented.
+  - `TODO.md`: T75 to Done. `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest` in the new venv: 383 passed, 14 skipped (11 min 29 s; warnings unchanged).
+- **Commits:** `1a78f06` feat(voxel): material registry with extensible properties [T75]; `5953d36`
+  feat(experiment): store a material snapshot with every experiment [T75]; docs(todo): close T75 [T75]
+- **Follow-ups:** which refractive index is `n_medium` stays G4 / O1 / O11; the registry has no data yet (the
+  maintainer enters values or a seed). Next: T77 (depends only on T70), then T76.
+  Branch `feat/t75-material-registry` on top of the design branches; nothing pushed.

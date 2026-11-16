@@ -92,19 +92,6 @@ test fixtures. Background of the 2026-11-16 changes: `docs/system/handover/from_
 
 ### Phase 6 — Information model
 
-- [ ] T75: Material registry for photopolymers [phase: 6]
-  - Priority: high
-  - Size: M
-  - Depends on: T70
-  - Done when:
-    - a `Material` record with name, supplier, batch and extensible properties (at least refractive
-      index uncured and cured per wavelength) is stored and queried as designed in T70;
-    - the snapshot provides the `n_medium` that OffAxisHolo uses for a result (today taken from the
-      OffAxisHolo preset; G7; which index applies depends on G4);
-    - new property keys can be added without a code change, with unit and source;
-    - `SubstrateSpec.material` accepts a registry name; the free dictionary keeps working;
-    - the material used is copied as a snapshot into `experiment.h5`, test on the dummy backend.
-
 - [ ] T76: Substrate record v2 and experiment overview [phase: 6]
   - Priority: medium
   - Size: M
@@ -520,6 +507,8 @@ fraction and peak position, piston phase, phase noise). The propagation distance
     proposed §15 of `EXPERIMENT_STORAGE.md` (draft 2026-11-16, decisions D1–D4 with proposals in §10).
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T75: Material registry for photopolymers — 2026-11-16 — The voxel database (schema 2) holds materials (resin/substrate/medium) with extensible properties (value, unit, wavelength, state, source, date; new keys without code change) behind `MaterialRegistry`; every new experiment file stores a snapshot per role in `/metadata/materials` (schema 1.1), `SubstrateSpec.material` accepts a registry name. Which index is `n_medium` stays G4. — commits: `1a78f06`, `5953d36`
+
 - [x] T70: Design the information model v2 — 2026-11-16 — `docs/design/INFORMATION_MODEL.md` defines material (registry in the voxel SQLite, M1), substrate record v2 (material per resin drop, M3), experiment spec as project file and structures with their own settings; setup per structure, sent before every structure, default `IFOV_on` (M2), camera only before/after a structure (M6); approved by the maintainer. — commits: `2709356`, `2f72064`, `c68d2a3`, `893202c`, `42313ef`
 
 - [x] T1: Record baseline and review the code — 2026-09-28 — Recorded the test baseline (global env: all 40 files fail on a NumPy ABI mismatch; clean venv: 16 passed / 20 failed / 16 errors over `test/`) in WORKLOG.md and wrote `docs/reviews/CODE_REVIEW_2026-09-28.md`; follow-ups T9–T18 added. — commits: `bf98f78`
