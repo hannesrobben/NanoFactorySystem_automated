@@ -37,7 +37,7 @@ with an evaluation after every layer capture; a camera live feed; a core that a 
 | 3 | Experiment scripts and substrate main | T51, T52 (done) | – |
 | 4 | Voxel database and voxel-aware slicing | T53, T54, T31 (done) | T53 design approved by the maintainer |
 | 5 | Concept for phases 6–10 | T70, T71, T72, T73, T74, T100 | each design approved by the maintainer |
-| 6 | Information model | T75, T76, T77, T78, T79, T80, T81 | T70 approved |
+| 6 | Information model | T75, T76, T77, T78, T79, T80, T81, T101 | T70 approved (T101 does not need it) |
 | 7 | DHM service integration | T82, T83, T84, T85, T86, T87 | T71 approved; T84 needs DHMConnect DL-C1, DL-C2 |
 | 8 | Operating modes | T88, T89, T90, T91, T92 | T72 approved; T89 needs G10 (K18) for the mask part; T90 needs MIRA MI-53 for the real evaluator |
 | 9 | Camera live feed | T93, T94, T95 | T73 approved |
@@ -89,22 +89,6 @@ test fixtures. Background of the 2026-11-16 changes: `docs/system/handover/from_
 ## Open
 
 ### Phase 5 — Concept
-
-- [ ] T70: Design the information model v2 (material, substrate, experiment, structure) [phase: 5]
-  - Priority: high
-  - Size: M
-  - Depends on: –
-  - Done when:
-    - `docs/design/INFORMATION_MODEL.md` defines the four levels, their fields, where each is stored
-      (config, SQLite, `substrate.json`, `experiment.h5`) and how old data is read;
-    - it defines which settings live on the structure (setup IFOV on / off, program source, slicing,
-      hatching, power, velocity, voxel model, DHM recipe, operating mode) with experiment defaults;
-    - it defines the serialised form of an experiment (project file) and of a structure;
-    - Decision: material store. Proposal: extend the voxel SQLite database (`material` plus a
-      `material_property` table with key, value, unit, wavelength, state, source, date) so that
-      details can be added at any time (G7).
-    - Decision: can structures with IFOV on and IFOV off be mixed in one experiment? Today `setup`
-      is a field of the experiment. Investigate the setup programs first and report.
 
 - [ ] T71: Design the DHM service integration and measurement recipes [phase: 5]
   - Priority: high
@@ -215,7 +199,8 @@ test fixtures. Background of the 2026-11-16 changes: `docs/system/handover/from_
     - a structure can set program source, slicing and hatching parameters, power, velocity, voxel
       model, DHM recipe and operating mode itself; unset values come from the experiment;
     - `spec.resolved()` shows the effective values per structure and validates combinations;
-    - setup per structure is implemented as far as T70 allows, otherwise a follow-up todo exists;
+    - setup per structure is implemented as far as T70 allows, otherwise a follow-up todo exists
+      (the switch from IFOV to non-IFOV programs needs the result of T101);
     - existing specs give identical programs (golden files unchanged).
 
 - [ ] T79: Experiment configuration record [phase: 6]
@@ -242,6 +227,19 @@ test fixtures. Background of the 2026-11-16 changes: `docs/system/handover/from_
   - Done when:
     - a structure names a strategy and its parameters, the name and parameters are stored in the
       metadata, and an unknown strategy is refused; no new strategy is implemented (F7, F12, F17).
+
+- [ ] T101: Find out which controller states persist between programs and experiments (found during T70) [phase: 6]
+  - Priority: medium
+  - Size: S
+  - Depends on: – (lab PC; A3200 manual, F11)
+  - Done when:
+    - it is known from the A3200 manual and a check on the lab PC whether `GALVO ROTATION A -0.6`
+      (`SetupIFOV`), `GALVO LASEROVERRIDE A AUTO`, `RAMP MODE RATE` / `RAMP RATE 0`, `LOOKAHEAD FAST` and
+      `METRIC` (IFOV layer programs) persist after a program task ends, into the next program and into the
+      next experiment of the same controller session (`DefaultSetup` resets none of them);
+    - the result is recorded in `docs/design/INFORMATION_MODEL.md` §7 and WORKLOG.md, and the reset
+      commands a switch to non-IFOV programs needs are listed for T78;
+    - if a state leaks into `IFOV_off` experiments today, a `fix:` todo exists.
 
 ### Phase 7 — DHM service integration
 
@@ -497,6 +495,23 @@ fraction and peak position, piston phase, phase noise). The propagation distance
 <!-- Claude Code moves a todo here when starting work. -->
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
+- [ ] T70: Design the information model v2 (material, substrate, experiment, structure) [phase: 5]
+  - Priority: high
+  - Size: M
+  - Depends on: –
+  - Done when:
+    - `docs/design/INFORMATION_MODEL.md` defines the four levels, their fields, where each is stored
+      (config, SQLite, `substrate.json`, `experiment.h5`) and how old data is read;
+    - it defines which settings live on the structure (setup IFOV on / off, program source, slicing,
+      hatching, power, velocity, voxel model, DHM recipe, operating mode) with experiment defaults;
+    - it defines the serialised form of an experiment (project file) and of a structure;
+    - Decision: material store. Proposal: extend the voxel SQLite database (`material` plus a
+      `material_property` table with key, value, unit, wavelength, state, source, date) so that
+      details can be added at any time (G7).
+    - Decision: can structures with IFOV on and IFOV off be mixed in one experiment? Today `setup`
+      is a field of the experiment. Investigate the setup programs first and report.
+  - Blocked by: waiting for maintainer approval of `docs/design/INFORMATION_MODEL.md` (draft 2026-11-16,
+    decisions M1–M6; M1 = material store, M2 = IFOV mixing, both with a recommendation in §7 and §8).
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
 - [x] T1: Record baseline and review the code — 2026-09-28 — Recorded the test baseline (global env: all 40 files fail on a NumPy ABI mismatch; clean venv: 16 passed / 20 failed / 16 errors over `test/`) in WORKLOG.md and wrote `docs/reviews/CODE_REVIEW_2026-09-28.md`; follow-ups T9–T18 added. — commits: `bf98f78`

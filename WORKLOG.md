@@ -2197,3 +2197,33 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Follow-ups:** copy the plan v0.3 unchanged into OffAxisHolo, DHMConnect and MIRA (those repositories
   are not reachable from this working copy; one `docs(system): …` commit each). T100 before K18.
   `todo_claude/` (old copies of the project files) is still untracked and can be removed by the maintainer.
+
+### 2026-11-16 17:19 CET — [T70] Design the information model v2
+- **Status:** blocked (design written; waiting for maintainer approval, working rule 2)
+- **Context:** First open todo of phase 5. Investigated `experiment_spec.py`, `substrate_plan.py`,
+  `storage/substrate_store.py`, `storage/records.py`, `storage/schema.py`, `voxel/migrations.py`,
+  `aerobasic/programs/setups.py`, `drawings/base.py`, `experiment.py` (setup and accelerations), the eight
+  scripts in `mains/Experiments/` that use `factory=`, and the golden files `commands_experiment_ifov_on.txt`,
+  `commands_experiment_ifov_off.txt`, `corner_default.txt`, `rectangle2d_ifov_20x.txt`,
+  `binary_grating_ifov_63x.txt`.
+- **Findings (IFOV decision):** the setup is sent once by immediate commands; layer programs have no setup
+  header; IFOV layer programs configure IFOV completely themselves (their values even override those of
+  `SetupIFOV`: 63x size 0.15 vs 0.075, tracking 16.5 vs 7.5); `IFOV_on` experiments already print corners and
+  QR code as non-IFOV programs; `accel_a` is `accel_x / 2` for the whole `IFOV_on` experiment; voxel lookup,
+  `StructureRecord.setup` and the summary report the experiment setup for every structure; `DefaultSetup`
+  never resets `GALVO ROTATION A -0.6`, `RAMP RATE 0`, `LOOKAHEAD FAST`, `METRIC`, `GALVO LASEROVERRIDE A AUTO`
+  (persistence unknown → T101).
+- **Changes:**
+  - `docs/design/INFORMATION_MODEL.md` (new): four levels with fields and storage, `StructureSettings` and
+    resolution order, storage table, project file and structure JSON, named factories with `BuildContext`,
+    reading old data, IFOV investigation with options, material store options, amendments to
+    `EXPERIMENT_STORAGE.md` (schema 1.1), decisions M1–M6 with proposals, todo mapping.
+  - `TODO.md`: T70 moved to Blocked (waiting for approval); T101 added (found during T70); T78 notes its
+    dependency on T101 for the setup switch; phase table lists T101.
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (documentation only; no code changed).
+- **Commits:** `2709356` docs(design): information model v2 for material, substrate, experiment [T70];
+  docs(todo): log the T70 design and add T101 [T70]
+- **Follow-ups:** maintainer answers M1–M6 and approves (line `Status: approved <date>`); T101 on the lab PC.
+  Next todo without approval dependency: T71 (design of the DHM service integration).
+  Branch `docs/t70-information-model` on top of `docs/system-plan` (from `main_HR`); nothing pushed.
