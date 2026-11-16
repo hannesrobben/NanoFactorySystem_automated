@@ -36,10 +36,10 @@ with an evaluation after every layer capture; a camera live feed; a core that a 
 | 2 | Experiment storage | T47, T48, T49, T50, T55, T56, T57, T59 (done) | – |
 | 3 | Experiment scripts and substrate main | T51, T52 (done) | – |
 | 4 | Voxel database and voxel-aware slicing | T53, T54, T31 (done) | T53 design approved by the maintainer |
-| 5 | Concept for phases 6–10 | T70, T71, T72, T73, T74 | each design approved by the maintainer |
+| 5 | Concept for phases 6–10 | T70, T71, T72, T73, T74, T100 | each design approved by the maintainer |
 | 6 | Information model | T75, T76, T77, T78, T79, T80, T81 | T70 approved |
 | 7 | DHM service integration | T82, T83, T84, T85, T86, T87 | T71 approved; T84 needs DHMConnect DL-C1, DL-C2 |
-| 8 | Operating modes | T88, T89, T90, T91, T92 | T72 approved; T90 needs MIRA MI-53 for the real evaluator |
+| 8 | Operating modes | T88, T89, T90, T91, T92 | T72 approved; T89 needs G10 (K18) for the mask part; T90 needs MIRA MI-53 for the real evaluator |
 | 9 | Camera live feed | T93, T94, T95 | T73 approved |
 | 10 | Core ready for a GUI | T96, T97 | T74 approved |
 | B | Backlog (from T19 `todo_notes.md`, lab checks, follow-ups) | T67, T69, T98, T99 | – |
@@ -76,11 +76,15 @@ single todos are marked "Decision:" in the todo.
 
 | ID | Decision | Recommendation | Blocks |
 |---|---|---|---|
-| G2 | Home of the shared contracts | JSON Schema plus examples in `dhmconnect/schemas/`, vendored here as test fixtures | T71, T83 |
 | G3 | GUI framework (same as the OffAxisHolo GUI) | PySide6 with pyqtgraph | T74, F15 |
+| G4 | Result plane, z per objective, medium index, sign convention phase → height (OffAxisHolo O1/O2) | open | T75 (which index the result uses), T89 |
 | G6 | Where the target comparison runs | Working-PC (this side) | T90 |
-| G7 | Single source of truth for material data | Material registry here; snapshot in `CaptureContext` | T70, T75 |
-| G9 | Python baseline, one venv per PC, repositories outside Seafile sync folders | Python 3.12, NumPy 2 | – |
+| G7 | Single source of truth for material data | Material registry here (incl. `n_medium` for the result); snapshot in `CaptureContext`; OffAxisHolo presets stay an offline fallback | T70, T75 |
+| G9 | Python baseline, one venv per PC, repositories outside Seafile sync folders | Python 3.12, NumPy 2; partly decided 2026-11-16 (OffAxisHolo stays in Seafile knowingly) | – |
+| G10 | Reference mask, averaging, stitching (SA1–SA7), planning session OffAxisHolo K18 | SA1 a priori mask from the `LayerTarget` footprint; SA2 stage µm; SA5 MIRA levels | T72, T89 |
+
+Decided: G2 (2026-11-16) — JSON Schema plus example messages in `dhmconnect/schemas/`, vendored here as
+test fixtures. Background of the 2026-11-16 changes: `docs/system/handover/from_offaxisholo_2026-11-16.md`.
 
 ## Open
 
@@ -105,14 +109,19 @@ single todos are marked "Decision:" in the todo.
 - [ ] T71: Design the DHM service integration and measurement recipes [phase: 5]
   - Priority: high
   - Size: M
-  - Depends on: – (reads DHMConnect DL-A2 if it exists; G2)
+  - Depends on: – (reads DHMConnect DL-A2 if it exists; G2 decided 2026-11-16)
   - Done when:
     - `docs/design/DHM_SERVICE_INTEGRATION.md` defines the role protocol `DhmMeasurement`, the
       adapters (legacy, service, fake), the recipe (fields in "Reference: DHM recipe fields" below),
       the capture sequence with `reserve_capture()`, asynchronous jobs, acknowledgement and `sync`
       after a restart;
+    - it defines the background policy of the recipe (a background never expires, an optional maximum
+      age only warns; proposal: once per objective and session, plus after optical changes) and how the
+      z hint of `CaptureContext` is filled;
     - `docs/design/EXPERIMENT_STORAGE.md` gets a proposed amendment for `raw_ref`, `job_id`, frame
-      metrics, `/dhm_groups` and the schema version;
+      records (metrics, `used`, `reject_reason`), `/dhm_groups`, the per-product fields `schema_version`,
+      `config_hash`, `background_id`, `warnings`, `quality`, `pixel_pitch_um`, `z_um`, and the schema
+      version (`ReconstructionResult` draft 0.3, handover §3);
     - Decision: behaviour when the DHM-PC is unreachable (`abort`, `continue`, `legacy`).
     - Decision: may the next layer print while the DHM-PC still computes?
 
@@ -124,7 +133,8 @@ single todos are marked "Decision:" in the todo.
     - `docs/design/OPERATING_MODES.md` defines the modes `off`, `monitor`, `shadow`, `correct`, the
       evaluation hook after a layer capture, the protocols `Evaluator` and `Controller`, where
       reports and plans are stored, and the hard limits of a correction;
-    - it defines `LayerTarget` for sliced and for drawn structures;
+    - it defines `LayerTarget` for sliced and for drawn structures, including the footprint after
+      layer n in stage µm that can serve as a priori reference mask (G10 / SA1, input T100);
     - Decision: for drawn structures (`DrawableObject`), is the target rasterised from the toolpath
       with the voxel model, or are they limited to `monitor` without a target?
 
@@ -147,6 +157,19 @@ single todos are marked "Decision:" in the todo.
       threading rule towards the single-writer experiment file;
     - Decision: GUI framework (G3).
 
+- [ ] T100: Prepare the nanofactorysystem input for the planning session K18 (from the OffAxisHolo handover 2026-11-16) [phase: 5]
+  - Priority: medium
+  - Size: S
+  - Depends on: – (uses the draft of T72 if it exists)
+  - Done when:
+    - a note `docs/system/handover/to_offaxisholo_k18_<date>.md` answers from this side: when and where
+      the `LayerTarget` footprint of a structure after layer n exists (before the print, in
+      `experiment.h5`, at capture time in the service?), its coordinate system (stage µm, which origin,
+      which z plane), who sets the pose tolerance / safety margin (recipe or material / process data),
+      and proposals for SA1, SA2 and SA5;
+    - the note lists what this side needs from MIRA for the stage µm ↔ camera pixel mapping (MI-41,
+      MI-50); the maintainer has reviewed it before the session.
+
 ### Phase 6 — Information model
 
 - [ ] T75: Material registry for photopolymers [phase: 6]
@@ -156,6 +179,8 @@ single todos are marked "Decision:" in the todo.
   - Done when:
     - a `Material` record with name, supplier, batch and extensible properties (at least refractive
       index uncured and cured per wavelength) is stored and queried as designed in T70;
+    - the snapshot provides the `n_medium` that OffAxisHolo uses for a result (today taken from the
+      OffAxisHolo preset; G7; which index applies depends on G4);
     - new property keys can be added without a code change, with unit and source;
     - `SubstrateSpec.material` accepts a registry name; the free dictionary keeps working;
     - the material used is copied as a snapshot into `experiment.h5`, test on the dummy backend.
@@ -237,9 +262,13 @@ single todos are marked "Decision:" in the todo.
   - Done when:
     - `ExperimentStore.reserve_capture()` returns the capture id before the acquisition;
     - a capture can be stored without holograms but with `raw_ref` (host, path, SHA-256), `job_id`,
-      frame metrics and selection mask; group products are stored under `/dhm_groups/<group_id>`;
+      frame records (metrics, `used`, `reject_reason`) and selection mask; group products are stored
+      under `/dhm_groups/<group_id>`;
+    - every product carries `schema_version`, `config_hash`, `background_id` and `warnings` (handover
+      2026-11-16 §3), so it can be traced to its background and parameter set;
     - the schema version is raised and old files are still read; `json_copies` and the unpack tool
-      in `analysis/` know the new entries.
+      in `analysis/` know the new entries; `docs/design/EXPERIMENT_STORAGE.md` is current (OffAxisHolo
+      K12 reads the file with `h5py` only, without file locking, by that document).
 
 - [ ] T84: Service adapter and fake service [phase: 7]
   - Priority: high
@@ -278,6 +307,9 @@ single todos are marked "Decision:" in the todo.
     - calibration (exposure, OPL scan, background) runs through the service and is stored;
     - an unreachable or busy service follows the rule from T71; a restart fetches unacknowledged
       results with `sync`; all of it is covered by dummy tests.
+  - Note: the integration with the control script and the reference measurement is done together with
+    the GPU validation OffAxisHolo K14 on the DHM-PC (handover 2026-11-16 §6.2; Python is not yet
+    installed there).
 
 - [ ] T87: Lab check of the service mode [phase: 7]
   - Priority: high
@@ -294,13 +326,26 @@ single todos are marked "Decision:" in the todo.
 |---|---|---|
 | `mode` | `off`, `legacy_raw` (today), `products`, `products_and_raw` | `legacy_raw` |
 | `n_frames` | number, or mapping by structure type and phase | 10 / 20 / 1 as today |
-| `selection` | policy and limits (`all`, `threshold`, `robust`, `best_k`, `min_frames`, `max_extra`) | `all` |
-| `keep_raw` | `none`, `rejected`, `selected`, `all` | decision D7 in DHMConnect `TODO.md` |
-| `products` | `phase`, `intensity`, `field` | phase and intensity |
+| `selection` | policy and limits, see below | `all` until the N-study OffAxisHolo K13 is evaluated |
+| `keep_raw` | `none`, `rejected`, `selected`, `all` | decision D7 in DHMConnect `TODO.md`; recommendation for the first experiments: `all` (input for K13) |
+| `products` | `phase`, `intensity`, `field` | phase and intensity always, `field` (complex) on request |
+| `background` | when a new background is recorded; optional maximum age (only warns) | proposal: once per objective and session, plus after optical changes |
 | `speckle` | pattern, count, amplitude | off |
 | `stitching` | overlap | off |
 | `post` | free dictionary for further processing steps on the DHM-PC | empty |
 | `unavailable` | `abort`, `continue`, `legacy` | decision in T71 |
+
+Selection policies offered by OffAxisHolo (`realtime/selection.py`, handover 2026-11-16 §2):
+- `all`: every frame is averaged;
+- `threshold`: fixed bounds per metric, e.g. `{"saturated_count": (None, 100)}`;
+- `robust`: median / MAD outliers on `robust_metrics` (default `sideband_fraction`, `phase_noise_rad`)
+  with factor `robust_k` (default 3.5);
+- `best_k`: the `k` best frames ranked by `rank_by` (default `phase_noise_rad`, ascending);
+- `min_frames` (default 1) is always enforced and reported.
+
+Frame metrics are computed by default (saturation and black counts, intensity quantiles, sideband energy
+fraction and peak position, piston phase, phase noise). The propagation distance comes from the z hint of
+`CaptureContext` or the parameter set; the result plane is open (G4).
 
 ### Phase 8 — Operating modes
 
@@ -321,6 +366,7 @@ single todos are marked "Decision:" in the todo.
     - for sliced structures a `LayerTarget` (expected height map and mask after layer n in µm, grid
       definition, position, material) is produced from the toolpath job and stored;
     - drawn structures follow the decision of T72;
+    - the target provides the footprint for the reference mask as decided in G10 (K18);
     - a test checks the target of a simple block against its analytic shape.
 
 - [ ] T90: Evaluation hook after a layer capture [phase: 8]

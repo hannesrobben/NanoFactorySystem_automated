@@ -2169,3 +2169,31 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
      Files: `TODO.md`, `future_todo.md`, `WORKLOG.md`
 - **Follow-ups:** T70–T74 (designs) are next; T69 (lab check) on the lab PC; the untracked folder
   `todo_claude/` can be removed once the maintainer has reviewed the files.
+
+### 2026-11-16 17:14 CET — [Handover] OffAxisHolo handover of 2026-11-16 and commit of the reorganisation
+- **Status:** done
+- **Context:** The maintainer handed over `to_nanofactorysystem_2026-11-16.md` from OffAxisHolo (K2–K7 done,
+  G2 decided, SA1–SA7 for the planning session K18). First, the reorganisation of 2026-11-15 (logged above
+  as uncommitted) was committed on the new branch `docs/system-plan` from `main_HR` (which already contains
+  `feat/lab-check`), in the three proposed topic commits.
+- **Changes:**
+  - `docs/system/handover/from_offaxisholo_2026-11-16.md` (new): the handover, filed with a header that says
+    where its content went.
+  - `docs/system/SOFTWARE_PLAN_OVERVIEW.md`: v0.3 — G2 decided, G9 partly decided, new G10 (reference mask,
+    averaging, stitching; K18), milestone P1 (planning session K18) before S3/S4, S1 progress, new §8 facts
+    about the DHM-PC (CUDA 13, no Python yet).
+  - `TODO.md`: open decisions (G2 moved to decided, G4 and G10 added, G7 and G9 updated); recipe reference
+    with the selection policies, frame metrics, `products`, `keep_raw` recommendation and a `background`
+    field; T71 (background policy, z hint, product fields for the storage amendment), T72 (footprint for
+    the reference mask), T75 (`n_medium` in the snapshot), T83 (product traceability fields, frame records,
+    keep `EXPERIMENT_STORAGE.md` current for K12), T86 (together with K14), T89 (G10); new T100 (input for
+    K18), phase table updated.
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (documentation only).
+- **Commits:** `89ab8bb` docs(system): add the plan for the four cooperating repositories; `3f5bdd5`
+  docs(claude): describe the system context and tighten the commit rules; `c8524ca` docs(todo): schedule
+  phases 5-10 for DHM service, operating modes and GUI; `50661ab` docs(system): system plan v0.3 with the
+  OffAxisHolo handover of 2026-11-16; docs(todo): take the OffAxisHolo handover into the todos
+- **Follow-ups:** copy the plan v0.3 unchanged into OffAxisHolo, DHMConnect and MIRA (those repositories
+  are not reachable from this working copy; one `docs(system): …` commit each). T100 before K18.
+  `todo_claude/` (old copies of the project files) is still untracked and can be removed by the maintainer.
