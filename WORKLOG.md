@@ -2283,3 +2283,24 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Commits:** `8118e4c` docs(design): DHM service integration and measurement recipes [T71]; `9f09c68`
   docs(design): propose storage of DHM service results [T71]; docs(todo): log the T71 design [T71]
 - **Follow-ups:** maintainer answers D1–D4 and approves. Next: T72.
+
+### 2026-11-16 18:35 CET — [T72] Design the operating modes and feedback hooks
+- **Status:** blocked (design written; waiting for maintainer approval, working rule 2)
+- **Context:** Investigated the slicer job model (`ElementGroup.contours` and `z_um` per layer group, kept for
+  in-situ DHM comparison; shell groups without contours), `Model3D_Slicer.iterate_layers`, the program parser
+  `utils/visualization.read_text` (laser state and power per movement, T38) and `EXPERIMENT_STORAGE.md` §5.9
+  (`/analysis` was reserved for the analysis tools, which conflicts with T90 → amendment §16).
+- **Changes:**
+  - `docs/design/OPERATING_MODES.md` (new): modes off / monitor / shadow / correct with validation,
+    evaluation hook at the result drain with an evaluation worker, `Evaluator` / `Controller` protocols,
+    `DeviationReport` and `CorrectionPlan` fields, `LayerTarget` (thickness, top/bottom, mask, footprint
+    polygons; sliced from contours, drawn from the voxel-rasterised toolpath or footprint only), reference
+    mask input for K18, storage, monitor rules, hard limits without defaults, decisions O1–O5, tests.
+  - `docs/design/EXPERIMENT_STORAGE.md`: proposed §16 (`/analysis/captures/<id>/deviation` written by the
+    printing process, `/feedback/<structure>`, structure status `stopped`).
+  - `TODO.md`: T72 to Blocked (waiting for approval).
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (documentation only).
+- **Commits:** `e6df488` docs(design): operating modes, feedback hooks and layer targets [T72]; `8e0934d`
+  docs(design): propose storage of feedback results [T72]; docs(todo): log the T72 design [T72]
+- **Follow-ups:** maintainer answers O1–O5 and approves. Next: T73.

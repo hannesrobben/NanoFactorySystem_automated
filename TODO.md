@@ -90,19 +90,6 @@ test fixtures. Background of the 2026-11-16 changes: `docs/system/handover/from_
 
 ### Phase 5 — Concept
 
-- [ ] T72: Design the operating modes and feedback hooks [phase: 5]
-  - Priority: high
-  - Size: M
-  - Depends on: –
-  - Done when:
-    - `docs/design/OPERATING_MODES.md` defines the modes `off`, `monitor`, `shadow`, `correct`, the
-      evaluation hook after a layer capture, the protocols `Evaluator` and `Controller`, where
-      reports and plans are stored, and the hard limits of a correction;
-    - it defines `LayerTarget` for sliced and for drawn structures, including the footprint after
-      layer n in stage µm that can serve as a priori reference mask (G10 / SA1, input T100);
-    - Decision: for drawn structures (`DrawableObject`), is the target rasterised from the toolpath
-      with the voxel model, or are they limited to `monitor` without a target?
-
 - [ ] T73: Design the camera live feed and recording [phase: 5]
   - Priority: medium
   - Size: S
@@ -483,6 +470,20 @@ fraction and peak position, piston phase, phase noise). The propagation distance
 <!-- Claude Code moves a todo here when starting work. -->
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
+- [ ] T72: Design the operating modes and feedback hooks [phase: 5]
+  - Priority: high
+  - Size: M
+  - Depends on: –
+  - Done when:
+    - `docs/design/OPERATING_MODES.md` defines the modes `off`, `monitor`, `shadow`, `correct`, the
+      evaluation hook after a layer capture, the protocols `Evaluator` and `Controller`, where
+      reports and plans are stored, and the hard limits of a correction;
+    - it defines `LayerTarget` for sliced and for drawn structures, including the footprint after
+      layer n in stage µm that can serve as a priori reference mask (G10 / SA1, input T100);
+    - Decision: for drawn structures (`DrawableObject`), is the target rasterised from the toolpath
+      with the voxel model, or are they limited to `monitor` without a target?
+  - Blocked by: waiting for maintainer approval of `docs/design/OPERATING_MODES.md` and of the proposed
+    §16 of `EXPERIMENT_STORAGE.md` (draft 2026-11-16, decisions O1–O5 with proposals in §8).
 - [ ] T71: Design the DHM service integration and measurement recipes [phase: 5]
   - Priority: high
   - Size: M
