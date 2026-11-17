@@ -134,7 +134,7 @@ Attributes of `/`:
 | Attribute | Content |
 |---|---|
 | `file_type` | `"nanofactory.experiment"` |
-| `schema_version` | `"1.0"` (§9) |
+| `schema_version` | `"1.0"`; `"1.1"` since T75 (`/metadata/materials`; `/spec` and `/inputs` from T77 belong to the same minor version) (§9) |
 | `experiment_uuid`, `experiment_label` | §4 |
 | `substrate_uuid`, `substrate_label` | §4 (empty strings if no substrate is given) |
 | `created` | first write |
@@ -151,6 +151,9 @@ Attributes of `/`:
 | `/metadata/system` | `sys_args_json` (as passed); `devices_json`: `System.items()` (controller, camera, DHM, system parameters) at start; `acceleration_x_mm_s2`, `acceleration_a_mm_s2`, `acceleration_z_mm_s2` (read from the controller) and `acceleration_a_rule` (`"controller"` or `"x/2 (IFOV workaround)"`); `backend` (`"real"` or `"dummy"`, so that dry-run files are never mistaken for prints) |
 | `/metadata/software` | `package_version` (from `importlib.metadata`), `git_commit`, `git_dirty` (bool), `git_branch` (empty if not a git checkout), `python_version`, `versions_json` (numpy, h5py, SciDataContainer, OpenCV) |
 | `/metadata/substrate` | copy of the substrate record at experiment start (§8), so the file stays self-contained |
+| `/metadata/materials/<role>` | since 1.1 (T75): material snapshot per role (`resin`, `substrate`, `medium`): attributes `schema`, `name`, `known`, `batch`, `name_source` (`argument`, `substrate`, `sys_args`), `registry_file`, `registry_schema_version`, `taken`, and of a known material `kind`, `supplier`, `notes`, `created`; table `properties` (`key`, `value_real` (NaN for text), `value_text`, `unit`, `wavelength_nm`, `state`, `temperature_c`, `uncertainty`, `source`, `date`, `notes`). Written once when the file is created; a restart keeps it |
+| `/spec` | since 1.1 (T77): the experiment spec as written (`ExperimentSpec.to_json()`, schema `nanofactory.experiment_spec/1`, not resolved: `null` = objective default) as text dataset `spec_json`; attributes `schema`, `written`. Written by `run_experiment()` at the start; exported as `experiment_spec.json`. Missing for experiments started without a spec or with a spec that cannot be stored (plain callable factory; a warning is logged) |
+| `/inputs/<file name>` | since 1.1 (T77): slicer input files of the spec (height maps as `.npy`, meshes) byte for byte (uint8), attributes `file` (path relative to the experiment folder, `inputs/…`) and `sha256` (decision M5) |
 | `/metadata/sessions` | table (compound dataset, one row per run of the process on this file): `started`, `ended`, `kind` (`new`/`restart`), `end_reason` (`finished`/`aborted`/`exception`), `software_git_commit` |
 
 ### 5.3 Calibration, plane fit and OPL scan
@@ -342,23 +345,41 @@ legacy reader (§9).
 
 ```json
 {
-  "schema_version": "1.0",
+  "schema_version": "2.0",
   "label": "HR-26-001",
   "uuid": "…",
   "created": "2026-09-29T18:00:00.000Z",
   "user": "Hannes",
   "material": {"substrate": "boro-silicate glass", "thickness_um": 700.0,
                "resin": "SZ2080", "resin_thickness_um": 75.0},
+  "substrate_material": "boro-silicate glass",
+  "substrate_type": "cover_slip",
+  "dimensions": {"shape": "round", "diameter_mm": 30.0, "thickness_um": 700.0},
   "resin_drops": [{"edges_um": [[5720, 22330], [-3333, 22420], [1660, 17212], [1200, 27190]],
-                   "added": "…"}],
+                   "added": "…", "material": "SZ2080", "batch": "", "thickness_um": 75.0,
+                   "application": "drop"}],
   "notes": "",
   "experiments": [
     {"uuid": "…", "label": "HR-26-001-A", "path": "HR-26-001-A_20260929-2018",
      "started": "…", "objective": "Zeiss 63x", "status": "finished",
-     "center_um": [1310, 19500], "double_corner_um": [980, 19295], "double_corner_rotation_deg": 0}
+     "center_um": [1310, 19500], "double_corner_um": [980, 19295], "double_corner_rotation_deg": 0,
+     "area_um": [[700, 19100], [1920, 19900]], "resin_drop": 0, "plan_id": "planned:power_speed"},
+    {"uuid": "", "label": "", "name": "lenses", "plan_id": "planned:lenses", "status": "planned",
+     "planned": "…", "objective": "Zeiss 63x", "area_um": [[2100, 19100], [3000, 19900]],
+     "resin_drop": 0, "center_um": [2550, 19500]}
   ]
 }
 ```
+
+Record version 2 (T76, INFORMATION_MODEL.md §3.2): `substrate_material`, `substrate_type`
+(`cover_slip`/`slide`/`wafer`/`other`), `dimensions` (fields of the shape only) and per drop
+`material`, `batch`, `thickness_um`, `application` (`drop`/`dip_in`). A `"1.0"` file is read as version 2
+(the `material` dict fills the new fields and stays as it is) and written as `"2.0"` only when the record
+changes. Index entries carry `area_um` (rectangle incl. corner markers and QR code) and `resin_drop`;
+`run_substrate()` enters every experiment as `planned` before the run (`plan_experiment`), and the
+experiment replaces its planned entry when it starts. An experiment that was never started stays
+`planned`. `substrate_overview(root, label)` lists all entries with the status read from the experiment
+files (the index is a cache) and the state `planned` / `running` / `done` / `aborted`.
 
 - The substrate record is small, edited by people (notes) and shared by all experiments, so it stays
   JSON; each experiment file holds a copy (`/metadata/substrate`).
@@ -538,3 +559,83 @@ proposal are answered by the proposal itself (D1: hard error; D2: `nnn` restarts
 
 Approved by the maintainer on 2026-09-29 (all proposals in §12 accepted); recorded in the status line
 at the top.
+
+## 15. Proposed amendment: DHM service results (T71, not yet approved)
+
+Proposed with `docs/design/DHM_SERVICE_INTEGRATION.md` (T71); implemented in T83 once both are approved.
+Minor schema addition: legacy captures and every existing group stay unchanged, readers of 1.0 files keep
+working. The version number is set when T83 is implemented (1.1, or the next minor if the information
+model additions of `INFORMATION_MODEL.md` §10 come first). OffAxisHolo K12 reads the file by this
+document, so this section is binding for it once approved.
+
+### 15.1 DHM capture (`/structures/<name>/captures/<nnnn>`, `kind = "dhm"`)
+
+New attributes:
+
+| Attribute | Content |
+|---|---|
+| `job_id` | job id of the DHM service (empty in legacy mode) |
+| `job_state` | `reserved`, `sent`, `acquired`, `stored`, `acknowledged`, `failed`, `missing` (legacy: `stored`) |
+| `error` | reason of a failed job, else empty |
+| `recipe_json` | effective recipe of this capture (incl. unknown keys passed to the service) |
+| `context_json` | `CaptureContext` as sent (incl. material snapshot reference and `z_hint_um`) |
+| `raw_ref_json` | raw frames that stayed on the DHM-PC: `host`, `path`, `sha256`, `n_frames`, `keep_raw`; empty if the frames are stored here |
+
+Datasets:
+- `holograms`, `capture_times_s`: as today, only when the raw frames are transferred (`legacy_raw`,
+  `products_and_raw`). A capture may have products and no `holograms` (as already allowed in §5.6).
+- `frames`: compound table, one row per frame: `index` (int), `used` (bool), `reject_reason` (str), one
+  float column per metric (`saturated_count`, `black_count`, `intensity_q01`, `intensity_q50`,
+  `intensity_q99`, `sideband_fraction`, `sideband_peak_x`, `sideband_peak_y`, `piston_rad`,
+  `phase_noise_rad`, …; unknown metrics become extra columns, a missing one NaN); attribute
+  `acquisition_json` (per-frame acquisition data passed through unchanged).
+
+### 15.2 Products (`…/captures/<nnnn>/products/<name>`)
+
+`<name>` is `phase_rad`, `intensity`, `field` (complex64) or a further product. Existing attributes stay
+(`source`, `created`, `parameters_json`, `unit`); new attributes:
+
+| Attribute | Content |
+|---|---|
+| `schema_version` | version of the `ReconstructionResult` / `ProductSet` contract |
+| `config_hash`, `config_json` | parameter set of the reconstruction |
+| `background_id`, `background_created`, `background_age_s` | background used |
+| `pixel_pitch_um` | after the sideband crop (not the camera pitch) |
+| `z_um`, `wavelength_um`, `n_medium` | propagation distance, wavelength, medium index used |
+| `quality_json` | `n_obj`, `n_effective`, `n_bg`, `piston_std_rad`, selection summary |
+| `timings_json`, `versions_json`, `warnings_json` | stage timings, software versions, warnings |
+| `job_id` | redundant back-reference |
+
+Products are stored as delivered (aligned, not levelled; levelling belongs to MIRA if G10 / SA5 is
+decided as proposed).
+
+### 15.3 Groups, calibration, orphans
+
+| Path | Content |
+|---|---|
+| `/dhm_groups/<group_id>` | attributes `kind` (`speckle`, `stitching`), `structure`, `phase`, `layer_id`, `recipe_json`, `job_id`, `job_state`; dataset `members` (capture ids); group `products/<name>` like §15.2; dataset `member_transforms` (one row per member, as delivered by MIRA) |
+| `/calibration/dhm/<kind>/<id>` | `kind` = `exposure`, `opl_scan`, `background`: attributes `parameters_json`, `result_json`, `time`, `session`, `job_id`; backgrounds only metadata (frames stay on the DHM-PC unless `keep_raw` asks otherwise). `/opl_scan` (§5.3) keeps the latest OPL result. |
+| `/metadata/dhm` | once per session (T79): service and software versions, parameter-set name and hash, camera, pixel size and its source, adapter (`legacy`, `service`, `fake`) |
+| `/dhm_orphans/<job_id>` | results that arrived for an unknown capture (restart after a crash), stored like a capture's products with the context they carried |
+
+### 15.4 JSON copies and unpack tool
+
+The JSON copies (`experiment_dictionary.json`, `structures.json`, `print_progress.json`) list no captures
+and stay unchanged. `analysis/experiment_analysis` unpacks `frames` as CSV and the new attributes as JSON
+without code change (generic mirroring); its `tables/captures.csv` gets the columns `job_id`, `job_state`
+and `products`; a test with a fake-service experiment checks it (T83).
+
+## 16. Proposed amendment: feedback results (T72, not yet approved)
+
+Proposed with `docs/design/OPERATING_MODES.md` (T72, §5 there); implemented in T88–T91 once approved.
+Minor schema addition.
+
+- §5.9 changes: besides the analysis tools, the printing process writes results under
+  `/analysis/captures/<capture id>/deviation` with `source = "nanofactorysystem.feedback"` (it holds the
+  experiment lock anyway). Analysis tools never overwrite or delete results of that source.
+- New group `/feedback/<structure>`: attributes `mode`, `evaluator`, `controller`, `rules_json`,
+  `limits_json`, `target_json`; dataset `events` (table: `layer_id`, `capture_id`, `time`, `rmse`, `mae`,
+  `validity`, `status`, `action`); subgroups `plans/<layer_id>` with the `CorrectionPlan` (`actions_json`,
+  `rationale`, `limits_applied_json`, `controller`, `applied`, `applied_at_layer`).
+- `StructureRecord.status` gets the value `stopped` (stopped by a monitor rule); `print_progress.json`
+  reports it like `failed`, with the reason.

@@ -15,6 +15,7 @@ from nanofactorysystem.devices.coordinate_system import DropDirection, Point2D, 
 from nanofactorysystem.experiment_spec import (CornerSpec, ExperimentSpec, StructureSpec, messagebox_confirm,
                                                run_experiment, script_output)
 from nanofactorysystem.plane_fitting import PlaneFitMode
+from nanofactorysystem.structure_factories import BuildContext, structure_factory
 
 OBJECTIVES = {
     "Zeiss 20x": dict(drop_direction=DropDirection.UP, fov_um=500.0, z_max_um=24550.0, margin_um=200.0,
@@ -46,17 +47,16 @@ def runtime_arguments() -> dict:
     }
 
 
-def distance_test(slice_size, velocity):
-    """ Factory of one line distance test; the acceleration is read from the running experiment. """
+@structure_factory("parameter_study.power_speed_line_test.distance_test")
+def distance_test(context: BuildContext, *, slice_size, velocity):
+    """ Factory of one line distance test; the acceleration is read from the build context. """
 
-    def build(experiment):
-        return Distance_Test(center=Point3D(0, 0, -2),
-                             fov=[150, 150],  # field of view range -> minimal 100 µm x 100 µm (63x objective)
-                             min_dist=0.050,  # 50 nm
-                             max_dist=5,  # maximal distance between lines -> 5 µm
-                             n_lines=20, length=50.0, height=3.0, draw_axis='y', slice_size=slice_size,
-                             velocity=velocity, acceleration=experiment.accel_a_um)
-    return build
+    return Distance_Test(center=Point3D(0, 0, -2),
+                         fov=[150, 150],  # field of view range -> minimal 100 µm x 100 µm (63x objective)
+                         min_dist=0.050,  # 50 nm
+                         max_dist=5,  # maximal distance between lines -> 5 µm
+                         n_lines=20, length=50.0, height=3.0, draw_axis='y', slice_size=slice_size,
+                         velocity=velocity, acceleration=context.accel_a_um)
 
 
 def experiment_spec(objective="Zeiss 20x", absolute_center=Point2D(0, 0), dhm_usage=False,
@@ -70,7 +70,7 @@ def experiment_spec(objective="Zeiss 20x", absolute_center=Point2D(0, 0), dhm_us
         raise ValueError(f"No power and velocity lists are defined for {objective}.")
     structures = [
         StructureSpec(f"lines_{i}_v_{velocity}_{j}_p_{power}",
-                      factory=distance_test(parameters["slice size"], velocity), power_mw=power, axes="ABZ")
+                      factory=distance_test(slice_size=parameters["slice size"], velocity=velocity), power_mw=power, axes="ABZ")
         for i, velocity in enumerate(parameters["velocity"]) for j, power in enumerate(parameters["power"])]
     return ExperimentSpec(
         name="y_axis_line_resolution_63x", objective=objective, center=absolute_center,

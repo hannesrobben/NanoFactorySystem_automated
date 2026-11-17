@@ -15,6 +15,7 @@ from nanofactorysystem.devices.coordinate_system import DropDirection, Point2D, 
 from nanofactorysystem.experiment_spec import (CornerSpec, ExperimentSpec, StructureSpec, messagebox_confirm,
                                                run_experiment, script_output)
 from nanofactorysystem.plane_fitting import PlaneFitMode
+from nanofactorysystem.structure_factories import BuildContext, structure_factory
 
 OBJECTIVES = {
     "Zeiss 20x": dict(drop_direction=DropDirection.UP, fov_um=500.0, z_max_um=24550.0, margin_um=200.0,
@@ -45,14 +46,13 @@ def runtime_arguments() -> dict:
     }
 
 
-def hollow_rectangle(hatch, slice_size, velocity):
-    """ Factory of one hollow rectangle; the acceleration is read from the running experiment. """
+@structure_factory("dhm_tomography.hollow_rect_first_print.hollow_rectangle")
+def hollow_rectangle(context: BuildContext, *, hatch, slice_size, velocity):
+    """ Factory of one hollow rectangle; the acceleration is read from the build context. """
 
-    def build(experiment):
-        return HollowRectangle(center=Point3D(0, 0, -2), width=75, length=75, base_height=3, hollow_height=3,
-                               top_height=3, min_opening=25, hatch_size=hatch, slice_size=slice_size,
-                               velocity=velocity, acceleration=experiment.accel_a_um)
-    return build
+    return HollowRectangle(center=Point3D(0, 0, -2), width=75, length=75, base_height=3, hollow_height=3,
+                           top_height=3, min_opening=25, hatch_size=hatch, slice_size=slice_size,
+                           velocity=velocity, acceleration=context.accel_a_um)
 
 
 def experiment_spec(objective="Zeiss 20x", absolute_center=Point2D(0, 0), dhm_usage=False,
@@ -64,8 +64,8 @@ def experiment_spec(objective="Zeiss 20x", absolute_center=Point2D(0, 0), dhm_us
     parameters = PARAMETERS[objective]
     structures = [
         StructureSpec(f"Hollow_rectangle_{i}",
-                      factory=hollow_rectangle(parameters["hatch size"], parameters["slice size"],
-                                               parameters["velocity"]),
+                      factory=hollow_rectangle(hatch=parameters["hatch size"], slice_size=parameters["slice size"],
+                                               velocity=parameters["velocity"]),
                       power_mw=parameters["power"], axes="ABZ")
         for i in range(GRID[0] * GRID[1])]
     return ExperimentSpec(

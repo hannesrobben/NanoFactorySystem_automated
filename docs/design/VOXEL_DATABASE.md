@@ -76,6 +76,8 @@ CREATE INDEX voxel_lookup ON voxel_measurement (material_id, objective, setup);
 The columns required by T53 are all present; `width_std_um`, `height_std_um`, `n_lines` and `source` are
 additions that cost nothing and let averaged measurements keep their spread.
 
+**Schema version 2 (T75).** `migrate_1_to_2` adds the material registry of `INFORMATION_MODEL.md` §8: `material.kind` (`resin`, `substrate`, `medium`; existing rows become resins), `material.created`, and the table `material_property` (`key`, `value_real` or `value_text`, `unit` (required for numbers), `wavelength_nm`, `state` (`uncured`, `cured`, `any`), `temperature_c`, `uncertainty`, `source`, `date`, `notes`; index on `(material_id, key)`). API: `voxel/materials.py` `MaterialRegistry`; seed `config/material_seed.csv`.
+
 **Migrations.** `voxel/migrations.py` holds an ordered list `MIGRATIONS = [migrate_0_to_1, …]`. Opening a
 database runs, inside one transaction, every migration from `PRAGMA user_version` up to the newest and then
 sets `user_version`. A database with a newer version than the code knows is refused.

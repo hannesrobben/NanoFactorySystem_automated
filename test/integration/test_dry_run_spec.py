@@ -1,4 +1,6 @@
 """Dry runs of experiments described by an ExperimentSpec, for both program sources (T51)."""
+import json
+
 import numpy as np
 import pytest
 
@@ -49,6 +51,11 @@ def test_drawing_spec_dry_run(test_config, dummy_backend, no_sleep, tmp_path):
     assert record.system["sys_args"]["controller"]["zMax"] == 24550.0
     assert record.structure("rect").power_mw == 1.0 and not record.captures  # camera off by default
     assert record.structure("rect_rep1").layer_powers_mw == [1.0, 1.2, 1.4]
+    # T77: the spec as written is stored in the file and as project file, and can be run again
+    assert record.spec == json.loads((folder / "experiment_spec.json").read_text())
+    assert record.spec["placement"]["structure_size_um"] is None  # not resolved
+    again = ExperimentSpec.load(folder / "experiment_spec.json")
+    assert [s.name for s in again.structures] == ["stair", "rect"] and again.structures[1].repeat == 1
 
 
 @pytest.mark.slow
@@ -78,6 +85,10 @@ def test_slicer_spec_dry_run(test_config, dummy_backend, no_sleep, tmp_path):
     for layer_id in range(block.n_layers):
         program = store.read_program("block", layer_id)
         assert "IFOV ON" in program and "LINEAR A" in program
+    # T77: the height map is stored next to the project file and in the experiment file
+    stored = folder / "inputs" / "block_height.npy"
+    assert store.read_input("block_height.npy") == stored.read_bytes()
+    assert np.array_equal(ExperimentSpec.load(folder / "experiment_spec.json").structures[0].height_data, height_map)
 
 
 @pytest.mark.slow

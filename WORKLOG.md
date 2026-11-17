@@ -2130,3 +2130,333 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Follow-ups:** T67 (evaluation pipeline). On the lab PC: unpack a real experiment and open it in Excel
   (CSV style), check the size for experiments with many DHM captures. Branch `feat/analysis-unpack`, created
   from `fix/contour-mask-uint8` (contains T65, not yet merged into `main_HR`), not pushed.
+
+
+### 2026-11-15 23:15 CET — [Reorganisation] Project files for the four-repository system plan
+- **Status:** done
+- **Context:** Maintainer request: create `CLAUDE.md` and `TODO.md` for OffAxisHolo, DHMConnect and MIRA in
+  the style of this repository and sort the todos of all four. The maintainer had moved this repository's
+  project files into `todo_claude/` together with the plans `00_SOFTWARE_PLAN_OVERVIEW.md` and
+  `03_NANOFACTORYSYSTEM_PLAN.md`; they are back at the root (content unchanged except where listed).
+  Decisions taken with the maintainer: G1 — the communication repository is DHMConnect, package
+  `dhmconnect` (the plan said `dhmlink`); the system plan is copied into every repository, master copy here;
+  all four repositories use the format of this `TODO.md`.
+- **Changes:**
+  - `docs/system/SOFTWARE_PLAN_OVERVIEW.md` (new): system plan v0.2 (G1 decided, `dhmlink` → `dhmconnect`,
+    unified todo rules, rule for contract changes); master copy.
+  - `CLAUDE.md`: project files listed (incl. `future_todo.md`, `todo_notes.md`, `docs/system/`), new section
+    "System context", legacy DHM path described, language rule extended, session start step 4, commit rules
+    (feature branch from `main_HR`, topic split, messages for human readers), `dhmconnect`/`mira` in the
+    testing rule, empty sections `## Current Status` / `## Status Update Anchor` added for the status
+    review routine (they were referenced but missing).
+  - `TODO.md`: phase plan extended by phases 5–10 (T70–T97 from the plan), working rules 7–9, table of open
+    global decisions, recipe field reference under phase 7, T98 and T99 added (found during the
+    reorganisation), field "Size" added to the format, T68 added to Done (it had been committed in `ed4e769`
+    but not logged).
+  - `future_todo.md`: F3, F4, F5, F6, F7, F12 marked as scheduled (→ T…, or moved to MIRA / DHMConnect);
+    F15 (system GUI), F16 (controller and mode `correct`), F17 (dynamic slicing) added.
+  - `WORKLOG.md`: this entry. Note: T68 has no entry of its own in this log; its commit message documents it.
+  - `todo_notes.md`, `TODO_default_origin.md`, `Information_Mehrere_Experimente.txt`: restored unchanged at
+    the root (T98 turns the last one into an English guide).
+- **Tests:** none (documentation only).
+- **Commits:** uncommitted — proposed messages (one per topic, on a branch `docs/system-plan` from the
+  current branch `feat/lab-check`):
+  1. `docs(system): add the plan for the four cooperating repositories`
+     Files: `docs/system/SOFTWARE_PLAN_OVERVIEW.md` (new)
+  2. `docs(claude): describe the system context and tighten the commit rules`
+     Files: `CLAUDE.md`
+  3. `docs(todo): schedule phases 5–10 for DHM service, operating modes and GUI`
+     Files: `TODO.md`, `future_todo.md`, `WORKLOG.md`
+- **Follow-ups:** T70–T74 (designs) are next; T69 (lab check) on the lab PC; the untracked folder
+  `todo_claude/` can be removed once the maintainer has reviewed the files.
+
+### 2026-11-16 17:14 CET — [Handover] OffAxisHolo handover of 2026-11-16 and commit of the reorganisation
+- **Status:** done
+- **Context:** The maintainer handed over `to_nanofactorysystem_2026-11-16.md` from OffAxisHolo (K2–K7 done,
+  G2 decided, SA1–SA7 for the planning session K18). First, the reorganisation of 2026-11-15 (logged above
+  as uncommitted) was committed on the new branch `docs/system-plan` from `main_HR` (which already contains
+  `feat/lab-check`), in the three proposed topic commits.
+- **Changes:**
+  - `docs/system/handover/from_offaxisholo_2026-11-16.md` (new): the handover, filed with a header that says
+    where its content went.
+  - `docs/system/SOFTWARE_PLAN_OVERVIEW.md`: v0.3 — G2 decided, G9 partly decided, new G10 (reference mask,
+    averaging, stitching; K18), milestone P1 (planning session K18) before S3/S4, S1 progress, new §8 facts
+    about the DHM-PC (CUDA 13, no Python yet).
+  - `TODO.md`: open decisions (G2 moved to decided, G4 and G10 added, G7 and G9 updated); recipe reference
+    with the selection policies, frame metrics, `products`, `keep_raw` recommendation and a `background`
+    field; T71 (background policy, z hint, product fields for the storage amendment), T72 (footprint for
+    the reference mask), T75 (`n_medium` in the snapshot), T83 (product traceability fields, frame records,
+    keep `EXPERIMENT_STORAGE.md` current for K12), T86 (together with K14), T89 (G10); new T100 (input for
+    K18), phase table updated.
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (documentation only).
+- **Commits:** `89ab8bb` docs(system): add the plan for the four cooperating repositories; `3f5bdd5`
+  docs(claude): describe the system context and tighten the commit rules; `c8524ca` docs(todo): schedule
+  phases 5-10 for DHM service, operating modes and GUI; `50661ab` docs(system): system plan v0.3 with the
+  OffAxisHolo handover of 2026-11-16; docs(todo): take the OffAxisHolo handover into the todos
+- **Follow-ups:** copy the plan v0.3 unchanged into OffAxisHolo, DHMConnect and MIRA (those repositories
+  are not reachable from this working copy; one `docs(system): …` commit each). T100 before K18.
+  `todo_claude/` (old copies of the project files) is still untracked and can be removed by the maintainer.
+
+### 2026-11-16 17:19 CET — [T70] Design the information model v2
+- **Status:** blocked (design written; waiting for maintainer approval, working rule 2)
+- **Context:** First open todo of phase 5. Investigated `experiment_spec.py`, `substrate_plan.py`,
+  `storage/substrate_store.py`, `storage/records.py`, `storage/schema.py`, `voxel/migrations.py`,
+  `aerobasic/programs/setups.py`, `drawings/base.py`, `experiment.py` (setup and accelerations), the eight
+  scripts in `mains/Experiments/` that use `factory=`, and the golden files `commands_experiment_ifov_on.txt`,
+  `commands_experiment_ifov_off.txt`, `corner_default.txt`, `rectangle2d_ifov_20x.txt`,
+  `binary_grating_ifov_63x.txt`.
+- **Findings (IFOV decision):** the setup is sent once by immediate commands; layer programs have no setup
+  header; IFOV layer programs configure IFOV completely themselves (their values even override those of
+  `SetupIFOV`: 63x size 0.15 vs 0.075, tracking 16.5 vs 7.5); `IFOV_on` experiments already print corners and
+  QR code as non-IFOV programs; `accel_a` is `accel_x / 2` for the whole `IFOV_on` experiment; voxel lookup,
+  `StructureRecord.setup` and the summary report the experiment setup for every structure; `DefaultSetup`
+  never resets `GALVO ROTATION A -0.6`, `RAMP RATE 0`, `LOOKAHEAD FAST`, `METRIC`, `GALVO LASEROVERRIDE A AUTO`
+  (persistence unknown → T101).
+- **Changes:**
+  - `docs/design/INFORMATION_MODEL.md` (new): four levels with fields and storage, `StructureSettings` and
+    resolution order, storage table, project file and structure JSON, named factories with `BuildContext`,
+    reading old data, IFOV investigation with options, material store options, amendments to
+    `EXPERIMENT_STORAGE.md` (schema 1.1), decisions M1–M6 with proposals, todo mapping.
+  - `TODO.md`: T70 moved to Blocked (waiting for approval); T101 added (found during T70); T78 notes its
+    dependency on T101 for the setup switch; phase table lists T101.
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (documentation only; no code changed).
+- **Commits:** `2709356` docs(design): information model v2 for material, substrate, experiment [T70];
+  docs(todo): log the T70 design and add T101 [T70]
+- **Follow-ups:** maintainer answers M1–M6 and approves (line `Status: approved <date>`); T101 on the lab PC.
+  Next todo without approval dependency: T71 (design of the DHM service integration).
+  Branch `docs/t70-information-model` on top of `docs/system-plan` (from `main_HR`); nothing pushed.
+
+### 2026-11-16 18:00 CET — [T70] Maintainer decisions M1–M6 worked into the information model
+- **Status:** blocked (decisions recorded; the approval line `Status: approved <date>` is still missing)
+- **Context:** The maintainer answered M1–M6: M1, M3 (several materials per substrate unlikely), M4, M5 as
+  proposed; M2: setup sent for every structure, unchanged within a structure, changeable between
+  structures, default `IFOV_on` (non-IFOV is outdated but stays selectable); M6: camera per structure only
+  before and after, no layer captures. Future camera wishes: video of the structure while printing (→ T94)
+  and a stitched overview of the experiment before and after printing by stage xy positions (exists since
+  T28, `overview_capture=True`).
+- **Changes:**
+  - `docs/design/INFORMATION_MODEL.md`: status line, §3.2 (M3 note), §4 (`setup` default `IFOV_on`,
+    `camera_capture` before/after only), §7 (decision M2 replaces the options; new §7.1 with the default
+    change, five scripts that need an explicit `setup="IFOV_off"`, re-recorded golden command logs, camera
+    behaviour change), §11 (decisions), §13.
+  - `TODO.md`: T78 acceptance criteria follow M2/M6; T101 asks for the resets of both setup programs; T94
+    note on the structure video; T70 blocked reason updated.
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (documentation only).
+- **Commits:** `c68d2a3` docs(design): record the maintainer's decisions M1-M6 in the info model [T70];
+  docs(todo): log the T70 decisions [T70]
+- **Follow-ups:** maintainer writes the approval line; then phase 6 (T75 first). T101 on the lab PC.
+
+### 2026-11-16 18:29 CET — [T70] Information model approved
+- **Status:** done
+- **Changes:**
+  - `docs/design/INFORMATION_MODEL.md`: status line `approved 2026-11-16`, entered at the maintainer's request.
+  - `TODO.md`: T70 moved from Blocked to Done.
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (documentation only).
+- **Commits:** `42313ef` docs(design): approve the information model v2 [T70]; docs(todo): close T70 [T70]
+- **Follow-ups:** phase 6 is open (T75 first, T101 on the lab PC). Next by working rule 1: T71.
+
+### 2026-11-16 18:33 CET — [T71] Design the DHM service integration and measurement recipes
+- **Status:** blocked (design written; waiting for maintainer approval, working rule 2)
+- **Context:** Investigated `devices/dhm.py`, `backends/protocols.py` (`DhmRole`, `DhmDriver`),
+  `Experiment.measure()`, `opl_scan()`, the print loop and the hologram counts in `build_programs()`
+  (grid structures 10 / 10 / 20, corners and QR code 1 / 1 / 11 for before / layer / after),
+  `ExperimentStore.add_capture()` / `add_dhm_product()` (the latter has no caller) and
+  `EXPERIMENT_STORAGE.md` §5.3/§5.6. DHMConnect DL-A2/DL-A3 are not reachable from this working copy; field
+  names follow the system plan and the OffAxisHolo draft 0.3.
+- **Changes:**
+  - `docs/design/DHM_SERVICE_INTEGRATION.md` (new): role protocol `DhmMeasurement` (configure, calibrate,
+    acquire_background, measure, result, acknowledge, sync, close), adapters legacy / service / fake, adapter
+    selection by recipe mode, `DhmRecipe` fields with defaults, `CaptureContext` incl. z hint, capture
+    sequence with `reserve_capture()`, job states, single-writer queue, back pressure (`maxPending`, default 1
+    until measured), store-then-acknowledge, restart with `sync`, calibration and background policy,
+    decisions D1–D4, tests, todo mapping.
+  - `docs/design/EXPERIMENT_STORAGE.md`: proposed §15 (capture job fields, raw reference, `frames` table,
+    product traceability attributes, `/dhm_groups`, `/calibration/dhm`, `/metadata/dhm`, `/dhm_orphans`,
+    unpack tool).
+  - `TODO.md`: T71 via In Progress to Blocked (waiting for approval).
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (documentation only).
+- **Commits:** `8118e4c` docs(design): DHM service integration and measurement recipes [T71]; `9f09c68`
+  docs(design): propose storage of DHM service results [T71]; docs(todo): log the T71 design [T71]
+- **Follow-ups:** maintainer answers D1–D4 and approves. Next: T72.
+
+### 2026-11-16 18:35 CET — [T72] Design the operating modes and feedback hooks
+- **Status:** blocked (design written; waiting for maintainer approval, working rule 2)
+- **Context:** Investigated the slicer job model (`ElementGroup.contours` and `z_um` per layer group, kept for
+  in-situ DHM comparison; shell groups without contours), `Model3D_Slicer.iterate_layers`, the program parser
+  `utils/visualization.read_text` (laser state and power per movement, T38) and `EXPERIMENT_STORAGE.md` §5.9
+  (`/analysis` was reserved for the analysis tools, which conflicts with T90 → amendment §16).
+- **Changes:**
+  - `docs/design/OPERATING_MODES.md` (new): modes off / monitor / shadow / correct with validation,
+    evaluation hook at the result drain with an evaluation worker, `Evaluator` / `Controller` protocols,
+    `DeviationReport` and `CorrectionPlan` fields, `LayerTarget` (thickness, top/bottom, mask, footprint
+    polygons; sliced from contours, drawn from the voxel-rasterised toolpath or footprint only), reference
+    mask input for K18, storage, monitor rules, hard limits without defaults, decisions O1–O5, tests.
+  - `docs/design/EXPERIMENT_STORAGE.md`: proposed §16 (`/analysis/captures/<id>/deviation` written by the
+    printing process, `/feedback/<structure>`, structure status `stopped`).
+  - `TODO.md`: T72 to Blocked (waiting for approval).
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (documentation only).
+- **Commits:** `e6df488` docs(design): operating modes, feedback hooks and layer targets [T72]; `8e0934d`
+  docs(design): propose storage of feedback results [T72]; docs(todo): log the T72 design [T72]
+- **Follow-ups:** maintainer answers O1–O5 and approves. Next: T73.
+
+### 2026-11-16 18:38 CET — [T73] Design the camera live feed and recording
+- **Status:** blocked (design written; waiting for maintainer approval, working rule 2)
+- **Context:** Investigated `devices/camera.py`, `camera/camera.py` (single image requests),
+  `camera/optexpose.py`, `System.getimage()` / `optexpose()` and their consumers (`measure()`, `overview.py`,
+  `tools/focus.py`, `tools/layer.py`, `tools/grid.py`), the dummy camera driver, F3. Found that the image
+  wait timeout is `2000 × ExposureTime` with the exposure in µs, i.e. about 11 h at 20 ms (→ T102).
+- **Changes:**
+  - `docs/design/CAMERA_LIVE.md` (new): `CameraService` with direct mode (feed off, unchanged device calls)
+    and threaded mode (one owner, snapshots preempt the feed, separate measurement and feed settings,
+    bounded subscriber queues, stop on abort), frame-to-layer mapping by times, recording per structure or
+    experiment next to the experiment file with `/recordings` table and limits, live feed interface, dummy
+    support, decisions C1–C5, tests.
+  - `TODO.md`: T73 to Blocked (waiting for approval); T102 added (found during T73); phase table lists T102.
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (documentation only).
+- **Commits:** `d690f28` docs(design): camera live feed, recording and single camera owner [T73];
+  docs(todo): log the T73 design and add T102 [T73]
+- **Follow-ups:** maintainer answers C1–C5 and approves; T102 (lab PC confirms the exposure unit). Next: T74.
+
+### 2026-11-16 18:40 CET — [T74] Design the headless core for a GUI
+- **Status:** blocked (design written; waiting for maintainer approval, working rule 2)
+- **Context:** Searched the package for calls that wait for a person (`messagebox`, `plt.show()`, `input()`,
+  `imshow`) and for pyplot use; read `plot_experiment()`, the substrate plot, `print_experiment()`,
+  `Experiment.__exit__` / `_end_session`, `_stop_failed_task` and `AerotechTask.wait_to_finish`.
+  `confirm` is already injectable in `run_experiment()` / `run_substrate()` (16 scripts import
+  `messagebox_confirm`); `plt.show()` in the run path only runs with `show=True`.
+- **Changes:**
+  - `docs/design/GUI_READINESS.md` (new): inventory of blocking calls and pyplot use, thread and ownership
+    rules (one worker thread owns all devices and is the only writer), `RunEvent` kinds and `EventBus`,
+    `RunControl` with pause / resume / abort / `stop_now` at checkpoints, runner API, decisions P1–P3, tests.
+  - `TODO.md`: T74 to Blocked (waiting for approval).
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (documentation only).
+- **Commits:** `2a2b0a6` docs(design): headless core with run control and progress events [T74];
+  docs(todo): log the T74 design [T74]
+- **Follow-ups:** maintainer answers P1–P3 and approves. Next: T100 (K18 input), then phase 6 (T75).
+
+### 2026-11-16 18:41 CET — [T100] Input for the planning session K18
+- **Status:** blocked (note written; the todo asks for the maintainer's review before the session)
+- **Changes:**
+  - `docs/system/handover/to_offaxisholo_k18_2026-11-16.md` (new): when and where footprints are known,
+    coordinate frame, proposals for SA1 (a priori with a posteriori check), SA2 (`reference_mask.occupied_um`
+    polygons in `CaptureContext`, union of everything printed in the field of view), margin split
+    (`pose_tolerance_um` here, `optical_margin_um` from OffAxisHolo), SA5, SA6; needs from MIRA and
+    OffAxisHolo; questions for the session.
+  - `TODO.md`: T100 to Blocked (review).
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (documentation only).
+- **Commits:** `2345a36` docs(system): nanofactorysystem input for the planning session K18 [T100];
+  docs(todo): log T100 [T100]
+- **Follow-ups:** maintainer reviews the note and takes it to K18. Phase 5 has no open todo left (T71–T74,
+  T100 wait for the maintainer); phase 6 can start with T75 (T70 approved).
+
+### 2026-11-16 19:04 CET — [T75] Material registry for photopolymers
+- **Status:** done
+- **Context:** First implementation todo of phase 6 (design T70 approved, decision M1: registry in the voxel
+  SQLite; M3: batch belongs to the use; M4: names into `sys_args["sample"]`). The old test venv was gone; a fresh
+  one was created at `%LOCALAPPDATA%\Temp\nfsv` (`pip install -e ".[test]"`: NumPy 2.5.5, h5py 3.16.0, OpenCV 5.0.0).
+  The global Python still has the NumPy/OpenCV mismatch of T1.
+- **Changes:**
+  - `nanofactorysystem/voxel/migrations.py`: `migrate_1_to_2` (`material.kind`, `material.created`,
+    table `material_property` with constraints and index).
+  - `nanofactorysystem/voxel/materials.py` (new): `MaterialProperty`, `Material` (lookup by key, wavelength,
+    state), `MaterialSnapshot`, `MaterialRegistry` (add, query, CSV import/export, `open_existing`, `snapshot`),
+    `material_names` (argument > substrate > sys_args), `as_material_dict`, `UnitWarning`.
+  - `nanofactorysystem/voxel/__init__.py`: exports.
+  - `config/material_seed.csv` (new): seed, header only (no invented values).
+  - `nanofactorysystem/storage/records.py`: `ExperimentRecord.materials`.
+  - `nanofactorysystem/storage/experiment_store.py`: `write_materials` / `read_materials`, property table;
+    `read()` fills `materials`.
+  - `nanofactorysystem/storage/schema.py`: schema version 1.1.
+  - `nanofactorysystem/experiment.py`: `materials=`, `material_registry=`, snapshots written into a new file,
+    M4 for `sys_args["sample"]`.
+  - `nanofactorysystem/experiment_spec.py`: `ExperimentSpec.materials`, `run_experiment(material_registry=)`.
+  - `nanofactorysystem/substrate_plan.py`: `SubstrateSpec.material` as registry name or dict,
+    `run_substrate(material_registry=)`.
+  - `test/conftest.py`: autouse fixture `no_default_material_registry` (opening the default database would
+    migrate the PC's file).
+  - `test/voxel/test_material_registry.py` (new, 10 tests); `test/voxel/test_voxel_database.py`: expected schema
+    version 2 instead of 1 (the migration raises it; the assertion is as strict as before) and the new table;
+    `test/storage/test_experiment_store.py`: snapshot round trip; `test/integration/test_dry_run_materials.py`
+    (new, 2 slow dry runs).
+  - `docs/design/VOXEL_DATABASE.md`, `docs/design/EXPERIMENT_STORAGE.md`, `test/README.md`, `CLAUDE.md`: documented.
+  - `TODO.md`: T75 to Done. `WORKLOG.md`: this entry.
+- **Tests:** `python -m pytest` in the new venv: 383 passed, 14 skipped (11 min 29 s; warnings unchanged).
+- **Commits:** `1a78f06` feat(voxel): material registry with extensible properties [T75]; `5953d36`
+  feat(experiment): store a material snapshot with every experiment [T75]; docs(todo): close T75 [T75]
+- **Follow-ups:** which refractive index is `n_medium` stays G4 / O1 / O11; the registry has no data yet (the
+  maintainer enters values or a seed). Next: T77 (depends only on T70), then T76.
+  Branch `feat/t75-material-registry` on top of the design branches; nothing pushed.
+
+### 2026-11-17 08:57 CET — [T77] Serialisable experiments and structures
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/structure_factories.py` (new): `@structure_factory(name)` registry, `BuildContext`
+    (objective, setup, accelerations, drop direction, attenuator power range and calibration, `check_power`),
+    `FactoryCall` (name + JSON arguments; stored with module and source file, loading imports either).
+  - `nanofactorysystem/experiment_spec.py`: `to_json`/`from_json`/`save`/`load` for `ExperimentSpec` and
+    `StructureSpec` (geometry kinds drawing/factory/slicer/empty, slicer inputs inline or in `inputs/` with
+    SHA-256, typos and other major versions refused), `SpecSerialisationError` naming structure and field,
+    `store_spec()` called by `run_experiment()`, `drawable()` builds `FactoryCall`s with a `BuildContext`;
+    new fields `description`, `tags`.
+  - `nanofactorysystem/storage/experiment_store.py`, `records.py`, `json_copies.py`: `/spec`, `/inputs`,
+    `ExperimentRecord.spec`, export of `experiment_spec.json`.
+  - `nanofactorysystem/aerobasic/programs/drawings/hollow_structure.py`, `dots/dot_rows_on_base.py`: keep all
+    constructor arguments, so that `to_json()` is complete (separate `fix` commit).
+  - `mains/Experiments/` (8 scripts: DHM_tomography/hollow_rect_first_print_63xobj.py,
+    Kailas/lens_surface_test.py, Kailas/power_z_pitch_lines.py,
+    parameter_study/line_test/Power_speed_line_test.py, parameter_study/parameter_testprint_power_speed.py,
+    parameter_study/parameter_testprint_power_speed_test4orientation.py,
+    parameter_study/parameter_testprint_slicing_hatching.py, refractive_index/refractive_index_vel_power.py):
+    closures replaced by named factories, same structures.
+  - `test/test_experiment_spec_json.py` (new); `test/integration/test_ported_scripts.py` (round trip of every
+    ported script and of the template); `test/integration/test_dry_run_spec.py` (stored spec and height map);
+    `test/storage/test_experiment_store.py` (spec/inputs round trip); `test/README.md`.
+  - `docs/design/EXPERIMENT_STORAGE.md` (`/spec`, `/inputs` in schema 1.1), `docs/design/INFORMATION_MODEL.md`
+    (§6.5 implementation notes), `CLAUDE.md` (project files and named factories), `TODO.md` (T77 done, new T103).
+- **Tests:** `python -m pytest` in the venv: 413 passed, 14 skipped (14:42 min); the earlier HollowRectangle
+  warning is gone.
+- **Commits:** `2c9bd1b` fix(drawings): keep all constructor arguments of two structures [T77]; `d431bbd`
+  feat(storage): store the experiment spec and its input files [T77]; `4f83dd7` feat(spec): save experiments
+  as project files with named factories [T77]; `e749109` refactor(mains): use named structure factories in
+  the ported scripts [T77]; docs(todo): close T77 [T77]
+- **Follow-ups:** T103 (`ExperimentSpec.from_record()` for files without `/spec`). Until T78 the `defaults`
+  group uses the existing field names (INFORMATION_MODEL §6.5). Next: T76 (substrate record v2), then T79/T80,
+  T78 after T101. Branch `feat/t77-serialisable-specs` on top of `feat/t75-material-registry`; nothing pushed.
+
+### 2026-11-17 09:55 CET — [T76] Substrate record v2 and experiment overview
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/storage/substrate_store.py`: record version 2 (`schema_version` "2.0"): `substrate_material`,
+    `substrate_type`, `dimensions`, per drop `material`/`batch`/`thickness_um`/`application`, validation
+    (`check_substrate_fields`); version 1 read as 2, written as 2 only on change; `drop_index()`,
+    `material_names(drop)`, `update_substrate()`, `plan_experiment()`, `register_experiment(replaces=)`,
+    `layout_area_um()`, `ExperimentOverview`, `substrate_overview()`; `find_experiments()` returns planned
+    entries only with `status="planned"`.
+  - `nanofactorysystem/substrate_plan.py`: `SubstrateSpec` v2 fields, `open_substrate()` writes them,
+    `run_substrate()` plans every experiment before the first print, `existing_areas()` via the overview
+    (planned entries skipped).
+  - `nanofactorysystem/experiment.py`: drop of the experiment by its edges, material names from that drop,
+    `area_um`/`resin_drop` in the index entry, `plan_id` replaces the planned entry.
+  - `nanofactorysystem/experiment_spec.py`: `run_experiment(plan_id=)`.
+  - `mains/substrate_main.py`: optional v2 fields in the template.
+  - `test/storage/test_substrate_store.py`: expected version "2.0" (justified: record version 2), new tests for
+    the v1 upgrade, v2 fields, planned entries and the overview.
+  - `test/integration/test_dry_run_substrate.py`: an experiment stopped before its start now stays `planned`
+    in the index (justified: new planned entries, design §3.2); area, drop and overview after the dry run.
+  - `test/README.md`, `CLAUDE.md`, `docs/design/EXPERIMENT_STORAGE.md` (§8), `docs/design/INFORMATION_MODEL.md`
+    (§6.6 implementation notes), `TODO.md` (T76 done).
+- **Tests:** `python -m pytest` in the venv: 416 passed, 14 skipped (8:38 min).
+- **Commits:** `31ae2b2` feat(storage): substrate record version 2 and substrate overview [T76]; `dd1bc9a`
+  feat(substrate): plan experiments in the index, resin per drop [T76]; docs(todo): close T76 [T76]
+- **Follow-ups:** none new. Next in phase 6: T79 (configuration record), T80 (layout as data, uses
+  `substrate_overview`), T103; T78 waits for T101 (lab PC). Branch `feat/t76-substrate-record-v2` on top of
+  `feat/t77-serialisable-specs`; nothing pushed.

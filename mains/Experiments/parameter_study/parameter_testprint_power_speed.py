@@ -15,6 +15,7 @@ from nanofactorysystem.devices.coordinate_system import DropDirection, Point2D, 
 from nanofactorysystem.experiment_spec import (CornerSpec, ExperimentSpec, StructureSpec, messagebox_confirm,
                                                run_experiment, script_output)
 from nanofactorysystem.plane_fitting import PlaneFitMode
+from nanofactorysystem.structure_factories import BuildContext, structure_factory
 
 OBJECTIVES = {
     "Zeiss 20x": dict(fov_um=500.0, z_max_um=25700.0, margin_um=200.0, padding_um=100.0,
@@ -46,13 +47,12 @@ def runtime_arguments() -> dict:
     }
 
 
-def rectangle(hatch, slice_size, velocity):
-    """ Factory of one rectangle; the acceleration is read from the running experiment. """
+@structure_factory("parameter_study.power_speed.rectangle")
+def rectangle(context: BuildContext, *, hatch, slice_size, velocity):
+    """ Factory of one rectangle; the acceleration is read from the build context. """
 
-    def build(experiment):
-        return Rectangle3D(center=Point3D(0, 0, -2), width=50, length=50, height=5, hatch_size=hatch,
-                           slice_size=slice_size, velocity=velocity, acceleration=experiment.accel_a_um)
-    return build
+    return Rectangle3D(center=Point3D(0, 0, -2), width=50, length=50, height=5, hatch_size=hatch,
+                       slice_size=slice_size, velocity=velocity, acceleration=context.accel_a_um)
 
 
 def experiment_spec(objective="Zeiss 20x", absolute_center=Point2D(0, 0), dhm_usage=True) -> ExperimentSpec:
@@ -65,7 +65,7 @@ def experiment_spec(objective="Zeiss 20x", absolute_center=Point2D(0, 0), dhm_us
         raise ValueError(f"No velocities are defined for {objective}.")
     structures = [
         StructureSpec(f"rect_{i}_{velocity}_{j}_{power}",
-                      factory=rectangle(parameters["hatch size"], parameters["slice size"], velocity),
+                      factory=rectangle(hatch=parameters["hatch size"], slice_size=parameters["slice size"], velocity=velocity),
                       power_mw=power, axes="ABZ")
         for i, velocity in enumerate(parameters["velocity"]) for j, power in enumerate(parameters["power"])]
     name = f"power_speed_at-h0.7_s0.7_2_{datetime.datetime.now():%Y%m%d}_{objective}"

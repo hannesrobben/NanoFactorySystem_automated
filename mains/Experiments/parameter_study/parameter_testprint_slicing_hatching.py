@@ -19,6 +19,7 @@ from nanofactorysystem.devices.coordinate_system import DropDirection, Point2D, 
 from nanofactorysystem.experiment_spec import (CornerSpec, ExperimentSpec, StructureSpec, messagebox_confirm,
                                                run_experiment, script_output)
 from nanofactorysystem.plane_fitting import PlaneFitMode
+from nanofactorysystem.structure_factories import BuildContext, structure_factory
 
 OBJECTIVES = {
     "Zeiss 20x": dict(fov_um=500.0, z_max_um=25700.0, margin_um=200.0, padding_um=100.0,
@@ -49,26 +50,29 @@ def runtime_arguments() -> dict:
     }
 
 
-def stair(hatch, slice_size, velocity):
-    def build(experiment):
-        return Stair(Point3D(0, 0, -2), n_steps=5, step_height=0.6, step_length=20, step_width=50, hatch_size=hatch,
-                     slice_size=slice_size, socket_height=5, velocity=velocity, acceleration=experiment.accel_a_um)
-    return build
+@structure_factory("parameter_study.slicing_hatching.stair")
+def stair(context: BuildContext, *, hatch, slice_size, velocity):
+    """ Factory of one stair; the acceleration is read from the build context. """
+
+    return Stair(Point3D(0, 0, -2), n_steps=5, step_height=0.6, step_length=20, step_width=50, hatch_size=hatch,
+                 slice_size=slice_size, socket_height=5, velocity=velocity, acceleration=context.accel_a_um)
 
 
-def lens(hatch, slice_size, velocity):
-    def build(experiment):
-        return AsphericalLens(Point3D(0, 0, -2), height=5, length=80, width=60, sphere_radius=1030,
-                              conic_constant=-2.3, hatch_size=hatch, slice_size=slice_size, velocity=velocity,
-                              acceleration=experiment.accel_a_um)
-    return build
+@structure_factory("parameter_study.slicing_hatching.lens")
+def lens(context: BuildContext, *, hatch, slice_size, velocity):
+    """ Factory of one lens; the acceleration is read from the build context. """
+
+    return AsphericalLens(Point3D(0, 0, -2), height=5, length=80, width=60, sphere_radius=1030,
+                          conic_constant=-2.3, hatch_size=hatch, slice_size=slice_size, velocity=velocity,
+                          acceleration=context.accel_a_um)
 
 
-def rectangle(hatch, slice_size, velocity):
-    def build(experiment):
-        return Rectangle3D(center=Point3D(0, 0, -2), width=40, length=75, height=5, hatch_size=hatch,
-                           slice_size=slice_size, velocity=velocity, acceleration=experiment.accel_a_um)
-    return build
+@structure_factory("parameter_study.slicing_hatching.rectangle")
+def rectangle(context: BuildContext, *, hatch, slice_size, velocity):
+    """ Factory of one rectangle; the acceleration is read from the build context. """
+
+    return Rectangle3D(center=Point3D(0, 0, -2), width=40, length=75, height=5, hatch_size=hatch,
+                       slice_size=slice_size, velocity=velocity, acceleration=context.accel_a_um)
 
 
 def experiment_spec(objective="Zeiss 20x", absolute_center=Point2D(0, 0), dhm_usage=True) -> ExperimentSpec:
@@ -87,7 +91,7 @@ def experiment_spec(objective="Zeiss 20x", absolute_center=Point2D(0, 0), dhm_us
                 else:
                     structures.append(StructureSpec(
                         f"{prefix}{i + j}_{AXES}_h_{hatch}_l_{slice_size}",
-                        factory=factory(hatch, slice_size, parameters["velocity"]),
+                        factory=factory(hatch=hatch, slice_size=slice_size, velocity=parameters["velocity"]),
                         power_mw=parameters["power"], axes=AXES))
     return ExperimentSpec(
         name="parameter_testprint", objective=objective, center=absolute_center,

@@ -15,7 +15,7 @@ index (``substrate.json``).
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 
 import numpy as np
 
@@ -24,9 +24,9 @@ from .experiment import QR_CODE_WIDTH_UM
 from .experiment_spec import ExperimentSpec, run_experiment
 from .resin_drop import drop_outline, has_drop_boundary, rectangle_inside
 from .runtime import getLogger
-from .storage.experiment_store import ExperimentStore
+from .voxel.materials import as_material_dict
 from .storage.substrate_store import (SubstrateRecord, SubstrateStore, check_not_synced, default_root,
-                                      find_experiments, initials)
+                                      initials, substrate_overview)
 
 
 
@@ -52,8 +52,25 @@ class SubstrateSpec:
         Label of the substrate, e.g. ``"HR-26-001"``. A substrate that does
         not exist yet is created; without a label the next free label of the
         user is used.
-    material : dict
-        Substrate and resin (stored when the substrate is created).
+    material : str or dict
+        Resin of the drop and substrate: a material registry name of the
+        resin, or a dictionary as in older mains (``resin``, ``substrate``,
+        ``medium``, ``batch``, thicknesses, …). The dictionary is stored when
+        the substrate is created; its ``resin``/``batch`` also name the
+        material of a newly recorded drop (T75, T76).
+    substrate_material : str
+        Registry name of the substrate material; default: ``material["substrate"]``.
+    substrate_type : str
+        ``"cover_slip"``, ``"slide"``, ``"wafer"``, ``"other"`` or ``""``.
+    dimensions : dict
+        ``shape`` (``"rectangle"``/``"round"``) with ``width_mm``,
+        ``length_mm`` / ``diameter_mm`` and ``thickness_um``.
+    resin_batch : str
+        Batch of the resin; default: ``material["batch"]``.
+    resin_thickness_um : float, optional
+        Thickness of the resin drop.
+    application : {"drop", "dip_in"}
+        How the resin is applied.
     notes : str
         Free text (stored when the substrate is created).
     data_root : Path, optional
@@ -66,10 +83,16 @@ class SubstrateSpec:
     objective: str
     resin_edges: list
     label: Optional[str] = None
-    material: dict = field(default_factory=dict)
+    material: Union[str, dict] = field(default_factory=dict)
     notes: str = ""
     data_root: Optional[Path] = None
     allow_synced_root: bool = False
+    substrate_material: str = ""
+    substrate_type: str = ""
+    dimensions: dict = field(default_factory=dict)
+    resin_batch: str = ""
+    resin_thickness_um: Optional[float] = None
+    application: str = "drop"
 
     def root(self) -> Path:
         """ The data root (see :func:`default_root`). """
@@ -174,18 +197,15 @@ def existing_areas(root: Path, label: str, logger: Optional[logging.Logger] = No
 
     logger = logger or getLogger()
     areas = []
-    for entry in find_experiments(root, substrate=label):
-        try:
-            layout = ExperimentStore.open(Path(entry["folder"]), logger).read(include_captures=False).layout
-        except (OSError, KeyError, ValueError) as error:
-            logger.warning(f"Experiment {entry['label']} ({entry['folder']}) is not checked for overlap: {error}")
+    for item in substrate_overview(root, label, qr_clearance_um=QR_CODE_WIDTH_UM / 2):
+        if item.state == "planned":
+            continue  # nothing printed yet; a substrate main plans its experiments again
+        if item.error:
+            logger.warning(f"Experiment {item.name} ({item.folder}) is not checked for overlap: {item.error}")
             continue
-        if layout is None:
+        if item.area_um is None:
             continue
-        rectangle = np.asarray(layout.rectangle_um, dtype=float)
-        clearance = QR_CODE_WIDTH_UM / 2 if layout.corners or layout.qrcode_um is not None else 0.0
-        areas.append(Area(entry["label"], tuple(map(float, rectangle.min(axis=0) - clearance)),
-                          tuple(map(float, rectangle.max(axis=0) + clearance))))
+        areas.append(Area(item.name, tuple(map(float, item.area_um[0])), tuple(map(float, item.area_um[1]))))
     return areas
 
 
@@ -279,25 +299,38 @@ def plot_substrate(substrate: SubstrateSpec, areas: list[Area], existing: Option
 
 
 def open_substrate(substrate: SubstrateSpec, store: SubstrateStore) -> SubstrateRecord:
-    """ Return the substrate record, creating it if needed, with the resin drop recorded. """
+    """ Return the substrate record, creating it if needed, with the resin drop recorded.
+
+    A new substrate gets the version-2 fields of the spec; a new drop the
+    resin name, batch, thickness and application (T76). An existing record is
+    not changed apart from a new drop.
+    """
 
     from .config import sysConfig
 
+    material = as_material_dict(substrate.material)
     if substrate.label is not None and substrate.label in store.labels():
         record = store.get(substrate.label)
     else:
         record = store.create(substrate.user, initials(sysConfig.user(substrate.user)), label=substrate.label,
-                              material=substrate.material, notes=substrate.notes)
+                              material=material, notes=substrate.notes,
+                              substrate_material=substrate.substrate_material or str(material.get("substrate", "")),
+                              substrate_type=substrate.substrate_type, dimensions=substrate.dimensions)
     edges = [list(map(float, e)) for e in substrate.resin_edges]
-    if not any(drop.get("edges_um") == edges for drop in record.resin_drops):
-        record = store.add_resin_drop(record.label, edges)
+    if record.drop_index(edges) is None:
+        thickness = substrate.resin_thickness_um
+        if thickness is None and material.get("resin_thickness_um") is not None:
+            thickness = float(material["resin_thickness_um"])
+        record = store.add_resin_drop(record.label, edges, material=str(material.get("resin", "")),
+                                      batch=substrate.resin_batch or str(material.get("batch", "")),
+                                      thickness_um=thickness, application=substrate.application)
     return record
 
 
 def run_substrate(substrate: SubstrateSpec, experiments: list[SubstrateExperiment], *, backend=None,
                   plane: Optional[ZFunction] = None, confirm: Optional[Callable[[str], bool]] = None,
                   confirm_between: Optional[Callable[[str], bool]] = None, show_plot: bool = False,
-                  logger: Optional[logging.Logger] = None) -> list[Path]:
+                  logger: Optional[logging.Logger] = None, material_registry=None) -> list[Path]:
     """ Check the layout, then run the experiments of a substrate one after another.
 
     Parameters
@@ -318,6 +351,9 @@ def run_substrate(substrate: SubstrateSpec, experiments: list[SubstrateExperimen
     show_plot : bool
         Show the substrate layout and each experiment plot.
     logger : logging.Logger, optional
+    material_registry : MaterialRegistry, Path or False, optional
+        Registry for the material snapshots of the experiments (see
+        :class:`~nanofactorysystem.experiment.Experiment`).
 
     Returns
     -------
@@ -341,6 +377,11 @@ def run_substrate(substrate: SubstrateSpec, experiments: list[SubstrateExperimen
 
     record = open_substrate(substrate, store)
     logger.info(f"Substrate {record.label}: {len(experiments)} experiments, {len(existing)} already on it")
+    drop = record.drop_index(substrate.resin_edges)
+    plan_ids = [store.plan_experiment(record.label, experiment.spec.name, objective=experiment.spec.objective,
+                                      area_um=(area.lower, area.upper), resin_drop=drop,
+                                      center_um=experiment.spec.center.as_tuple())
+                for experiment, area in zip(experiments, areas)]
     folders = []
     for index, experiment in enumerate(experiments):
         if index > 0 and confirm_between is not None \
@@ -352,5 +393,6 @@ def run_substrate(substrate: SubstrateSpec, experiments: list[SubstrateExperimen
         folders.append(run_experiment(
             experiment.spec, user=substrate.user, resin_edges=substrate.resin_edges, path=experiment.path,
             substrate=record.label, data_root=store.root, backend=backend, plane=plane, confirm=confirm,
-            show_plot=show_plot, allow_synced_root=substrate.allow_synced_root))
+            show_plot=show_plot, allow_synced_root=substrate.allow_synced_root,
+            material_registry=material_registry, plan_id=plan_ids[index]))
     return folders

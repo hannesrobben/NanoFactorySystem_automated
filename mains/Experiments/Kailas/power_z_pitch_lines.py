@@ -17,6 +17,7 @@ from nanofactorysystem.experiment import StructureType
 from nanofactorysystem.experiment_spec import (CornerSpec, ExperimentSpec, StructureSpec, messagebox_confirm,
                                                run_experiment, script_output)
 from nanofactorysystem.plane_fitting import PlaneFitMode, sample_points
+from nanofactorysystem.structure_factories import BuildContext, structure_factory
 
 PAD_SIZE = 100.0         # um
 EDGE_MARGIN = 3.0        # um
@@ -66,21 +67,15 @@ def _z_note(dz: float) -> str:
     return "proud of pad"
 
 
-def cell(power, pitch, dz, objective):
+@structure_factory("kailas.power_z_pitch_lines.cell")
+def cell(context: BuildContext, *, power, pitch, dz, objective):
     """ Factory of one line cell; checks the powers against the attenuator calibration of the experiment. """
 
-    def build(experiment):
-        attenuator = experiment.system.controller.attenuator
-        power_min, power_max = attenuator["powerMin"], attenuator["powerMax"]
-        out_of_range = [p for p in (power, BASE_POWER) if not power_min <= p <= power_max]
-        if out_of_range:
-            raise ValueError(f"Powers {out_of_range} mW lie outside the attenuator calibration range "
-                             f"({power_min:.4f} - {power_max:.4f} mW).")
-        return CellLinesOnBase(center=Point3D(0, 0, Z_B), cellsize=PAD_SIZE, distance_between_lines=pitch,
-                               line_z_offset=dz, edge_margin=EDGE_MARGIN, velocity=VELOCITY, line_power=power,
-                               base_power=BASE_POWER, base_height=BASE_HEIGHT, base_hatch=BASE_HATCH,
-                               base_slice=BASE_SLICE, objective=objective)
-    return build
+    context.check_power(power, BASE_POWER)
+    return CellLinesOnBase(center=Point3D(0, 0, Z_B), cellsize=PAD_SIZE, distance_between_lines=pitch,
+                           line_z_offset=dz, edge_margin=EDGE_MARGIN, velocity=VELOCITY, line_power=power,
+                           base_power=BASE_POWER, base_height=BASE_HEIGHT, base_hatch=BASE_HATCH,
+                           base_slice=BASE_SLICE, objective=objective)
 
 
 def experiment_spec(objective="Zeiss 63x", absolute_center=Point2D(0, 0), dhm_usage=True,
@@ -104,7 +99,7 @@ def experiment_spec(objective="Zeiss 63x", absolute_center=Point2D(0, 0), dhm_us
     if PAD_SIZE > fov:
         raise ValueError(f"Pad {PAD_SIZE} um exceeds the {fov} um field of view.")
     structures = [
-        StructureSpec(f"cell_p{power}_d{pitch}_z{dz:+}", factory=cell(power, pitch, dz, objective), power_mw=power,
+        StructureSpec(f"cell_p{power}_d{pitch}_z{dz:+}", factory=cell(power=power, pitch=pitch, dz=dz, objective=objective), power_mw=power,
                       axes="XYZ", structure_type=StructureType.IFOV)
         for power in POWERS for pitch, dz in zip(PITCHES, Z_OFFSETS)]
     return ExperimentSpec(

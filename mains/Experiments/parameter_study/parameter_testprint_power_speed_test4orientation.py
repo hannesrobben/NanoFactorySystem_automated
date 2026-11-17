@@ -15,6 +15,7 @@ from nanofactorysystem.devices.coordinate_system import DropDirection, Point2D, 
 from nanofactorysystem.experiment_spec import (CornerSpec, ExperimentSpec, StructureSpec, messagebox_confirm,
                                                run_experiment, script_output)
 from nanofactorysystem.plane_fitting import PlaneFitMode
+from nanofactorysystem.structure_factories import BuildContext, structure_factory
 
 OBJECTIVES = {
     "Zeiss 20x": dict(fov_um=500.0, z_max_um=25700.0, margin_um=200.0, padding_um=100.0,
@@ -46,13 +47,12 @@ def runtime_arguments() -> dict:
     }
 
 
-def rectangle(hatch, slice_size):
-    """ Factory of one rectangle (10 mm/s); the acceleration is read from the running experiment. """
+@structure_factory("parameter_study.power_speed_orientation.rectangle")
+def rectangle(context: BuildContext, *, hatch, slice_size):
+    """ Factory of one rectangle (10 mm/s); the acceleration is read from the build context. """
 
-    def build(experiment):
-        return Rectangle3D(center=Point3D(0, 0, -2), width=50, length=50, height=3, hatch_size=hatch,
-                           slice_size=slice_size, velocity=10_000, acceleration=experiment.accel_a_um)
-    return build
+    return Rectangle3D(center=Point3D(0, 0, -2), width=50, length=50, height=3, hatch_size=hatch,
+                       slice_size=slice_size, velocity=10_000, acceleration=context.accel_a_um)
 
 
 def experiment_spec(objective="Zeiss 20x", absolute_center=Point2D(0, 0)) -> ExperimentSpec:
@@ -68,7 +68,7 @@ def experiment_spec(objective="Zeiss 20x", absolute_center=Point2D(0, 0)) -> Exp
         for j in range(len(parameters["power"])):
             if (i, j) in PRINTED_CELLS:
                 structures.append(StructureSpec(f"rect_{i}_{10_000}_{j}_{0.7}",
-                                                factory=rectangle(parameters["hatch size"], parameters["slice size"]),
+                                                factory=rectangle(hatch=parameters["hatch size"], slice_size=parameters["slice size"]),
                                                 power_mw=0.7, axes="ABZ"))
             else:
                 structures.append(StructureSpec.empty())

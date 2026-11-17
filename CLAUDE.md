@@ -6,7 +6,34 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `nanofactorysystem` is a Python 3 (3.12) package that drives the Femtika Laser Nanofactory, a two-photon-polymerization (2PP) laser direct-writing system, as a 3D printer. The hardware is an Aerotech A3200 motion controller (stages X/Y/Z and galvo scanner A/B) with a laser attenuator, a MatrixVision camera and a LyncéeTec DHM (digital holographic microscope). Most code only produces real results on the lab PC connected to that hardware.
 
-Comments, docs and TODOs are often in German. `TODO.md` is the task list with the sections Open / In Progress / Blocked / Done; its format rules are in the comment at the top of the file. `ARCHIVE.md` holds archived completed tasks.
+Project files:
+- `TODO.md`: the task list with the sections Open / In Progress / Blocked / Done; its format rules and the phase plan are at the top of the file. `ARCHIVE.md` holds archived completed tasks (created by the status review routine when it first archives).
+- `future_todo.md`: planned but unscheduled ideas (F<number>). Never implement them unless they are moved into `TODO.md`.
+- `todo_notes.md`: inventory of the code markers N001–N095 removed in T19, with their meaning and original locations. Reference only.
+- `WORKLOG.md`: append-only work log (see "Work log").
+- `docs/system/SOFTWARE_PLAN_OVERVIEW.md`: the plan for the four cooperating repositories (this one, OffAxisHolo, DHMConnect, MIRA). This repository holds the **master copy**.
+- `docs/design/`: approved design documents. `docs/reviews/`: code review and metadata audit.
+
+Some experiment scripts in `mains/` and the scripts in `test/manual/` still contain German comments (T99).
+
+## System context
+
+This repository is one of four that together build a 2PP system with real-time feedback from the DHM. Ownership (details in `docs/system/SOFTWARE_PLAN_OVERVIEW.md`):
+
+| Package | Repository | Owns |
+|---|---|---|
+| `nanofactorysystem` (this one) | NanoFactorySystem_automated | Orchestration, information model (material, substrate, experiment, structure), measurement recipes, operating modes, layer targets, later the controller, `experiment.h5` (single writer), camera live feed, system GUI. |
+| `offaxisholo` | OffAxisHolo (branch `Holo_HR`) | Hologram reconstruction (golden reference offline, GPU kernel for the service), frame metrics, DHM analysis GUI. |
+| `dhmconnect` | DHMConnect | Protocol v1 between Working-PC and DHM-PC, the DHM service on the DHM-PC, the client used here. Replaces protocol v6 / `DhmServ` / `nanofactorysystem.dhm` once the maintainer switches. |
+| `mira` | MIRA | Registration, speckle fusion, stitching, comparison with the target structure (`DeviationReport`). |
+
+Rules that follow from this:
+- No reconstruction, registration, fusion or stitching code in this repository. Call `dhmconnect` and `mira` through adapters.
+- `dhmconnect` and `mira` are optional dependencies: `python -m pytest` passes without them (fakes in the dummy backend).
+- The legacy DHM path (`Dhm`, `DhmClient`, protocol v6) and the hologram counts 10 / 20 / 1 stay the default until the maintainer switches. Golden command logs must not change in the legacy mode.
+- Only the experiment process on this PC writes `experiment.h5`. The DHM-PC delivers, this side stores (design decision T42).
+- Shared contracts (`CaptureContext`, `MeasurementRecipe`, `ProductSet`, `LayerTarget`, `DeviationReport`, …) are defined in DHMConnect (`dhmconnect/schemas/`); this repository vendors their example messages as test fixtures. Conventions: units in names (`_um`, `_rad`, `_s`, `_mw`), `schema_version` in every message, never `pickle` across a process or network boundary.
+- Todo IDs of the other repositories may be referenced as dependencies: `K…`/`L…` (OffAxisHolo), `DL-…` (DHMConnect), `MI-…` (MIRA).
 
 
 ## Commands
@@ -47,6 +74,7 @@ python -m pytest test/test_aerobasic/test_golden_programs.py --update-golden   #
   - Safety: the helpers check `zMax` (and close the connection when exceeded); in addition, `api.z_limit` refuses immediate absolute Z moves beyond `zMax` sent through `.api` (maintainer decision). Programs run as tasks are not checked.
   - `devices/aerotech.Aerotech3200` is the same task handling without user/config (e.g. for scripts and `test_femtika`), with an optional `z_max` and its own `home()` sequence.
   - `AerotechError` is a `RuntimeError`; `TaskFailedError` (a failed or stalled task) is also a `ValueError`.
+- DHM, legacy path (default until the switch to `dhmconnect`): `devices/dhm.Dhm` wraps `dhm/dhmclient.DhmClient`, which talks protocol v6 (binary, lockstep, one client, no request ids) to `DhmServ.exe` on the DHM-PC (`192.168.22.2:27182`, config section `dhm`); objective selection via `dhmId` (Zeiss 20x = 178, Nikon 20x = 179, Zeiss 63x = 180). Exposure optimisation (`dhm/optimage.py`) and the OPL scan (`dhm/motorscan.py`) run on this PC and fetch every image over the network. `Experiment.measure()` stores the raw hologram stack per capture; `ExperimentStore.add_dhm_product()` is the prepared receiving side for reconstructed products. The Koala pixel size of configuration 180 is wrong for 63x (finding B17): never take a pixel size for reconstruction from the device parameters.
 - `tools/` holds measurement algorithms built on the camera and DHM: `Focus`, `Layer` (resin interface detection), `Plane`, `Grid`, `Stitch`, and `Transform` (camera↔stage pixel/µm transforms).
 
 **Hardware backends** (`backends/`, design in `docs/design/DUMMY_BACKEND.md`)
@@ -70,6 +98,7 @@ python -m pytest test/test_aerobasic/test_golden_programs.py --update-golden   #
 
 **Voxel database** (`voxel/`, design in `docs/design/VOXEL_DATABASE.md`)
 - `VoxelDatabase` (SQLite, schema version in `PRAGMA user_version`, migrations in `voxel/migrations.py`) stores measured voxel widths/heights per material, objective, setup, power and velocity; `voxel_size()` returns an exact hit, a 2-D linear interpolation in (ln P, ln v) inside the convex hull, or a 1-D dose fallback for collinear data, else None (no extrapolation). CSV import/export; `*.sqlite` is not versioned.
+- Material registry (T75, design `docs/design/INFORMATION_MODEL.md`): the same SQLite file (schema version 2) holds materials (`kind` resin / substrate / medium) with extensible properties (`material_property`: key, value, unit, wavelength, state uncured/cured/any, source, date); API `voxel/materials.MaterialRegistry`, seed `config/material_seed.csv`. `Experiment(materials=, material_registry=)` / `ExperimentSpec.materials` / `SubstrateSpec.material` (registry name of the resin, or the old dict) name the materials; a new experiment file stores a `MaterialSnapshot` per role in `/metadata/materials` (schema 1.1). Without `material_registry` the default database is used only if the file exists; tests never see it (autouse fixture in `test/conftest.py`).
 - Voxel-aware slicing (T54): `voxel/model.py` has the voxel models `NoVoxelData`, `FixedVoxelModel` and `DatabaseVoxelModel` (material, objective, setup); the slicer only knows the protocol `aerobasic/slicer/voxel.VoxelModel`. `slice_geometry(..., voxel_model=)` / `Model3D_Slicer(voxel_model=, power=)` / `ExperimentSpec(voxel_material=)` compensate with the voxel size of the job's power and velocity (`slicer/voxel.compensate`): contour offset by half the width, first/last slice half a height inside the part (`SlicingParameters.voxel_height_um`), and spacing per `SlicingParameters.spacing_mode` — `"voxel_overlap"` (default, maintainer decision: spacing = voxel size × (1 − `voxel_overlap`)) or `"static_hatching"` (given spacing, gaps only warned). Strategies get a `voxel=` `VoxelContext`. The values used are in `job.meta["voxel"]`, `Model3D_Slicer.to_json()["voxel"]` and the summary. Without a model or data nothing changes (golden files).
 
 **Experiment orchestration** (`experiment.py`)
@@ -100,24 +129,30 @@ python -m pytest test/test_aerobasic/test_golden_programs.py --update-golden   #
 - `mains/Experiments/**` holds one script per experiment in use. Each describes its experiment in `experiment_spec(objective, absolute_center, ...)` (objective values: FOV, zMax, drop direction, margins, corners) and keeps its former entry function (`print_file`/`testprint`, with `backend=` and `plane=` for dry runs), which runs it with `run_experiment()`. `test/integration/test_ported_scripts.py` checks all of them.
 - `mains/Experiments/focal_points/z_line_focal_points.py` exposes z-lines at random points with camera images before and after (one `FocusDetect` container each, training data for a classifier; T36). It only calls `tools.focus.Focus.run`.
 - `mains/Experiments/historical/` holds the scripts of earlier experiments that are not ported (not tested; see its README).
-- Several experiments on one substrate: `mains/substrate_main.py` is the template (copy per substrate). It defines a `SubstrateSpec` (label, user, objective, resin edges, material) and a list of `SubstrateExperiment`s (an `ExperimentSpec` plus an optional folder); `nanofactorysystem/substrate_plan.run_substrate()` checks all experiment areas (grid, margin, corner/QR clearance) for overlap with each other, with experiments already in the substrate index and with the resin drop before anything is printed, then runs them one after another into the substrate index. The drop is the ellipse through the four edge points (`resin_drop.py`, T62; also the center check of `Experiment(resin_edges=)`); dip-in has no drop boundary and is not checked.
+- Several experiments on one substrate: `mains/substrate_main.py` is the template (copy per substrate). It defines a `SubstrateSpec` (label, user, objective, resin edges, material) and a list of `SubstrateExperiment`s (an `ExperimentSpec` plus an optional folder); `nanofactorysystem/substrate_plan.run_substrate()` checks all experiment areas (grid, margin, corner/QR clearance) for overlap with each other, with experiments already in the substrate index and with the resin drop before anything is printed, then runs them one after another into the substrate index. Substrate record version 2 (T76): substrate material, type and dimensions, material/batch/thickness/application per resin drop (`SubstrateSpec` fields; version-1 files are read as version 2); `run_substrate()` enters the experiments as `planned` first, each experiment replaces its entry (`area_um`, `resin_drop`), and `substrate_overview()` lists them with the status of their experiment files. The drop is the ellipse through the four edge points (`resin_drop.py`, T62; also the center check of `Experiment(resin_edges=)`); dip-in has no drop boundary and is not checked.
 - `mains/lab_checks/new_features_check.py` is a substrate main that exercises the new features on the lab PC (two small experiments: overview, camera captures, power per layer, repetition, slicer block; files unpacked with `analysis/`) and prints a checklist (T68).
-- New experiments are described by an `ExperimentSpec` (`nanofactorysystem/experiment_spec.py`: objective defaults for FOV, drop direction, zMax, margins and corners; structures as `StructureSpec`; `ProgramSource.DRAWING` or `.SLICER`) and run with `run_experiment()`; `mains/Experiments/experiment_template.py` is the template (dry run: `main(backend="dummy", plane=...)`).
+- New experiments are described by an `ExperimentSpec` (`nanofactorysystem/experiment_spec.py`: objective defaults for FOV, drop direction, zMax, margins and corners; structures as `StructureSpec`; `ProgramSource.DRAWING` or `.SLICER`) and run with `run_experiment()`; `mains/Experiments/experiment_template.py` is the template (dry run: `main(backend="dummy", plane=...)`). A spec is a project file (T77): `to_json()`/`from_json()`, `save()`/`load()` (schema `nanofactory.experiment_spec/1`, slicer inputs in `inputs/` with SHA-256); `run_experiment()` stores it as `experiment_spec.json` and in `/spec` of the experiment file. Structures that need values of the running experiment use named factories (`structure_factories.py`: `@structure_factory(name)`, called with keyword arguments, built with a `BuildContext`); a plain callable `factory=` still runs, but the spec is then not stored.
 - `mains/Experiments/default_exp_file.py` is the former template; its `binary_testprint(..., backend=, plane=)` can be dry-run on the dummy backend (see `test/integration/`).
 - `mains/main.py` selects one of these functions by import and supplies the resin edge coordinates and center for the current substrate.
 
 ## Maintainer Instructions (Hannes)
 
 ### Language
-Everything is written in English: variable, function and class names, docstrings, comments,
-commit messages, documentation, and log entries. If you encounter German identifiers or
-comments within the scope of your current task, translate them. Outside that scope,
-add a todo instead of renaming them unasked.
+Everything is written in English: variable, function, class and module names, docstrings,
+comments, README and other documentation, design documents, todo entries, commit messages,
+pull request texts and log entries. If you encounter German identifiers or comments within
+the scope of your current task, translate them. Outside that scope, add a todo instead of
+renaming them unasked. Material the maintainer hands over in German (notes, specifications)
+is translated when it is turned into documentation or todos.
 
 ### Session start
-1. Read `## Current Status` and `## Status Update Anchor` in this file.
-2. Read `TODO.md` and pick a task. Prefer the one named as the next task in `## Current Status`.
+1. Read `## Current Status` and `## Status Update Anchor` at the end of this file. As long as
+   they hold no status yet, go by the phase plan in `TODO.md`.
+2. Read `TODO.md` and pick a task. Prefer the one named as the next task in `## Current Status`,
+   otherwise follow working rule 1 at the top of `TODO.md`.
 3. Read the most recent entries in `WORKLOG.md`.
+4. If the task touches the DHM, the experiment file layout for DHM products, or MIRA, read
+   `docs/system/SOFTWARE_PLAN_OVERVIEW.md` first.
 
 ### Work log (mandatory)
 After every completed task, and before ending a session even if the task is unfinished,
@@ -161,8 +196,17 @@ If a task does not meet this, mark it `partial` in the log and describe the rema
 - If you discover new problems, add them to "Open" and tag them with `(found during T<n>)`.
 
 ### Commits (mandatory)
-- Commit after every completed task and after every coherent sub-step of larger tasks.
-- One logical change per commit. Do not mix refactoring, formatting and feature work.
+- Work on a feature branch created from `main_HR` (`feat/…`, `fix/…`, `docs/…`), never directly on
+  `main_HR`.
+- Commit after every completed task and after every coherent sub-step of larger tasks. A task
+  that ends without a commit is not done.
+- Split commits by topic: one logical change per commit. Do not mix refactoring, formatting,
+  feature work, tests of unrelated code and documentation of other tasks. Todo bookkeeping
+  (`TODO.md`, `WORKLOG.md`) goes into its own `docs(todo): …` commit at the end of a task.
+- Write every message for a human who reads `git log` months later without the session: the
+  subject says what the change does for the system (not "update files", "fixes", "WIP"), the
+  body says why it was needed and what a reader must know (decisions, side effects, limits).
+  Example of a good subject: `fix(image): build the contour mask as uint8 for OpenCV [T65]`.
 - Always write a complete commit message in this format (Conventional Commits):
 ```
   <type>(<scope>): <imperative summary, max. 72 chars> [<Todo ID>]
@@ -191,8 +235,8 @@ If a task does not meet this, mark it `partial` in the log and describe the rema
 
 ### Testing conventions
 - `python -m pytest` must pass without hardware, without `~/nanofactory.json`, and without
-  `mvImpact` or `OffAxisHolo`. Tests that need the lab are marked `hardware` and only run
-  with `--run-hardware`.
+  `mvImpact`, `OffAxisHolo`, `dhmconnect` or `mira`. Tests that need the lab are marked
+  `hardware` and only run with `--run-hardware`.
 - Never make a test pass by weakening or deleting assertions without justification.
   If a test reveals a real bug, fix it in a separate `fix:` commit if the fix is small and clear.
   Otherwise, mark the test `xfail(reason=..., strict=True)` and add a todo.
@@ -202,3 +246,10 @@ If a task does not meet this, mark it `partial` in the log and describe the rema
 - Keep existing `unittest.TestCase` classes. New tests may use plain pytest style with fixtures.
 - Never modify legacy code (`old_to-delete/`, `new/`, `*_old.py`). Exclude it from collection.
 - Real hardware is always the default backend. The dummy backend is opt-in.
+## Current Status
+<!-- Maintained exclusively by the status review routine. Claude Code reads it, never edits it. -->
+No status written yet (section created 2026-11-15 during the reorganisation of the project files).
+
+## Status Update Anchor
+<!-- Maintained exclusively by the status review routine. Claude Code reads it, never edits it. -->
+No anchor set yet.

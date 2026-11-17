@@ -91,6 +91,8 @@ class DotGridOnBase(DrawableObject):
         self.pitch = pitch
         self.edge_margin = edge_margin
         self.dot_z_offsets = dot_z_offsets
+        # The argument as given (single float or one value per row), so that to_json() can rebuild the structure
+        self.dot_z_offset = dot_z_offset if isinstance(dot_z_offset, (int, float)) else list(dot_z_offsets)
         self.velocity = velocity
         self.base_power = base_power  # investigation of power in dot program 
         self.base_height = base_height

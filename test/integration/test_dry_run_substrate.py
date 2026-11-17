@@ -8,7 +8,7 @@ from nanofactorysystem.aerobasic.programs.drawings.lines import Rectangle3D
 from nanofactorysystem.devices.coordinate_system import Point2D, Point3D
 from nanofactorysystem.experiment_spec import ExperimentSpec, StructureSpec
 from nanofactorysystem.storage import ExperimentStore
-from nanofactorysystem.storage.substrate_store import SubstrateStore, find_experiments
+from nanofactorysystem.storage.substrate_store import SubstrateStore, find_experiments, substrate_overview
 from nanofactorysystem.substrate_plan import (LayoutError, SubstrateExperiment, SubstrateSpec, existing_areas,
                                               experiment_area, run_substrate)
 
@@ -56,6 +56,16 @@ def test_two_experiments_on_one_substrate(test_config, dummy_backend, no_sleep, 
         rectangle = np.asarray(stored.layout.rectangle_um)
         assert np.allclose(rectangle.min(axis=0), area.lower) and np.allclose(rectangle.max(axis=0), area.upper)
 
+    # T76: drop material, area and drop index in the index; the overview reads the experiment files
+    assert record.resin_drops[0]["material"] == "" and record.resin_drops[0]["application"] == "drop"
+    assert record.substrate_material == "glass"
+    overview = substrate_overview(root, "TU-26-007")
+    assert [(o.name, o.state, o.resin_drop) for o in overview] == [("TU-26-007-A", "done", 0),
+                                                                   ("TU-26-007-B", "done", 0)]
+    for experiment, item in zip(planned, overview):
+        area = experiment_area(experiment.spec)
+        assert np.allclose(item.area_um, [area.lower, area.upper])
+
     # Running the main file again is refused before anything is printed: the areas are taken
     assert [a.name for a in existing_areas(root, "TU-26-007")] == ["TU-26-007-A", "TU-26-007-B"]
     with pytest.raises(LayoutError, match="left overlaps experiment TU-26-007-A already on the substrate"):
@@ -82,7 +92,9 @@ def test_optional_folder_and_confirmation_between_experiments(test_config, dummy
     assert folders == [tmp_path / "elsewhere" / "left"]
     assert questions == ["Start experiment right (2/2)?"]
     index = SubstrateStore(tmp_path / "root").get("TU-26-007").experiments
-    assert [e["label"] for e in index] == ["TU-26-007-A"]
+    # T76: the experiment that was not started stays in the index as planned (no file, no label)
+    assert [(e["label"], e["status"]) for e in index] == [("TU-26-007-A", "created"), ("", "planned")]
+    assert index[1]["name"] == "right"
     assert Path(index[0]["path"]) == (tmp_path / "elsewhere" / "left").resolve()
 
 

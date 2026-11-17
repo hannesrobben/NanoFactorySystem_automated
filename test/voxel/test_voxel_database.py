@@ -31,8 +31,8 @@ def add(db, power, velocity, *, width=None, height=None, n_lines=1, material=MAT
 
 def test_schema_version_and_migration(tmp_path):
     with VoxelDatabase(tmp_path / "new.sqlite") as db:
-        assert db.schema_version == SCHEMA_VERSION == 1
-        assert {"material", "voxel_measurement"} <= {r[0] for r in db.connection.execute(
+        assert db.schema_version == SCHEMA_VERSION == 2  # 2 since the material registry (T75)
+        assert {"material", "voxel_measurement", "material_property"} <= {r[0] for r in db.connection.execute(
             "SELECT name FROM sqlite_master WHERE type = 'table'")}
 
     # A newer database is refused

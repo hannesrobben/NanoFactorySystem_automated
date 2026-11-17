@@ -47,13 +47,49 @@ def migrate_0_to_1(connection: sqlite3.Connection) -> None:
     """)
 
 
+def migrate_1_to_2(connection: sqlite3.Connection) -> None:
+    """ Add the material registry (schema version 2, docs/design/INFORMATION_MODEL.md §8).
+
+    ``material`` gets ``kind`` (existing rows become resins) and ``created``;
+    the new table ``material_property`` holds extensible properties with unit,
+    wavelength, state and source.
+    """
+
+    _execute_all(connection, """
+        ALTER TABLE material ADD COLUMN kind TEXT NOT NULL DEFAULT 'resin'
+            CHECK (kind IN ('resin', 'substrate', 'medium'));
+
+        ALTER TABLE material ADD COLUMN created TEXT NOT NULL DEFAULT '';
+
+        CREATE TABLE material_property (
+            id              INTEGER PRIMARY KEY,
+            material_id     INTEGER NOT NULL REFERENCES material(id),
+            key             TEXT NOT NULL CHECK (key <> ''),
+            value_real      REAL,
+            value_text      TEXT,
+            unit            TEXT NOT NULL DEFAULT '',
+            wavelength_nm   REAL CHECK (wavelength_nm IS NULL OR wavelength_nm > 0),
+            state           TEXT NOT NULL DEFAULT 'any' CHECK (state IN ('uncured', 'cured', 'any')),
+            temperature_c   REAL,
+            uncertainty     REAL CHECK (uncertainty IS NULL OR uncertainty >= 0),
+            source          TEXT NOT NULL DEFAULT '',
+            date            TEXT NOT NULL,
+            notes           TEXT NOT NULL DEFAULT '',
+            CHECK (value_real IS NOT NULL OR value_text IS NOT NULL),
+            CHECK (value_real IS NULL OR unit <> '')
+        );
+
+        CREATE INDEX material_property_lookup ON material_property (material_id, key);
+    """)
+
+
 def _execute_all(connection: sqlite3.Connection, script: str) -> None:
     for statement in script.split(";"):
         if statement.strip():
             connection.execute(statement)
 
 
-MIGRATIONS = [migrate_0_to_1]
+MIGRATIONS = [migrate_0_to_1, migrate_1_to_2]
 SCHEMA_VERSION = len(MIGRATIONS)
 
 
