@@ -708,7 +708,7 @@ def run_experiment(spec: ExperimentSpec, *, user: str, resin_edges, path: Option
                    substrate: Optional[str] = None, data_root: Optional[Path] = None, backend=None,
                    plane: Optional[ZFunction] = None, confirm: Optional[Callable[[str], bool]] = None,
                    show_plot: bool = False, substrate_information: Optional[dict] = None,
-                   allow_synced_root: bool = False, material_registry=None) -> Path:
+                   allow_synced_root: bool = False, material_registry=None, plan_id: Optional[str] = None) -> Path:
     """ Run an experiment: plot, plane fit, OPL scan (DHM), structures, build and print.
 
     Parameters
@@ -739,6 +739,9 @@ def run_experiment(spec: ExperimentSpec, *, user: str, resin_edges, path: Option
         Accept a data root inside a synchronised folder.
     material_registry : MaterialRegistry, Path or False, optional
         Registry for the material snapshots (see :class:`Experiment`).
+    plan_id : str, optional
+        Planned entry of the substrate index that the experiment replaces
+        (see :class:`Experiment`).
 
     Returns
     -------
@@ -758,6 +761,7 @@ def run_experiment(spec: ExperimentSpec, *, user: str, resin_edges, path: Option
     arguments["substrate_information"] = substrate_information
     arguments["allow_synced_root"] = allow_synced_root
     arguments["material_registry"] = material_registry
+    arguments["plan_id"] = plan_id
 
     def ask(question: str) -> bool:
         return confirm is None or confirm(question)

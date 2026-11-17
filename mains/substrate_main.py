@@ -34,6 +34,10 @@ SUBSTRATE = SubstrateSpec(
     label=None,
     material={"substrate": "boro-silicate glass", "thickness_um": 700.0, "resin": "SZ2080",
               "resin_thickness_um": 75.0},
+    # Substrate record version 2 (optional): type and dimensions of the substrate, batch of the resin
+    substrate_type="",  # "cover_slip", "slide", "wafer" or "other"
+    dimensions={},  # e.g. {"shape": "round", "diameter_mm": 30.0, "thickness_um": 700.0}
+    resin_batch="",
     notes="",
 )
 

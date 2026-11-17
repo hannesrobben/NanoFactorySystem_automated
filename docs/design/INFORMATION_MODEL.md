@@ -306,6 +306,19 @@ def rectangle(context: BuildContext, *, hatch: float, slice_size: float, velocit
   warning and the experiment still runs (§6.4, scripts).
 - `ExperimentSpec.from_record()` for files without `/spec` is not part of T77 (follow-up todo T103).
 
+### 6.6 Implementation notes (T76, 2026-11-17)
+
+- The record version is the existing `schema_version` of `substrate.json` (`"2.0"`) instead of a separate
+  `record_version` attribute.
+- A planned index entry carries `name` and `plan_id` (`"planned:<name>"`) and no label; the experiment
+  replaces it through `Experiment(plan_id=)` / `run_experiment(plan_id=)`. Planning a name again replaces
+  the planned entry. Planned entries are skipped by the overlap check and by `find_experiments()` unless
+  `status="planned"` is asked for.
+- `substrate_overview()` returns the file status and a coarse state: `planned`, `running` (created,
+  built, printing), `done` (finished), `aborted` (aborted, failed).
+- An experiment finds its drop by its resin edges; the material names for its snapshots come from that
+  drop (`SubstrateRecord.material_names(drop)`), the substrate material from the record.
+
 ## 7. Setup IFOV on / off per structure — investigation (decision M2)
 
 What the code does today:

@@ -46,7 +46,7 @@ from nanofactorysystem.resin_drop import drop_outline, has_drop_boundary
 from nanofactorysystem.time_estimate import (DEFAULT_LAYER_OVERHEAD_S, TimeEstimate, estimate_program_s,
                                              format_duration)
 from nanofactorysystem.storage.substrate_store import (SubstrateRecord, SubstrateStore, check_not_synced,
-                                                       default_root)
+                                                       default_root, layout_area_um)
 from nanofactorysystem.storage import schema
 from nanofactorysystem.voxel.materials import MaterialRegistry, material_names, unregistered_snapshot
 from nanofactorysystem.dhm.optimage import optImageMedian
@@ -153,7 +153,8 @@ class Experiment(object):
                  camera_capture: bool = False,
                  program_source: ProgramSource | str = ProgramSource.DRAWING,
                  materials: Optional[dict[str, str]] = None,
-                 material_registry=None):
+                 material_registry=None,
+                 plan_id: Optional[str] = None):
         """ Experiment on one substrate.
 
         Only the newer parameters are documented here; see the class
@@ -222,6 +223,9 @@ class Experiment(object):
             Registry for the snapshots. None: the voxel database at its
             default path if that file exists (it is never created here);
             False: no registry (snapshots keep only the names).
+        plan_id : str, optional
+            Planned entry in the substrate index that this experiment takes
+            the place of (written by ``substrate_plan.run_substrate``, T76).
         backend : {"real", "dummy"}, Backend or None
             Hardware backend passed to :class:`System`. None or ``"real"``
             (default) uses the lab hardware, ``"dummy"`` or a
@@ -273,8 +277,12 @@ class Experiment(object):
         self.substrate_information = substrate_information
         # Runtime arguments as stored with the experiment; the tools get the drop direction from here
         self.sys_args = self._with_drop_direction(sys_args, drop_direction)
+        # The resin drop of the experiment on its substrate (by its edges, T76) names the resin
+        self.resin_drop = self.substrate.drop_index(resin_edges) if self.substrate is not None else None
+        self.plan_id = plan_id
         self.material_names = material_names(
-            materials=materials, substrate_material=self.substrate.material if self.substrate is not None else None,
+            materials=materials,
+            substrate_material=self.substrate.material_names(self.resin_drop) if self.substrate is not None else None,
             sample=self.sys_args.get("sample"))
         self._material_registry = material_registry
         self._with_material_names(self.sys_args, self.material_names)
@@ -643,7 +651,8 @@ class Experiment(object):
             "center_um": [float(v) for v in self.absolute_grid_center],
             "double_corner_um": list(double.center_um) if double is not None else None,
             "double_corner_rotation_deg": double.rotation_deg if double is not None else None,
-        })
+            "area_um": layout_area_um(layout, QR_CODE_WIDTH_UM / 2), "resin_drop": self.resin_drop,
+        }, replaces=self.plan_id)
 
     def _update_substrate_index(self) -> None:
         """ Copy the experiment status into the index of its substrate. """
