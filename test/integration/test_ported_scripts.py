@@ -1,13 +1,17 @@
 """The experiment scripts ported to ExperimentSpec (T51) build valid experiments."""
+import dataclasses
 import importlib.util
+import json
 from types import SimpleNamespace
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from nanofactorysystem.aerobasic.programs.drawings import DrawableObject
 from nanofactorysystem.devices.coordinate_system import Point2D
 from nanofactorysystem.experiment import StructureType
+from nanofactorysystem.experiment_spec import ExperimentSpec
 
 EXPERIMENTS = Path(__file__).parents[2] / "mains" / "Experiments"
 # script -> objectives with a complete parameter set
@@ -65,6 +69,47 @@ def test_ported_script_builds_its_experiment(script, test_config):
                 assert drawable is None
             else:
                 assert isinstance(drawable, DrawableObject)
+
+
+def _round_trip(spec, folder=None):
+    data = json.loads(json.dumps(spec.to_json(folder)))
+    again = ExperimentSpec.from_json(data, folder)
+    assert json.loads(json.dumps(again.to_json(folder))) == data
+    return again
+
+
+@pytest.mark.parametrize("script", sorted(PORTED))
+def test_ported_script_spec_round_trip(script, test_config):
+    """ T77: every ported script can be stored as project file and rebuilt with identical structures. """
+
+    module = load(script)
+    for objective in PORTED[script]:
+        spec = module.experiment_spec(objective=objective, absolute_center=Point2D(1310, 19500))
+        again = _round_trip(spec)
+        assert again.resolved() == dataclasses.replace(spec.resolved(), structures=again.structures)
+        assert len(again.structures) == len(spec.structures)
+        for original, rebuilt in zip(spec.structures, again.structures):
+            assert (rebuilt.name, rebuilt.repeat, rebuilt.power_mw, rebuilt.axes, rebuilt.structure_type) == \
+                   (original.name, original.repeat, original.power_mw, original.axes, original.structure_type)
+            built = [s.drawable(spec.program_source, spec.objective, FakeExperiment()) for s in (original, rebuilt)]
+            if built[0] is None:
+                assert built[1] is None
+            else:
+                assert built[1].to_json() == built[0].to_json()
+
+
+@pytest.mark.parametrize("name", ["drawing_spec", "slicer_spec"])
+def test_template_spec_round_trip(name, test_config, tmp_path):
+    """ T77: the template's specs, the slicer height map via ``inputs/`` and inline. """
+
+    spec = getattr(load("experiment_template.py"), name)()
+    _round_trip(spec)
+    spec.save(tmp_path / "experiment_spec.json")
+    again = ExperimentSpec.load(tmp_path / "experiment_spec.json")
+    for original, rebuilt in zip(spec.structures, again.structures):
+        if original.height_data is not None:
+            assert (tmp_path / "inputs" / f"{original.name}_height.npy").is_file()
+            assert np.array_equal(rebuilt.height_data, original.height_data)
 
 
 @pytest.mark.slow

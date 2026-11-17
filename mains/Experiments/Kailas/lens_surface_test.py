@@ -16,6 +16,7 @@ from nanofactorysystem.devices.coordinate_system import DropDirection, Point2D, 
 from nanofactorysystem.experiment_spec import (CornerSpec, ExperimentSpec, StructureSpec, messagebox_confirm,
                                                run_experiment, script_output)
 from nanofactorysystem.plane_fitting import PlaneFitMode
+from nanofactorysystem.structure_factories import BuildContext, structure_factory
 
 OBJECTIVES = {
     "Zeiss 20x": dict(drop_direction=DropDirection.UP, fov_um=500.0, z_max_um=24550.0, margin_um=300.0,
@@ -52,14 +53,13 @@ def runtime_arguments() -> dict:
     }
 
 
-def lens(hatch, slice_size, velocity):
-    """ Factory of one lens; the acceleration is read from the running experiment. """
+@structure_factory("kailas.lens_surface_test.lens")
+def lens(context: BuildContext, *, hatch, slice_size, velocity):
+    """ Factory of one lens; the acceleration is read from the build context. """
 
-    def build(experiment):
-        return AsphericalLens(Point3D(0, 0, -1), height=4, length=50, width=50, sphere_radius=515,
-                              conic_constant=-2.3, hatch_size=hatch, slice_size=slice_size, velocity=velocity,
-                              acceleration=experiment.accel_a_um)
-    return build
+    return AsphericalLens(Point3D(0, 0, -1), height=4, length=50, width=50, sphere_radius=515,
+                          conic_constant=-2.3, hatch_size=hatch, slice_size=slice_size, velocity=velocity,
+                          acceleration=context.accel_a_um)
 
 
 def experiment_spec(objective="Zeiss 20x", absolute_center=Point2D(0, 0), repeat=5, dhm_usage=False,
@@ -72,7 +72,7 @@ def experiment_spec(objective="Zeiss 20x", absolute_center=Point2D(0, 0), repeat
     if not parameter_sets:
         raise ValueError(f"No parameter sets are defined for {objective}.")
     structures = [
-        StructureSpec(f"lens_param_{str(parameters)}_{j}", factory=lens(*parameters[:2], parameters[3]),
+        StructureSpec(f"lens_param_{str(parameters)}_{j}", factory=lens(hatch=parameters[0], slice_size=parameters[1], velocity=parameters[3]),
                       power_mw=parameters[2], axes="ABZ")
         for j in range(repeat) for parameters in parameter_sets]
     return ExperimentSpec(
