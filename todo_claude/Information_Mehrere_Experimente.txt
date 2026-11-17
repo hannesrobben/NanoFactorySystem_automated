@@ -1,0 +1,127 @@
+Hier ist der neue Aufbau von oben nach unten, mit einem fertigen Beispiel für dein STL-Experiment am Ende.
+
+1. Die drei Ebenen
+
+substrate_main.py            ← ein Substrat: Benutzer, Objektiv, Tropfen, Liste von Experimenten
+ └─ SubstrateExperiment      ← ein Experiment auf dem Substrat (+ optional eigener Ordner)
+     └─ ExperimentSpec       ← alles, was EIN Experiment ausmacht (Raster, Ebenen-Fit, Setup, …)
+         └─ StructureSpec    ← EINE Struktur = eine Rasterzelle (was gedruckt wird, Leistung, Achsen)
+             └─ DrawableObject / STL / Heightmap   ← die eigentliche Geometrie
+Früher stand all das als Variablen in einer print_file()-Funktion: die if objective == ...-Blöcke, Experiment(...) mit 30 Argumenten und add_structure(...) von Hand. Jetzt beschreibst du ein Experiment als Datenobjekt. run_experiment() arbeitet es immer in derselben Reihenfolge ab: Plot, Ebenen-Fit, OPL-Scan (nur mit DHM), Strukturen, Build, Druck.
+
+2. ExperimentSpec im Detail
+Definiert in experiment_spec.py:174-240. Felder, die du auf None lässt, bekommen den Wert des Objektivs aus OBJECTIVE_DEFAULTS (experiment_spec.py:53-61). Diese Tabelle ersetzt die alten if objective == "Zeiss 63x":-Blöcke.
+
+Gruppe	Felder	Bedeutung
+Pflicht	name, objective, center, grid	Ordnername, Objektiv, Mittelpunkt des Rasters (µm), (Zeilen, Spalten)
+Strukturen	structures, program_source	Liste von StructureSpec in Druckreihenfolge, DRAWING (Python-Strukturklassen) oder SLICER (STL/Heightmap)
+Setup	setup	"IFOV_off" (Default) / "IFOV_on". SLICER braucht "IFOV_on"
+Objektivwerte (None → Default)	fov_um, drop_direction, z_max_um, margin_um, padding_um, corner	63x: FOV 150, DOWN, zMax 25480, Margin 50, Padding 100, Ecken 30×120 µm
+Raster	structure_size_um (None → FOV), skip_corner, n_mid_points	Größe einer Rasterzelle; Ecken+QR weglassen
+Ebenen-Fit	plane_fit_mode (GRID/CORNERS/BORDER), tilt_warning_um	Messpunkte; Warnung bei Verkippung unter einer Struktur
+Messungen	dhm_usage, opl_start_um, camera_capture, overview_capture, overview_single_images	DHM/OPL, Kamerabilder nach dem Druck, Mosaik vor und nach dem Druck
+Bewegung/Leistung	default_power_mw, low_speed_um_s, high_speed_um_s	Standardleistung, Verfahrgeschwindigkeiten
+Voxel	voxel_material, voxel_database	Mit Material: der Slicer kompensiert mit gemessenen Voxelgrößen
+Laufzeit	sys_args, layer_overhead_s	Abschnitte für Fokus, Layer, Probe und Attenuator (wie das alte sys_args-Dict); Overhead pro Schicht für die Zeitschätzung
+spec.resolved() gibt dir die Kopie mit allen Defaults zurück. So siehst du, was tatsächlich verwendet wird. Die Funktion prüft auch, ob die Strukturen ins Raster passen und ob SLICER mit IFOV_on kombiniert ist.
+
+3. Wo die Strukturen festgelegt werden
+In der Liste structures der Spec. Jeder Eintrag ist ein StructureSpec (experiment_spec.py:78-118) und belegt eine Rasterzelle:
+
+Feld	Bedeutung
+name	Name der Struktur (Ordner, Summary)
+structure	Fertiges DrawableObject, z. B. Rectangle3D(...) oder Stair(...) (DRAWING)
+factory	factory(experiment) -> DrawableObject, für Strukturen, die Werte des laufenden Experiments brauchen, z. B. den Kalibrierbereich des Attenuators. So macht es power_z_pitch_lines.cell()
+height_data + slicer	STL-Pfad / Heightmap + Keyword-Argumente für Model3D_Slicer (SLICER)
+power_mw, layer_power	Leistung der Struktur bzw. pro Schicht
+axes	"ABZ" (Galvo) / "XYZ" (Stages)
+repeat	So oft wird die Struktur in den nächsten Zellen wiederholt
+structure_type	Default NORMAL (DRAWING) bzw. IFOV (SLICER); StructureSpec.empty() lässt eine Zelle leer
+Wo die Liste gebaut wird:
+
+In einem Experiment-Skript unter mains/Experiments/... in dessen Funktion experiment_spec(objective, absolute_center, ...). Die Parameter stehen dort meist als Konstanten oben in der Datei, z. B. POWERS und PITCHES in power_z_pitch_lines.py.
+Oder direkt in substrate_main.py, wenn das Experiment klein ist und nur dort gebraucht wird.
+4. Ein STL-Experiment als Spec
+Dein früheres historical/Model_3D_experiment.py hat Model3D_Slicer(...) direkt an add_structure übergeben. In der neuen Form sieht dasselbe Experiment so aus. Die Werte stammen aus deinem alten 63x-Zweig:
+
+
+from pathlib import Path
+from nanofactorysystem.devices.coordinate_system import Point2D, Point3D
+from nanofactorysystem.experiment import ProgramSource
+from nanofactorysystem.experiment_spec import ExperimentSpec, StructureSpec
+from nanofactorysystem.plane_fitting import PlaneFitMode
+
+STL = Path(r"C:\Users\Nanofactory\Desktop\Hannes\mdl_lens.stl")
+
+def stl_lens_spec(objective="Zeiss 63x", absolute_center=Point2D(500, 22500),
+                  slice_um=0.2, hatch_um=0.2, power_mw=0.5) -> ExperimentSpec:
+    return ExperimentSpec(
+        name="stl_lens",
+        objective=objective,
+        center=absolute_center,
+        grid=(1, 1),
+        structure_size_um=250,              # wie früher (Struktur > FOV wird gestitcht)
+        program_source=ProgramSource.SLICER,
+        setup="IFOV_on",
+        plane_fit_mode=PlaneFitMode.CORNERS,  # entspricht dem alten plane_fit_mode=1
+        camera_capture=True,
+        structures=[StructureSpec(
+            f"model3d_s{slice_um}_h{hatch_um}_p{power_mw}",
+            height_data=STL,
+            power_mw=power_mw,
+            axes="XYZ",
+            slicer={                      # alles, was früher in Model3D_Slicer(...) stand
+                "center": Point3D(0, 0, -0.5),
+                "unit": "um",
+                "velocity": 10_000,
+                "hatch_size": hatch_um,
+                "slice_size": slice_um,
+                "hatch_strategy": "alternating",
+                "optimize": True,
+            },
+        )],
+    )
+center, objective und source setzt die Spec selbst. Was du in slicer={...} einträgst, hat Vorrang. Ein Parameter-Sweep ist einfach: mehrere StructureSpec mit verschiedenen slice_um/power_mw, dazu ein größeres grid.
+
+Mischen geht auch. In einem DRAWING-Experiment kannst du ein STL als normale Struktur einhängen: StructureSpec("lens", structure=Model3D_Slicer(center=Point3D(0, 0, -0.5), source=STL, velocity=10_000, ...), structure_type=StructureType.IFOV, axes="XYZ"). Dann musst du setup="IFOV_on" setzen. Die Voxel-Kompensation über voxel_material greift in diesem Fall nicht automatisch.
+
+5. Mehrere Experimente auf einem Substrat verketten
+mains/substrate_main.py pro Substrat kopieren, z. B. als mains/substrate_HR-26-001.py, und zwei Stellen anpassen:
+
+
+from Experiments.Kailas import power_z_pitch_lines, parametric_4q
+from stl_lens import stl_lens_spec     # oder wo du die Funktion oben ablegst
+
+OBJECTIVE = "Zeiss 63x"
+SUBSTRATE = SubstrateSpec(
+    user="Hannes",
+    objective=OBJECTIVE,                 # gilt für ALLE Experimente auf dem Substrat
+    resin_edges=[[1500, 17400], [1400, 27000], [-3600, 22400], [5500, 21700]],
+    label=None,                          # None = nächstes freies Label, z. B. HR-26-001
+    material={"substrate": "boro-silicate glass", "resin": "SZ2080"},
+    notes="Linien + STL-Linse",
+)
+
+def experiments():
+    lines = power_z_pitch_lines.experiment_spec(objective=OBJECTIVE, absolute_center=Point2D(0, 21000),
+                                                dhm_usage=False)
+    lens = stl_lens_spec(objective=OBJECTIVE, absolute_center=Point2D(2000, 23000))
+    return [
+        SubstrateExperiment(lines),
+        SubstrateExperiment(lens),
+        # SubstrateExperiment(spec, path=r"C:\...") → eigener Ordner statt Substrat-Ordner
+    ]
+Ablauf beim Start (cd mains, dann python substrate_HR-26-001.py):
+
+Vor jedem Druck prüft run_substrate() das ganze Layout: keine Überlappung zwischen den Experimenten (inklusive Ecken und QR-Code), keine Überlappung mit Experimenten, die schon im Index dieses Substrats stehen, und alles innerhalb der Tropfen-Ellipse. Passt etwas nicht, bricht es mit LayoutError ab, bevor sich etwas bewegt. Danach zeigt es den Layout-Plot.
+Die Experimente laufen nacheinander. Jedes macht seinen eigenen Ebenen-Fit mit eigenen Ecken und eigenem QR-Code. Vor jedem weiteren Experiment fragt eine Messagebox nach.
+Die Daten landen unter <dataRoot>\<Label>\<Label>-A_<Datum>\, ...-B_... usw., und substrate.json führt den Index. dataRoot ist ~/Documents/Femtika_Experiment/Hannes oder der Wert aus nanofactory.json. Er darf nicht in Seafile/OneDrive/Dropbox liegen.
+Willst du später weitere Experimente auf dasselbe Substrat drucken, setzt du label="HR-26-001". Dann werden die bereits gedruckten Flächen bei der Überlappungsprüfung berücksichtigt.
+Trockenlauf vorher (ohne Hardware, prüft vor allem das Layout):
+
+
+cd mains
+python -c "import substrate_HR-26-001 as s; from nanofactorysystem.devices.coordinate_system import StaticOffset; s.main(backend='dummy', plane=StaticOffset(25000), data_root=r'C:\temp\dry')"
+Bei diesem Dateinamen funktioniert import wegen der Bindestriche nicht. Nenn die Datei dafür z. B. substrate_hr26_001.py.
+
+Soll ich dein STL-Experiment als portiertes Skript mains/Experiments/model3d/stl_lens.py anlegen, mit print_2pp-kompatibler Funktion und Trockenlauf-Test, wie bei den anderen Skripten? Dann könnte dein altes main_3D_model.py es direkt aufrufen.
