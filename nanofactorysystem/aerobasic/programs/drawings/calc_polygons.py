@@ -168,15 +168,15 @@ def workflow_example(grating_angle=0,  # degree
     pass
 
 
-# ========== HAUPTBEISPIEL ==========
+# ========== MAIN EXAMPLE ==========
 if __name__ == '__main__':
 
     print("=" * 60)
-    print("Beispiel: Gitter mit kreisförmiger Begrenzung")
+    print("Example: grating with circular boundary")
     print("=" * 60)
 
     # Parameter
-    grating_angle = 0  # Grad
+    grating_angle = 0  # degree
     period = 1.5
     duty_cycle = 0.5
     radius = 4.0
@@ -196,23 +196,23 @@ if __name__ == '__main__':
 
     # Extract the polygons
     polygons = binary_mask_to_closed_polygons(mask, xs, ys, min_area=50)
-    print(f"Gefundene geschlossene Polygone: {len(polygons)}")
+    print(f"Closed polygons found: {len(polygons)}")
 
     # Check whether the polygons are closed
     for i, poly in enumerate(polygons):
         is_closed = np.allclose(poly[0], poly[-1])
         area = 0.5 * np.abs(np.sum(poly[:-1, 0] * poly[1:, 1] - poly[1:, 0] * poly[:-1, 1]))
-        print(f"  Polygon {i}: {len(poly)} Punkte, geschlossen={is_closed}, Fläche≈{area:.2f}")
+        print(f"  Polygon {i}: {len(poly)} points, closed={is_closed}, area≈{area:.2f}")
 
-    # Hatch-Segmente erzeugen
+    # Create the hatch segments
     all_segments = []
     for poly in polygons:
         segs = hatch_segments_for_polygon(poly, hatch_angle, hatch_dist, z=0)
         all_segments.extend(segs)
 
-    print(f"\nGesamte Hatch-Segmente: {len(all_segments)}")
+    print(f"\nTotal hatch segments: {len(all_segments)}")
 
-    # ========== VISUALISIERUNG ==========
+    # ========== VISUALISATION ==========
     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
 
     # 1) Binary mask
@@ -221,10 +221,10 @@ if __name__ == '__main__':
               origin='lower', cmap='viridis')
     circle = plt.Circle((0, 0), radius, fill=False, color='red', linewidth=2)
     ax.add_patch(circle)
-    ax.set_title(f"Gitter (θ={grating_angle}°, T={period})")
+    ax.set_title(f"Grating (θ={grating_angle}°, T={period})")
     ax.set_aspect('equal')
 
-    # 2) Extrahierte Polygone
+    # 2) Extracted polygons
     ax = axes[1]
     ax.set_aspect('equal')
     colors = plt.cm.tab10(np.linspace(0, 1, max(len(polygons), 1)))
@@ -234,10 +234,10 @@ if __name__ == '__main__':
                 edgecolor='black', linewidth=1)
     ax.set_xlim(-5, 5)
     ax.set_ylim(-5, 5)
-    ax.set_title(f"Geschlossene Polygone ({len(polygons)})")
+    ax.set_title(f"Closed polygons ({len(polygons)})")
     ax.grid(True, alpha=0.3)
 
-    # 3) Hatch-Segmente
+    # 3) Hatch segments
     ax = axes[2]
     ax.set_aspect('equal')
 
@@ -252,16 +252,16 @@ if __name__ == '__main__':
 
     ax.set_xlim(-5, 5)
     ax.set_ylim(-5, 5)
-    ax.set_title(f"Hatch-Segmente ({len(all_segments)})")
+    ax.set_title(f"Hatch segments ({len(all_segments)})")
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
     plt.savefig('complete_example.png', dpi=150)
-    print("\nGespeichert: complete_example.png")
+    print("\nSaved: complete_example.png")
 
     # ========== SECOND EXAMPLE: without boundary (stripe structure) ==========
     print("\n" + "=" * 60)
-    print("Beispiel 2: Streifenstruktur ohne Begrenzung")
+    print("Example 2: stripe structure without boundary")
     print("=" * 60)
 
     # Here: the original problem
@@ -278,14 +278,14 @@ if __name__ == '__main__':
     )
 
     polygons2 = binary_mask_to_closed_polygons(mask2, xs2, ys2, min_area=100)
-    print(f"Polygone: {len(polygons2)}")
+    print(f"Polygons: {len(polygons2)}")
 
     segments2 = []
     for poly in polygons2:
-        segs = hatch_segments_for_polygon(poly, 90, 0.3, z=0)  # 90° Hatching
+        segs = hatch_segments_for_polygon(poly, 90, 0.3, z=0)  # 90° hatching
         segments2.extend(segs)
 
-    print(f"Hatch-Segmente: {len(segments2)}")
+    print(f"Hatch segments: {len(segments2)}")
 
     # Visualisation
     fig2, ax2 = plt.subplots(figsize=(8, 8))
@@ -301,8 +301,8 @@ if __name__ == '__main__':
 
     ax2.set_xlim(-5, 5)
     ax2.set_ylim(-5, 5)
-    ax2.set_title(f"Streifen mit 90° Hatching ({len(segments2)} Segmente)")
+    ax2.set_title(f"Stripes with 90° hatching ({len(segments2)} segments)")
     ax2.grid(True, alpha=0.3)
 
     plt.savefig('stripes_example.png', dpi=150)
-    print("Gespeichert: stripes_example.png")
+    print("Saved: stripes_example.png")
