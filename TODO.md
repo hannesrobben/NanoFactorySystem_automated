@@ -37,7 +37,7 @@ with an evaluation after every layer capture; a camera live feed; a core that a 
 | 3 | Experiment scripts and substrate main | T51, T52 (done) | – |
 | 4 | Voxel database and voxel-aware slicing | T53, T54, T31 (done) | T53 design approved by the maintainer |
 | 5 | Concept for phases 6–10 | T70, T71, T72, T73, T74, T100 | each design approved by the maintainer |
-| 6 | Information model | T75, T76, T77, T78, T79, T80, T81, T101 | T70 approved (T101 does not need it) |
+| 6 | Information model | T75, T76, T77, T78, T79, T80, T81, T101, T103 | T70 approved (T101 does not need it) |
 | 7 | DHM service integration | T82, T83, T84, T85, T86, T87 | T71 approved; T84 needs DHMConnect DL-C1, DL-C2 |
 | 8 | Operating modes | T88, T89, T90, T91, T92 | T72 approved; T89 needs G10 (K18) for the mask part; T90 needs MIRA MI-53 for the real evaluator |
 | 9 | Camera live feed | T93, T94, T95 | T73 approved |
@@ -102,18 +102,6 @@ test fixtures. Background of the 2026-11-16 changes: `docs/system/handover/from_
       aborted) and area, for display and for running them one after another;
     - `run_substrate()` behaviour is unchanged for existing substrate mains.
 
-- [ ] T77: Serialisable experiments and structures [phase: 6]
-  - Priority: high
-  - Size: M
-  - Depends on: T70
-  - Done when:
-    - `ExperimentSpec` and `StructureSpec` have `to_json()` / `from_json()`; structures use
-      `DrawableObject.to_json()` and `structure_from_json()`;
-    - `factory` callables are replaced by named, registered factories; a spec that cannot be stored
-      raises a clear error that names the field;
-    - the spec is stored in the experiment folder and in `experiment.h5`; a round-trip test covers
-      every ported script in `mains/Experiments/`.
-
 - [ ] T78: Settings per structure with experiment defaults [phase: 6]
   - Priority: high
   - Size: L
@@ -169,6 +157,16 @@ test fixtures. Background of the 2026-11-16 changes: `docs/system/handover/from_
       commands that `DefaultSetup` and `SetupIFOV` each need to reach a defined state regardless of what
       ran before are listed for T78 (the setup is sent before every structure, decision M2);
     - if a state leaks into `IFOV_off` experiments today, a `fix:` todo exists.
+
+- [ ] T103: Rebuild a spec from an experiment file without `/spec` (follow-up of T77) [phase: 6]
+  - Priority: low
+  - Size: S
+  - Depends on: T77
+  - Done when:
+    - `ExperimentSpec.from_record(record)` rebuilds a spec from `/metadata/experiment` and the structure
+      `config`s of an experiment file 1.0 (or 1.1 without `/spec`), marked `reconstructed: true`; factories
+      become `drawing` geometries (INFORMATION_MODEL.md §6.4);
+    - a test rebuilds the spec of a dry-run file whose `/spec` was removed and compares the built structures.
 
 ### Phase 7 — DHM service integration
 
@@ -507,6 +505,8 @@ fraction and peak position, piston phase, phase noise). The propagation distance
     proposed §15 of `EXPERIMENT_STORAGE.md` (draft 2026-11-16, decisions D1–D4 with proposals in §10).
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T77: Serialisable experiments and structures — 2026-11-17 — `ExperimentSpec`/`StructureSpec` are project files (`to_json`/`from_json`, `save`/`load`, schema `nanofactory.experiment_spec/1`, slicer inputs with SHA-256), structures that need the running experiment use named factories (`structure_factories.py`, `BuildContext`), unstorable fields raise an error naming structure and field; `run_experiment()` stores the spec as `experiment_spec.json` and in `/spec` + `/inputs`; all ported scripts round-trip. Follow-up T103 (`from_record()`). — commits: `2c9bd1b`, `d431bbd`, `4f83dd7`, `e749109`
+
 - [x] T75: Material registry for photopolymers — 2026-11-16 — The voxel database (schema 2) holds materials (resin/substrate/medium) with extensible properties (value, unit, wavelength, state, source, date; new keys without code change) behind `MaterialRegistry`; every new experiment file stores a snapshot per role in `/metadata/materials` (schema 1.1), `SubstrateSpec.material` accepts a registry name. Which index is `n_medium` stays G4. — commits: `1a78f06`, `5953d36`
 
 - [x] T70: Design the information model v2 — 2026-11-16 — `docs/design/INFORMATION_MODEL.md` defines material (registry in the voxel SQLite, M1), substrate record v2 (material per resin drop, M3), experiment spec as project file and structures with their own settings; setup per structure, sent before every structure, default `IFOV_on` (M2), camera only before/after a structure (M6); approved by the maintainer. — commits: `2709356`, `2f72064`, `c68d2a3`, `893202c`, `42313ef`

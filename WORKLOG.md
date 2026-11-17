@@ -2395,3 +2395,39 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Follow-ups:** which refractive index is `n_medium` stays G4 / O1 / O11; the registry has no data yet (the
   maintainer enters values or a seed). Next: T77 (depends only on T70), then T76.
   Branch `feat/t75-material-registry` on top of the design branches; nothing pushed.
+
+### 2026-11-17 08:57 CET — [T77] Serialisable experiments and structures
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/structure_factories.py` (new): `@structure_factory(name)` registry, `BuildContext`
+    (objective, setup, accelerations, drop direction, attenuator power range and calibration, `check_power`),
+    `FactoryCall` (name + JSON arguments; stored with module and source file, loading imports either).
+  - `nanofactorysystem/experiment_spec.py`: `to_json`/`from_json`/`save`/`load` for `ExperimentSpec` and
+    `StructureSpec` (geometry kinds drawing/factory/slicer/empty, slicer inputs inline or in `inputs/` with
+    SHA-256, typos and other major versions refused), `SpecSerialisationError` naming structure and field,
+    `store_spec()` called by `run_experiment()`, `drawable()` builds `FactoryCall`s with a `BuildContext`;
+    new fields `description`, `tags`.
+  - `nanofactorysystem/storage/experiment_store.py`, `records.py`, `json_copies.py`: `/spec`, `/inputs`,
+    `ExperimentRecord.spec`, export of `experiment_spec.json`.
+  - `nanofactorysystem/aerobasic/programs/drawings/hollow_structure.py`, `dots/dot_rows_on_base.py`: keep all
+    constructor arguments, so that `to_json()` is complete (separate `fix` commit).
+  - `mains/Experiments/` (8 scripts: DHM_tomography/hollow_rect_first_print_63xobj.py,
+    Kailas/lens_surface_test.py, Kailas/power_z_pitch_lines.py,
+    parameter_study/line_test/Power_speed_line_test.py, parameter_study/parameter_testprint_power_speed.py,
+    parameter_study/parameter_testprint_power_speed_test4orientation.py,
+    parameter_study/parameter_testprint_slicing_hatching.py, refractive_index/refractive_index_vel_power.py):
+    closures replaced by named factories, same structures.
+  - `test/test_experiment_spec_json.py` (new); `test/integration/test_ported_scripts.py` (round trip of every
+    ported script and of the template); `test/integration/test_dry_run_spec.py` (stored spec and height map);
+    `test/storage/test_experiment_store.py` (spec/inputs round trip); `test/README.md`.
+  - `docs/design/EXPERIMENT_STORAGE.md` (`/spec`, `/inputs` in schema 1.1), `docs/design/INFORMATION_MODEL.md`
+    (§6.5 implementation notes), `CLAUDE.md` (project files and named factories), `TODO.md` (T77 done, new T103).
+- **Tests:** `python -m pytest` in the venv: 413 passed, 14 skipped (14:42 min); the earlier HollowRectangle
+  warning is gone.
+- **Commits:** `2c9bd1b` fix(drawings): keep all constructor arguments of two structures [T77]; `d431bbd`
+  feat(storage): store the experiment spec and its input files [T77]; `4f83dd7` feat(spec): save experiments
+  as project files with named factories [T77]; `e749109` refactor(mains): use named structure factories in
+  the ported scripts [T77]; docs(todo): close T77 [T77]
+- **Follow-ups:** T103 (`ExperimentSpec.from_record()` for files without `/spec`). Until T78 the `defaults`
+  group uses the existing field names (INFORMATION_MODEL §6.5). Next: T76 (substrate record v2), then T79/T80,
+  T78 after T101. Branch `feat/t77-serialisable-specs` on top of `feat/t75-material-registry`; nothing pushed.
