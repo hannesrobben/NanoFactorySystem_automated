@@ -11,6 +11,8 @@ from nanofactorysystem.devices.coordinate_system import Point3D, CoordinateSyste
 class HollowRectangle(DrawableObject):
     default_acceleration: float = 20_000
     default_power: float = 0.7  # µW
+    # Constructor parameter stored under another attribute name (for to_json(), T77)
+    _json_attributes = {"alternate_hatching_direction": "alternating_hatch"}
 
     def __init__(self,
                  center: Point3D,
