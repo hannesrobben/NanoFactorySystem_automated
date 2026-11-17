@@ -92,16 +92,6 @@ test fixtures. Background of the 2026-11-16 changes: `docs/system/handover/from_
 
 ### Phase 6 — Information model
 
-- [ ] T76: Substrate record v2 and experiment overview [phase: 6]
-  - Priority: medium
-  - Size: M
-  - Depends on: T75
-  - Done when:
-    - the substrate record carries material reference, substrate type and dimensions;
-    - a function returns all experiments of a substrate with status (planned, running, done,
-      aborted) and area, for display and for running them one after another;
-    - `run_substrate()` behaviour is unchanged for existing substrate mains.
-
 - [ ] T78: Settings per structure with experiment defaults [phase: 6]
   - Priority: high
   - Size: L
@@ -505,6 +495,8 @@ fraction and peak position, piston phase, phase noise). The propagation distance
     proposed §15 of `EXPERIMENT_STORAGE.md` (draft 2026-11-16, decisions D1–D4 with proposals in §10).
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T76: Substrate record v2 and experiment overview — 2026-11-17 — `substrate.json` version 2 holds substrate material, type and dimensions and material/batch/thickness/application per resin drop (version 1 read as 2); `run_substrate()` enters experiments as `planned`, each experiment replaces its entry with area and drop, and `substrate_overview()` lists them with the status of their files; existing substrate mains run unchanged. — commits: `31ae2b2`, `dd1bc9a`
+
 - [x] T77: Serialisable experiments and structures — 2026-11-17 — `ExperimentSpec`/`StructureSpec` are project files (`to_json`/`from_json`, `save`/`load`, schema `nanofactory.experiment_spec/1`, slicer inputs with SHA-256), structures that need the running experiment use named factories (`structure_factories.py`, `BuildContext`), unstorable fields raise an error naming structure and field; `run_experiment()` stores the spec as `experiment_spec.json` and in `/spec` + `/inputs`; all ported scripts round-trip. Follow-up T103 (`from_record()`). — commits: `2c9bd1b`, `d431bbd`, `4f83dd7`, `e749109`
 
 - [x] T75: Material registry for photopolymers — 2026-11-16 — The voxel database (schema 2) holds materials (resin/substrate/medium) with extensible properties (value, unit, wavelength, state, source, date; new keys without code change) behind `MaterialRegistry`; every new experiment file stores a snapshot per role in `/metadata/materials` (schema 1.1), `SubstrateSpec.material` accepts a registry name. Which index is `n_medium` stays G4. — commits: `1a78f06`, `5953d36`

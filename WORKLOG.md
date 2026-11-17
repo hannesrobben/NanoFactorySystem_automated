@@ -2431,3 +2431,32 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Follow-ups:** T103 (`ExperimentSpec.from_record()` for files without `/spec`). Until T78 the `defaults`
   group uses the existing field names (INFORMATION_MODEL §6.5). Next: T76 (substrate record v2), then T79/T80,
   T78 after T101. Branch `feat/t77-serialisable-specs` on top of `feat/t75-material-registry`; nothing pushed.
+
+### 2026-11-17 09:55 CET — [T76] Substrate record v2 and experiment overview
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/storage/substrate_store.py`: record version 2 (`schema_version` "2.0"): `substrate_material`,
+    `substrate_type`, `dimensions`, per drop `material`/`batch`/`thickness_um`/`application`, validation
+    (`check_substrate_fields`); version 1 read as 2, written as 2 only on change; `drop_index()`,
+    `material_names(drop)`, `update_substrate()`, `plan_experiment()`, `register_experiment(replaces=)`,
+    `layout_area_um()`, `ExperimentOverview`, `substrate_overview()`; `find_experiments()` returns planned
+    entries only with `status="planned"`.
+  - `nanofactorysystem/substrate_plan.py`: `SubstrateSpec` v2 fields, `open_substrate()` writes them,
+    `run_substrate()` plans every experiment before the first print, `existing_areas()` via the overview
+    (planned entries skipped).
+  - `nanofactorysystem/experiment.py`: drop of the experiment by its edges, material names from that drop,
+    `area_um`/`resin_drop` in the index entry, `plan_id` replaces the planned entry.
+  - `nanofactorysystem/experiment_spec.py`: `run_experiment(plan_id=)`.
+  - `mains/substrate_main.py`: optional v2 fields in the template.
+  - `test/storage/test_substrate_store.py`: expected version "2.0" (justified: record version 2), new tests for
+    the v1 upgrade, v2 fields, planned entries and the overview.
+  - `test/integration/test_dry_run_substrate.py`: an experiment stopped before its start now stays `planned`
+    in the index (justified: new planned entries, design §3.2); area, drop and overview after the dry run.
+  - `test/README.md`, `CLAUDE.md`, `docs/design/EXPERIMENT_STORAGE.md` (§8), `docs/design/INFORMATION_MODEL.md`
+    (§6.6 implementation notes), `TODO.md` (T76 done).
+- **Tests:** `python -m pytest` in the venv: 416 passed, 14 skipped (8:38 min).
+- **Commits:** `31ae2b2` feat(storage): substrate record version 2 and substrate overview [T76]; `dd1bc9a`
+  feat(substrate): plan experiments in the index, resin per drop [T76]; docs(todo): close T76 [T76]
+- **Follow-ups:** none new. Next in phase 6: T79 (configuration record), T80 (layout as data, uses
+  `substrate_overview`), T103; T78 waits for T101 (lab PC). Branch `feat/t76-substrate-record-v2` on top of
+  `feat/t77-serialisable-specs`; nothing pushed.
