@@ -291,6 +291,21 @@ def rectangle(context: BuildContext, *, hatch: float, slice_size: float, velocit
 | Voxel database v1 | migration 1 → 2 on open (existing mechanism), see §8. |
 | Scripts | Python fields of `ExperimentSpec`/`StructureSpec` are kept; `factory=` with a plain callable keeps working for running, but such a spec cannot be saved (clear error on `to_json()`). |
 
+### 6.5 Implementation notes (T77, 2026-11-17)
+
+- Implemented in `experiment_spec.py` (`to_json`/`from_json`, `save`/`load`, `store_spec`) and
+  `structure_factories.py`. Until T78 the `defaults` group holds the existing field names
+  (`program_source`, `setup`, `default_power_mw`, `low_speed_um_s`, `high_speed_um_s`, `voxel_material`,
+  `voxel_database`) and a structure's `settings` hold `axes`, `power_mw` and `layer_power`; T78 maps them to
+  `StructureSettings`. `placement.resin_drop` follows with T76.
+- `BuildContext` additionally carries `power_min_mw` / `power_max_mw` (the line-cell factory checks its
+  powers against the attenuator calibration).
+- The stored factory form also records the source `file` of the function: the scripts in `mains/` are
+  not always importable by module name, so loading falls back to the file.
+- `run_experiment()` stores the spec as written (not resolved). A spec that cannot be stored is logged as a
+  warning and the experiment still runs (§6.4, scripts).
+- `ExperimentSpec.from_record()` for files without `/spec` is not part of T77 (follow-up todo T103).
+
 ## 7. Setup IFOV on / off per structure — investigation (decision M2)
 
 What the code does today:
