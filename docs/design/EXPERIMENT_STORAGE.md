@@ -345,23 +345,41 @@ legacy reader (§9).
 
 ```json
 {
-  "schema_version": "1.0",
+  "schema_version": "2.0",
   "label": "HR-26-001",
   "uuid": "…",
   "created": "2026-09-29T18:00:00.000Z",
   "user": "Hannes",
   "material": {"substrate": "boro-silicate glass", "thickness_um": 700.0,
                "resin": "SZ2080", "resin_thickness_um": 75.0},
+  "substrate_material": "boro-silicate glass",
+  "substrate_type": "cover_slip",
+  "dimensions": {"shape": "round", "diameter_mm": 30.0, "thickness_um": 700.0},
   "resin_drops": [{"edges_um": [[5720, 22330], [-3333, 22420], [1660, 17212], [1200, 27190]],
-                   "added": "…"}],
+                   "added": "…", "material": "SZ2080", "batch": "", "thickness_um": 75.0,
+                   "application": "drop"}],
   "notes": "",
   "experiments": [
     {"uuid": "…", "label": "HR-26-001-A", "path": "HR-26-001-A_20260929-2018",
      "started": "…", "objective": "Zeiss 63x", "status": "finished",
-     "center_um": [1310, 19500], "double_corner_um": [980, 19295], "double_corner_rotation_deg": 0}
+     "center_um": [1310, 19500], "double_corner_um": [980, 19295], "double_corner_rotation_deg": 0,
+     "area_um": [[700, 19100], [1920, 19900]], "resin_drop": 0, "plan_id": "planned:power_speed"},
+    {"uuid": "", "label": "", "name": "lenses", "plan_id": "planned:lenses", "status": "planned",
+     "planned": "…", "objective": "Zeiss 63x", "area_um": [[2100, 19100], [3000, 19900]],
+     "resin_drop": 0, "center_um": [2550, 19500]}
   ]
 }
 ```
+
+Record version 2 (T76, INFORMATION_MODEL.md §3.2): `substrate_material`, `substrate_type`
+(`cover_slip`/`slide`/`wafer`/`other`), `dimensions` (fields of the shape only) and per drop
+`material`, `batch`, `thickness_um`, `application` (`drop`/`dip_in`). A `"1.0"` file is read as version 2
+(the `material` dict fills the new fields and stays as it is) and written as `"2.0"` only when the record
+changes. Index entries carry `area_um` (rectangle incl. corner markers and QR code) and `resin_drop`;
+`run_substrate()` enters every experiment as `planned` before the run (`plan_experiment`), and the
+experiment replaces its planned entry when it starts. An experiment that was never started stays
+`planned`. `substrate_overview(root, label)` lists all entries with the status read from the experiment
+files (the index is a cache) and the state `planned` / `running` / `done` / `aborted`.
 
 - The substrate record is small, edited by people (notes) and shared by all experiments, so it stays
   JSON; each experiment file holds a copy (`/metadata/substrate`).

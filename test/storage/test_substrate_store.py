@@ -7,7 +7,7 @@ import pytest
 from nanofactorysystem.config import use_config, DEFAULT_CONFIG
 from nanofactorysystem.storage.substrate_store import (SubstrateStore, SyncedFolderError, check_not_synced,
                                                        default_root, experiment_letters, find_experiments,
-                                                       initials)
+                                                       initials, substrate_overview)
 
 
 def entry(label, uuid, started, objective="Zeiss 20x", status="finished"):
@@ -51,7 +51,8 @@ def test_substrate_record_round_trip(tmp_path):
         assert loaded.uuid == created.uuid and loaded.material["thickness_um"] == 700.0
         assert loaded.resin_drops[0]["edges_um"][1] == [-3333.0, 22420.0]
     data = json.loads((tmp_path / created.label / "substrate.json").read_text())
-    assert data["schema_version"] == "1.0" and data["notes"] == "first drop in the center"
+    # record version 2 since T76 (was "1.0")
+    assert data["schema_version"] == "2.0" and data["notes"] == "first drop in the center"
     with pytest.raises(KeyError):
         store.get("HR-99-999")
 
@@ -116,3 +117,81 @@ def test_import_legacy_substrate_information(tmp_path):
     record = SubstrateStore(tmp_path / "root").import_legacy(legacy, "Hannes", "HR")
 
     assert record.notes == "old substrate" and record.extra["Number of drops"] == 2
+
+
+V1_RECORD = {
+    "schema_version": "1.0", "label": "HR-26-003", "uuid": "0f0e0d0c-0000-4000-8000-000000000003",
+    "created": "2026-10-01T08:00:00.000Z", "user": "Hannes",
+    "material": {"substrate": "boro-silicate glass", "thickness_um": 700.0, "resin": "SZ2080",
+                 "resin_thickness_um": 75.0, "batch": "L42"},
+    "resin_drops": [{"edges_um": [[0.0, 0.0], [1.0, 1.0]], "added": "2026-10-01T08:00:00.000Z"}],
+    "notes": "", "experiments": [], "extra": {}}
+
+
+def test_version_1_record_is_read_as_version_2(tmp_path):
+    folder = tmp_path / "HR-26-003"
+    folder.mkdir()
+    (folder / "substrate.json").write_text(json.dumps(V1_RECORD))
+    store = SubstrateStore(tmp_path)
+
+    record = store.get("HR-26-003")
+
+    assert record.material == V1_RECORD["material"]  # the free dict is kept
+    assert (record.substrate_material, record.dimensions) == ("boro-silicate glass", {"thickness_um": 700.0})
+    drop = record.resin_drops[0]
+    assert (drop["material"], drop["batch"], drop["thickness_um"], drop["application"]) == \
+           ("SZ2080", "L42", 75.0, "drop")
+    assert record.material_names(0)["resin"] == "SZ2080"
+    # Reading does not rewrite the file; the next change writes version 2
+    assert json.loads((folder / "substrate.json").read_text())["schema_version"] == "1.0"
+    store.update_substrate("HR-26-003", substrate_type="cover_slip")
+    data = json.loads((folder / "substrate.json").read_text())
+    assert data["schema_version"] == "2.0" and data["substrate_type"] == "cover_slip"
+    assert data["resin_drops"][0]["material"] == "SZ2080" and data["material"] == V1_RECORD["material"]
+
+
+def test_version_2_fields_and_material_per_drop(tmp_path):
+    store = SubstrateStore(tmp_path)
+    label = store.create("Hannes", "HR", substrate_material="cover slip glass", substrate_type="cover_slip",
+                         dimensions={"shape": "round", "diameter_mm": 30.0, "thickness_um": 170.0}).label
+    store.add_resin_drop(label, [[0, 0], [1, 1]], material="SZ2080", batch="L1", thickness_um=50.0)
+    store.add_resin_drop(label, [[5, 5], [6, 6]], material="IP-Dip", application="dip_in")
+    record = store.get(label)
+
+    assert record.drop_index([[5, 5], [6, 6]]) == 1 and record.drop_index([[9, 9]]) is None
+    assert record.material_names(0) == {"substrate": "cover slip glass", "resin": "SZ2080", "batch": "L1"}
+    assert record.material_names(1)["resin"] == "IP-Dip" and record.material_names()["resin"] == "IP-Dip"
+
+    with pytest.raises(ValueError, match="substrate type"):
+        store.create("Hannes", "HR", substrate_type="glass plate")
+    with pytest.raises(ValueError, match="do not belong"):
+        store.create("Hannes", "HR", dimensions={"shape": "round", "width_mm": 20.0})
+    with pytest.raises(ValueError, match="application"):
+        store.add_resin_drop(label, [[0, 0]], application="spin")
+    with pytest.raises(ValueError, match="cannot be changed"):
+        store.update_substrate(label, uuid="x")
+
+
+def test_planned_entries_are_replaced_by_the_experiment(tmp_path):
+    store = SubstrateStore(tmp_path)
+    label = store.create("Hannes", "HR").label
+    plan_a = store.plan_experiment(label, "left", objective="Zeiss 20x", area_um=((0, 0), (10, 10)), resin_drop=0)
+    store.plan_experiment(label, "right", objective="Zeiss 20x", area_um=((20, 0), (30, 10)))
+    # Planning again (a substrate main started twice) replaces the entry instead of adding one
+    assert store.plan_experiment(label, "left", objective="Zeiss 20x", area_um=((0, 0), (12, 12))) == plan_a
+    assert [e["name"] for e in store.get(label).experiments] == ["left", "right"]
+    assert store.next_experiment_label(label) == f"{label}-A"
+    assert find_experiments(tmp_path, substrate=label) == []  # planned entries only on request
+    assert [e["name"] for e in find_experiments(tmp_path, status="planned")] == ["left", "right"]
+
+    store.register_experiment(label, entry(f"{label}-A", "u1", "2026-11-17T08:00:00.000Z", status="created")
+                              | {"area_um": [[0, 0], [12, 12]], "resin_drop": 0}, replaces=plan_a)
+
+    overview = substrate_overview(tmp_path, label, refresh=False, qr_clearance_um=70.0)
+    assert [(o.name, o.status, o.state, o.area_um) for o in overview] == [
+        (f"{label}-A", "created", "running", [[0, 0], [12, 12]]),
+        ("right", "planned", "planned", [[20.0, 0.0], [30.0, 10.0]])]
+    assert overview[0].folder == tmp_path / label / f"{label}-A_20260930-0800" and overview[1].folder is None
+    # With refresh the experiment file is the truth; a missing file is reported, the index values stay
+    refreshed = substrate_overview(tmp_path, label, qr_clearance_um=70.0)
+    assert refreshed[0].status == "created" and refreshed[0].error
