@@ -227,3 +227,22 @@ def test_material_snapshots_round_trip(store):
     assert store.read().materials["resin"]["material"]["properties"][0]["value"] == 1.52
     store.write_materials({"resin": resin})  # replaces, never merges
     assert set(store.read_materials()) == {"resin"}
+
+
+def test_spec_and_inputs_round_trip(store, tmp_path):
+    assert store.read_spec() is None and store.read().spec is None  # files written before T77 have none
+    height = tmp_path / "inputs" / "block_height.npy"
+    height.parent.mkdir()
+    np.save(height, np.ones((3, 3)), allow_pickle=False)
+    spec = {"schema": "nanofactory.experiment_spec/1", "name": "x", "structures": [
+        {"name": "block", "geometry": {"kind": "slicer", "source": {"array": "inputs/block_height.npy"}}}]}
+
+    store.write_spec(spec, {"inputs/block_height.npy": height})
+
+    assert store.read_spec() == spec and store.read().spec == spec
+    assert store.read_input("block_height.npy") == height.read_bytes()
+    with h5py.File(store.path, "r") as f:
+        assert f["spec"].attrs["schema"] == "nanofactory.experiment_spec/1"
+        assert f["inputs/block_height.npy"].attrs["file"] == "inputs/block_height.npy"
+    store.write_spec(dict(spec, name="y"))  # replaces
+    assert store.read_spec()["name"] == "y"

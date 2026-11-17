@@ -301,6 +301,9 @@ class ExperimentRecord:
         Material snapshots per role (``"resin"``, ``"substrate"``, ``"medium"``)
         as written by ``MaterialSnapshot.to_dict()`` (T75); empty for files
         written before.
+    spec : dict, optional
+        The experiment spec (``ExperimentSpec.to_json()``) stored in ``/spec``
+        (T77); None for files written without one.
     """
 
     uuid: str
@@ -327,6 +330,7 @@ class ExperimentRecord:
     captures: list[CaptureRecord] = field(default_factory=list)
     time_estimate: Optional[dict] = None
     materials: dict[str, dict] = field(default_factory=dict)
+    spec: Optional[dict] = None
 
     def structure(self, name: str) -> StructureRecord:
         """ Return the structure with the given name. """

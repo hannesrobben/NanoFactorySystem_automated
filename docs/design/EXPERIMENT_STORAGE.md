@@ -134,7 +134,7 @@ Attributes of `/`:
 | Attribute | Content |
 |---|---|
 | `file_type` | `"nanofactory.experiment"` |
-| `schema_version` | `"1.0"`; `"1.1"` since T75 (`/metadata/materials`) (§9) |
+| `schema_version` | `"1.0"`; `"1.1"` since T75 (`/metadata/materials`; `/spec` and `/inputs` from T77 belong to the same minor version) (§9) |
 | `experiment_uuid`, `experiment_label` | §4 |
 | `substrate_uuid`, `substrate_label` | §4 (empty strings if no substrate is given) |
 | `created` | first write |
@@ -152,6 +152,8 @@ Attributes of `/`:
 | `/metadata/software` | `package_version` (from `importlib.metadata`), `git_commit`, `git_dirty` (bool), `git_branch` (empty if not a git checkout), `python_version`, `versions_json` (numpy, h5py, SciDataContainer, OpenCV) |
 | `/metadata/substrate` | copy of the substrate record at experiment start (§8), so the file stays self-contained |
 | `/metadata/materials/<role>` | since 1.1 (T75): material snapshot per role (`resin`, `substrate`, `medium`): attributes `schema`, `name`, `known`, `batch`, `name_source` (`argument`, `substrate`, `sys_args`), `registry_file`, `registry_schema_version`, `taken`, and of a known material `kind`, `supplier`, `notes`, `created`; table `properties` (`key`, `value_real` (NaN for text), `value_text`, `unit`, `wavelength_nm`, `state`, `temperature_c`, `uncertainty`, `source`, `date`, `notes`). Written once when the file is created; a restart keeps it |
+| `/spec` | since 1.1 (T77): the experiment spec as written (`ExperimentSpec.to_json()`, schema `nanofactory.experiment_spec/1`, not resolved: `null` = objective default) as text dataset `spec_json`; attributes `schema`, `written`. Written by `run_experiment()` at the start; exported as `experiment_spec.json`. Missing for experiments started without a spec or with a spec that cannot be stored (plain callable factory; a warning is logged) |
+| `/inputs/<file name>` | since 1.1 (T77): slicer input files of the spec (height maps as `.npy`, meshes) byte for byte (uint8), attributes `file` (path relative to the experiment folder, `inputs/…`) and `sha256` (decision M5) |
 | `/metadata/sessions` | table (compound dataset, one row per run of the process on this file): `started`, `ended`, `kind` (`new`/`restart`), `end_reason` (`finished`/`aborted`/`exception`), `software_git_commit` |
 
 ### 5.3 Calibration, plane fit and OPL scan

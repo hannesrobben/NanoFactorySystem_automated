@@ -403,6 +403,53 @@ class ExperimentStore:
             materials[role] = snapshot
         return materials
 
+    def write_spec(self, spec: dict, inputs: Optional[dict[str, Path]] = None) -> None:
+        """ Store the experiment spec and its input files (T77, INFORMATION_MODEL.md §5, §6.2).
+
+        Parameters
+        ----------
+        spec : dict
+            ``ExperimentSpec.to_json()``; stored as text dataset
+            ``/spec/spec_json`` with the attributes ``schema`` and ``written``.
+            An existing spec is replaced.
+        inputs : dict, optional
+            Input files (slicer height maps, meshes) by their path relative to
+            the experiment folder; each is stored byte for byte as
+            ``/inputs/<file name>`` (uint8) with the attributes ``file`` and
+            ``sha256``.
+        """
+
+        import hashlib
+
+        with self._write() as f:
+            group = _group(f, "spec")
+            _replace_text(group, "spec_json", json.dumps(spec))
+            group.attrs["schema"] = spec.get("schema", "")
+            group.attrs["written"] = utc_timestamp()
+            for relative, path in (inputs or {}).items():
+                data = Path(path).read_bytes()
+                name = Path(relative).name
+                target = _group(f, "inputs")
+                if name in target:
+                    del target[name]
+                dataset = target.create_dataset(name, data=np.frombuffer(data, dtype=np.uint8), **COMPRESSION)
+                dataset.attrs["file"] = Path(relative).as_posix()
+                dataset.attrs["sha256"] = hashlib.sha256(data).hexdigest()
+
+    def read_spec(self) -> Optional[dict]:
+        """ Return the stored experiment spec (JSON form), or None if none was written. """
+
+        with self._read() as f:
+            if "spec/spec_json" not in f:
+                return None
+            return json.loads(_text(f["spec/spec_json"][()]))
+
+    def read_input(self, name: str) -> bytes:
+        """ Return an input file stored by :meth:`write_spec` (by file name). """
+
+        with self._read() as f:
+            return f[f"inputs/{name}"][()].tobytes()
+
     def set_status(self, status: str) -> None:
         """ Set the experiment status (``schema.STATUS_*``). """
 
@@ -805,6 +852,8 @@ class ExperimentStore:
             if "time_estimate" in f:
                 record.time_estimate = _get_json_attrs(f["time_estimate"])
             record.materials = self._read_materials(f)
+            if "spec/spec_json" in f:
+                record.spec = json.loads(_text(f["spec/spec_json"][()]))
             for name, group in f.get("structures", {}).items():
                 record.structures.append(self._read_structure(group))
                 record.progress[name] = [_get_json_attrs(g) for _, g in sorted(group["progress"].items())]

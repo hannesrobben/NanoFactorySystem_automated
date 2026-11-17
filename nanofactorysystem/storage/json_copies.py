@@ -21,6 +21,7 @@ from .records import ExperimentRecord
 DICTIONARY_NAME = "experiment_dictionary.json"
 STRUCTURES_NAME = "structures.json"
 PROGRESS_NAME = "print_progress.json"
+SPEC_NAME = "experiment_spec.json"
 PROGRESS_SCHEMA = "nanofactory.print_progress/2"
 
 
@@ -211,11 +212,13 @@ def export_progress(record: ExperimentRecord, folder: Path) -> None:
 
 
 def export_json(record: ExperimentRecord, folder: Path) -> None:
-    """ Write ``experiment_dictionary.json`` and, if structures exist, ``structures.json`` and
-    ``print_progress.json``. """
+    """ Write ``experiment_dictionary.json``, ``experiment_spec.json`` if a spec is stored (T77) and, if
+    structures exist, ``structures.json`` and ``print_progress.json``. """
 
     folder = Path(folder)
     write_json(folder / DICTIONARY_NAME, experiment_dictionary(record, folder))
+    if record.spec is not None:
+        write_json(folder / SPEC_NAME, record.spec)
     if record.structures:
         write_json(folder / STRUCTURES_NAME, structures_list(record))
         export_progress(record, folder)
