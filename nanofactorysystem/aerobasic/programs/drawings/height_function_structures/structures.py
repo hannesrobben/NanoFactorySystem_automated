@@ -307,17 +307,17 @@ class HeightFunctionStructure(DrawableObject):
     def get_tile_center_for_layer(self, layer_id: int) -> Tuple[float, float]:
         """Return the tile_center for the given layer_id."""
         if self._layer_to_tile_mapping is None:
-            raise RuntimeError("iterate_layers() muss erst aufgerufen werden")
+            raise RuntimeError("iterate_layers() must be called first")
 
         if layer_id not in self._layer_to_tile_mapping:
-            raise ValueError(f"Layer {layer_id} existiert nicht")
+            raise ValueError(f"Layer {layer_id} does not exist")
 
         return self._layer_to_tile_mapping[layer_id]['tile_center']
 
     def get_tile_info_for_layer(self, layer_id: int) -> Dict:
         """Return the complete tile info for the given layer_id."""
         if self._layer_to_tile_mapping is None:
-            raise RuntimeError("iterate_layers() muss erst aufgerufen werden")
+            raise RuntimeError("iterate_layers() must be called first")
 
         return self._layer_to_tile_mapping.get(layer_id)
 

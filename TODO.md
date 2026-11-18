@@ -399,6 +399,8 @@ fraction and peak position, piston phase, phase noise). The propagation distance
   - Note: T90 stores its `DeviationReport` through the same access layer; keep the `/analysis` layout
     compatible.
 
+## In Progress
+<!-- Claude Code moves a todo here when starting work. -->
 - [ ] T98: Turn `Information_Mehrere_Experimente.txt` into an English user guide (found during the reorganisation 2026-11-15) [phase: B]
   - Priority: low
   - Size: S
@@ -409,19 +411,7 @@ fraction and peak position, piston phase, phase noise). The propagation distance
       experiment as spec, chaining experiments on one substrate and the dry run, checked against the
       current code (line numbers removed, paths without personal folders);
     - the German text file is moved to `attic/` after the maintainer approves; README links the guide.
-
-- [ ] T99: Translate the German comments in `mains/` and `test/manual/` (follow-up of T18) [phase: B]
-  - Priority: low
-  - Size: M
-  - Depends on: –
-  - Done when:
-    - the ported scripts in `mains/Experiments/`, the substrate and lab-check mains and the scripts in
-      `test/manual/` have English comments, docstrings and identifiers; `mains/Experiments/historical/`
-      stays unchanged (legacy);
-    - one commit per folder; `python -m pytest` passes (the ported-script tests import these files).
-
-## In Progress
-<!-- Claude Code moves a todo here when starting work. -->
+  - Progress 2026-11-17: the guide exists (`docs/guides/SUBSTRATE_AND_EXPERIMENT_SPECS.md`, commit `3101a96`) and the README links it. Remaining: the maintainer approves moving `Information_Mehrere_Experimente.txt` to `attic/` (note: `attic/` is gitignored, see `_system/DECISIONS.md` X-B).
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
 - [ ] T100: Prepare the nanofactorysystem input for the planning session K18 (from the OffAxisHolo handover 2026-11-16) [phase: 5]
@@ -495,6 +485,7 @@ fraction and peak position, piston phase, phase noise). The propagation distance
     proposed §15 of `EXPERIMENT_STORAGE.md` (draft 2026-11-16, decisions D1–D4 with proposals in §10).
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T99: Translate the German comments in `mains/` and `test/manual/` — 2026-11-17 — the named folders were already English; the German left in active package code (`calc_polygons.py` demo, exception messages in `height_function_structures/structures.py`) and the package README of `height_function_structures/` were translated; legacy folders, commented-out code and the personal notes `drawings/Plan.md`, `TODO_default_origin.md` stay German on purpose. — commits: `49b1fc6`, `3101a96`
 - [x] T76: Substrate record v2 and experiment overview — 2026-11-17 — `substrate.json` version 2 holds substrate material, type and dimensions and material/batch/thickness/application per resin drop (version 1 read as 2); `run_substrate()` enters experiments as `planned`, each experiment replaces its entry with area and drop, and `substrate_overview()` lists them with the status of their files; existing substrate mains run unchanged. — commits: `31ae2b2`, `dd1bc9a`
 
 - [x] T77: Serialisable experiments and structures — 2026-11-17 — `ExperimentSpec`/`StructureSpec` are project files (`to_json`/`from_json`, `save`/`load`, schema `nanofactory.experiment_spec/1`, slicer inputs with SHA-256), structures that need the running experiment use named factories (`structure_factories.py`, `BuildContext`), unstorable fields raise an error naming structure and field; `run_experiment()` stores the spec as `experiment_spec.json` and in `/spec` + `/inputs`; all ported scripts round-trip. Follow-up T103 (`from_record()`). — commits: `2c9bd1b`, `d431bbd`, `4f83dd7`, `e749109`

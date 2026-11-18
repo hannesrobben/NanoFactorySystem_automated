@@ -1,22 +1,28 @@
 # Drawings Module - Modular Structure
 
-## Übersicht
+> **Note (2026-11-17, translation):** this README was translated from German without changing its
+> content. It describes how the modular structure was originally installed. The current tree differs:
+> `height_functions.py` lives in this folder (`height_function_structures/`), not at the `drawings/`
+> level; `apertures.py`, `laser_segments.py`, `hatch_generator.py` and `tile_manager.py` are at the
+> `drawings/` level. The installation steps below are historical.
 
-Die neue modulare Struktur trennt wiederverwendbare Komponenten von spezifischen Struktur-Implementierungen.
+## Overview
+
+The new modular structure separates reusable components from specific structure implementations.
 
 ```
 drawings/
-├── __init__.py                  # Haupt-Init mit allen Imports
-├── base.py                      # DrawableObject, etc. (bestehend)
-├── lines.py                     # PolyLine, Rectangle3D, etc. (bestehend)
+├── __init__.py                  # Main init with all imports
+├── base.py                      # DrawableObject, etc. (existing)
+├── lines.py                     # PolyLine, Rectangle3D, etc. (existing)
 │
-├── tile_manager.py              # ✓ STANDALONE - Bleibt wie es ist
-├── apertures.py                 # ★ NEU STANDALONE - Für alle Strukturen!
-├── laser_segments.py            # ★ NEU STANDALONE - Für alle Strukturen!
-├── hatch_generator.py           # ★ NEU STANDALONE - Für alle Strukturen!
-├── height_functions.py          # ★ NEU STANDALONE - Mathematische Funktionen
+├── tile_manager.py              # ✓ STANDALONE - stays as it is
+├── apertures.py                 # ★ NEW STANDALONE - for all structures!
+├── laser_segments.py            # ★ NEW STANDALONE - for all structures!
+├── hatch_generator.py           # ★ NEW STANDALONE - for all structures!
+├── height_functions.py          # ★ NEW STANDALONE - mathematical functions
 │
-└── height_function_structures/  # Grating-Strukturen
+└── height_function_structures/  # Grating structures
     ├── __init__.py
     ├── slicer.py
     └── structures.py
@@ -24,62 +30,62 @@ drawings/
 
 ## Installation
 
-### Schritt 1: Neue Dateien kopieren
+### Step 1: Copy the new files
 
 ```bash
 cd nanofactorysystem/aerobasic/programs/drawings/
 
-# Neue standalone Module hinzufügen
+# Add the new standalone modules
 cp drawings_modular/apertures.py .
 cp drawings_modular/laser_segments.py .
 cp drawings_modular/hatch_generator.py .
 cp drawings_modular/height_functions.py .
 
-# Height function structures Ordner hinzufügen
+# Add the height function structures folder
 cp -r drawings_modular/height_function_structures/ .
 
-# __init__.py ersetzen (BACKUP machen!)
+# Replace __init__.py (make a BACKUP!)
 cp __init__.py __init__.backup.py
 cp drawings_modular/__init__.py .
 ```
 
-### Schritt 2: Imports anpassen
+### Step 2: Adjust the imports
 
-Falls du Import-Fehler bekommst, passe die `__init__.py` an:
+If you get import errors, adjust `__init__.py`:
 
 ```python
-# Kommentiere aus was fehlt:
-# from .lines import XLines, YLines, ZLines  # Falls nicht vorhanden
+# Comment out what is missing:
+# from .lines import XLines, YLines, ZLines  # if not available
 ```
 
-## Vorteile der modularen Struktur
+## Advantages of the modular structure
 
-### 1. Apertures für ALLE Strukturen
+### 1. Apertures for ALL structures
 
 ```python
 from nanofactorysystem.aerobasic.programs.drawings import Apertures
 
-# Jetzt kann JEDE Struktur Apertures nutzen!
+# Now EVERY structure can use apertures!
 aperture = Apertures.circular(radius=50)
 aperture = Apertures.rectangular(width=100, height=80)
 aperture = Apertures.annular(inner_radius=20, outer_radius=50)
 
-# Kombinieren
+# Combine
 aperture = Apertures.subtract(
     Apertures.circular(radius=50),
     Apertures.rectangular(width=20, height=20)
 )
 ```
 
-### 2. HatchGenerator für beliebige Formen
+### 2. HatchGenerator for arbitrary shapes
 
 ```python
 from nanofactorysystem.aerobasic.programs.drawings import HatchGenerator, HatchConfig
 
-# Für Rectangle3D mit Aperture (zukünftig)
+# For Rectangle3D with an aperture (future)
 hatch_gen = HatchGenerator(HatchConfig(hatch_size=0.3, hatch_angle_deg=45))
 
-# Hatch mit Aperture
+# Hatch with an aperture
 segments = hatch_gen.hatch_with_aperture(
     x_min=-50, x_max=50,
     y_min=-50, y_max=50,
@@ -89,14 +95,14 @@ segments = hatch_gen.hatch_with_aperture(
 )
 ```
 
-### 3. LaserSegments statt PolyLines
+### 3. LaserSegments instead of PolyLines
 
 ```python
 from nanofactorysystem.aerobasic.programs.drawings import (
     LaserSegments, LaserSegmentsConfig, SortingStrategy
 )
 
-# Für discontinuous laser paths
+# For discontinuous laser paths
 config = LaserSegmentsConfig(
     velocity=10000,
     acceleration=100000,
@@ -106,7 +112,7 @@ config = LaserSegmentsConfig(
 laser_segments = LaserSegments(segments=my_segments, config=config)
 ```
 
-## Beispiel: Binary Grating
+## Example: binary grating
 
 ```python
 from nanofactorysystem.aerobasic.programs.drawings import (
@@ -120,7 +126,7 @@ grating = BinaryGrating(
     length=100,
     period=10,
     height=2,
-    duty_cycle=0.5,           # Oder 5 für 5µm
+    duty_cycle=0.5,           # or 5 for 5 µm
     grating_angle_deg=0.0,
     base_height=2.0,
     
@@ -130,7 +136,7 @@ grating = BinaryGrating(
     velocity=10000,
     acceleration=100000,
     
-    # Aperture (NEU: Standalone Modul!)
+    # Aperture (NEW: standalone module!)
     aperture=Apertures.circular(radius=50),
     
     # Hatching
@@ -140,50 +146,50 @@ grating = BinaryGrating(
     # Tiling
     fov_size=(150, 150),
     usable_fov_fraction=0.85,
-    grid_resolution=500       # NICHT 10000!
+    grid_resolution=500       # NOT 10000!
 )
 
-# Iteration mit Strategie-Wahl
+# Iteration with a choice of strategy
 for program in grating.iterate_layers(cs, strategy="TILE_FIRST"):
     ...
 ```
 
-## Strategie-Vergleich
+## Strategy comparison
 
 ```python
-# TILE_FIRST: Ein Tile komplett, dann nächstes
+# TILE_FIRST: one tile completely, then the next
 for program in grating.iterate_layers(cs, strategy="TILE_FIRST"):
     ...
 
-# LAYER_FIRST: Layer 1 in allen Tiles, dann Layer 2, etc.
+# LAYER_FIRST: layer 1 in all tiles, then layer 2, etc.
 for program in grating.iterate_layers(cs, strategy="LAYER_FIRST"):
     ...
 ```
 
-## Zukünftige Erweiterungen
+## Future extensions
 
-Mit der modularen Struktur kannst du einfach:
+With the modular structure you can easily:
 
-1. **Rectangle3D mit Aperture** erweitern
-2. **Stair mit Aperture** erweitern
-3. **Neue Strukturen** hinzufügen die alle Module nutzen
-4. **STL Import** über `HeightFunctions.from_array()` implementieren
+1. extend **Rectangle3D with an aperture**
+2. extend **Stair with an aperture**
+3. add **new structures** that use all modules
+4. implement **STL import** via `HeightFunctions.from_array()`
 
-## Dateistruktur nach Installation
+## File structure after installation
 
 ```
 nanofactorysystem/aerobasic/programs/drawings/
-├── __init__.py                  # Aktualisiert
-├── base.py                      # Unverändert
-├── lines.py                     # Unverändert
-├── tile_manager.py              # Unverändert
+├── __init__.py                  # Updated
+├── base.py                      # Unchanged
+├── lines.py                     # Unchanged
+├── tile_manager.py              # Unchanged
 │
-├── apertures.py                 # ★ NEU
-├── laser_segments.py            # ★ NEU
-├── hatch_generator.py           # ★ NEU
-├── height_functions.py          # ★ NEU
+├── apertures.py                 # ★ NEW
+├── laser_segments.py            # ★ NEW
+├── hatch_generator.py           # ★ NEW
+├── height_functions.py          # ★ NEW
 │
-└── height_function_structures/  # ★ NEU
+└── height_function_structures/  # ★ NEW
     ├── __init__.py
     ├── slicer.py
     └── structures.py

@@ -2460,3 +2460,40 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Follow-ups:** none new. Next in phase 6: T79 (configuration record), T80 (layout as data, uses
   `substrate_overview`), T103; T78 waits for T101 (lab PC). Branch `feat/t76-substrate-record-v2` on top of
   `feat/t77-serialisable-specs`; nothing pushed.
+
+### 2026-11-17 16:09 CET — [T99] Translate the remaining German in active code
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/aerobasic/programs/drawings/calc_polygons.py`: `__main__` demo comments, printed text
+    and plot titles in English.
+  - `nanofactorysystem/aerobasic/programs/drawings/height_function_structures/structures.py`: three exception
+    messages in English (no test matches their text).
+  - `TODO.md`: T99 moved to Done.
+- **Tests:** `python -m pytest` in the short-path venv (`%LOCALAPPDATA%\Temp\nfsv`): 416 passed, 14 skipped
+  (6:23 min), unchanged.
+- **Commits:** `49b1fc6` docs(drawings): translate German demo output and error messages [T99]; bookkeeping in
+  the following `docs(todo)` commit.
+- **Follow-ups:** the folders named in T99 (`mains/Experiments/` outside `historical/`, `mains/lab_checks/`,
+  `test/manual/`) were already English, so `CLAUDE.md:17` ("comments are often in German") is outdated (the
+  maintainer's file, not changed). German that stays on purpose: legacy folders, the commented-out `"Mitte"`
+  in `mains/main.py`, `drawings/Plan.md`, `TODO_default_origin.md`, quotes in `todo_notes.md`.
+
+### 2026-11-17 16:09 CET — [T98] English guide to substrate and experiment specs
+- **Status:** partial — the guide is done; moving the German source file to `attic/` waits for approval.
+- **Changes:**
+  - `docs/guides/SUBSTRATE_AND_EXPERIMENT_SPECS.md` (new): English version of
+    `Information_Mehrere_Experimente.txt`, checked against `experiment_spec.py` and `substrate_plan.py`
+    (fields `materials`, `description`, `tags` and the further `SubstrateSpec` fields added; a table of
+    `OBJECTIVE_DEFAULTS`; line numbers and personal paths removed; example file name with underscores so the
+    dry-run import works; the closing question of the chat note dropped).
+  - `README.md`: link to the guide.
+  - `nanofactorysystem/aerobasic/programs/drawings/height_function_structures/README.md`: translated to
+    English; a note at the top says it describes the original installation and that the tree differs today.
+  - `TODO.md`: T98 moved to In Progress with the remaining step.
+- **Tests:** documentation only; the full suite above ran with these files present (416 passed, 14 skipped).
+- **Commits:** `3101a96` docs(guides): add English guide to substrate and experiment specs [T98]; bookkeeping in
+  the following `docs(todo)` commit.
+- **Follow-ups:** approval to move `Information_Mehrere_Experimente.txt` to `attic/`; `attic/` is gitignored in
+  this repository, so decide first whether moved files stay versioned. The cross-repository overview of this
+  session (errors, duplicates, decisions, lab checks) lives outside the repository in
+  `Seafile/phoenixd-robben/Code/_system/`.
