@@ -30,7 +30,7 @@ def test_version_1_database_is_migrated_and_keeps_its_data(tmp_path):
     connection.close()
 
     with VoxelDatabase(path) as db:
-        assert db.schema_version == SCHEMA_VERSION == 2
+        assert db.schema_version == SCHEMA_VERSION == 3  # 3: material states of T108
         assert len(db.measurements("SZ2080")) == 1
         material = MaterialRegistry(db).material("SZ2080")
     assert (material.kind, material.supplier, material.properties) == ("resin", "IESL-FORTH", ())
@@ -94,7 +94,8 @@ def test_kinds_and_shared_material_table(registry):
 
 
 def test_csv_round_trip_and_seed(tmp_path, registry):
-    assert registry.import_csv(SEED) == 0  # the versioned seed has only the header
+    with MaterialRegistry(tmp_path / "seed.sqlite") as seeded:
+        assert seeded.import_csv(SEED) == 3  # SZ2080 in three states (T108)
     registry.add_material("ResinX", supplier="Lab")
     registry.add_property("ResinX", "refractive_index", 1.48, "1", wavelength_nm=633, state="uncured",
                           uncertainty=0.002, source="datasheet", date="2026-01-01")
@@ -125,7 +126,7 @@ def test_snapshot_round_trip_and_unknown_names(registry):
     registry.add_material("ResinX")
     registry.add_property("ResinX", "refractive_index", 1.51, "1", wavelength_nm=633, state="cured")
     snapshot = registry.snapshot("ResinX", "resin", batch="L42", name_source="argument")
-    assert snapshot.known and snapshot.registry_schema_version == 2 and snapshot.batch == "L42"
+    assert snapshot.known and snapshot.registry_schema_version == 3 and snapshot.batch == "L42"
     assert snapshot.refractive_index(633, "cured") == 1.51
     assert MaterialSnapshot.from_dict(snapshot.to_dict()) == snapshot
 
