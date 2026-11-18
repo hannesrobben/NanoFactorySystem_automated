@@ -2523,3 +2523,17 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** none (documentation only).
 - **Commits:** `dbd4e67` docs(system): master plan v0.4 from the decision session 2026-11-18, `3048e1f` docs(design): record approval of the designs T71-T74 of 2026-11-18, `e22fdda` docs(todo): derive the todos from the decisions of 2026-11-18, `e3da359` docs(todo): move the DHM operation panel into F15 [O9], plus the `docs(todo)` commit of these entries.
 - **Follow-ups:** T108 (material states + SZ2080 seed) is the first implementation task; the seed rows need the new states, so `config/material_seed.csv` was not filled in this revision.
+
+### 2026-11-18 21:35 CET — [T108] Material states and the SZ2080 seed
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/voxel/materials.py`: `STATES` with `cured_in_resin` / `cured_developed`, `LEGACY_STATES`, `PHYSICAL_STATES`, `normalize_state`, `MissingPropertyError`, `Material.require_refractive_index`, `Material.contract_snapshot` (DHMConnect `material_snapshot` form), `MaterialRegistry.export_json` (schema `nanofactory.material_registry/1`); legacy `cured` mapped on input and in lookups
+  - `nanofactorysystem/voxel/migrations.py`: `migrate_2_to_3` rebuilds `material_property` with the new CHECK constraint and rewrites `cured` rows
+  - `nanofactorysystem/voxel/__init__.py`: new public names
+  - `config/material_seed.csv`: SZ2080 at 674.994 nm in three states (maintainer's measurement, recorded 2026-11-18)
+  - `test/voxel/test_material_states.py` (new): 9 tests (migration of a version-2 file, old CSV, old snapshot dict, seed values and Δn, missing index, contract snapshot incl. DHMConnect schema check when installed, JSON export)
+  - `test/voxel/test_material_registry.py`, `test/voxel/test_voxel_database.py`: schema version 3 instead of 2; seed import in its own registry
+  - `docs/design/INFORMATION_MODEL.md`, `CLAUDE.md`: states of schema version 3
+- **Tests:** short-path venv `%LOCALAPPDATA%\Temp\nfsv` (Python 3.12.3): `python -m pytest -m "not slow"` 401 passed, 15 skipped; full `python -m pytest` exit code 0.
+- **Commits:** `e79a531` feat(materials): split cured into cured_in_resin / cured_developed [T108], `0108f7f` feat(materials): seed SZ2080 refractive indices at 674.994 nm [T108], `698cc5c` docs(materials): describe the material states of schema version 3 [T108]
+- **Follow-ups:** lab PC: the default voxel database is migrated to version 3 on first open (back it up first; `_system/LAB_PC_CHECKS.md` A7); the seed is not imported automatically into an existing database (`MaterialRegistry.import_csv(config/material_seed.csv)` once); OffAxisHolo K9 can generate its material presets from `export_json`.
