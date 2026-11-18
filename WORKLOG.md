@@ -2537,3 +2537,12 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** short-path venv `%LOCALAPPDATA%\Temp\nfsv` (Python 3.12.3): `python -m pytest -m "not slow"` 401 passed, 15 skipped; full `python -m pytest` exit code 0.
 - **Commits:** `e79a531` feat(materials): split cured into cured_in_resin / cured_developed [T108], `0108f7f` feat(materials): seed SZ2080 refractive indices at 674.994 nm [T108], `698cc5c` docs(materials): describe the material states of schema version 3 [T108]
 - **Follow-ups:** lab PC: the default voxel database is migrated to version 3 on first open (back it up first; `_system/LAB_PC_CHECKS.md` A7); the seed is not imported automatically into an existing database (`MaterialRegistry.import_csv(config/material_seed.csv)` once); OffAxisHolo K9 can generate its material presets from `export_json`.
+
+### 2026-11-18 22:48 CET — [T83, T90] Notes from MIRA MI-10 and MI-53
+- **Status:** done
+- **Changes:**
+  - `TODO.md`: T83 notes MIRA's HDF5 layout of a `LayerProduct` (`header_json` + one dataset per buffer) as a proposal; T90 notes that `mira.api.evaluate_layer` exists (MIRA `f513ef0`) and its context / settings keys
+  - `WORKLOG.md`: this entry
+- **Tests:** none (documentation only).
+- **Commits:** see the `docs(todo)` commit of this entry.
+- **Follow-ups:** none.
