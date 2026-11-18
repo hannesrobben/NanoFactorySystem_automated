@@ -1,1 +1,4 @@
 material,kind,supplier,key,value,unit,wavelength_nm,state,temperature_c,uncertainty,source,date,notes
+SZ2080,resin,IESL-FORTH,refractive_index,1.508,1,674.994,uncured,,,"maintainer's measurement (decision session 2026-11-17/18)",2026-11-18,"liquid resin; delta n to the polymerised state = 0.012 (measured)"
+SZ2080,resin,IESL-FORTH,refractive_index,1.52,1,674.994,cured_in_resin,,,"maintainer's measurement (decision session 2026-11-17/18)",2026-11-18,"polymerised in the resin bath (in-situ); delta n = 0.012 to uncured"
+SZ2080,resin,IESL-FORTH,refractive_index,1.52,1,674.994,cured_developed,,,"maintainer's measurement (decision session 2026-11-17/18)",2026-11-18,"developed structure; value checked against air (n = 1)"
