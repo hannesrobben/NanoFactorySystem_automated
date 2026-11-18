@@ -22,10 +22,10 @@ This repository is one of four that together build a 2PP system with real-time f
 
 | Package | Repository | Owns |
 |---|---|---|
-| `nanofactorysystem` (this one) | NanoFactorySystem_automated | Orchestration, information model (material, substrate, experiment, structure), measurement recipes, operating modes, layer targets, later the controller, `experiment.h5` (single writer), camera live feed, system GUI. |
-| `offaxisholo` | OffAxisHolo (branch `Holo_HR`) | Hologram reconstruction (golden reference offline, GPU kernel for the service), frame metrics, DHM analysis GUI. |
-| `dhmconnect` | DHMConnect | Protocol v1 between Working-PC and DHM-PC, the DHM service on the DHM-PC, the client used here. Replaces protocol v6 / `DhmServ` / `nanofactorysystem.dhm` once the maintainer switches. |
-| `mira` | MIRA | Registration, speckle fusion, stitching, comparison with the target structure (`DeviationReport`). |
+| `nanofactorysystem` (this one) | NanoFactorySystem_automated | Runs on the **Work-PC (control node)**. Orchestration, information model (material registry = master of refractive indices, substrate, experiment, structure), measurement recipes, capture-position plan generator (`GroupSpec`), target rasteriser (`LayerTarget`), calibration writing field ↔ camera ↔ DHM, focus from the corner markers, operating modes, later the controller, `experiment.h5` (single writer), camera live feed, system GUI incl. DHM + stage operation. |
+| `offaxisholo` | OffAxisHolo (branch `Holo_HR`) | Reconstruction of one hologram stack on the DHM-PC (golden reference offline, GPU kernel in the service), frame metrics, parameter sets, analysis GUI (observer only). |
+| `dhmconnect` | DHMConnect | Protocol v1 between Work-PC and DHM-PC (groups `open_group` / `measure` / `close_group`), the DHM service on the DHM-PC (compute node), the client used here. Replaces protocol v6 / `DhmServ` / `nanofactorysystem.dhm` once the maintainer switches. |
+| `mira` | MIRA | On the DHM-PC: registration, speckle fusion, stitching, levelling → stitched `LayerProduct`. Here: `evaluate_layer` (comparison with the target, `DeviationReport`, G6). |
 
 Rules that follow from this:
 - No reconstruction, registration, fusion or stitching code in this repository. Call `dhmconnect` and `mira` through adapters.
@@ -33,6 +33,8 @@ Rules that follow from this:
 - The legacy DHM path (`Dhm`, `DhmClient`, protocol v6) and the hologram counts 10 / 20 / 1 stay the default until the maintainer switches. Golden command logs must not change in the legacy mode.
 - Only the experiment process on this PC writes `experiment.h5`. The DHM-PC delivers, this side stores (design decision T42).
 - Shared contracts (`CaptureContext`, `MeasurementRecipe`, `ProductSet`, `LayerTarget`, `DeviationReport`, …) are defined in DHMConnect (`dhmconnect/schemas/`); this repository vendors their example messages as test fixtures. Conventions: units in names (`_um`, `_rad`, `_s`, `_mw`), `schema_version` in every message, never `pickle` across a process or network boundary.
+- Decisions of 2026-11-18 (master plan v0.4, "Decided" table in `TODO.md`): the default DHM result per structure and layer is the stitched `LayerProduct`; member products and raw data stay on the DHM-PC and are referenced; the full parameter set is stored once per `config_hash`; no silent defaults for physical parameters. Design decision IDs are `SI1–SI4` (T71) and `OM1–OM5` (T72).
+- Files that leave the active code go to the local, Git-ignored `attic/` after approval and are listed in `docs/ATTIC_INDEX.md` (procedure X-B, master plan §9 rule 8).
 - Todo IDs of the other repositories may be referenced as dependencies: `K…`/`L…` (OffAxisHolo), `DL-…` (DHMConnect), `MI-…` (MIRA).
 
 
