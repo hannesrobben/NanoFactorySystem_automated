@@ -5,7 +5,7 @@
 ##########################################################################
 """Material registry: photoresists, substrate materials and media with extensible properties.
 
-The registry lives in the voxel database (schema version 2, decision M1 of
+The registry lives in the voxel database (schema version 3, decision M1 of
 docs/design/INFORMATION_MODEL.md): the table ``material`` is shared with the
 voxel measurements, ``material_property`` holds one row per property value.
 New property keys need no code change; :data:`KNOWN_PROPERTY_KEYS` only
@@ -16,6 +16,7 @@ so later changes in the registry never change a stored experiment (G7).
 """
 import csv
 import datetime
+import json
 import math
 import warnings
 from dataclasses import asdict, dataclass, field
@@ -25,7 +26,14 @@ from typing import Any, Optional, Union
 from .database import VoxelDatabase, default_path
 
 KINDS = ("resin", "substrate", "medium")
-STATES = ("uncured", "cured", "any")
+# Material states (G7, T108): liquid resin, polymerised resin still surrounded by
+# resin (in-situ), developed structure; "any" = independent of the state.
+STATES = ("uncured", "cured_in_resin", "cured_developed", "any")
+# Old names that are still accepted on input and mapped (schema migration 2 -> 3).
+LEGACY_STATES = {"cured": "cured_in_resin"}
+# The three physical states every material snapshot of a DHM capture needs.
+PHYSICAL_STATES = ("uncured", "cured_in_resin", "cured_developed")
+REGISTRY_EXPORT_SCHEMA = "nanofactory.material_registry/1"
 ROLES = ("resin", "substrate", "medium")
 SNAPSHOT_SCHEMA = "nanofactory.material_snapshot/1"
 
@@ -46,6 +54,36 @@ class UnitWarning(UserWarning):
     """ A known property key was entered with an unexpected unit. """
 
 
+class MissingPropertyError(LookupError):
+    """ A required property value is not in the registry (no silent default, G7). """
+
+
+def normalize_state(state: str) -> str:
+    """ Map a legacy state name to its current name and check it.
+
+    Parameters
+    ----------
+    state : str
+        One of :data:`STATES` or a legacy name of :data:`LEGACY_STATES`
+        (``"cured"`` becomes ``"cured_in_resin"``).
+
+    Returns
+    -------
+    str
+        The current state name.
+
+    Raises
+    ------
+    ValueError
+        For an unknown state.
+    """
+
+    state = LEGACY_STATES.get(state, state)
+    if state not in STATES:
+        raise ValueError(f"Unknown state {state!r}; use one of {STATES}")
+    return state
+
+
 @dataclass(frozen=True)
 class MaterialProperty:
     """ One property value of a material.
@@ -61,8 +99,10 @@ class MaterialProperty:
         for text values.
     wavelength_nm : float, optional
         Wavelength of an optical property.
-    state : {"uncured", "cured", "any"}
-        Liquid resin, polymerised resin, or independent of it.
+    state : {"uncured", "cured_in_resin", "cured_developed", "any"}
+        Liquid resin, polymerised resin in the resin bath, developed
+        structure, or independent of the state. The legacy name ``"cured"``
+        is read as ``"cured_in_resin"``.
     temperature_c, uncertainty : float, optional
         Temperature and uncertainty (same unit as the value).
     source : str
@@ -91,9 +131,12 @@ class MaterialProperty:
 
     @classmethod
     def from_dict(cls, data: dict) -> "MaterialProperty":
-        """ Build a property from :meth:`to_dict` output. """
+        """ Build a property from :meth:`to_dict` output (legacy states are mapped). """
 
-        return cls(**{k: data[k] for k in cls.__dataclass_fields__ if k in data})
+        values = {k: data[k] for k in cls.__dataclass_fields__ if k in data}
+        if "state" in values:
+            values["state"] = normalize_state(values["state"])
+        return cls(**values)
 
 
 @dataclass(frozen=True)
@@ -129,9 +172,10 @@ class Material:
             Property name.
         wavelength_nm : float, optional
             Required wavelength; it must match exactly (no interpolation).
-        state : {"uncured", "cured", "any"}, optional
+        state : {"uncured", "cured_in_resin", "cured_developed", "any"}, optional
             Required state; values stored with state ``"any"`` match every
-            state, an exact match is preferred.
+            state, an exact match is preferred. ``"cured"`` is read as
+            ``"cured_in_resin"``.
 
         Returns
         -------
@@ -140,6 +184,8 @@ class Material:
             most recently entered).
         """
 
+        if state is not None:
+            state = normalize_state(state)
         candidates = []
         for order, item in enumerate(self.properties):
             if item.key != key:
@@ -161,6 +207,68 @@ class Material:
 
         item = self.property("refractive_index", wavelength_nm=wavelength_nm, state=state)
         return None if item is None or isinstance(item.value, str) else float(item.value)
+
+    def require_refractive_index(self, wavelength_nm: float, state: str) -> MaterialProperty:
+        """ Refractive index for a wavelength and state; never a default.
+
+        Parameters
+        ----------
+        wavelength_nm : float
+            Wavelength; must match a stored value exactly.
+        state : str
+            Material state (see :meth:`property`).
+
+        Returns
+        -------
+        MaterialProperty
+            The matching value with its source.
+
+        Raises
+        ------
+        MissingPropertyError
+            Naming material, wavelength, state and the stored alternatives.
+        """
+
+        item = self.property("refractive_index", wavelength_nm=wavelength_nm, state=state)
+        if item is None or isinstance(item.value, str):
+            stored = [f"{p.state}@{p.wavelength_nm} nm ({p.source or 'no source'})"
+                      for p in self.properties if p.key == "refractive_index"]
+            raise MissingPropertyError(
+                f"Material {self.name!r} has no refractive index for state {state!r} at "
+                f"{wavelength_nm} nm in the material registry; stored: {stored or 'none'}. "
+                "Add it to the registry (config/material_seed.csv or MaterialRegistry.add_property).")
+        return item
+
+    def contract_snapshot(self, wavelength_nm: float, registry_version: str = "") -> dict:
+        """ Material snapshot in the form of the DHMConnect contracts (``material_snapshot``).
+
+        Parameters
+        ----------
+        wavelength_nm : float
+            DHM wavelength (674.994 nm).
+        registry_version : str, optional
+            Version of the registry the values come from.
+
+        Returns
+        -------
+        dict
+            ``material_id``, ``name``, ``registry_version``, ``wavelength_nm``
+            and ``states`` with ``n`` and ``source`` for all of
+            :data:`PHYSICAL_STATES`.
+
+        Raises
+        ------
+        MissingPropertyError
+            If one of the three states has no index at this wavelength.
+        """
+
+        states = {}
+        for state in PHYSICAL_STATES:
+            item = self.require_refractive_index(wavelength_nm, state)
+            states[state] = {"n": float(item.value), "source": item.source}
+        return {"material_id": self.name.lower().replace(" ", "_"), "name": self.name,
+                "registry_version": registry_version, "wavelength_nm": float(wavelength_nm),
+                "states": states}
 
     def to_dict(self) -> dict:
         """ Return the material as JSON-compatible dictionary. """
@@ -346,8 +454,7 @@ class MaterialRegistry:
 
         if not key:
             raise ValueError("A property needs a key.")
-        if state not in STATES:
-            raise ValueError(f"Unknown state {state!r}; use one of {STATES}")
+        state = normalize_state(state)
         numeric = not isinstance(value, str)
         if numeric and not unit:
             raise ValueError(f"Property {key!r} of {material!r}: a numeric value needs a unit ('1' if dimensionless).")
@@ -419,6 +526,33 @@ class MaterialRegistry:
                 for item in material.properties:
                     row = dict(base, **{k: v for k, v in item.to_dict().items()})
                     writer.writerow({k: "" if row.get(k) is None else row.get(k, "") for k in PROPERTY_CSV_COLUMNS})
+
+    def export_json(self, path: Path) -> dict:
+        """ Write the whole registry as a versioned JSON file for offline use.
+
+        OffAxisHolo and MIRA read this file instead of the database (G7); the
+        OffAxisHolo material presets are generated from it.
+
+        Parameters
+        ----------
+        path : Path
+            Target file.
+
+        Returns
+        -------
+        dict
+            The written document: ``schema`` (:data:`REGISTRY_EXPORT_SCHEMA`),
+            ``registry_schema_version``, ``exported_utc``, ``states`` and
+            ``materials`` (``Material.to_dict()`` each).
+        """
+
+        document = {"schema": REGISTRY_EXPORT_SCHEMA,
+                    "registry_schema_version": self.database.schema_version,
+                    "exported_utc": _utc_now(),
+                    "states": list(STATES),
+                    "materials": [self.material(name).to_dict() for name in self.materials()]}
+        Path(path).write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        return document
 
     # ---------------------------------------------------------------- reading
 

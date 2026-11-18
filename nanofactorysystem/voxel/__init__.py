@@ -7,8 +7,9 @@
 and the material registry (docs/design/INFORMATION_MODEL.md §3.1, §8)."""
 
 from .database import CSV_COLUMNS, METHODS, SETUPS, VoxelDatabase, VoxelSize, default_path
-from .materials import (KINDS, KNOWN_PROPERTY_KEYS, PROPERTY_CSV_COLUMNS, ROLES, STATES, Material, MaterialProperty,
-                        MaterialRegistry, MaterialSnapshot, UnitWarning, as_material_dict, material_names,
-                        unregistered_snapshot)
+from .materials import (KINDS, KNOWN_PROPERTY_KEYS, LEGACY_STATES, PHYSICAL_STATES, PROPERTY_CSV_COLUMNS,
+                        REGISTRY_EXPORT_SCHEMA, ROLES, STATES, Material, MaterialProperty, MaterialRegistry,
+                        MaterialSnapshot, MissingPropertyError, UnitWarning, as_material_dict, material_names,
+                        normalize_state, unregistered_snapshot)
 from .migrations import SCHEMA_VERSION
 from .model import DatabaseVoxelModel, FixedVoxelModel, NoVoxelData

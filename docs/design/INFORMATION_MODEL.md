@@ -76,7 +76,7 @@ A material is a photoresist, a substrate material or another medium (immersion o
 | `value` | float or str | Number in the unit below; a str for non-numeric facts. |
 | `unit` | str | Required for numbers (`"1"` for dimensionless). |
 | `wavelength_nm` | float, optional | For optical properties. |
-| `state` | `uncured` \| `cured` \| `any` | Liquid resin vs. polymerised; `any` for properties that do not depend on it. |
+| `state` | `uncured` \| `cured_in_resin` \| `cured_developed` \| `any` | Liquid resin, polymerised in the resin bath (in-situ), developed structure; `any` for properties that do not depend on it. Since schema version 3 (T108, G7, 2026-11-18); the old `cured` is migrated to and read as `cured_in_resin`. |
 | `temperature_c` | float, optional | |
 | `uncertainty` | float, optional | Same unit. |
 | `source` | str | Data sheet, publication (DOI), own measurement (experiment UUID). |
@@ -401,7 +401,7 @@ Options:
   - `material`: add `kind TEXT NOT NULL DEFAULT 'resin' CHECK (kind IN ('resin','substrate','medium'))`
     and `created TEXT NOT NULL DEFAULT ''`;
   - new table `material_property` (`id`, `material_id` → `material(id)`, `key`, `value_real`, `value_text`,
-    `unit`, `wavelength_nm`, `state CHECK IN ('uncured','cured','any')`, `temperature_c`, `uncertainty`,
+    `unit`, `wavelength_nm`, `state CHECK IN ('uncured','cured','any')` (schema 3, T108: `'uncured','cured_in_resin','cured_developed','any'`), `temperature_c`, `uncertainty`,
     `source`, `date`, `notes`; `CHECK (value_real IS NOT NULL OR value_text IS NOT NULL)`; index on
     `(material_id, key)`);
   - seed `config/material_seed.csv` (versioned, like `voxel_seed.csv`); CSV import/export of properties.

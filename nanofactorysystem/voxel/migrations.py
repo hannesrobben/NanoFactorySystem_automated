@@ -83,13 +83,55 @@ def migrate_1_to_2(connection: sqlite3.Connection) -> None:
     """)
 
 
+def migrate_2_to_3(connection: sqlite3.Connection) -> None:
+    """ Split the state ``cured`` into ``cured_in_resin`` / ``cured_developed`` (schema version 3, T108).
+
+    SQLite cannot change a CHECK constraint, so ``material_property`` is
+    rebuilt with the new state list; existing ``cured`` rows become
+    ``cured_in_resin`` (the polymerised resin in the bath, decision G7).
+    """
+
+    _execute_all(connection, """
+        CREATE TABLE material_property_v3 (
+            id              INTEGER PRIMARY KEY,
+            material_id     INTEGER NOT NULL REFERENCES material(id),
+            key             TEXT NOT NULL CHECK (key <> ''),
+            value_real      REAL,
+            value_text      TEXT,
+            unit            TEXT NOT NULL DEFAULT '',
+            wavelength_nm   REAL CHECK (wavelength_nm IS NULL OR wavelength_nm > 0),
+            state           TEXT NOT NULL DEFAULT 'any'
+                            CHECK (state IN ('uncured', 'cured_in_resin', 'cured_developed', 'any')),
+            temperature_c   REAL,
+            uncertainty     REAL CHECK (uncertainty IS NULL OR uncertainty >= 0),
+            source          TEXT NOT NULL DEFAULT '',
+            date            TEXT NOT NULL,
+            notes           TEXT NOT NULL DEFAULT '',
+            CHECK (value_real IS NOT NULL OR value_text IS NOT NULL),
+            CHECK (value_real IS NULL OR unit <> '')
+        );
+
+        INSERT INTO material_property_v3
+            SELECT id, material_id, key, value_real, value_text, unit, wavelength_nm,
+                   CASE state WHEN 'cured' THEN 'cured_in_resin' ELSE state END,
+                   temperature_c, uncertainty, source, date, notes
+            FROM material_property;
+
+        DROP TABLE material_property;
+
+        ALTER TABLE material_property_v3 RENAME TO material_property;
+
+        CREATE INDEX material_property_lookup ON material_property (material_id, key);
+    """)
+
+
 def _execute_all(connection: sqlite3.Connection, script: str) -> None:
     for statement in script.split(";"):
         if statement.strip():
             connection.execute(statement)
 
 
-MIGRATIONS = [migrate_0_to_1, migrate_1_to_2]
+MIGRATIONS = [migrate_0_to_1, migrate_1_to_2, migrate_2_to_3]
 SCHEMA_VERSION = len(MIGRATIONS)
 
 

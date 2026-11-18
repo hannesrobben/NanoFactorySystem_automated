@@ -180,20 +180,6 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
       become `drawing` geometries (INFORMATION_MODEL.md §6.4);
     - a test rebuilds the spec of a dry-run file whose `/spec` was removed and compares the built structures.
 
-- [ ] T108: Material states and the SZ2080 seed (G7, found during the decision session 2026-11-18) [phase: 6]
-  - Priority: high
-  - Size: M
-  - Depends on: –
-  - Done when:
-    - the material registry knows the states `uncured`, `cured_in_resin`, `cured_developed` (plus `any`);
-      old databases with `cured` are migrated (`cured` → `cured_in_resin`) by a schema migration with a
-      test, and old CSV files still load;
-    - `config/material_seed.csv` holds SZ2080 at 674.994 nm: `uncured` n = 1.508, `cured_in_resin`
-      n = 1.52, `cured_developed` n = 1.52 (checked against air), source "maintainer's measurement",
-      Δn = 0.012, with the date;
-    - a versioned JSON export of the registry exists for offline use by OffAxisHolo / MIRA;
-    - asking for a missing index raises or warns with the source named (no silent default).
-
 ### Phase 7 — DHM service integration
 
 - [ ] T82: Role protocol `DhmMeasurement` and legacy adapter [phase: 7]
@@ -513,6 +499,7 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T108: Material states and the SZ2080 seed — 2026-11-18 — States `uncured` / `cured_in_resin` / `cured_developed` / `any` with schema migration 2 → 3 (`cured` → `cured_in_resin`, old CSV files and snapshots still load); SZ2080 at 674.994 nm in `config/material_seed.csv`; versioned JSON export `MaterialRegistry.export_json`; `require_refractive_index` / `contract_snapshot` raise `MissingPropertyError` instead of a default — commits: `e79a531`, `0108f7f`, `698cc5c`.
 - [x] T98: Turn `Information_Mehrere_Experimente.txt` into an English user guide — 2026-11-18 — Guide `docs/guides/SUBSTRATE_AND_EXPERIMENT_SPECS.md` (`3101a96`); the German original moved to the local attic per X-A / X-B and is listed in `docs/ATTIC_INDEX.md` (`32d04e2`).
 - [x] T100: Prepare the nanofactorysystem input for the planning session K18 — 2026-11-18 — The note `docs/system/handover/to_offaxisholo_k18_2026-11-16.md` was reviewed in the decision session 2026-11-17/18; G10 is decided (SA1–SA7), master plan v0.4 (`dbd4e67`).
 - [x] T71: Design the DHM service integration and measurement recipes — 2026-11-18 — Approved with additions (SI1–SI4, formerly D1–D4; recipe defaults), `DHM_SERVICE_INTEGRATION.md` §10.1 (`3048e1f`).
