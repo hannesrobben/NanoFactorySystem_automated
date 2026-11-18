@@ -4,7 +4,7 @@ This guide explains how a print is described today: a substrate main script hold
 each experiment is an `ExperimentSpec`, and each grid cell of an experiment is a `StructureSpec`. It ends
 with a complete STL experiment and with chaining several experiments on one substrate.
 
-Source: English version of `Information_Mehrere_Experimente.txt` (T98), checked against the code of
+Source: English version of `Information_Mehrere_Experimente.txt` (T98; the German original is in the local attic, see `docs/ATTIC_INDEX.md`), checked against the code of
 2026-11-17. Relevant modules: `nanofactorysystem/experiment_spec.py`, `nanofactorysystem/substrate_plan.py`,
 `nanofactorysystem/storage/substrate_store.py`, `mains/substrate_main.py`.
 
