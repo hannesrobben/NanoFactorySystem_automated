@@ -210,6 +210,10 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
     - the schema version is raised and old files are still read; `json_copies` and the unpack tool
       in `analysis/` know the new entries; `docs/design/EXPERIMENT_STORAGE.md` is current (OffAxisHolo
       K12 reads the file with `h5py` only, without file locking, by that document).
+  - Note (from MIRA MI-10, 2026-11-18): MIRA `LayerProduct.to_h5` / `from_h5` (`h5py` only) use the
+    layout attribute `header_json` (the contract header) + one dataset per buffer under its contract name
+    (`phase_rad`, `intensity_rel`, `valid` as uint8, optional `field`). Proposal for the `LayerProduct`
+    group under `/dhm_groups/<group_id>`; if T83 chooses another layout, add a MIRA todo to adapt the reader.
 
 - [ ] T84: Service adapter and fake service [phase: 7]
   - Priority: high
@@ -343,6 +347,10 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
     - the comparison domain is chosen automatically (phase preferred, else height) or fixed per spec
       (OM4); reports go to `/analysis/captures/<id>/deviation` with `source = "nanofactorysystem.feedback"`
       (OM5).
+  - Note (2026-11-18): MIRA MI-53 is done: `mira.api.evaluate_layer(product, target, context, settings)`
+    with `LayerProduct` / `LayerTarget` from `mira.products` / `mira.targets` (`from_message`); `context`
+    needs `parameter_set.phase_sign` (or `phase_sign`), `source`, optional `registration`; `settings` keys:
+    `domain`, `sigma`, `k`, `shift_um`, `min_coverage`, `segments` (MIRA commit `f513ef0`).
 
 - [ ] T91: Behaviour of `monitor` and `shadow` [phase: 8]
   - Priority: medium
