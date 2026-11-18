@@ -1,6 +1,8 @@
 # Design: DHM service integration and measurement recipes
 
-Status: draft 2026-11-16, waiting for maintainer approval (T71). Implementation todos: T82–T87.
+Status: approved 2026-11-18 (decision session 2026-11-17/18, with the additions of §10.1). Implementation
+todos: T82–T87, T105, T106. The decisions of this document were called D1–D4 in the draft; they are SI1–SI4
+since 2026-11-18 to avoid a clash with the DHMConnect decisions D1–D13.
 
 Context: `docs/system/SOFTWARE_PLAN_OVERVIEW.md` (data flow §2, contracts §4, G2 decided: contracts as
 JSON Schema plus examples in `dhmconnect/schemas/`), the OffAxisHolo handover of 2026-11-16
@@ -105,15 +107,18 @@ Unknown keys are kept and passed to the service untouched, so new modes on the D
 | `n_frames` | number of holograms; per phase | as today: grid structures 10 / 10 / 20 (before / layer / after), corners and QR code 1 / 1 / 11 |
 | `selection` | `{"policy": "all" \| "threshold" \| "robust" \| "best_k", …}` with `bounds`, `robust_metrics`, `robust_k`, `k`, `rank_by`, `min_frames`, `max_extra` | `{"policy": "all", "min_frames": 1}` until the N-study K13 |
 | `metrics` | compute frame metrics | `true` |
-| `keep_raw` | `none`, `rejected`, `selected`, `all` | DHMConnect D7; recommendation for the first experiments `all` |
+| `keep_raw` | `none`, `rejected`, `selected`, `all` | `all` in V1.0 (D7; also training data); the service downgrades to `selected` at 95 % fill level with a clear message |
+| `publication` | keep all raw data and transfer them to the Work-PC after the print (background, never during the print) | `false` |
 | `raw_transfer` | raw frames sent here (`true`) or only referenced (`raw_ref`) | `false` for `products`, `true` for `products_and_raw` |
 | `products` | subset of `phase`, `intensity`, `field` | `["phase", "intensity"]` |
 | `exposure` | `{"policy": "fixed" \| "calibrated" \| "auto", "time_us": …}` | `calibrated` (value of the last exposure calibration) |
-| `background` | `{"policy": "per_session" \| "per_structure" \| "manual", "max_age_s": null}` | `per_session` (§8) |
+| `background` | `{"policy": "per_structure" \| "per_session" \| "manual", "max_age_s": 3600}` | `per_structure` (SI3, §8); `max_age_s` only warns |
 | `z_hint` | `{"source": "parameter_set" \| "structure_top" \| "fixed", "z_um": …}` | `parameter_set` (§6) |
-| `group` | `{"kind": "single" \| "speckle" \| "stitching", …}` (T85) | `single` |
+| `group` | `GroupSpec` from the plan generator (T85): ordered position list, per-position frames / shift pattern / exposure, stitching parameters, jitter seed | at least 9 positions per structure (M4); `single_shot` allowed |
+| `reference_exclusion` | which printed matter is excluded from the reference region: `all_printed`, `since_background` | `all_printed` (G10) |
+| `unwrap` | unwrapping in the group step: `fast2d`, `least_squares`, `none`, `temporal` | `fast2d` (O5) |
 | `post` | free dict of post-processing steps on the DHM-PC | `{}` |
-| `unavailable` | behaviour when the DHM-PC is unreachable (§10, D1) | decision D1 |
+| `unavailable` | behaviour when the DHM-PC is lost during the print: `abort`, `continue` (§10, SI1) | `abort` after a failed reconnect (SI1) |
 
 In `legacy_raw` only `n_frames` is used; the other fields are stored but have no effect (a warning lists
 them once). The effective recipe of every capture is stored with it (§9), so a later reader knows what was
@@ -182,11 +187,12 @@ drain queue (between layers, end of structure, end of experiment):
   parameters, result and time; the existing `/opl_scan` keeps being written in legacy mode (and in
   service mode with the result of the latest OPL scan, so existing readers keep working).
 - **Background** (OffAxisHolo O6 / handover §2): a background never expires; `max_age_s` only adds a
-  warning to the result. Policy of the recipe: `per_session` (default, proposal of the handover): one
-  background per objective and session, recorded after the OPL scan at a structure-free place (the grid
+  warning to the result. Policy of the recipe: `per_structure` (**default, SI3**): before each structure **at the
+  structure's own position**, before it is printed (current lab practice; drop surface and aberrations
+  change with position); for large structures background tiles at the same raster positions as the
+  later object tiles (one background group). `per_session`: one background per objective and session, recorded after the OPL scan at a structure-free place (the grid
   center before printing, or a place given by the spec); a new one is required after an optical change
-  (objective change, OPL scan repeated, manual request). `per_structure`: before each structure at an
-  offset outside the structure area. `manual`: only when the script calls `acquire_background()`. Every
+  (objective change, OPL scan repeated, manual request). `manual`: only when the script calls `acquire_background()`. Every
   result names its `background_id`; backgrounds are listed under `/calibration/dhm/background/<id>`
   (metadata only; the background frames stay on the DHM-PC unless `keep_raw` asks otherwise).
 
@@ -199,14 +205,30 @@ frame: index, used, reject reason, metric columns); per product dataset the trac
 `z_um`, `wavelength_um`, `n_medium`, `timings_json`, `versions_json`). Group results of speckle sets and
 stitching rasters go to `/dhm_groups/<group_id>`. Schema 1.x minor addition; legacy captures are unchanged.
 
-## 10. Decisions for the maintainer
+## 10. Decisions
+
+The table below is the proposal of the draft (2026-11-16); §10.1 records what was decided.
 
 | ID | Question | Options | Proposal |
 |---|---|---|---|
-| D1 | Behaviour when the DHM-PC is unreachable or the service fails (recipe field `unavailable`) | `abort`, `continue`, `legacy` | **Before the print:** always `abort` (the experiment refuses to start, `configure()` fails clearly). **During the print:** `continue` by default — the print goes on, the capture is stored with `job_state = "failed"` and the reason, a warning is logged and shown in the summary, and the adapter retries the connection before the next capture; `abort` stops after the current layer (the experiment can be restarted). `legacy` is not offered: the service replaces `DhmServ.exe` on the DHM-PC, so when the service is unreachable the legacy server is not reachable either. Operating modes other than `off` (T72) switch themselves to `off` for the rest of the structure when captures fail. |
-| D2 | May the next layer print while the DHM-PC still computes? | wait for the result; continue after `frames_acquired` | **Yes, after `frames_acquired`** (the stage must not move while frames are taken; the computation does not need the stage), bounded by `maxPending`. Exception: the future mode `correct` (F16) waits for the evaluation of the previous layer. Until `maxPending` is measured, the default 1 makes the print wait for every result. |
-| D3 | Background policy default | `per_session`, `per_structure`, `manual` | `per_session` with the place before printing (grid center or given), as proposed in the handover. |
-| D4 | Where do results of jobs with an unknown capture go? | drop, store separately | `/dhm_orphans/<job_id>` (nothing is lost; visible in the unpack tool). |
+| SI1 | Behaviour when the DHM-PC is unreachable or the service fails (recipe field `unavailable`) | `abort`, `continue`, `legacy` | **Before the print:** always `abort` (the experiment refuses to start, `configure()` fails clearly). **During the print:** `continue` by default — the print goes on, the capture is stored with `job_state = "failed"` and the reason, a warning is logged and shown in the summary, and the adapter retries the connection before the next capture; `abort` stops after the current layer (the experiment can be restarted). `legacy` is not offered: the service replaces `DhmServ.exe` on the DHM-PC, so when the service is unreachable the legacy server is not reachable either. Operating modes other than `off` (T72) switch themselves to `off` for the rest of the structure when captures fail. |
+| SI2 | May the next layer print while the DHM-PC still computes? | wait for the result; continue after `frames_acquired` | **Yes, after `frames_acquired`** (the stage must not move while frames are taken; the computation does not need the stage), bounded by `maxPending`. Exception: the future mode `correct` (F16) waits for the evaluation of the previous layer. Until `maxPending` is measured, the default 1 makes the print wait for every result. |
+| SI3 | Background policy default | `per_session`, `per_structure`, `manual` | `per_session` with the place before printing (grid center or given), as proposed in the handover. |
+| SI4 | Where do results of jobs with an unknown capture go? | drop, store separately | `/dhm_orphans/<job_id>` (nothing is lost; visible in the unpack tool). |
+
+### 10.1 Decided 2026-11-18
+
+| ID | Decision |
+|---|---|
+| general | Recipes with `mode = off` never connect to the DHM. "Abort before the print if the DHM is unreachable" applies only when the experiment uses the DHM. |
+| SI1 | **Circuit breaker:** reconnect with backoff at layer boundaries, not before every capture; the summary reports the DHM coverage. **In-situ:** on connection loss try to restore the connection; if that fails, **abort the print with a clear reason**; resumable via the experiment structure (`restart_experiment` / spec). `continue` stays an explicit recipe option. `legacy` is not offered. |
+| SI2 | **Depends on the job:** if the data are needed for the next layer (`correct`, F16, or `wait_for_evaluation = true`, OM2) the print waits for reconstruction + evaluation; otherwise the next layer prints after `frames_acquired`. Fallback: if `frames_acquired` does not arrive within `n_frames × exposure + margin`, poll `job_status`. |
+| SI3 | Background **per structure at the structure's own position**, before the structure is printed; large structures: background tiles at the raster positions of the later object tiles. `max_age_s` = 3600 s, warning only. |
+| SI4 | **Hybrid orphan handling:** results that were sent but never acknowledged are never deleted automatically and stay on the DHM-PC. On `restart_experiment` or the next connection nanofactorysystem asks the service for the orphans of this experiment: `LayerProduct`s are fetched, stored in full in `experiment.h5`, marked `recovered` (reason, original session) and acknowledged; tiles and raw data stay on the DHM-PC, `/dhm_orphans` holds references only (result id, structure, layer, time, host, path, SHA-256, size, reason). Never-restarted experiments: the archive tool (N7) lists the orphans, an offline tool can fetch them later (T106). |
+| D6 | Calibration (exposure, OPL scan) runs in the service on the DHM-PC; the legacy procedures `optimage` / `motorscan` on the Work-PC stay selectable so that legacy artefacts stay traceable. |
+| D7 | `keep_raw = all` in V1.0; raw data stay on the DHM-PC (D:), `raw_ref` (host, path, SHA-256, frame count) in `experiment.h5`; no automatic deletion; option `publication` transfers all raw data to the Work-PC after the print (T105). |
+| DL-A3 a | Every message carries `config_hash` + parameter-set id; nanofactorysystem stores the full parameter set **once per hash** in `experiment.h5` (T79). |
+| N1, N2 | The default result per structure and layer is the stitched `LayerProduct` (unwrapped phase + `intensity_rel`, complex field on request); member `ProductSet`s stay on the DHM-PC and are referenced. Groups follow `open_group(GroupSpec)` → `measure` per position → `close_group` (master plan v0.4 §2). |
 
 ## 11. Tests (dummy backend, no hardware)
 
@@ -226,11 +248,11 @@ stitching rasters go to `/dhm_groups/<group_id>`. Schema 1.x minor addition; leg
 | T83 Capture reservation, raw references, groups | §7 (`reserve_capture`, job states), §9, `EXPERIMENT_STORAGE.md` §15 |
 | T84 Service adapter and fake | §4, config `dhm_service` |
 | T85 Recipes and planner | §5, `group` field |
-| T86 Experiment flow with the service | §6, §7, §8, D1, D2 |
+| T86 Experiment flow with the service | §6, §7, §8, SI1, SI2 |
 | T87 Lab check | §11 against the real service |
 | T79 Configuration record | `DhmInfo` from `configure()` |
 
 ## 13. Approval
 
 Waiting for maintainer approval. Implementation (T82–T87) starts only when this line reads
-`Status: approved <date>` at the top of the document, with the answers to D1–D4.
+`Status: approved <date>` at the top of the document, with the answers to SI1–SI4. **Done 2026-11-18** (§10.1).

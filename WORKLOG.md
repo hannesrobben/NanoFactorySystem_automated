@@ -2497,3 +2497,29 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   this repository, so decide first whether moved files stay versioned. The cross-repository overview of this
   session (errors, duplicates, decisions, lab checks) lives outside the repository in
   `Seafile/phoenixd-robben/Code/_system/`.
+
+### 2026-11-18 17:42 CET — [T98, X-C, X-J] Merge and attic move
+- **Status:** done
+- **Changes:**
+  - `docs/ATTIC_INDEX.md` (new): attic index (X-B)
+  - `docs/guides/SUBSTRATE_AND_EXPERIMENT_SPECS.md`: source note points to the attic index
+  - `Information_Mehrere_Experimente.txt`, `todo_claude/00_SOFTWARE_PLAN_OVERVIEW.md`, `todo_claude/03_NANOFACTORYSYSTEM_PLAN.md`, `todo_claude/CLAUDE.md`, `todo_claude/Information_Mehrere_Experimente.txt`, `todo_claude/TODO.md`, `todo_claude/TODO_default_origin.md`, `todo_claude/WORKLOG.md`, `todo_claude/future_todo.md`, `todo_claude/todo_notes.md` (removed from Git, moved to the local `attic/`)
+- **Tests:** `python -m pytest -m "not slow"` in the short-path venv before the changes: exit code 0.
+- **Commits:** `9c62592` Merge branch 'docs/translate-german' into main_HR [T98, T99], `32d04e2` chore(attic): move approved files to the local attic [T98, X-C], merged with `9e9976b`.
+- **Follow-ups:** none.
+
+### 2026-11-18 17:42 CET — [X-D, T71–T74, T100] Master plan v0.4, design approvals and todo revision
+- **Status:** done
+- **Changes:**
+  - `docs/system/SOFTWARE_PLAN_OVERVIEW.md`: master v0.4 from the decision session of 2026-11-17/18 (all global decisions, G5-new with N1–N7, group protocol, contracts, deferred points, milestones, attic rule, machine facts)
+  - `docs/design/DHM_SERVICE_INTEGRATION.md`: approved; D1–D4 renamed SI1–SI4; recipe defaults; §8 background per structure; §10.1 decided
+  - `docs/design/OPERATING_MODES.md`: approved; O1–O5 renamed OM1–OM5; §4.2, §4.4; §8.1 decided
+  - `docs/design/CAMERA_LIVE.md`: approved; §8.1 decided
+  - `docs/design/GUI_READINESS.md`: approved; §7.1 decided
+  - `TODO.md`: phase plan, "Open decisions" (deferred points), new "Decided" table; rewritten T79, T83, T85, T86, T89, T90, T91, T93, T94, T97, T102 (now phase 9, high); new T104–T109; T71–T74, T98, T100 done
+  - `CLAUDE.md`: system context after G5-new, rules of 2026-11-18, attic procedure
+  - `future_todo.md`: F15 takes over the DHM operation panel (O9)
+  - `WORKLOG.md`: these entries
+- **Tests:** none (documentation only).
+- **Commits:** `dbd4e67` docs(system): master plan v0.4 from the decision session 2026-11-18, `3048e1f` docs(design): record approval of the designs T71-T74 of 2026-11-18, `e22fdda` docs(todo): derive the todos from the decisions of 2026-11-18, `e3da359` docs(todo): move the DHM operation panel into F15 [O9], plus the `docs(todo)` commit of these entries.
+- **Follow-ups:** T108 (material states + SZ2080 seed) is the first implementation task; the seed rows need the new states, so `config/material_seed.csv` was not filled in this revision.

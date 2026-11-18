@@ -1,6 +1,7 @@
 # Design: Headless core for a GUI
 
-Status: draft 2026-11-16, waiting for maintainer approval (T74). Implementation todos: T96, T97.
+Status: approved 2026-11-18 (decision session 2026-11-17/18, with the additions of §7.1). Implementation
+todos: T96, T97.
 
 Context: F15 (system GUI, details follow from the maintainer), G3 (GUI framework; recommendation PySide6
 with pyqtgraph, not decided — this design is framework-neutral), `INFORMATION_MODEL.md` (experiments as
@@ -124,7 +125,9 @@ thread = runner.start()          # worker thread; runner.result() → experiment
 the calling thread. The runner takes an `ExperimentSpec` (or a project file, T77), so a GUI needs no
 Python script.
 
-## 7. Decisions for the maintainer
+## 7. Decisions
+
+The table below is the proposal of the draft (2026-11-16); §7.1 records what was decided.
 
 | ID | Question | Options | Proposal |
 |---|---|---|---|
@@ -132,6 +135,15 @@ Python script.
 | P2 | Offer `stop_now()` (immediate task stop) in addition to abort between layers? | yes; no | Yes, with the clear note that it is no safety function. |
 | P3 | May a pause happen in the middle of a structure? | between layers; only between structures | Between layers (resin and drift effects of a long pause show up in the stored pause times; the GUI can warn). |
 | G3 | GUI framework | PySide6 + pyqtgraph (recommendation of the system plan) | Not needed for this design; decided with F15. |
+
+### 7.1 Decided 2026-11-18
+
+| ID | Decision |
+|---|---|
+| P1 | Runner in a worker thread (T97); events and commands stay serialisable so the runner can move into its own process later (F15). |
+| P2 | `stop_now()` yes, with the note that it is no safety function. **Restart rule:** a layer stopped in the middle of its program is never reprinted automatically (double dose); the structure counts as `stopped`, resuming is opt-in (`resume_stopped=True`) with a warning. |
+| P3 | Pause between layers; warning threshold `max_pause_s`; an optional (not default) interface / focus check after a long pause. |
+| G3 | **PySide6 + pyqtgraph** for all GUIs (system GUI F15 and `offaxisholo.gui`); the PyQt5 legacy (`DHM_User_Interface`) is migrated when touched; napari is evaluated in OffAxisHolo L0 for the offline analysis GUI, not mandatory. DHM + stage operation is part of the system GUI (O9). |
 
 ## 8. Tests (dummy backend)
 
@@ -154,4 +166,4 @@ Python script.
 ## 10. Approval
 
 Waiting for maintainer approval. Implementation (T96, T97) starts only when this line reads
-`Status: approved <date>` at the top of the document, with the answers to P1–P3.
+`Status: approved <date>` at the top of the document, with the answers to P1–P3. **Done 2026-11-18** (§7.1).

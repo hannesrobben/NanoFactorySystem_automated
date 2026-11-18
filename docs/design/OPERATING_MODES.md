@@ -1,6 +1,8 @@
 # Design: Operating modes and feedback hooks
 
-Status: draft 2026-11-16, waiting for maintainer approval (T72). Implementation todos: T88–T92.
+Status: approved 2026-11-18 (decision session 2026-11-17/18, with the additions of §8.1). Implementation
+todos: T88–T92. The decisions of this document were called O1–O5 in the draft; they are OM1–OM5 since
+2026-11-18 to avoid a clash with the OffAxisHolo decisions O1–O11.
 
 Context: `docs/system/SOFTWARE_PLAN_OVERVIEW.md` (data flow §2: `LayerTarget` + product → MIRA compare →
 `DeviationReport` → controller → `CorrectionPlan`; G6 recommendation: comparison on the Working-PC; G10:
@@ -136,7 +138,7 @@ it, else the slice distance. The maps are rasterised from the union of the print
 Shell groups (no contours) are rasterised from their toolpath as in §4.2. Exact up to the slicing; no
 hardware or images needed, so targets can be computed before the print and on demand.
 
-### 4.2 Drawn structures (`DrawableObject`) — decision O1
+### 4.2 Drawn structures (`DrawableObject`) — decision OM1
 
 Options:
 - **A (recommended):** rasterise the laser-on toolpath of the layer programs with the voxel model
@@ -146,9 +148,11 @@ Options:
   and velocity; this gives full targets for `monitor` and `shadow`.
 - **B:** limit drawn structures to `monitor` without a target height: only the footprint (laser-on
   segments dilated by a fixed width, `source = footprint_only`) is used for validity and the reference
-  mask; `shadow` is refused.
-- Proposal: A when the voxel model gives width and height, otherwise B automatically, with a warning
-  naming the missing voxel data.
+  mask.
+- **Decided (OM1, 2026-11-18):** A when the voxel model gives width and height, otherwise B automatically,
+  with a warning naming the missing voxel data. **`shadow` stays allowed with a footprint-only target**
+  (useful for materials with unknown voxel size or shrinkage). In-layer overlap (union vs. sum) and
+  dose / proximity effects are secondary for now and become model parameters later.
 
 ### 4.3 Storage of targets
 
@@ -159,11 +163,13 @@ structure's target settings (`pixel_um`, extent, source, voxel values) are store
 
 ### 4.4 Reference mask (G10 / SA1, input for T100)
 
-The footprint after layer n is known on this PC before the capture (it does not need the product). For the
-a priori reference mask the context can carry `footprint_um` (polygons in stage µm) plus a margin; the
-service turns it into a pixel mask with the stage ↔ camera mapping (MIRA MI-41, MI-50). Who sets the
-margin (recipe or material/process data) and whether the mask travels in the context or the recipe are
-decided in K18; T100 prepares this side's answer.
+The footprint after layer n is known on this PC before the capture (it does not need the product). Decided
+in K18 / G10 (2026-11-18): the a priori mask is the default (SA1); `CaptureContext` carries
+`occupied_um` (polygons in stage µm of **all printed matter in the field of view**, not only the current
+structure; `uint8` raster as alternative) and `pose_tolerance_um` (set here); the parameter set adds
+`optical_margin_um` (OffAxisHolo default). The service rasterises with an OffAxisHolo helper and the
+stage ↔ DHM mapping of the calibration (T104, MIRA MI-41). Recipe option `reference_exclusion` =
+`all_printed` (default) or `since_background`.
 
 ## 5. Storage
 
@@ -192,7 +198,7 @@ Set per experiment with override per structure (`feedback` settings):
 | `stop_after` | consecutive stop candidates or invalid layers before the structure is stopped | none |
 | `on_stop` | `stop_structure` (skip its remaining layers, status `stopped`, continue with the next structure) or `stop_experiment` | `stop_structure` |
 
-Default (decision O3): only log and warn; stopping is opt-in, because thresholds need real data first.
+Default (decision OM3): only log and warn; stopping is opt-in, because thresholds need real data first.
 A stopped structure keeps its progress; `restart_experiment()` does not resume it unless asked
 (`resume_stopped=True`).
 
@@ -208,16 +214,30 @@ Defined now so that `shadow` plans are checked against the same limits:
 - over-exposure cannot be undone: re-exposure is refused where the target is already reached;
 - stop rule: a structure whose plans hit a limit `n` times in a row is stopped as in §6.
 
-## 8. Decisions for the maintainer
+## 8. Decisions
+
+The table below is the proposal of the draft (2026-11-16); §8.1 records what was decided.
 
 | ID | Question | Proposal |
 |---|---|---|
-| O1 | Drawn structures: target rasterised from the toolpath with the voxel model, or `monitor` without a target? | Toolpath with voxel model when voxel data exist, otherwise automatically footprint only (no `shadow`), with a warning (§4.2). |
-| O2 | Does the print wait for the evaluation in `monitor` / `shadow`? | No; the stop rule acts at the next layer boundary after the report. `correct` waits. |
-| O3 | Default of the monitor rule | Log and warn only; stopping is opt-in (§6). |
-| O4 | Comparison domain | Target in height (µm); the evaluator converts with `n_medium` from the snapshot and states the domain in the report (depends on G4). |
-| O5 | Reports in `/analysis` written by the printing process | Yes, under `/analysis/captures/<id>/deviation` with source `nanofactorysystem.feedback` (amendment §16 of `EXPERIMENT_STORAGE.md`). |
+| OM1 | Drawn structures: target rasterised from the toolpath with the voxel model, or `monitor` without a target? | Toolpath with voxel model when voxel data exist, otherwise automatically footprint only (no `shadow`), with a warning (§4.2). |
+| OM2 | Does the print wait for the evaluation in `monitor` / `shadow`? | No; the stop rule acts at the next layer boundary after the report. `correct` waits. |
+| OM3 | Default of the monitor rule | Log and warn only; stopping is opt-in (§6). |
+| OM4 | Comparison domain | Target in height (µm); the evaluator converts with `n_medium` from the snapshot and states the domain in the report (depends on G4). |
+| OM5 | Reports in `/analysis` written by the printing process | Yes, under `/analysis/captures/<id>/deviation` with source `nanofactorysystem.feedback` (amendment §16 of `EXPERIMENT_STORAGE.md`). |
 | G6 | Where the comparison runs | Assumed Working-PC (system plan recommendation); a remote evaluator keeps the design valid otherwise. |
+
+### 8.1 Decided 2026-11-18
+
+| ID | Decision |
+|---|---|
+| OM1 | Toolpath + voxel model when voxel data exist, otherwise footprint only with a warning; `shadow` allowed with a footprint-only target (§4.2). |
+| OM2 | `monitor` / `shadow` do not wait; optional per-structure setting `wait_for_evaluation` (default `false`, always `true` in `correct`). Consistent with SI2 of `DHM_SERVICE_INTEGRATION.md`. |
+| OM3 | Log and warn only; stopping is opt-in. Thresholds stay empty until M7 is decided (data base). |
+| OM4 | **Flexible comparison domain:** chosen automatically from the data available for the design (phase domain preferred when the expected phase can be computed, otherwise height domain); can be fixed to `phase` or `height`. Both conversions may carry uncertainty. `LayerTarget` carries geometry in µm; the report states its `domain`. Indices: in-situ only resin indices (`n_surround` = liquid resin, `n_structure` = cured in resin, from the material snapshot, G4 / G7); no silent defaults. |
+| OM5 | Reports under `/analysis/captures/<id>/deviation` with `source = "nanofactorysystem.feedback"` (amendment §16 of `EXPERIMENT_STORAGE.md`); may change later. |
+| G6 | Comparison on the Work-PC. |
+| M6 | This side rasterises the target at `pixel_um = min(half hatch distance, product pitch)`, area-weighted edges, exact masks from the footprint polygons (pure function); MIRA only shifts / transforms / downsamples. Later target source `design_heightmap` (grey-value height map with explicit grey → height mapping). |
 
 ## 9. Tests (dummy backend)
 
@@ -235,8 +255,8 @@ Defined now so that `shadow` plans are checked against the same limits:
 | Todo | Sections |
 |---|---|
 | T88 Mode in spec and storage | §2, §5 (`/feedback` attributes, summary) |
-| T89 Layer targets | §4 (O1) |
-| T90 Evaluation hook | §3, §5, O2, O5 |
+| T89 Layer targets | §4 (OM1) |
+| T90 Evaluation hook | §3, §5, OM2, OM5 |
 | T91 `monitor` and `shadow` | §3.3, §6, §7 (limits checked in shadow) |
 | T92 Process model in the dummy world | §9 (products to compare against targets) |
 | T100 K18 input | §4.4 |
@@ -244,4 +264,4 @@ Defined now so that `shadow` plans are checked against the same limits:
 ## 11. Approval
 
 Waiting for maintainer approval. Implementation (T88–T92) starts only when this line reads
-`Status: approved <date>` at the top of the document, with the answers to O1–O5.
+`Status: approved <date>` at the top of the document, with the answers to OM1–OM5. **Done 2026-11-18** (§8.1).

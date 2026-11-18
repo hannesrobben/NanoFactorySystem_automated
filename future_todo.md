@@ -207,8 +207,11 @@ first), **Watch out for** (pitfalls and constraints), **Open questions** (for th
 - **Goal:** One application to define substrates, experiments and structures, see the layout, run
   and supervise prints, with live camera and DHM views.
 - **Context:** Details follow separately from the maintainer. The core is prepared by T77, T80,
-  T93–T97. The DHM analysis and live GUI is OffAxisHolo L0–L8.
-- **Prerequisites:** T74, T96, T97; decision G3 (same framework as the OffAxisHolo GUI).
+  T93–T97. The DHM analysis and live GUI is OffAxisHolo L0–L9, a pure observer (O9, 2026-11-18): the
+  **operation of the DHM and the stage** (objective and parameter set, exposure, OPL scan, background,
+  laser on / off, fringe contrast, snapshot — the former OffAxisHolo L6) belongs to this GUI.
+- **Prerequisites:** T74, T96, T97; G3 decided 2026-11-18: PySide6 + pyqtgraph (same framework as the
+  OffAxisHolo GUI); runner in a worker thread (P1).
 - **Watch out for:** The GUI process must respect the single writer of `experiment.h5`; hardware
   stays the default backend; a GUI crash must not stop a running print uncontrolled.
 - **Open questions:** Scope of the first version; one application with the DHM GUI or two.

@@ -36,24 +36,26 @@ with an evaluation after every layer capture; a camera live feed; a core that a 
 | 2 | Experiment storage | T47, T48, T49, T50, T55, T56, T57, T59 (done) | – |
 | 3 | Experiment scripts and substrate main | T51, T52 (done) | – |
 | 4 | Voxel database and voxel-aware slicing | T53, T54, T31 (done) | T53 design approved by the maintainer |
-| 5 | Concept for phases 6–10 | T70, T71, T72, T73, T74, T100 | each design approved by the maintainer |
-| 6 | Information model | T75, T76, T77, T78, T79, T80, T81, T101, T103 | T70 approved (T101 does not need it) |
-| 7 | DHM service integration | T82, T83, T84, T85, T86, T87 | T71 approved; T84 needs DHMConnect DL-C1, DL-C2 |
-| 8 | Operating modes | T88, T89, T90, T91, T92 | T72 approved; T89 needs G10 (K18) for the mask part; T90 needs MIRA MI-53 for the real evaluator |
-| 9 | Camera live feed | T93, T94, T95 | T73 approved |
-| 10 | Core ready for a GUI | T96, T97 | T74 approved |
-| B | Backlog (from T19 `todo_notes.md`, lab checks, follow-ups) | T67, T69, T98, T99, T102 | – |
+| 5 | Concept for phases 6–10 | T70, T71, T72, T73, T74, T100 (done; all approved 2026-11-18) | – |
+| 6 | Information model | T75, T76, T77 (done), T78, T79, T80, T81, T101, T103, T108 | – |
+| 7 | DHM service integration | T82, T83, T84, T85, T86, T87, T105, T106 | T84 needs DHMConnect DL-C1, DL-C2; T87 needs DL-H2 and K14 |
+| 8 | Operating modes and calibration | T88, T89, T90, T91, T92, T104, T107 | T90 needs MIRA MI-53 for the real evaluator; T104 needs MIRA MI-41 for the fit; T107 needs OffAxisHolo K10 for the sweep |
+| 9 | Camera live feed | T102, T93, T94, T95 | T102 before T93 (hard prerequisite, `CAMERA_LIVE.md`) |
+| 10 | Core ready for a GUI | T96, T97 | – |
+| B | Backlog (from T19 `todo_notes.md`, lab checks, follow-ups) | T67, T69, T109 | – |
 
-Phases 6, 9 and 10 are independent of each other. Phase 7 can start with T82 and T83 before `dhmconnect`
-exists. Phase 8 needs T83 and T85.
+Phases 6, 9 and 10 are independent of each other. Phase 7 can start with T82, T83 and T85 before
+`dhmconnect` exists. Phase 8 needs T83 and T85. Target of all phases: Release V1.0 as defined by the
+decision session of 2026-11-17/18 (`docs/system/SOFTWARE_PLAN_OVERVIEW.md` v0.4).
 
 ### Working rules for Claude Code (in addition to CLAUDE.md)
 1. Pick the first open todo of the lowest unfinished phase whose dependencies are done. Phases 6, 9 and 10
    may run in parallel once their design is approved. Take phase B todos only when nothing else is
    available or the maintainer names one; T69 (lab check) is done by the maintainer on the lab PC.
-2. Design todos (T70–T74) end with a document in `docs/design/`. After writing it, move the todo to
-   "Blocked" with "Blocked by: waiting for maintainer approval". Implementation that depends on it starts
-   only when the document contains the line `Status: approved <date>` written by the maintainer.
+2. Design todos end with a document in `docs/design/`. After writing it, move the todo to "Blocked" with
+   "Blocked by: waiting for maintainer approval". Implementation that depends on it starts only when the
+   document contains the line `Status: approved <date>`. T70–T74 are approved (2026-11-18); where a design
+   document's proposal table and its "Decided" section differ, the "Decided" section wins.
 3. If a todo leaves a decision open (marked "Decision:"), propose an answer in the todo or design
    document and ask the maintainer before implementing the part that depends on it.
 4. The real-hardware path stays the default. Every behaviour change gets a dummy-backend test; golden
@@ -71,20 +73,38 @@ exists. Phase 8 needs T83 and T85.
 
 ## Open decisions (maintainer)
 
-Global decisions from `docs/system/SOFTWARE_PLAN_OVERVIEW.md` that block todos here. The decisions inside
-single todos are marked "Decision:" in the todo.
+All global decisions G1–G10 and the decisions of the design documents T70–T74 are taken (decision
+session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
 
-| ID | Decision | Recommendation | Blocks |
+| ID | Decision | When / by what | Blocks |
 |---|---|---|---|
-| G3 | GUI framework (same as the OffAxisHolo GUI) | PySide6 with pyqtgraph | T74, F15 |
-| G4 | Result plane, z per objective, medium index, sign convention phase → height (OffAxisHolo O1/O2) | open | T75 (which index the result uses), T89 |
-| G6 | Where the target comparison runs | Working-PC (this side) | T90 |
-| G7 | Single source of truth for material data | Material registry here (incl. `n_medium` for the result); snapshot in `CaptureContext`; OffAxisHolo presets stay an offline fallback | T70, T75 |
-| G9 | Python baseline, one venv per PC, repositories outside Seafile sync folders | Python 3.12, NumPy 2; partly decided 2026-11-16 (OffAxisHolo stays in Seafile knowingly) | – |
-| G10 | Reference mask, averaging, stitching (SA1–SA7), planning session OffAxisHolo K18 | SA1 a priori mask from the `LayerTarget` footprint; SA2 stage µm; SA5 MIRA levels | T72, T89 |
+| M7 | Tolerances / thresholds for registration and comparison | after a sufficient data base (M4 study with OffAxisHolo K13, MIRA MI-31) | default thresholds of T91 (stay empty until then) |
+| – | `pose_tolerance_um` for 20x / 63x | measure (T104) | final values in T89 |
+| – | Final defaults for positions / frames / offset of the plan generator | after the speckle / position study (M4) | final values in T85 (start values exist) |
+| – | Final default z per objective | focus study OffAxisHolo K10 | fallback value of T107 |
 
-Decided: G2 (2026-11-16) — JSON Schema plus example messages in `dhmconnect/schemas/`, vendored here as
-test fixtures. Background of the 2026-11-16 changes: `docs/system/handover/from_offaxisholo_2026-11-16.md`.
+## Decided
+
+| ID | Date | Result (details: master plan v0.4 §6 and the design documents) |
+|---|---|---|
+| G2 | 2026-11-16 | JSON Schema plus example messages in `dhmconnect/schemas/`, vendored here as test fixtures. |
+| G3 | 2026-11-18 | PySide6 + pyqtgraph for the system GUI (F15) and the OffAxisHolo GUI. |
+| G4 | 2026-11-18 | Separate `propagation_index` and `n_surround`; z stored with its index; in-situ only resin indices; focus from the corner markers (T107), fallback 63x −2.6 µm at n = 1.0; `phase_sign` in the parameter set. |
+| G5 | 2026-11-18 | G5-new: compute on the DHM-PC, control on the Work-PC; stitched `LayerProduct` per structure and layer (N1), group protocol (N2). |
+| G6 | 2026-11-18 | Target comparison on the Work-PC (this side calls `mira.evaluate_layer`). |
+| G7 | 2026-11-18 | Material registry here = master; snapshot in `CaptureContext` / `experiment.h5`; JSON export for offline use; states `uncured`, `cured_in_resin`, `cured_developed` with `wavelength_nm`; SZ2080 at 674.994 nm: uncured 1.508, cured 1.52 (T108); no silent defaults. |
+| G8 | 2026-11-18 | V1.0 on the Koala SDK (DHMConnect DL-H1 chooses pythonnet or a C# gateway). |
+| G9 | 2026-11-18 | Lab PCs install tagged releases from GitHub with a lock file; DHM-PC Python 3.14; this repository keeps `requires-python >= 3.12`; the Work-PC follows after the mvIMPACT / NumPy 2 check. |
+| G10 | 2026-11-18 | SA1 a-priori mask (default); `occupied_um` + `pose_tolerance_um` in `CaptureContext`; calibration cross + square (T104); SA6 stitching algorithm in MIRA; background tiles at the object raster positions (SI3). |
+| SI1–SI4 | 2026-11-18 | `DHM_SERVICE_INTEGRATION.md` §10.1 (formerly D1–D4). |
+| OM1–OM5 | 2026-11-18 | `OPERATING_MODES.md` §8.1 (formerly O1–O5). |
+| C1–C5 | 2026-11-18 | `CAMERA_LIVE.md` §8.1; T102 before T93. |
+| P1–P3 | 2026-11-18 | `GUI_READINESS.md` §7.1; restart rule after `stop_now()`. |
+| D6, D7 | 2026-11-18 | Calibration in the service, legacy `optimage` / `motorscan` stay selectable; `keep_raw = all` in V1.0, `publication` option (T105). |
+| DL-A3 a | 2026-11-18 | `config_hash` + parameter-set id in every message; the full parameter set once per hash in `experiment.h5` (T79). |
+| M4 / T85 | 2026-11-18 | One plan generator here (T85), one algorithm in MIRA; at least 9 positions per structure; jitter with stored seed; start values in T85. |
+| M6 | 2026-11-18 | This side rasterises the target at least as fine as the product (T89). |
+| X-A, X-B, X-C | 2026-11-18 | `Information_Mehrere_Experimente.txt` and `todo_claude/` moved to the local attic; `docs/ATTIC_INDEX.md`. |
 
 ## Open
 
@@ -115,7 +135,9 @@ test fixtures. Background of the 2026-11-16 changes: `docs/system/handover/from_
   - Depends on: T70
   - Done when:
     - objective, camera information and DHM information (service version, parameter set and hash,
-      pixel size and its source) are stored once per session and shown in the summary.
+      pixel size and its source) are stored once per session and shown in the summary;
+    - the full DHM parameter set is stored **once per `config_hash`** in `experiment.h5` (DL-A3 a), so an
+      experiment is traceable without the DHM-PC; products reference it by hash and parameter-set id.
 
 - [ ] T80: Layout of an experiment as data [phase: 6]
   - Priority: medium
@@ -158,6 +180,20 @@ test fixtures. Background of the 2026-11-16 changes: `docs/system/handover/from_
       become `drawing` geometries (INFORMATION_MODEL.md §6.4);
     - a test rebuilds the spec of a dry-run file whose `/spec` was removed and compares the built structures.
 
+- [ ] T108: Material states and the SZ2080 seed (G7, found during the decision session 2026-11-18) [phase: 6]
+  - Priority: high
+  - Size: M
+  - Depends on: –
+  - Done when:
+    - the material registry knows the states `uncured`, `cured_in_resin`, `cured_developed` (plus `any`);
+      old databases with `cured` are migrated (`cured` → `cured_in_resin`) by a schema migration with a
+      test, and old CSV files still load;
+    - `config/material_seed.csv` holds SZ2080 at 674.994 nm: `uncured` n = 1.508, `cured_in_resin`
+      n = 1.52, `cured_developed` n = 1.52 (checked against air), source "maintainer's measurement",
+      Δn = 0.012, with the date;
+    - a versioned JSON export of the registry exists for offline use by OffAxisHolo / MIRA;
+    - asking for a missing index raises or warns with the source named (no silent default).
+
 ### Phase 7 — DHM service integration
 
 - [ ] T82: Role protocol `DhmMeasurement` and legacy adapter [phase: 7]
@@ -173,9 +209,13 @@ test fixtures. Background of the 2026-11-16 changes: `docs/system/handover/from_
 - [ ] T83: Capture reservation, raw references and groups in the store [phase: 7]
   - Priority: high
   - Size: M
-  - Depends on: T71
+  - Depends on: –
   - Done when:
     - `ExperimentStore.reserve_capture()` returns the capture id before the acquisition;
+    - a `LayerProduct` (contract `GroupProduct`, master plan v0.4 N1) is stored in full per structure and
+      layer; its member `ProductSet`s and raw frames are stored as references only (`raw_ref` / product
+      id, host, path, SHA-256); results recovered after a restart are marked `recovered` (SI4);
+      `/dhm_orphans` holds references only;
     - a capture can be stored without holograms but with `raw_ref` (host, path, SHA-256), `job_id`,
       frame records (metrics, `used`, `reject_reason`) and selection mask; group products are stored
       under `/dhm_groups/<group_id>`;
@@ -197,19 +237,25 @@ test fixtures. Background of the 2026-11-16 changes: `docs/system/handover/from_
     - a dry run of an experiment in service mode passes and stores products with
       `add_dhm_product()`.
 
-- [ ] T85: Measurement recipes and planner [phase: 7]
+- [ ] T85: Measurement recipes and capture-position plan generator [phase: 7]
   - Priority: high
   - Size: L
   - Depends on: T78, T83
   - Done when:
-    - a `DhmRecipe` with the fields of "Reference: DHM recipe fields" exists at experiment level with
-      an override per structure and per phase (before, layer, after); today's counts 10 / 20 / 1 are
-      its defaults;
-    - a `MeasurementPlanner` produces the capture positions for a single capture, a speckle set
-      (pattern, count, amplitude) and a stitching raster (structure size, DHM field of view, overlap);
-    - recipe and planned positions are stored; unknown recipe keys are passed to the service
-      untouched, so that new modes need no change here.
-    - Decision: speckle pattern, count and amplitude; stitching overlap (F5, F6).
+    - a `DhmRecipe` with the fields of `DHM_SERVICE_INTEGRATION.md` §5 exists at experiment level with an
+      override per structure and per phase (before, layer, after); today's counts 10 / 20 / 1 stay the
+      defaults of the legacy mode;
+    - **one plan generator** (pure function) turns footprint, field of view, `min_positions`, overlap,
+      offset and jitter into a `GroupSpec` (ordered position list + per-position frames / shift pattern
+      / exposure + stitching parameters + seed): small structure ≥ 9 positions around the centre; large
+      structure a ring of tiles with ≈ 50 % substrate, then inwards, extra positions until
+      `min_coverage`; background groups at the same raster positions (SI3); `single_shot` allowed;
+    - start values (configurable, replaced after the M4 study): `min_positions` 9,
+      `frames_per_position` 10, `min_coverage` 4, step for small structures ≈ 10 % of the field of view
+      (≈ 9 µm at 63x), overlap ≥ 2 × border band + 10 µm, jitter ± 1 µm (63x) / ± 3 µm (20x), seed per
+      capture stored;
+    - recipe, `GroupSpec` and seed are stored; unknown recipe keys are passed to the service untouched;
+      tests check coverage, ring anchoring and reproducibility from the seed.
 
 - [ ] T86: Experiment flow with the service [phase: 7]
   - Priority: high
@@ -220,8 +266,13 @@ test fixtures. Background of the 2026-11-16 changes: `docs/system/handover/from_
       `frames_acquired` as the design allows, collects results in the writing process and
       acknowledges them after they are stored;
     - calibration (exposure, OPL scan, background) runs through the service and is stored;
-    - an unreachable or busy service follows the rule from T71; a restart fetches unacknowledged
-      results with `sync`; all of it is covered by dummy tests.
+    - groups follow `open_group(GroupSpec)` → per position stage move + `measure(CaptureContext with
+      actual position, tile index)` → `close_group` → `LayerProduct`; the stage moves on after
+      `frames_acquired`; the print waits for the result only when the job needs it (SI2, OM2), with the
+      `job_status` fallback;
+    - a lost service follows SI1: reconnect with backoff at layer boundaries, otherwise abort the print
+      with a clear reason (resumable with `restart_experiment`); recipe `off` never connects; orphan
+      recovery is T106; all of it is covered by dummy tests.
   - Note: the integration with the control script and the reference measurement is done together with
     the GPU validation OffAxisHolo K14 on the DHM-PC (handover 2026-11-16 §6.2; Python is not yet
     installed there).
@@ -235,34 +286,37 @@ test fixtures. Background of the 2026-11-16 changes: `docs/system/handover/from_
       checklist is recorded in `WORKLOG.md`, including a comparison of the products with an offline
       reconstruction of the same raw data.
 
-#### Reference: DHM recipe fields (input for T71 and T85)
+#### Reference: DHM recipe fields
 
-| Field | Meaning | Default |
-|---|---|---|
-| `mode` | `off`, `legacy_raw` (today), `products`, `products_and_raw` | `legacy_raw` |
-| `n_frames` | number, or mapping by structure type and phase | 10 / 20 / 1 as today |
-| `selection` | policy and limits, see below | `all` until the N-study OffAxisHolo K13 is evaluated |
-| `keep_raw` | `none`, `rejected`, `selected`, `all` | decision D7 in DHMConnect `TODO.md`; recommendation for the first experiments: `all` (input for K13) |
-| `products` | `phase`, `intensity`, `field` | phase and intensity always, `field` (complex) on request |
-| `background` | when a new background is recorded; optional maximum age (only warns) | proposal: once per objective and session, plus after optical changes |
-| `speckle` | pattern, count, amplitude | off |
-| `stitching` | overlap | off |
-| `post` | free dictionary for further processing steps on the DHM-PC | empty |
-| `unavailable` | `abort`, `continue`, `legacy` | decision in T71 |
+The approved field list with defaults is `docs/design/DHM_SERVICE_INTEGRATION.md` §5 (2026-11-18:
+`keep_raw = all`, `publication`, background `per_structure`, `group` as `GroupSpec`, `reference_exclusion`,
+`unwrap`, `unavailable = abort` after a failed reconnect). Selection policies offered by OffAxisHolo
+(`realtime/selection.py`): `all`, `threshold`, `robust` (median / MAD on `robust_metrics`, factor
+`robust_k` 3.5), `best_k`; `min_frames` (default 1) is always enforced and reported. The propagation
+distance comes from the experiment focus (T107) or the parameter set and is stored with its
+`propagation_index` (G4).
 
-Selection policies offered by OffAxisHolo (`realtime/selection.py`, handover 2026-11-16 §2):
-- `all`: every frame is averaged;
-- `threshold`: fixed bounds per metric, e.g. `{"saturated_count": (None, 100)}`;
-- `robust`: median / MAD outliers on `robust_metrics` (default `sideband_fraction`, `phase_noise_rad`)
-  with factor `robust_k` (default 3.5);
-- `best_k`: the `k` best frames ranked by `rank_by` (default `phase_noise_rad`, ascending);
-- `min_frames` (default 1) is always enforced and reported.
+- [ ] T105: Transfer of raw data to the Work-PC for publication experiments (D7) [phase: 7]
+  - Priority: medium
+  - Size: M
+  - Depends on: T86, DL-B12
+  - Done when:
+    - with `publication: true` all raw data of the experiment are transferred from the DHM-PC after the
+      print (background, never during the print) to a configurable target (data root or archive /
+      network drive); SHA-256 checked; progress and result stored in `experiment.h5`;
+    - a dummy test transfers from the fake service.
 
-Frame metrics are computed by default (saturation and black counts, intensity quantiles, sideband energy
-fraction and peak position, piston phase, phase noise). The propagation distance comes from the z hint of
-`CaptureContext` or the parameter set; the result plane is open (G4).
+- [ ] T106: Orphan recovery on restart (SI4) [phase: 7]
+  - Priority: high
+  - Size: M
+  - Depends on: T83, T86, DL-B6
+  - Done when:
+    - on `restart_experiment` or the next connection the orphans of this experiment are listed by the
+      service; `LayerProduct`s are fetched, stored in full, marked `recovered` (reason, original session)
+      and acknowledged; tiles and raw data are stored as references under `/dhm_orphans`;
+    - nothing is deleted on the DHM-PC; a dummy test covers a crash after `result` and before `ack`.
 
-### Phase 8 — Operating modes
+### Phase 8 — Operating modes and calibration
 
 - [ ] T88: Operating mode in specification and storage [phase: 8]
   - Priority: high
@@ -276,13 +330,18 @@ fraction and peak position, piston phase, phase noise). The propagation distance
 - [ ] T89: Layer targets [phase: 8]
   - Priority: high
   - Size: M
-  - Depends on: T72
+  - Depends on: T78
   - Done when:
-    - for sliced structures a `LayerTarget` (expected height map and mask after layer n in µm, grid
-      definition, position, material) is produced from the toolpath job and stored;
-    - drawn structures follow the decision of T72;
-    - the target provides the footprint for the reference mask as decided in G10 (K18);
-    - a test checks the target of a simple block against its analytic shape.
+    - a pure rasteriser produces a `LayerTarget` (expected height map and exact mask after layer n in µm,
+      grid with `pixel_um = min(half hatch distance, product pitch)`, area-weighted edges, position,
+      material, `domain`) for sliced structures from the toolpath job, and it is stored (M6);
+    - drawn structures: toolpath + voxel model, otherwise footprint only with a warning; `shadow` stays
+      allowed with a footprint target (OM1);
+    - the capture context carries `occupied_um` (all printed matter in the field of view, stage µm) and
+      `pose_tolerance_um` for the a-priori reference mask (G10 SA1 / SA2), with `reference_exclusion`;
+    - a test checks the target of a simple block against its analytic shape, including edge weights.
+  - Later (not V1.0): target source `design_heightmap` (grey-value height map, explicit grey → height
+    mapping, pixel ≤ 50 nm, area-averaged down).
 
 - [ ] T90: Evaluation hook after a layer capture [phase: 8]
   - Priority: high
@@ -293,15 +352,19 @@ fraction and peak position, piston phase, phase noise). The propagation distance
       `DeviationReport`, which is stored under `/analysis` (uses the access layer of T66 / T67);
     - the default evaluator is an adapter to `mira`; without `mira` the modes other than `off` are
       refused with a clear message; the dummy backend has a fake evaluator;
-    - the hook can run without blocking the print, as designed in T72.
+    - the hook can run without blocking the print (OM2); `wait_for_evaluation` per structure (default
+      `false`, always `true` in `correct`) makes the next layer wait;
+    - the comparison domain is chosen automatically (phase preferred, else height) or fixed per spec
+      (OM4); reports go to `/analysis/captures/<id>/deviation` with `source = "nanofactorysystem.feedback"`
+      (OM5).
 
 - [ ] T91: Behaviour of `monitor` and `shadow` [phase: 8]
   - Priority: medium
   - Size: M
   - Depends on: T90
   - Done when:
-    - `monitor` logs RMSE, MAE and validity per layer, warns above the threshold of the spec and
-      can stop the structure by rule;
+    - `monitor` logs RMSE, MAE and validity per layer, warns above the threshold of the spec and can
+      stop the structure by rule (opt-in, OM3); the default thresholds stay empty until M7 is decided;
     - `shadow` additionally asks a `Controller` for a `CorrectionPlan` and stores it without
       applying it; the default controller returns an empty plan;
     - both are shown in the summary and covered by dummy tests.
@@ -314,12 +377,50 @@ fraction and peak position, piston phase, phase noise). The propagation distance
     - the dummy world can produce layer products from the printed programs with a simple height per
       dose model and a configurable disturbance, so that the modes can be dry-run end to end.
 
+- [ ] T104: Calibration procedure writing field ↔ camera ↔ DHM (G10 SA2) [phase: 8]
+  - Priority: high
+  - Size: L
+  - Depends on: T83, MI-41 (fit)
+  - Done when:
+    - a simple program prints a cross + square; the cross gives the offset of the centres, the square
+      rotation / scale / shear; the cross is additionally imaged at known stage offsets (e.g. 3×3) for an
+      affine least-squares fit independent of the galvo scale; per objective, camera and DHM separately;
+    - the result is a versioned calibration file (date, objective, id, residuals) loaded with the
+      parameter set; id + copy are stored in `/calibration/dhm/mapping`; it stays valid until someone
+      touches the hardware; manual recalibration at any time; optional quick check at the start of an
+      experiment;
+    - until a calibration exists: rotation 0, nominal pixel size, generous tolerance (documented);
+    - dummy test with a synthetic mapping; `pose_tolerance_um` for 20x / 63x measured on the lab PC.
+
+- [ ] T107: Focus determination from the corner markers (G4) [phase: 8]
+  - Priority: high
+  - Size: M
+  - Depends on: T86, K10 (z sweep in OffAxisHolo)
+  - Done when:
+    - after the corner markers are written a DHM capture is taken; z is determined from a z sweep of the
+      reconstructed amplitude with a sharpness metric (e.g. minimum of std / mean) and stored per
+      experiment under `/calibration/dhm/focus` as the default z of the experiment, with its
+      `propagation_index`;
+    - fallback: z per objective from the parameter set (63x: −2.6 µm at n = 1.0 until K10);
+    - per-capture autofocus values are only reported in `quality`; a dummy test with a synthetic stack.
+
 ### Phase 9 — Camera live feed
+
+- [ ] T102: Camera image timeout uses the exposure in µs as if it were ms (found during T73) [phase: 9]
+  - Priority: high
+  - Size: S
+  - Depends on: – (verification on the lab PC)
+  - Done when:
+    - `CameraDevice.getimage()` waits at most a bounded time derived from the exposure in ms (e.g. twice the
+      exposure plus a transfer margin, at least 50 ms) instead of `2000 × ExposureTime[µs]` ms (≈ 11 h at
+      20 ms); the unit of `ExposureTime` returned by mvIMPACT is confirmed on the lab PC;
+    - a missed frame raises a clear error instead of blocking; a unit test with the dummy driver checks
+      the computed timeout; the camera service (T93) relies on it for its stop bound.
 
 - [ ] T93: Camera service with one owner [phase: 9]
   - Priority: medium
   - Size: M
-  - Depends on: T73
+  - Depends on: T102
   - Done when:
     - one thread owns the camera driver and offers the latest frame and subscriptions;
     - `measure()`, the overview and the focus tools get their images through it; no behaviour change
@@ -332,7 +433,11 @@ fraction and peak position, piston phase, phase noise). The propagation distance
   - Done when:
     - a recording can be started per experiment or structure, is written next to the experiment
       file, and a table in `experiment.h5` maps frame times to structures and layers;
-    - the recording stops cleanly on abort.
+    - the recording stops cleanly on abort;
+    - container MP4 `mp4v` by default, lossless `h5` opt-in, no AVI / MJPG (C2); check whether `avc1`
+      (H.264, QuickSync on the Work-PC) works directly, otherwise an export step;
+    - the camera overview before / after the print runs through the camera service and has an optional
+      downscale factor for the stored mosaic.
   - Note: the maintainer wants a video of each structure while it prints (2026-11-16, with T70 M6).
 
 - [ ] T95: Live feed interface [phase: 9]
@@ -361,7 +466,10 @@ fraction and peak position, piston phase, phase noise). The propagation distance
   - Done when:
     - a runner emits events for structure, layer and capture start and end, and accepts pause,
       resume and abort between layers from another thread;
-    - a dummy test pauses and aborts a dry run and restarts it with `restart_experiment()`.
+    - a dummy test pauses and aborts a dry run and restarts it with `restart_experiment()`;
+    - `stop_now()` stops the running task (documented as no safety function); a layer stopped mid-program
+      is never reprinted automatically, the structure counts as `stopped`, `resume_stopped=True` resumes
+      with a warning (P2); a pause longer than `max_pause_s` warns (P3).
 
 ### Phase B — Backlog (from T19 `todo_notes.md`, lab checks, follow-ups)
 
@@ -374,17 +482,6 @@ fraction and peak position, piston phase, phase noise). The propagation distance
       recorded in WORKLOG.md as working or as a new todo;
     - in particular: the overview before printing is in focus (it is taken at the Z where the plane fit
       ended; if not, a todo for a defined overview Z), and a restart after Ctrl+C prints only the missing layers.
-
-- [ ] T102: Camera image timeout uses the exposure in µs as if it were ms (found during T73) [phase: B]
-  - Priority: medium
-  - Size: S
-  - Depends on: – (verification on the lab PC)
-  - Done when:
-    - `CameraDevice.getimage()` waits at most a bounded time derived from the exposure in ms (e.g. twice the
-      exposure plus a transfer margin, at least 50 ms) instead of `2000 × ExposureTime[µs]` ms (≈ 11 h at
-      20 ms); the unit of `ExposureTime` returned by mvIMPACT is confirmed on the lab PC;
-    - a missed frame raises a clear error instead of blocking; a unit test with the dummy driver checks
-      the computed timeout; the camera service (T93) relies on it for its stop bound.
 
 - [ ] T67: Evaluation pipeline on top of `ExperimentFile` (follow-up of T66) [phase: B]
   - Priority: medium
@@ -399,92 +496,29 @@ fraction and peak position, piston phase, phase noise). The propagation distance
   - Note: T90 stores its `DeviationReport` through the same access layer; keep the `/analysis` layout
     compatible.
 
-## In Progress
-<!-- Claude Code moves a todo here when starting work. -->
-- [ ] T98: Turn `Information_Mehrere_Experimente.txt` into an English user guide (found during the reorganisation 2026-11-15) [phase: B]
+- [ ] T109: Check the active v6 client for the tuple `raise` of finding B19 (found during DHMConnect DL-A8) [phase: B]
   - Priority: low
   - Size: S
   - Depends on: –
   - Done when:
-    - `docs/guides/SUBSTRATE_AND_EXPERIMENT_SPECS.md` explains in English the levels substrate main →
-      `SubstrateExperiment` → `ExperimentSpec` → `StructureSpec` → geometry, the spec fields, an STL
-      experiment as spec, chaining experiments on one substrate and the dry run, checked against the
-      current code (line numbers removed, paths without personal folders);
-    - the German text file is moved to `attic/` after the maintainer approves; README links the guide.
-  - Progress 2026-11-17: the guide exists (`docs/guides/SUBSTRATE_AND_EXPERIMENT_SPECS.md`, commit `3101a96`) and the README links it. Remaining: the maintainer approves moving `Information_Mehrere_Experimente.txt` to `attic/` (note: `attic/` is gitignored, see `_system/DECISIONS.md` X-B).
+    - the v6 client in `nanofactorysystem/dhm/` raises `AttributeError(...)` instead of
+      `raise(AttributeError, "…")` (a `TypeError` in Python 3), with a unit test; golden command logs
+      unchanged.
+
+## In Progress
+<!-- Claude Code moves a todo here when starting work. -->
+
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
-- [ ] T100: Prepare the nanofactorysystem input for the planning session K18 (from the OffAxisHolo handover 2026-11-16) [phase: 5]
-  - Priority: medium
-  - Size: S
-  - Depends on: – (uses the draft of T72 if it exists)
-  - Done when:
-    - a note `docs/system/handover/to_offaxisholo_k18_<date>.md` answers from this side: when and where
-      the `LayerTarget` footprint of a structure after layer n exists (before the print, in
-      `experiment.h5`, at capture time in the service?), its coordinate system (stage µm, which origin,
-      which z plane), who sets the pose tolerance / safety margin (recipe or material / process data),
-      and proposals for SA1, SA2 and SA5;
-    - the note lists what this side needs from MIRA for the stage µm ↔ camera pixel mapping (MI-41,
-      MI-50); the maintainer has reviewed it before the session.
-  - Blocked by: waiting for the maintainer's review of `docs/system/handover/to_offaxisholo_k18_2026-11-16.md`
-    (written 2026-11-16; the remaining criterion of this todo).
-- [ ] T74: Design the headless core for a GUI [phase: 5]
-  - Priority: medium
-  - Size: S
-  - Depends on: –
-  - Done when:
-    - `docs/design/GUI_READINESS.md` lists every blocking call in the run path (message boxes,
-      `plt.show()`), defines progress events, pause, resume and abort between layers, and the
-      threading rule towards the single-writer experiment file;
-    - Decision: GUI framework (G3).
-  - Blocked by: waiting for maintainer approval of `docs/design/GUI_READINESS.md` (draft 2026-11-16,
-    decisions P1–P3 with proposals in §7; G3 not needed for it).
-- [ ] T73: Design the camera live feed and recording [phase: 5]
-  - Priority: medium
-  - Size: S
-  - Depends on: –
-  - Done when:
-    - `docs/design/CAMERA_LIVE.md` defines the single owner of the camera, how `measure()`, the
-      overview and the focus tools get frames while the feed runs, exposure conflicts, stop on abort;
-    - Decision: frame rate, codec, resolution, storage location and size limit of recordings.
-  - Blocked by: waiting for maintainer approval of `docs/design/CAMERA_LIVE.md` (draft 2026-11-16,
-    decisions C1–C5 with proposals in §8).
-- [ ] T72: Design the operating modes and feedback hooks [phase: 5]
-  - Priority: high
-  - Size: M
-  - Depends on: –
-  - Done when:
-    - `docs/design/OPERATING_MODES.md` defines the modes `off`, `monitor`, `shadow`, `correct`, the
-      evaluation hook after a layer capture, the protocols `Evaluator` and `Controller`, where
-      reports and plans are stored, and the hard limits of a correction;
-    - it defines `LayerTarget` for sliced and for drawn structures, including the footprint after
-      layer n in stage µm that can serve as a priori reference mask (G10 / SA1, input T100);
-    - Decision: for drawn structures (`DrawableObject`), is the target rasterised from the toolpath
-      with the voxel model, or are they limited to `monitor` without a target?
-  - Blocked by: waiting for maintainer approval of `docs/design/OPERATING_MODES.md` and of the proposed
-    §16 of `EXPERIMENT_STORAGE.md` (draft 2026-11-16, decisions O1–O5 with proposals in §8).
-- [ ] T71: Design the DHM service integration and measurement recipes [phase: 5]
-  - Priority: high
-  - Size: M
-  - Depends on: – (reads DHMConnect DL-A2 if it exists; G2 decided 2026-11-16)
-  - Done when:
-    - `docs/design/DHM_SERVICE_INTEGRATION.md` defines the role protocol `DhmMeasurement`, the
-      adapters (legacy, service, fake), the recipe (fields in "Reference: DHM recipe fields" below),
-      the capture sequence with `reserve_capture()`, asynchronous jobs, acknowledgement and `sync`
-      after a restart;
-    - it defines the background policy of the recipe (a background never expires, an optional maximum
-      age only warns; proposal: once per objective and session, plus after optical changes) and how the
-      z hint of `CaptureContext` is filled;
-    - `docs/design/EXPERIMENT_STORAGE.md` gets a proposed amendment for `raw_ref`, `job_id`, frame
-      records (metrics, `used`, `reject_reason`), `/dhm_groups`, the per-product fields `schema_version`,
-      `config_hash`, `background_id`, `warnings`, `quality`, `pixel_pitch_um`, `z_um`, and the schema
-      version (`ReconstructionResult` draft 0.3, handover §3);
-    - Decision: behaviour when the DHM-PC is unreachable (`abort`, `continue`, `legacy`).
-    - Decision: may the next layer print while the DHM-PC still computes?
-  - Blocked by: waiting for maintainer approval of `docs/design/DHM_SERVICE_INTEGRATION.md` and of the
-    proposed §15 of `EXPERIMENT_STORAGE.md` (draft 2026-11-16, decisions D1–D4 with proposals in §10).
+
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T98: Turn `Information_Mehrere_Experimente.txt` into an English user guide — 2026-11-18 — Guide `docs/guides/SUBSTRATE_AND_EXPERIMENT_SPECS.md` (`3101a96`); the German original moved to the local attic per X-A / X-B and is listed in `docs/ATTIC_INDEX.md` (`32d04e2`).
+- [x] T100: Prepare the nanofactorysystem input for the planning session K18 — 2026-11-18 — The note `docs/system/handover/to_offaxisholo_k18_2026-11-16.md` was reviewed in the decision session 2026-11-17/18; G10 is decided (SA1–SA7), master plan v0.4 (`dbd4e67`).
+- [x] T71: Design the DHM service integration and measurement recipes — 2026-11-18 — Approved with additions (SI1–SI4, formerly D1–D4; recipe defaults), `DHM_SERVICE_INTEGRATION.md` §10.1 (`3048e1f`).
+- [x] T72: Design the operating modes and feedback hooks — 2026-11-18 — Approved with additions (OM1–OM5, formerly O1–O5), `OPERATING_MODES.md` §8.1 (`3048e1f`).
+- [x] T73: Design the camera live feed and recording — 2026-11-18 — Approved (C1–C5, MP4 default, T102 prerequisite), `CAMERA_LIVE.md` §8.1 (`3048e1f`).
+- [x] T74: Design the headless core for a GUI — 2026-11-18 — Approved (P1–P3, restart rule, G3 PySide6 + pyqtgraph), `GUI_READINESS.md` §7.1 (`3048e1f`).
 - [x] T99: Translate the German comments in `mains/` and `test/manual/` — 2026-11-17 — the named folders were already English; the German left in active package code (`calc_polygons.py` demo, exception messages in `height_function_structures/structures.py`) and the package README of `height_function_structures/` were translated; legacy folders, commented-out code and the personal notes `drawings/Plan.md`, `TODO_default_origin.md` stay German on purpose. — commits: `49b1fc6`, `3101a96`
 - [x] T76: Substrate record v2 and experiment overview — 2026-11-17 — `substrate.json` version 2 holds substrate material, type and dimensions and material/batch/thickness/application per resin drop (version 1 read as 2); `run_substrate()` enters experiments as `planned`, each experiment replaces its entry with area and drop, and `substrate_overview()` lists them with the status of their files; existing substrate mains run unchanged. — commits: `31ae2b2`, `dd1bc9a`
 

@@ -1,6 +1,7 @@
 # Design: Camera live feed and recording
 
-Status: draft 2026-11-16, waiting for maintainer approval (T73). Implementation todos: T93–T95.
+Status: approved 2026-11-18 (decision session 2026-11-17/18, with the additions of §8.1). Implementation
+todos: T93–T95; **T102 (camera timeout in µs vs ms) is a hard prerequisite of T93.**
 
 Context: F3 (video recording, scheduled as T73/T93–T95); maintainer wish of 2026-11-16 (with
 `INFORMATION_MODEL.md` M6): a video of each structure while it prints; camera snapshots per structure only
@@ -129,7 +130,9 @@ A headless dummy test subscribes during a dry run and receives frames with incre
 small pattern) so that tests can check ordering and drops. Tests use a short feed with a real thread and a
 bounded number of frames; the virtual clock of `SimulatedWorld` is used for the `time_utc` values.
 
-## 8. Decisions for the maintainer
+## 8. Decisions
+
+The table below is the proposal of the draft (2026-11-16); §8.1 records what was decided.
 
 | ID | Question | Options | Proposal |
 |---|---|---|---|
@@ -138,6 +141,18 @@ bounded number of frames; the virtual clock of `SimulatedWorld` is used for the 
 | C3 | Resolution | full sensor; AOI around the structure; downscaled | Full sensor at the measurement AOI (what snapshots see); optional `downscale` factor in `FeedSettings`. |
 | C4 | Storage location and size limit | inside / next to the experiment folder; limits | `recordings/` in the experiment folder; `max_size_mb` and `min_free_mb` configurable, defaults fixed after the measurement in T94 (until then: no size limit, `min_free_mb` = 1024). |
 | C5 | Feed exposure | follow the measurement exposure; own fixed value | Follow by default; a fixed value can be set when the laser light saturates the image during printing. |
+
+### 8.1 Decided 2026-11-18
+
+| ID | Decision |
+|---|---|
+| prerequisite | T102 (the camera image timeout uses the exposure in µs as if it were ms) is fixed before T93 starts. |
+| C1 | 5 fps default, configurable up to the exposure limit; the actual rate is stored (`fps_actual`). |
+| C2 | **MP4 `mp4v` default** (the video is for documentation only, not for analysis); lossless `h5` opt-in (`container = "h5"`); **AVI / MJPG dropped**. Export to H.264 MP4 for talks, or `avc1` directly if T94 shows it works (the Work-PC has an Intel QuickSync H.264 encoder). |
+| C3 | Full sensor at the measurement AOI; optional `downscale` factor in `FeedSettings`. |
+| C4 | `recordings/` in the experiment folder; `max_size_mb` and `min_free_mb` configurable; defaults after the measurement in T94 (until then no size limit, `min_free_mb` = 1024). The Work-PC has ≈ 205 GB free (2026-11-18). |
+| C5 | Follow the measurement exposure by default; a fixed value can be set. |
+| overview | The stitched camera overview before / after the print (T28, `overview_capture=True`) keeps running as snapshots through the camera service and gets an optional **downscale factor** for the stored mosaic. |
 
 ## 9. Tests
 
@@ -159,4 +174,4 @@ bounded number of frames; the virtual clock of `SimulatedWorld` is used for the 
 ## 11. Approval
 
 Waiting for maintainer approval. Implementation (T93–T95) starts only when this line reads
-`Status: approved <date>` at the top of the document, with the answers to C1–C5.
+`Status: approved <date>` at the top of the document, with the answers to C1–C5. **Done 2026-11-18** (§8.1).
