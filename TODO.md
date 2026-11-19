@@ -385,6 +385,9 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
       experiment;
     - until a calibration exists: rotation 0, nominal pixel size, generous tolerance (documented);
     - dummy test with a synthetic mapping; `pose_tolerance_um` for 20x / 63x measured on the lab PC.
+  - Note (2026-11-19, MIRA MI-11 / MI-41): the model, the file format (`StageImageCalibration` 1.0, proposed
+    in `mira/geometry.py`, contract todo DHMConnect DL-A11) and the fit exist in MIRA:
+    `mira.calibration_marks.detect_cross` / `detect_square` / `fit_cross_raster` → `mira.geometry.save_calibration`.
 
 - [ ] T107: Focus determination from the corner markers (G4) [phase: 8]
   - Priority: high
