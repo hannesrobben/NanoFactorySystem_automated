@@ -42,7 +42,7 @@ with an evaluation after every layer capture; a camera live feed; a core that a 
 | 8 | Operating modes and calibration | T88, T89, T90, T91, T92, T104, T107 | T90 needs MIRA MI-53 for the real evaluator; T104 needs MIRA MI-41 for the fit; T107 needs OffAxisHolo K10 for the sweep |
 | 9 | Camera live feed | T102, T93, T94, T95 | T102 before T93 (hard prerequisite, `CAMERA_LIVE.md`) |
 | 10 | Core ready for a GUI | T96, T97 | – |
-| B | Backlog (from T19 `todo_notes.md`, lab checks, follow-ups) | T67, T69, T109 | – |
+| B | Backlog (from T19 `todo_notes.md`, lab checks, follow-ups) | T67, T69, T109, T111, T112 | – |
 
 Phases 6, 9 and 10 are independent of each other. Phase 7 can start with T82, T83 and T85 before
 `dhmconnect` exists. Phase 8 needs T83 and T85. Target of all phases: Release V1.0 as defined by the
@@ -502,6 +502,33 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
       `raise(AttributeError, "…")` (a `TypeError` in Python 3), with a unit test; golden command logs
       unchanged.
 
+- [ ] T111: Clear error for an incomplete user section in the configuration (found during T110) [phase: B]
+  - Priority: low
+  - Size: S
+  - Depends on: –
+  - A `user:<name>` section without `email`, `organization` or `orcid` makes every `System`/`Experiment`
+    fail inside `scidatacontainer.load_config` with `AttributeError: 'NoneType' object has no attribute
+    'strip'` (`nanofactorysystem/parameter.py`, `Parameter.__init__`), which does not name the missing key.
+  - Done when:
+    - `Parameter.__init__` (or `Config.user`) raises an error naming the user and the missing keys, with a
+      unit test; complete user sections behave as before.
+
+- [ ] T112: Realistic accelerations in the stage examples of the template and the lab check (found during T110) [phase: B]
+  - Priority: medium
+  - Size: S
+  - Depends on: –
+  - `Rectangle3D(..., velocity=1000, acceleration=500)` with `axes="XYZ"` in
+    `mains/Experiments/experiment_template.py` (`drawing_spec`, "rectangle") and
+    `mains/lab_checks/new_features_check.py` (`rect`, `ramp`) gives a run-up of 2·v²/(2a) = 2 mm before
+    every 50/30 µm hatch line (`_Lines.iterate_layers`, a in µm/s²); the time estimate says about 49 min
+    for one 50×50×3 µm block. The dry runs do not show it (simulated motion time).
+  - Decision: use the controller acceleration through a named factory (as `default_experiment.rectangle`,
+    T110) or a fixed realistic value? Proposal: the factory, because the controller value is the one the
+    stages really use.
+  - Done when:
+    - both scripts use the chosen acceleration and the expected printing time of these structures is in the
+      range of minutes; T69 (lab check) is run with the corrected values.
+
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
 
@@ -510,6 +537,7 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T110: Main entry point for every task and a fully documented default experiment (maintainer request 2026-11-19) — 2026-11-19 — `mains/main.py` runs the tasks experiment / slicer / layout / substrate / spec_file / restart / overview / analyse / materials, each also as dry run (`--task demo --dry-run` runs all, checked end to end); `mains/Experiments/default_experiment.py` writes out every spec field and slicer option with an explanation; `backends.dummy.dry_run` for dry runs from scripts; the former main is `mains/main_legacy.py`. Follow-ups T111, T112. — commits: `9bd6c74`, `76138ba`, `e374b12`, `268f1c4`
 - [x] T108: Material states and the SZ2080 seed — 2026-11-18 — States `uncured` / `cured_in_resin` / `cured_developed` / `any` with schema migration 2 → 3 (`cured` → `cured_in_resin`, old CSV files and snapshots still load); SZ2080 at 674.994 nm in `config/material_seed.csv`; versioned JSON export `MaterialRegistry.export_json`; `require_refractive_index` / `contract_snapshot` raise `MissingPropertyError` instead of a default — commits: `e79a531`, `0108f7f`, `698cc5c`.
 - [x] T98: Turn `Information_Mehrere_Experimente.txt` into an English user guide — 2026-11-18 — Guide `docs/guides/SUBSTRATE_AND_EXPERIMENT_SPECS.md` (`3101a96`); the German original moved to the local attic per X-A / X-B and is listed in `docs/ATTIC_INDEX.md` (`32d04e2`).
 - [x] T100: Prepare the nanofactorysystem input for the planning session K18 — 2026-11-18 — The note `docs/system/handover/to_offaxisholo_k18_2026-11-16.md` was reviewed in the decision session 2026-11-17/18; G10 is decided (SA1–SA7), master plan v0.4 (`dbd4e67`).

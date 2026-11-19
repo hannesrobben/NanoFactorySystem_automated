@@ -2546,3 +2546,37 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** none (documentation only).
 - **Commits:** see the `docs(todo)` commit of this entry.
 - **Follow-ups:** none.
+
+### 2026-11-19 22:39 CET — [T110] Main entry point and fully documented default experiment
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/backends/dummy/dry_run.py` (new): `dry_run(user)` context manager (dummy backend, known
+    plane, `time.sleep` on the virtual clock, missing user/objective added to the config only for the dry run,
+    restored on exit); a user section with only `name` crashed `System` in `scidatacontainer` (→ T111), so the
+    added user carries placeholder email/organization/orcid.
+  - `test/backends/test_dry_run_helper.py` (new): 4 tests.
+  - `mains/main.py` (new; the former file → `mains/main_legacy.py`): entry point with SETTINGS block and the tasks
+    experiment, slicer, layout, substrate, spec_file, restart, overview, analyse, materials; `--dry-run`,
+    `--task demo`; dry runs use their own material registry (seed + invented voxel data).
+  - `mains/main_legacy.py` (renamed from `mains/main.py`): header docstring; contains the maintainer's uncommitted
+    formatting/path edit of the working tree. The pure rename landed in `9bd6c74` by mistake (staged by `git mv`;
+    not amended per the commit rules).
+  - `mains/Experiments/default_experiment.py` (new): every `ExperimentSpec`/`StructureSpec` field and slicer option
+    with comment; named factory `default_experiment.rectangle` takes the controller acceleration of its axes.
+  - `test/integration/test_main_entry.py` (new): 8 tests (2 slow dry runs).
+  - `test/README.md`, `README.md`, `CLAUDE.md`: new entry point, default experiment, dry-run helper.
+  - `TODO.md`: T110 done; new T111, T112 in the backlog.
+- **Tests:** short-path venv: `python -m pytest` 436 passed, 15 skipped (11:41 min). Manual:
+  `cd mains && python main.py --task demo --dry-run` exit 0, all nine tasks, 7 experiments finished (9:39 min);
+  `python -m Experiments.default_experiment --dry-run` exit 0. Errors found and fixed during the runs (all in the
+  new files): voxel method `"sem"` → `"SEM"`; `ExperimentFile.is_busy` is a property; `Session.run` passed
+  `confirm` twice; the first template version used `acceleration=500` (estimate 2 h 58 min → 57 min, mostly the
+  78-layer stair).
+- **Commits:** `9bd6c74` feat(backends): add a dry-run context manager for main scripts [T110], `76138ba`
+  chore(mains): keep the former main script as main_legacy.py [T110], `e374b12` feat(mains): add a main entry
+  point for every task and a default experiment [T110], `268f1c4` docs: point new users to mains/main.py and the
+  default experiment [T110], plus the `docs(todo)` commit of this entry.
+- **Follow-ups:** T111 (clear error for incomplete user sections), T112 (acceleration=500 in
+  `experiment_template.py` and the lab check → 2 mm run-up per line on the stages; decision needed before T69).
+  The local `~/nanofactory.json` of this PC has neither user `Hannes` nor `Zeiss 63x` (the dry-run helper bridges
+  it). The slicer logs "mesh is not watertight" for height maps (harmless).
