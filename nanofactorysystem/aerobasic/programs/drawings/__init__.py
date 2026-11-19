@@ -99,6 +99,8 @@ from .ifov_gratings import (
     Rectangle3D_IFOV,
     BinaryGrating_IFOV)
 
+from .height_map import HeightMap_IFOV
+
 
 # =============================================================================
 # PUBLIC API
@@ -156,5 +158,6 @@ __all__ = [
 
     # IFOV Structures
     "BinaryGrating_IFOV",
-    "Rectangle3D_IFOV"
+    "Rectangle3D_IFOV",
+    "HeightMap_IFOV",
 ]
