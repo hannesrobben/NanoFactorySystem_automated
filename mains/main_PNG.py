@@ -16,7 +16,7 @@ many µm one gray value step is. Everything else has a working default:
 Run with ``mains/`` as working directory::
 
     cd mains
-    python main_PNG.py                 # statistics + preview, then the experiment (every step confirmed)
+    python main_PNG.py                 # statistics + preview, then the experiment (see ASK_EACH_STEP, SHOW_PLOTS)
     python main_PNG.py --preview       # only statistics and preview, no hardware
     python main_PNG.py --dry-run       # whole experiment on simulated hardware (temporary folder)
 
@@ -63,7 +63,10 @@ CENTER: Optional[Point2D] = None          # absolute stage position (µm); None:
 CAMERA_CAPTURE = True           # camera image after every layer
 OVERVIEW_CAPTURE = False        # stitched camera mosaic of the area before and after printing
 MARGIN_AROUND_UM = 100.0        # free space around the image inside the experiment area
-ASK_EACH_STEP = True            # message boxes before plane fit and printing (plots are shown either way)
+# Unattended run: set both to False, then nothing waits for a click
+ASK_EACH_STEP = True            # message boxes before plane fit and printing
+SHOW_PLOTS = True               # preview and layout windows (must be closed to continue); False: none,
+                                # experiment.png is written into the folder anyway
 
 
 def structure() -> HeightMap_IFOV:
@@ -191,12 +194,13 @@ def run(*, dry: bool = False, preview_only: bool = False, workdir: Optional[Path
         import matplotlib
         matplotlib.use("Agg")  # no plot windows in a dry run
     height_map = structure()
-    stats = preview(height_map, show=not dry)
+    stats = preview(height_map, show=SHOW_PLOTS and not dry)
     if preview_only:
         return stats
     spec = experiment_spec(height_map)
     if not dry:
-        return settings.Session(confirm=messagebox_confirm if ASK_EACH_STEP else None).run(spec)
+        return settings.Session(confirm=messagebox_confirm if ASK_EACH_STEP else None,
+                                show_plot=SHOW_PLOTS).run(spec)
 
     from nanofactorysystem.backends.dummy.dry_run import dry_run
     with dry_run(settings.USER, workdir=workdir) as simulated:
