@@ -18,7 +18,15 @@ python clean.py
 
 ## Usage examples
 
-See Python scripts in the directory `test`.
+Start with `mains/main.py`, the entry point for every task (single experiment, slicer, substrate
+with several experiments, layout check, rerun of a stored spec, restart, overview, analysis,
+materials). Its experiment is `mains/Experiments/default_experiment.py`, which shows every setting
+with an explanation. Without the lab hardware, run everything on simulated hardware:
+
+```
+cd mains
+python main.py --task demo --dry-run
+```
 
 How a print is described with substrate, experiment and structure specs, including a complete STL
 experiment and chaining several experiments on one substrate:
