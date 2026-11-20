@@ -68,7 +68,8 @@ from nanofactorysystem.substrate_plan import SubstrateExperiment, SubstrateSpec
 USER = "Hannes"                                      # user key "user:<name>" of ~/nanofactory.json
 OBJECTIVE = "Zeiss 63x"                              # the IFOV structures below are set up for 63x
 # LAB: edges of the resin drop measured with the camera: right, left, near, far
-RESIN_EDGES = [[5720, 22330], [-3333, 22420], [1660, 17212], [1200, 27190]]
+# RESIN_EDGES = [[5720, 22330], [-3333, 22420], [1660, 17212], [1200, 27190]]
+RESIN_EDGES = [[-1600, 20400],[6900, 21800],[1700, 16200],[3000,25000]]
 # LAB: centers of the three experiment grids, side by side along x (checked by check_layout)
 CENTERS = {
     "rectangle": Point2D(-300, 22300),
@@ -441,7 +442,7 @@ def substrate_spec(data_root: Optional[Path] = None) -> SubstrateSpec:
         substrate_material="",
         substrate_type="cover_slip",
         dimensions={"shape": "round", "diameter_mm": 30.0, "thickness_um": 170.0},
-        resin_batch="",                                 # LAB: batch of the resin bottle
+        resin_batch="SZ2080_newBatch_Nov2026",                                 # LAB: batch of the resin bottle
         resin_thickness_um=None,
         application="drop",
         notes="Chain rectangle -> DOE -> aspheric lens, power x hatch grids (mains/Experiments/"
@@ -519,4 +520,5 @@ if __name__ == "__main__":
             folders = main(backend=simulated.backend, plane=simulated.plane, data_root=simulated.workdir / "data")
         print("Dry run finished:", *folders, sep="\n  ")
     else:
-        main()
+        # main()
+        main(data_root=Path(r"C:\Users\Nanofactory\Desktop\Hannes\NEW_EXPERIMENTS\TEST_EXP_noDHM"))
