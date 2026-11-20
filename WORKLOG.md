@@ -2659,3 +2659,21 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Commits:** the `docs(todo)` commit of this entry.
 - **Follow-ups:** T117 (lab test). `main_PNG.py` uses the same IFOV path and should not be used for a long
   print before T117 is solved.
+
+### 2026-11-20 17:46 CET — [T117] Lab test script for the IFOV laser band failure
+- **Status:** partial (script ready and dry-run; the lab print and the fix are open)
+- **Changes:**
+  - `mains/Experiments/ifov_laser_test.py` (new): four experiments a–d (current `Rectangle3D_IFOV`, explicit
+    laser ON/OFF, IFOV configuration of 2026-03, galvo only without IFOV), each 2 x 2 squares 50 x 50 x 3 µm
+    (0.25 / 0.7 mW x lines along x / y, hatch 0.2 µm, slice 0.25 µm, no cross hatching); `--layout`, `--dry-run`
+  - `test/integration/test_ifov_laser_test.py` (new): 10 tests (1 slow dry run)
+  - `test/README.md`: new test module
+  - `TODO.md`: T117 to In Progress with the state
+- **Tests:** short-path venv: `python -m pytest test/integration/test_ifov_laser_test.py` 10 passed (incl. dry
+  run). Manual: `python -m Experiments.ifov_laser_test --dry-run` exit 0, all four experiments finished with
+  4 x 13 layers. Interpretation choices (to confirm): lines in one direction per square instead of cross hatching,
+  height 3 µm incl. 1 µm in the substrate, slice 0.25 µm, centers y = 20800 µm next to the chain experiments.
+- **Commits:** `7cf1403` feat(mains): add a lab test for the IFOV laser band failure [T117], plus the
+  `docs(todo)` commit of this entry.
+- **Follow-ups:** variant c may inherit RAMP/LOOKAHEAD/SYNCAXES settings from earlier IFOV programs (no setup
+  resets them). Branch based on `feat/t116-main-png`.

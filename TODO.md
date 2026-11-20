@@ -42,7 +42,7 @@ with an evaluation after every layer capture; a camera live feed; a core that a 
 | 8 | Operating modes and calibration | T88, T89, T90, T91, T92, T104, T107 | T90 needs MIRA MI-53 for the real evaluator; T104 needs MIRA MI-41 for the fit; T107 needs OffAxisHolo K10 for the sweep |
 | 9 | Camera live feed | T102, T93, T94, T95 | T102 before T93 (hard prerequisite, `CAMERA_LIVE.md`) |
 | 10 | Core ready for a GUI | T96, T97 | – |
-| B | Backlog (from T19 `todo_notes.md`, lab checks, follow-ups) | T67, T69, T109, T111, T112, T114, T117 | – |
+| B | Backlog (from T19 `todo_notes.md`, lab checks, follow-ups) | T67, T69, T109, T111, T112, T114 | – |
 
 Phases 6, 9 and 10 are independent of each other. Phase 7 can start with T82, T83 and T85 before
 `dhmconnect` exists. Phase 8 needs T83 and T85. Target of all phases: Release V1.0 as defined by the
@@ -529,6 +529,26 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
     - both scripts use the chosen acceleration and the expected printing time of these structures is in the
       range of minutes; T69 (lab check) is run with the corrected values.
 
+- [ ] T114: `Rectangle3D_IFOV`: objective of the IFOV configuration and stateless alternating hatch (found during T113) [phase: B]
+  - Priority: medium
+  - Size: S
+  - Depends on: –
+  - `Rectangle2D_IFOV` / `Rectangle3D_IFOV` (`aerobasic/programs/drawings/ifov_gratings.py`) create `IFOV_Lines`
+    without an objective, so their layer programs always use the IFOV configuration and writing speed of the
+    Zeiss 63x (`IFOV_Lines.iterate_layers(objective="Zeiss 63x")`), also in a 20x experiment.
+    `HeightMap_IFOV` already takes `objective=`.
+  - With `alternate_hatching=True`, `Rectangle3D_IFOV.iterate_layers` flips `self.hatching_direction` after
+    every layer. With an odd number of layers (e.g. 6 µm / 0.25 µm → 25 layers) a second iteration (time
+    estimate, plot, rebuild) starts with the other direction, and `to_json()` may store the flipped start
+    direction.
+  - Done when:
+    - both classes take `objective=` (default `"Zeiss 63x"`, stored in `to_json()`) and pass it on;
+    - the alternating direction is computed from the layer index without changing the object; iterating twice
+      gives identical programs (unit test); golden files unchanged.
+
+## In Progress
+<!-- Claude Code moves a todo here when starting work. -->
+
 - [ ] T117: IFOV prints only a cross ("+") of every filled area: the laser exposes only a ~20 µm band of each 50 µm line (found during the chain print HR-26-002, 2026-11-20) [phase: B]
   - Priority: high
   - Size: M
@@ -549,29 +569,11 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
   - Lab test: one single-layer 50 x 50 µm square per variant on one substrate: (a) current program; (b) explicit
     `GALVO LASEROVERRIDE A ON/OFF` around every `LINEAR`; (c) configuration of 2026-03; (d) same square without
     IFOV (galvo only, like the corners).
+  - 2026-11-20: lab test script `mains/Experiments/ifov_laser_test.py` (variants a–d, 4 squares each) built
+    and dry-run; waiting for the lab print.
   - Done when: the cause is known, IFOV squares print as full squares, and the fix is in `IFOV_Lines` /
     `initialise_IFOV_configuration` with updated golden files. Until then no IFOV print (incl. `main_PNG.py`)
     should be started for real work.
-
-- [ ] T114: `Rectangle3D_IFOV`: objective of the IFOV configuration and stateless alternating hatch (found during T113) [phase: B]
-  - Priority: medium
-  - Size: S
-  - Depends on: –
-  - `Rectangle2D_IFOV` / `Rectangle3D_IFOV` (`aerobasic/programs/drawings/ifov_gratings.py`) create `IFOV_Lines`
-    without an objective, so their layer programs always use the IFOV configuration and writing speed of the
-    Zeiss 63x (`IFOV_Lines.iterate_layers(objective="Zeiss 63x")`), also in a 20x experiment.
-    `HeightMap_IFOV` already takes `objective=`.
-  - With `alternate_hatching=True`, `Rectangle3D_IFOV.iterate_layers` flips `self.hatching_direction` after
-    every layer. With an odd number of layers (e.g. 6 µm / 0.25 µm → 25 layers) a second iteration (time
-    estimate, plot, rebuild) starts with the other direction, and `to_json()` may store the flipped start
-    direction.
-  - Done when:
-    - both classes take `objective=` (default `"Zeiss 63x"`, stored in `to_json()`) and pass it on;
-    - the alternating direction is computed from the layer index without changing the object; iterating twice
-      gives identical programs (unit test); golden files unchanged.
-
-## In Progress
-<!-- Claude Code moves a todo here when starting work. -->
 
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
