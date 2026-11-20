@@ -77,6 +77,9 @@ CENTERS = {
     "lens": Point2D(2900, 22300),
 }
 SUBSTRATE_LABEL: Optional[str] = None                # LAB: e.g. "HR-26-001"; None = next free label
+# Message boxes on the lab PC (former ask_continue_box); plots are shown either way
+ASK_EACH_STEP = True                                 # confirm plane fit and printing inside every experiment
+ASK_BETWEEN = True                                   # confirm before starting the next experiment
 
 # ------------------------------------------------------------------------------------------------
 # Parameter grid shared by all three experiments
@@ -481,8 +484,9 @@ def main(*, backend=None, plane=None, data_root: Optional[Path] = None, material
     from nanofactorysystem.substrate_plan import run_substrate
     interactive = backend is None
     return run_substrate(substrate_spec(data_root), experiments(), backend=backend, plane=plane,
-                         confirm=messagebox_confirm if interactive else None,
-                         confirm_between=messagebox_confirm if interactive else None, show_plot=interactive,
+                         confirm=messagebox_confirm if interactive and ASK_EACH_STEP else None,
+                         confirm_between=messagebox_confirm if interactive and ASK_BETWEEN else None,
+                         show_plot=interactive,
                          material_registry=material_registry)
 
 

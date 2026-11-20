@@ -63,6 +63,7 @@ CENTER: Optional[Point2D] = None          # absolute stage position (µm); None:
 CAMERA_CAPTURE = True           # camera image after every layer
 OVERVIEW_CAPTURE = False        # stitched camera mosaic of the area before and after printing
 MARGIN_AROUND_UM = 100.0        # free space around the image inside the experiment area
+ASK_EACH_STEP = True            # message boxes before plane fit and printing (plots are shown either way)
 
 
 def structure() -> HeightMap_IFOV:
@@ -195,7 +196,7 @@ def run(*, dry: bool = False, preview_only: bool = False, workdir: Optional[Path
         return stats
     spec = experiment_spec(height_map)
     if not dry:
-        return settings.Session(confirm=messagebox_confirm).run(spec)
+        return settings.Session(confirm=messagebox_confirm if ASK_EACH_STEP else None).run(spec)
 
     from nanofactorysystem.backends.dummy.dry_run import dry_run
     with dry_run(settings.USER, workdir=workdir) as simulated:

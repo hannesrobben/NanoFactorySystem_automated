@@ -59,6 +59,10 @@ REPOSITORY = Path(__file__).resolve().parents[1]
 TASK = "experiment"            # see the list of tasks in the docstring above
 DRY_RUN = False                # True: simulated hardware, output in a temporary folder
 
+# Message boxes on the lab PC (former ask_continue_box); plots are shown either way
+ASK_EACH_STEP = True           # True: confirm plane fit and printing inside every experiment
+ASK_BETWEEN = True             # True: confirm before the next experiment of task "substrate"
+
 USER = "Hannes"                # user key "user:<name>" in ~/nanofactory.json
 OBJECTIVE = "Zeiss 63x"        # "Zeiss 20x" or "Zeiss 63x"
 
@@ -159,6 +163,8 @@ class Session:
         Data root of the substrates; None: dataRoot of the user.
     confirm : callable or None
         ``confirm(question) -> bool`` before each step; None: no questions.
+    confirm_between : callable or None
+        ``confirm_between(question) -> bool`` before the next experiment of a substrate; None: no question.
     show_plot : bool
         Show plot windows.
     material_registry : MaterialRegistry, Path or None
@@ -170,6 +176,7 @@ class Session:
     output_root: Optional[Path] = OUTPUT_ROOT
     data_root: Optional[Path] = None
     confirm: Optional[Callable[[str], bool]] = None
+    confirm_between: Optional[Callable[[str], bool]] = None
     show_plot: bool = True
     material_registry: object = None
     last_experiment: Optional[Path] = None
@@ -268,7 +275,8 @@ def task_substrate(session: Session) -> list[Path]:
     if session.data_root is not None:
         substrate = dataclasses.replace(substrate, data_root=session.data_root)
     folders = run_substrate(substrate, substrate_experiments(), backend=session.backend, plane=session.plane,
-                            confirm=session.confirm, confirm_between=session.confirm, show_plot=session.show_plot,
+                            confirm=session.confirm, confirm_between=session.confirm_between,
+                            show_plot=session.show_plot,
                             material_registry=session.material_registry)
     for folder in folders:
         print(f"Experiment written to {folder}")
@@ -407,7 +415,8 @@ def main(task: str = TASK, *, dry: bool = DRY_RUN, workdir: Optional[Path] = Non
     if not dry:
         if task == "demo":
             raise ValueError("Task 'demo' runs every task and is meant for a dry run (--dry-run).")
-        return TASKS[task](Session(confirm=messagebox_confirm))
+        return TASKS[task](Session(confirm=messagebox_confirm if ASK_EACH_STEP else None,
+                                   confirm_between=messagebox_confirm if ASK_BETWEEN else None))
 
     import matplotlib
     matplotlib.use("Agg")  # no plot windows in a dry run
