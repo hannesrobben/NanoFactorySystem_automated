@@ -148,7 +148,7 @@ def test_template_examples_dry_run(example, test_config, dummy_backend, no_sleep
     import matplotlib
     matplotlib.use("Agg")
     pytest.importorskip("shapely")
-    script = Path(__file__).parents[2] / "mains" / "Experiments" / "experiment_template.py"
+    script = Path(__file__).parents[2] / "mains" / "Experiments" / "old_experiment" / "experiment_template.py"
     spec_loader = importlib.util.spec_from_file_location("experiment_template", script)
     template = importlib.util.module_from_spec(spec_loader)
     spec_loader.loader.exec_module(template)

@@ -9,7 +9,7 @@ import pytest
 from nanofactorysystem.devices.coordinate_system import Point2D
 from nanofactorysystem.storage import ExperimentStore
 
-SCRIPT = Path(__file__).parents[2] / "mains" / "Experiments" / "focal_points" / "z_line_focal_points.py"
+SCRIPT = Path(__file__).parents[2] / "mains" / "Experiments" / "old_experiment" / "focal_points" / "z_line_focal_points.py"
 RESIN_EDGES = [[5720, 22330], [-3333, 22420], [1660, 17212], [1200, 27190]]
 
 

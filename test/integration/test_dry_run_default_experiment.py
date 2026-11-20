@@ -1,4 +1,4 @@
-"""Dry run of the experiment template mains/Experiments/default_exp_file.py on the dummy backend.
+"""Dry run of the experiment template mains/Experiments/old_experiment/default_exp_file.py on the dummy backend.
 
 The whole flow runs as on the lab PC: System start-up, plane_fit() (with the
 known plane of the simulated sample instead of a measurement),
@@ -18,7 +18,7 @@ from nanofactorysystem.devices.coordinate_system import Point2D
 from nanofactorysystem.storage import ExperimentStore
 from nanofactorysystem.storage.json_copies import experiment_dictionary, structures_list
 
-TEMPLATE = Path(__file__).parents[2] / "mains" / "Experiments" / "default_exp_file.py"
+TEMPLATE = Path(__file__).parents[2] / "mains" / "Experiments" / "old_experiment" / "default_exp_file.py"
 
 # Resin drop edges and experiment center in µm, as in mains/main.py
 RESIN_EDGES = [[5720, 22330], [-3333, 22420], [1660, 17212], [1200, 27190]]
