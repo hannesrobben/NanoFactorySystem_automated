@@ -2645,3 +2645,17 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Commits:** `f6efbac` feat(mains): add main_PNG.py to print a 16-bit PNG height map [T116], plus the
   `docs(todo)` commit of this entry.
 - **Follow-ups:** none. 8-bit PNGs are refused by `HeightMap_IFOV` (deliberate `require_16bit`).
+
+### 2026-11-20 17:03 CET — [T117] Analysis of the failed chain print (IFOV structures print as "+")
+- **Status:** partial (analysis done, cause in the controller behaviour still open)
+- **Changes:**
+  - `TODO.md`: new T117 with the finding, the suspects and a lab test plan; phase table
+- **Tests:** none (analysis only). Checked on the data of substrate HR-26-002 (copy on the office PC): layer
+  programs of all 27 structures (correct square geometry, grid placement, z range 6 µm), `print_progress.json`
+  (all layers ok, 2.7–4.4 s per layer), `A3200.log` (no error), camera captures after every layer (the "+" builds
+  up layer by layer, identical for all powers and hatches), git history of `IFOV_Lines` /
+  `initialise_IFOV_configuration` (no functional change since 2026-06-05; T35/T63 kept the programs, golden
+  files). Dry run of one chain rectangle gives the same programs as the lab run.
+- **Commits:** the `docs(todo)` commit of this entry.
+- **Follow-ups:** T117 (lab test). `main_PNG.py` uses the same IFOV path and should not be used for a long
+  print before T117 is solved.

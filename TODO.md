@@ -42,7 +42,7 @@ with an evaluation after every layer capture; a camera live feed; a core that a 
 | 8 | Operating modes and calibration | T88, T89, T90, T91, T92, T104, T107 | T90 needs MIRA MI-53 for the real evaluator; T104 needs MIRA MI-41 for the fit; T107 needs OffAxisHolo K10 for the sweep |
 | 9 | Camera live feed | T102, T93, T94, T95 | T102 before T93 (hard prerequisite, `CAMERA_LIVE.md`) |
 | 10 | Core ready for a GUI | T96, T97 | – |
-| B | Backlog (from T19 `todo_notes.md`, lab checks, follow-ups) | T67, T69, T109, T111, T112, T114 | – |
+| B | Backlog (from T19 `todo_notes.md`, lab checks, follow-ups) | T67, T69, T109, T111, T112, T114, T117 | – |
 
 Phases 6, 9 and 10 are independent of each other. Phase 7 can start with T82, T83 and T85 before
 `dhmconnect` exists. Phase 8 needs T83 and T85. Target of all phases: Release V1.0 as defined by the
@@ -528,6 +528,30 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
   - Done when:
     - both scripts use the chosen acceleration and the expected printing time of these structures is in the
       range of minutes; T69 (lab check) is run with the corrected values.
+
+- [ ] T117: IFOV prints only a cross ("+") of every filled area: the laser exposes only a ~20 µm band of each 50 µm line (found during the chain print HR-26-002, 2026-11-20) [phase: B]
+  - Priority: high
+  - Size: M
+  - Depends on: lab time
+  - Finding (substrate HR-26-002, experiments A/B/C of `chain_rectangle_doe_lens.py`): the layer programs are
+    correct (full 50 x 50 µm square, lines alternating along x and y, correct grid placement and z range, no
+    controller error in `A3200.log`), but the camera images after every layer show that each layer is exposed
+    only in a band of ~20 µm across the scan direction, ~6 µm off the structure center; with cross hatching the
+    union is a "+" instead of a square. Identical for all 9 power x hatch cells (0.25–0.75 mW, 0.2–0.6 µm), so a
+    hard gating of the laser, not a dose effect. Rectangle (`Rectangle3D_IFOV`) and height maps
+    (`HeightMap_IFOV`, DOE, lens) are affected alike, as everything goes through `IFOV_Lines` +
+    `IFOV_AeroBasicProgram.initialise_IFOV_configuration` (unchanged since 2026-06-05). The corner markers (galvo
+    A/B without IFOV, explicit `GALVO LASEROVERRIDE A ON/OFF`, up to ±60 µm deflection, same 5 mm/s) print
+    correctly. The 20x IFOV gratings of 2026-03 used another configuration (no `RAMP RATE 0`, `LOOKAHEAD FAST`,
+    `CRITICAL START`, `IFOV SYNCAXES Z`; other IFOV size and tracking values).
+  - Suspects (to separate in the lab): laser gating with `GALVO LASEROVERRIDE A AUTO` in IFOV mode; the IFOV
+    configuration of 2026-06 (`RAMP RATE 0`, tracking speed/accel, `IFOV TIME`); laser on/off delays of the galvo.
+  - Lab test: one single-layer 50 x 50 µm square per variant on one substrate: (a) current program; (b) explicit
+    `GALVO LASEROVERRIDE A ON/OFF` around every `LINEAR`; (c) configuration of 2026-03; (d) same square without
+    IFOV (galvo only, like the corners).
+  - Done when: the cause is known, IFOV squares print as full squares, and the fix is in `IFOV_Lines` /
+    `initialise_IFOV_configuration` with updated golden files. Until then no IFOV print (incl. `main_PNG.py`)
+    should be started for real work.
 
 - [ ] T114: `Rectangle3D_IFOV`: objective of the IFOV configuration and stateless alternating hatch (found during T113) [phase: B]
   - Priority: medium
