@@ -9,6 +9,7 @@ Moved here in T113 so that `mains/Experiments/` holds only the documented defaul
 | `focal_points/z_line_focal_points.py` | z-lines with camera images for focus training data (T36) | `test/integration/test_focal_points.py` |
 | `experiment_template.py` | Short template of T51 (superseded by `../default_experiment.py`) | `test/integration/test_dry_run_spec.py`, `test_ported_scripts.py` |
 | `default_exp_file.py` | Older template with the former `binary_testprint` flow | `test/integration/test_dry_run_default_experiment.py` |
+| `dhm_paper.py`, `dhm_paper_pillowProblem_63.py`, `grating_try.py` | Former entry scripts of `mains/` (moved in T115); run with `mains/` as working directory, e.g. `python -m Experiments.old_experiment.grating_try` | – |
 | `historical/` | Scripts of earlier experiments, not ported, not tested (see its README) | – |
 
 Import them as `from Experiments.old_experiment.<folder>.<script> import ...` (working directory `mains/`).
