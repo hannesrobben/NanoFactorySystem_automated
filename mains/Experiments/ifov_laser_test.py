@@ -70,9 +70,10 @@ CENTERS = {
     "galvo_only": Point2D(3000, -1000),
 }
 SUBSTRATE_LABEL: Optional[str] = None                # LAB: e.g. "HR-26-003"; None = next free label
-# Message boxes on the lab PC (former ask_continue_box); plots are shown either way
+# Unattended run: set all three to False, then nothing waits for a click
 ASK_EACH_STEP = False                                 # confirm plane fit and printing inside every experiment
 ASK_BETWEEN = False                                   # confirm before starting the next experiment
+SHOW_PLOTS = False                                    # layout plot windows (must be closed to continue); False: experiment.png only
 
 # ------------------------------------------------------------------------------------------------
 # Test parameters
@@ -394,7 +395,7 @@ def main(*, backend=None, plane=None, data_root: Optional[Path] = None, material
     return run_substrate(substrate_spec(data_root), experiments(), backend=backend, plane=plane,
                          confirm=messagebox_confirm if interactive and ASK_EACH_STEP else None,
                          confirm_between=messagebox_confirm if interactive and ASK_BETWEEN else None,
-                         show_plot=interactive,
+                         show_plot=interactive and SHOW_PLOTS,
                          material_registry=material_registry)
 
 

@@ -59,9 +59,11 @@ REPOSITORY = Path(__file__).resolve().parents[1]
 TASK = "experiment"            # see the list of tasks in the docstring above
 DRY_RUN = False                # True: simulated hardware, output in a temporary folder
 
-# Message boxes on the lab PC (former ask_continue_box); plots are shown either way
-ASK_EACH_STEP = True           # True: confirm plane fit and printing inside every experiment
-ASK_BETWEEN = True             # True: confirm before the next experiment of task "substrate"
+# Unattended run: set all three to False, then nothing waits for a click
+ASK_EACH_STEP = True           # True: message box before plane fit and printing inside every experiment
+ASK_BETWEEN = True             # True: message box before the next experiment of task "substrate"
+SHOW_PLOTS = True              # True: open the layout plots (a window must be closed to continue);
+                               # False: no window, experiment.png is written into the folder anyway
 
 USER = "Hannes"                # user key "user:<name>" in ~/nanofactory.json
 OBJECTIVE = "Zeiss 63x"        # "Zeiss 20x" or "Zeiss 63x"
@@ -416,7 +418,8 @@ def main(task: str = TASK, *, dry: bool = DRY_RUN, workdir: Optional[Path] = Non
         if task == "demo":
             raise ValueError("Task 'demo' runs every task and is meant for a dry run (--dry-run).")
         return TASKS[task](Session(confirm=messagebox_confirm if ASK_EACH_STEP else None,
-                                   confirm_between=messagebox_confirm if ASK_BETWEEN else None))
+                                   confirm_between=messagebox_confirm if ASK_BETWEEN else None,
+                                   show_plot=SHOW_PLOTS))
 
     import matplotlib
     matplotlib.use("Agg")  # no plot windows in a dry run
