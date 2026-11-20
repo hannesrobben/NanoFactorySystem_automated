@@ -61,18 +61,18 @@ from nanofactorysystem.substrate_plan import SubstrateExperiment, SubstrateSpec
 USER = "Hannes"
 OBJECTIVE = "Zeiss 63x"
 # LAB: edges of the resin drop measured with the camera: right, left, near, far
-RESIN_EDGES = [[5720, 22330], [-3333, 22420], [1660, 17212], [1200, 27190]]
+RESIN_EDGES = [[-4900, -2300], [4300, -700], [-800, -5900], [-200, 3600]]
 # LAB: centers of the four experiments, side by side along x (checked by check_layout)
-CENTERS = {
-    "current": Point2D(-600, 20800),
-    "laser_on_off": Point2D(400, 20800),
-    "config_march": Point2D(1400, 20800),
-    "galvo_only": Point2D(2400, 20800),
+CENTERS = {    
+    "current": Point2D(0, -1000),
+    "laser_on_off": Point2D(1000, -1000),
+    "config_march": Point2D(2000, -1000),
+    "galvo_only": Point2D(3000, -1000),
 }
 SUBSTRATE_LABEL: Optional[str] = None                # LAB: e.g. "HR-26-003"; None = next free label
-# Message boxes on the lab PC (former ask_continue_box)
-ASK_EACH_STEP = True        # True: confirm plane fit and printing inside every experiment
-ASK_BETWEEN = True          # True: confirm before starting the next experiment
+# Message boxes on the lab PC (former ask_continue_box); plots are shown either way
+ASK_EACH_STEP = False                                 # confirm plane fit and printing inside every experiment
+ASK_BETWEEN = False                                   # confirm before starting the next experiment
 
 # ------------------------------------------------------------------------------------------------
 # Test parameters
