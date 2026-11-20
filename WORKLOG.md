@@ -2693,3 +2693,14 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   feat(mains): switch the confirmation boxes in main, main_PNG and the chain [T117], plus the `docs(todo)`
   commit of this entry.
 - **Follow-ups:** none.
+
+### 2026-11-20 20:33 CET — [T117] Switch to suppress the plot windows (unattended run)
+- **Status:** done (T117 itself stays in progress until the lab test is evaluated)
+- **Changes:**
+  - `mains/main.py`: `SHOW_PLOTS` in the SETTINGS block next to `ASK_EACH_STEP`/`ASK_BETWEEN`, passed as `Session(show_plot=)` in a real run.
+  - `mains/main_PNG.py`: `SHOW_PLOTS` switches off the preview window and the layout plot.
+  - `mains/Experiments/chain_rectangle_doe_lens.py`: `SHOW_PLOTS` (default True), `show_plot=interactive and SHOW_PLOTS`.
+  - `mains/Experiments/ifov_laser_test.py`: `SHOW_PLOTS = False` (matching the maintainer's False confirmation switches there).
+- **Tests:** `test_main_png.py`, `test_ifov_laser_test.py`, `test_main_entry.py` (incl. slow demo dry run): 21 passed; `test_experiment_chain.py -m "not slow"`: 8 passed.
+- **Commits:** see `git log` on `feat/t117-show-plots-switch` (feat(mains): add SHOW_PLOTS to run the lab scripts unattended [T117])
+- **Follow-ups:** none; `experiment.png` is still written with the windows off.
