@@ -2677,3 +2677,19 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   `docs(todo)` commit of this entry.
 - **Follow-ups:** variant c may inherit RAMP/LOOKAHEAD/SYNCAXES settings from earlier IFOV programs (no setup
   resets them). Branch based on `feat/t116-main-png`.
+
+### 2026-11-20 18:13 CET — [T117] Switches for the confirmation boxes of the lab scripts
+- **Status:** done (maintainer request; part of the T117 lab work)
+- **Changes:**
+  - `mains/Experiments/ifov_laser_test.py`: `ASK_EACH_STEP`, `ASK_BETWEEN`
+  - `mains/main.py`: `ASK_EACH_STEP`, `ASK_BETWEEN` in SETTINGS; `Session.confirm_between` (task `substrate`
+    used `confirm` for both questions before)
+  - `mains/main_PNG.py`: `ASK_EACH_STEP`
+  - `mains/Experiments/chain_rectangle_doe_lens.py`: `ASK_EACH_STEP`, `ASK_BETWEEN`
+  - The switches turn off only the message boxes; plots still depend on the backend (lab = shown).
+- **Tests:** short-path venv: `test_main_entry.py` 8 passed (incl. slow demo dry run); `test_main_png.py`,
+  `test_experiment_chain.py`, `test_ifov_laser_test.py` with `-m "not slow"`: 27 passed.
+- **Commits:** `4719134` feat(mains): switch the confirmation boxes of the IFOV lab test [T117], `c936384`
+  feat(mains): switch the confirmation boxes in main, main_PNG and the chain [T117], plus the `docs(todo)`
+  commit of this entry.
+- **Follow-ups:** none.
