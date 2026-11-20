@@ -36,6 +36,7 @@ def test_three_experiments_with_a_power_by_hatch_grid(chain, test_config):
         spec = experiment.spec.resolved()
         assert spec.objective == "Zeiss 63x" and spec.setup == "IFOV_on" and spec.grid == (3, 3)
         assert len(spec.structures) == 9
+        assert spec.overview_capture and spec.camera_capture and not spec.dhm_usage
         # print order row by row: one row per power, one column per hatch distance
         for index, structure in enumerate(spec.structures):
             row, column = divmod(index, 3)
@@ -51,6 +52,7 @@ def test_rectangle_geometry(chain):
     assert (rectangle.x_length, rectangle.y_length, rectangle.height) == (50.0, 50.0, 6.0)
     assert rectangle.center.Z == -1.0 and rectangle.slice_size == 0.25
     assert rectangle.hatch_size == 0.4 and rectangle.power == 0.5
+    assert rectangle.alternate_hatching  # cross hatching
 
 
 def test_doe_geometry(chain):
@@ -60,6 +62,9 @@ def test_doe_geometry(chain):
     assert set(np.unique(doe.height_map)) == {0.0, 0.5, 1.0, 1.5, 2.0, 2.5}
     assert doe.socket_height == 3.5 and doe.center.Z == -1.0 and doe.slice_size == 0.25
     assert doe.width == doe.length == 50.0
+    # cross hatching with the same hatch and slice distance in the base and the fields
+    assert doe.alternating_hatch and doe.socket_hatch_size == doe.hatch_size == 0.2
+    assert doe.socket_slice_size == 0.25
     # the levels are fixed in the script, not drawn anew
     assert np.array_equal(np.asarray(chain.DOE_LEVELS),
                           np.random.default_rng(20261120).integers(0, 6, size=(5, 5)))

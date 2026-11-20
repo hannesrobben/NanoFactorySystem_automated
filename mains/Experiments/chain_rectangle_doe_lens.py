@@ -10,8 +10,11 @@ Every experiment is a 3 x 3 parameter grid of the same structure:
 - rows (y): laser power 0.25 / 0.50 / 0.75 mW,
 - columns (x): hatch distance 0.2 / 0.4 / 0.6 µm,
 - slice distance 0.25 µm everywhere,
+- cross hatching: the hatch lines alternate between x and y from layer to layer, with the same
+  hatch distance in every layer of a structure (also in the DOE base),
 - every structure starts 1 µm inside the substrate (bottom layer at z = -1 µm relative to the
-  surface found by the plane fit), so 1 µm of its height is written into the substrate.
+  surface found by the plane fit). The heights below include this 1 µm; the height written above
+  the substrate is 5 µm for the rectangle and the lens, 2.5 µm base + up to 2.5 µm DOE levels.
 
 =============  ==================================================================================
 Experiment     Structure
@@ -83,7 +86,9 @@ SLICE_UM = 0.25                                      # slice distance of every s
 SUBSTRATE_OVERLAP_UM = 1.0                           # depth written into the substrate (start z = -1 µm)
 IFOV_VELOCITY_MM_S = 5.0                             # kept for the metadata; IFOV writes at the fixed
                                                      # speed of the objective (5 mm/s for 63x)
-ALTERNATING_HATCH = True                             # turn the hatch direction by 90° from layer to layer
+ALTERNATING_HATCH = True                             # cross hatching: lines along x and along y alternate
+                                                     # from layer to layer; the hatch distance of a grid
+                                                     # cell applies to every layer (incl. the DOE base)
 
 # Experiment 1: rectangle
 RECT_SIZE_UM = 50.0
@@ -259,6 +264,7 @@ def doe(context: BuildContext, *, power_mw: float, hatch_um: float, levels: list
     _check_power(context, power_mw)
     return HeightMap_IFOV(Point3D(0, 0, -SUBSTRATE_OVERLAP_UM), doe_height_map(levels), DOE_FIELD_UM,
                           DOE_BASE_HEIGHT_UM, slice_size=SLICE_UM, hatch_size=hatch_um,
+                          socket_slice_size=SLICE_UM, socket_hatch_size=hatch_um,  # base: same slice and hatch
                           velocity=IFOV_VELOCITY_MM_S, power=power_mw, objective=context.objective or OBJECTIVE,
                           alternating_hatch=ALTERNATING_HATCH)
 
@@ -401,7 +407,7 @@ def experiment_spec(kind: str, center: Optional[Point2D] = None, objective: str 
         dhm_usage=False,
         opl_start_um=None,
         camera_capture=True,                            # one camera image after every structure
-        overview_capture=False,
+        overview_capture=True,                          # stitched camera mosaic before and after printing
         overview_single_images=False,
         materials={"resin": "SZ2080"},
         voxel_material=None,
