@@ -3,7 +3,11 @@
 .output/
 attic/
 postprocessing/
+<<<<<<< Updated upstream
 .venv/
+=======
+NFS_RUN_ENV/
+>>>>>>> Stashed changes
 
 *.png
 *.zdc
