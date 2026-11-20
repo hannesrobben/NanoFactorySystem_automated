@@ -2629,3 +2629,19 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   this entry.
 - **Follow-ups:** T114 unchanged (the cross hatching of `Rectangle3D_IFOV` flips its own state; with 25 layers a
   second iteration starts in the other direction).
+
+### 2026-11-20 16:49 CET — [T116] Entry script for printing a PNG height map
+- **Status:** done
+- **Changes:**
+  - `mains/main_PNG.py` (new): prints a 16-bit PNG as `HeightMap_IFOV` in IFOV mode; only `PNG`, `PIXEL_SIZE_UM`,
+    `HEIGHT_PER_GRAY_UM` (and optional `GRAY_OFFSET`) must be set; user, objective, resin edges, output root and
+    substrate label from `main.py`; center of the resin drop unless `CENTER` is set; `--preview`, `--dry-run`.
+    Based on the maintainer's draft `height_map_ifov.py`.
+  - `test/integration/test_main_png.py` (new): 5 tests (1 slow dry run)
+  - `test/README.md`: new test module
+  - `TODO.md`: T116 done
+- **Tests:** short-path venv: `python -m pytest test/integration/test_main_png.py` 5 passed (incl. dry run);
+  `python -m pytest -m "not slow"` 423 passed, 15 skipped.
+- **Commits:** `f6efbac` feat(mains): add main_PNG.py to print a 16-bit PNG height map [T116], plus the
+  `docs(todo)` commit of this entry.
+- **Follow-ups:** none. 8-bit PNGs are refused by `HeightMap_IFOV` (deliberate `require_16bit`).
