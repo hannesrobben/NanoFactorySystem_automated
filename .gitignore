@@ -52,3 +52,4 @@ MANIFEST
 
 # Voxel database (T53); the seed CSV in config/ is versioned
 *.sqlite
+analysis/exp_20112026.py
