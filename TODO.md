@@ -549,11 +549,38 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
 
+- [ ] T117: IFOV prints only a cross ("+") of every filled area: the laser exposes only a ~20 µm band of each 50 µm line (found during the chain print HR-26-002, 2026-11-20) [phase: B]
+  - Priority: high
+  - Size: M
+  - Depends on: lab time
+  - Finding (substrate HR-26-002, experiments A/B/C of `chain_rectangle_doe_lens.py`): the layer programs are
+    correct (full 50 x 50 µm square, lines alternating along x and y, correct grid placement and z range, no
+    controller error in `A3200.log`), but the camera images after every layer show that each layer is exposed
+    only in a band of ~20 µm across the scan direction, ~6 µm off the structure center; with cross hatching the
+    union is a "+" instead of a square. Identical for all 9 power x hatch cells (0.25–0.75 mW, 0.2–0.6 µm), so a
+    hard gating of the laser, not a dose effect. Rectangle (`Rectangle3D_IFOV`) and height maps
+    (`HeightMap_IFOV`, DOE, lens) are affected alike, as everything goes through `IFOV_Lines` +
+    `IFOV_AeroBasicProgram.initialise_IFOV_configuration` (unchanged since 2026-06-05). The corner markers (galvo
+    A/B without IFOV, explicit `GALVO LASEROVERRIDE A ON/OFF`, up to ±60 µm deflection, same 5 mm/s) print
+    correctly. The 20x IFOV gratings of 2026-03 used another configuration (no `RAMP RATE 0`, `LOOKAHEAD FAST`,
+    `CRITICAL START`, `IFOV SYNCAXES Z`; other IFOV size and tracking values).
+  - Suspects (to separate in the lab): laser gating with `GALVO LASEROVERRIDE A AUTO` in IFOV mode; the IFOV
+    configuration of 2026-06 (`RAMP RATE 0`, tracking speed/accel, `IFOV TIME`); laser on/off delays of the galvo.
+  - Lab test: one single-layer 50 x 50 µm square per variant on one substrate: (a) current program; (b) explicit
+    `GALVO LASEROVERRIDE A ON/OFF` around every `LINEAR`; (c) configuration of 2026-03; (d) same square without
+    IFOV (galvo only, like the corners).
+  - 2026-11-20: lab test script `mains/Experiments/ifov_laser_test.py` (variants a–d, 4 squares each) built
+    and dry-run; waiting for the lab print.
+  - Done when: the cause is known, IFOV squares print as full squares, and the fix is in `IFOV_Lines` /
+    `initialise_IFOV_configuration` with updated golden files. Until then no IFOV print (incl. `main_PNG.py`)
+    should be started for real work.
+
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T116: Entry script for printing a PNG height map (maintainer request 2026-11-20) — 2026-11-20 — `mains/main_PNG.py` needs only the PNG path, pixel size and µm per gray value; user, objective, drop and output come from `main.py`, the structure is placed in the drop center; `--preview` and `--dry-run`; tested incl. dry run. — commits: `f6efbac`
 - [x] T115: Maintainer decisions on the experiment chain and the remaining old entry scripts (follow-up of T113, maintainer request 2026-11-20) — 2026-11-20 — The chain keeps 5 µm written height above the substrate (totals incl. the 1 µm overlap), uses cross hatching with one hatch distance per cell in every layer (DOE base explicit) and captures the overview mosaic; `dhm_paper.py`, `dhm_paper_pillowProblem_63.py`, `grating_try.py` moved from `mains/` to `mains/Experiments/old_experiment/`. — commits: `21806e8`, `1ee08c1`
 - [x] T113: Older experiment scripts to `old_experiment/` and a rectangle → DOE → lens experiment chain (maintainer request 2026-11-20) — 2026-11-20 — `mains/Experiments/` holds only `default_experiment.py` and `chain_rectangle_doe_lens.py`; everything else is in `mains/Experiments/old_experiment/`. The chain prints three IFOV experiments (rectangle 50×50×6 µm, DOE 5×5 on a 3.5 µm base, aspheric lens R 30 µm / k 2.3 / sag 6 µm, all 1 µm in the substrate, slice 0.25 µm), each a 3×3 grid power × hatch; dry run of the whole chain finished. Follow-up T114. — commits: `6c82ef8`, `1e4c3f9`, `75c3d19`
 - [x] T110: Main entry point for every task and a fully documented default experiment (maintainer request 2026-11-19) — 2026-11-19 — `mains/main.py` runs the tasks experiment / slicer / layout / substrate / spec_file / restart / overview / analyse / materials, each also as dry run (`--task demo --dry-run` runs all, checked end to end); `mains/Experiments/default_experiment.py` writes out every spec field and slicer option with an explanation; `backends.dummy.dry_run` for dry runs from scripts; the former main is `mains/main_legacy.py`. Follow-ups T111, T112. — commits: `9bd6c74`, `76138ba`, `e374b12`, `268f1c4`

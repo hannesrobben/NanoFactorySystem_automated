@@ -2629,3 +2629,51 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   this entry.
 - **Follow-ups:** T114 unchanged (the cross hatching of `Rectangle3D_IFOV` flips its own state; with 25 layers a
   second iteration starts in the other direction).
+
+### 2026-11-20 16:49 CET — [T116] Entry script for printing a PNG height map
+- **Status:** done
+- **Changes:**
+  - `mains/main_PNG.py` (new): prints a 16-bit PNG as `HeightMap_IFOV` in IFOV mode; only `PNG`, `PIXEL_SIZE_UM`,
+    `HEIGHT_PER_GRAY_UM` (and optional `GRAY_OFFSET`) must be set; user, objective, resin edges, output root and
+    substrate label from `main.py`; center of the resin drop unless `CENTER` is set; `--preview`, `--dry-run`.
+    Based on the maintainer's draft `height_map_ifov.py`.
+  - `test/integration/test_main_png.py` (new): 5 tests (1 slow dry run)
+  - `test/README.md`: new test module
+  - `TODO.md`: T116 done
+- **Tests:** short-path venv: `python -m pytest test/integration/test_main_png.py` 5 passed (incl. dry run);
+  `python -m pytest -m "not slow"` 423 passed, 15 skipped.
+- **Commits:** `f6efbac` feat(mains): add main_PNG.py to print a 16-bit PNG height map [T116], plus the
+  `docs(todo)` commit of this entry.
+- **Follow-ups:** none. 8-bit PNGs are refused by `HeightMap_IFOV` (deliberate `require_16bit`).
+
+### 2026-11-20 17:03 CET — [T117] Analysis of the failed chain print (IFOV structures print as "+")
+- **Status:** partial (analysis done, cause in the controller behaviour still open)
+- **Changes:**
+  - `TODO.md`: new T117 with the finding, the suspects and a lab test plan; phase table
+- **Tests:** none (analysis only). Checked on the data of substrate HR-26-002 (copy on the office PC): layer
+  programs of all 27 structures (correct square geometry, grid placement, z range 6 µm), `print_progress.json`
+  (all layers ok, 2.7–4.4 s per layer), `A3200.log` (no error), camera captures after every layer (the "+" builds
+  up layer by layer, identical for all powers and hatches), git history of `IFOV_Lines` /
+  `initialise_IFOV_configuration` (no functional change since 2026-06-05; T35/T63 kept the programs, golden
+  files). Dry run of one chain rectangle gives the same programs as the lab run.
+- **Commits:** the `docs(todo)` commit of this entry.
+- **Follow-ups:** T117 (lab test). `main_PNG.py` uses the same IFOV path and should not be used for a long
+  print before T117 is solved.
+
+### 2026-11-20 17:46 CET — [T117] Lab test script for the IFOV laser band failure
+- **Status:** partial (script ready and dry-run; the lab print and the fix are open)
+- **Changes:**
+  - `mains/Experiments/ifov_laser_test.py` (new): four experiments a–d (current `Rectangle3D_IFOV`, explicit
+    laser ON/OFF, IFOV configuration of 2026-03, galvo only without IFOV), each 2 x 2 squares 50 x 50 x 3 µm
+    (0.25 / 0.7 mW x lines along x / y, hatch 0.2 µm, slice 0.25 µm, no cross hatching); `--layout`, `--dry-run`
+  - `test/integration/test_ifov_laser_test.py` (new): 10 tests (1 slow dry run)
+  - `test/README.md`: new test module
+  - `TODO.md`: T117 to In Progress with the state
+- **Tests:** short-path venv: `python -m pytest test/integration/test_ifov_laser_test.py` 10 passed (incl. dry
+  run). Manual: `python -m Experiments.ifov_laser_test --dry-run` exit 0, all four experiments finished with
+  4 x 13 layers. Interpretation choices (to confirm): lines in one direction per square instead of cross hatching,
+  height 3 µm incl. 1 µm in the substrate, slice 0.25 µm, centers y = 20800 µm next to the chain experiments.
+- **Commits:** `7cf1403` feat(mains): add a lab test for the IFOV laser band failure [T117], plus the
+  `docs(todo)` commit of this entry.
+- **Follow-ups:** variant c may inherit RAMP/LOOKAHEAD/SYNCAXES settings from earlier IFOV programs (no setup
+  resets them). Branch based on `feat/t116-main-png`.
