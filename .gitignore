@@ -3,6 +3,7 @@
 .output/
 attic/
 postprocessing/
+.venv/
 
 *.png
 *.zdc
