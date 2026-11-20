@@ -2608,3 +2608,24 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   object). Interpretations to confirm by the maintainer: total heights include the 1 µm in the substrate; DOE base
   hatch = DOE hatch; lens in IFOV; alternating hatch on. Branch based on `feat/t110-main-access-point` (T110 not yet
   in `main_HR`).
+
+### 2026-11-20 12:14 CET — [T115] Chain decisions and the remaining old entry scripts
+- **Status:** done
+- **Changes:**
+  - `mains/dhm_paper.py`, `mains/dhm_paper_pillowProblem_63.py`, `mains/grating_try.py` (renamed →
+    `mains/Experiments/old_experiment/`, unchanged)
+  - `mains/Experiments/old_experiment/README.md`: lists them
+  - `mains/Experiments/chain_rectangle_doe_lens.py`: `overview_capture=True`; DOE base with explicit
+    `socket_hatch_size`/`socket_slice_size` (same hatch and slice as the fields); docstring states the written height
+    above the substrate (5 µm) and the cross hatching
+  - `test/integration/test_experiment_chain.py`: checks overview, cross hatching, base hatch/slice
+  - `TODO.md`: T115 done
+- **Tests:** `python -m pytest test/integration/test_experiment_chain.py` 9 passed (incl. slow dry run). Manual:
+  chain `--dry-run` exit 0, three experiments finished, `overview_before.png` / `overview_after.png` in every folder.
+  The full suite was not rerun: the change touches only the chain script, its test and file moves without
+  references (`todo_notes.md` is a historical inventory and keeps the old paths).
+- **Commits:** `21806e8` chore(mains): move dhm_paper and grating_try scripts to old_experiment/ [T115], `1ee08c1`
+  feat(mains): cross hatching and overview mosaic in the experiment chain [T115], plus the `docs(todo)` commit of
+  this entry.
+- **Follow-ups:** T114 unchanged (the cross hatching of `Rectangle3D_IFOV` flips its own state; with 25 layers a
+  second iteration starts in the other direction).
