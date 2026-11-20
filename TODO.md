@@ -42,7 +42,7 @@ with an evaluation after every layer capture; a camera live feed; a core that a 
 | 8 | Operating modes and calibration | T88, T89, T90, T91, T92, T104, T107 | T90 needs MIRA MI-53 for the real evaluator; T104 needs MIRA MI-41 for the fit; T107 needs OffAxisHolo K10 for the sweep |
 | 9 | Camera live feed | T102, T93, T94, T95 | T102 before T93 (hard prerequisite, `CAMERA_LIVE.md`) |
 | 10 | Core ready for a GUI | T96, T97 | – |
-| B | Backlog (from T19 `todo_notes.md`, lab checks, follow-ups) | T67, T69, T109, T111, T112 | – |
+| B | Backlog (from T19 `todo_notes.md`, lab checks, follow-ups) | T67, T69, T109, T111, T112, T114 | – |
 
 Phases 6, 9 and 10 are independent of each other. Phase 7 can start with T82, T83 and T85 before
 `dhmconnect` exists. Phase 8 needs T83 and T85. Target of all phases: Release V1.0 as defined by the
@@ -518,7 +518,7 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
   - Size: S
   - Depends on: –
   - `Rectangle3D(..., velocity=1000, acceleration=500)` with `axes="XYZ"` in
-    `mains/Experiments/experiment_template.py` (`drawing_spec`, "rectangle") and
+    `mains/Experiments/old_experiment/experiment_template.py` (`drawing_spec`, "rectangle"; moved in T113) and
     `mains/lab_checks/new_features_check.py` (`rect`, `ramp`) gives a run-up of 2·v²/(2a) = 2 mm before
     every 50/30 µm hatch line (`_Lines.iterate_layers`, a in µm/s²); the time estimate says about 49 min
     for one 50×50×3 µm block. The dry runs do not show it (simulated motion time).
@@ -529,6 +529,23 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
     - both scripts use the chosen acceleration and the expected printing time of these structures is in the
       range of minutes; T69 (lab check) is run with the corrected values.
 
+- [ ] T114: `Rectangle3D_IFOV`: objective of the IFOV configuration and stateless alternating hatch (found during T113) [phase: B]
+  - Priority: medium
+  - Size: S
+  - Depends on: –
+  - `Rectangle2D_IFOV` / `Rectangle3D_IFOV` (`aerobasic/programs/drawings/ifov_gratings.py`) create `IFOV_Lines`
+    without an objective, so their layer programs always use the IFOV configuration and writing speed of the
+    Zeiss 63x (`IFOV_Lines.iterate_layers(objective="Zeiss 63x")`), also in a 20x experiment.
+    `HeightMap_IFOV` already takes `objective=`.
+  - With `alternate_hatching=True`, `Rectangle3D_IFOV.iterate_layers` flips `self.hatching_direction` after
+    every layer. With an odd number of layers (e.g. 6 µm / 0.25 µm → 25 layers) a second iteration (time
+    estimate, plot, rebuild) starts with the other direction, and `to_json()` may store the flipped start
+    direction.
+  - Done when:
+    - both classes take `objective=` (default `"Zeiss 63x"`, stored in `to_json()`) and pass it on;
+    - the alternating direction is computed from the layer index without changing the object; iterating twice
+      gives identical programs (unit test); golden files unchanged.
+
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
 
@@ -537,6 +554,8 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T115: Maintainer decisions on the experiment chain and the remaining old entry scripts (follow-up of T113, maintainer request 2026-11-20) — 2026-11-20 — The chain keeps 5 µm written height above the substrate (totals incl. the 1 µm overlap), uses cross hatching with one hatch distance per cell in every layer (DOE base explicit) and captures the overview mosaic; `dhm_paper.py`, `dhm_paper_pillowProblem_63.py`, `grating_try.py` moved from `mains/` to `mains/Experiments/old_experiment/`. — commits: `21806e8`, `1ee08c1`
+- [x] T113: Older experiment scripts to `old_experiment/` and a rectangle → DOE → lens experiment chain (maintainer request 2026-11-20) — 2026-11-20 — `mains/Experiments/` holds only `default_experiment.py` and `chain_rectangle_doe_lens.py`; everything else is in `mains/Experiments/old_experiment/`. The chain prints three IFOV experiments (rectangle 50×50×6 µm, DOE 5×5 on a 3.5 µm base, aspheric lens R 30 µm / k 2.3 / sag 6 µm, all 1 µm in the substrate, slice 0.25 µm), each a 3×3 grid power × hatch; dry run of the whole chain finished. Follow-up T114. — commits: `6c82ef8`, `1e4c3f9`, `75c3d19`
 - [x] T110: Main entry point for every task and a fully documented default experiment (maintainer request 2026-11-19) — 2026-11-19 — `mains/main.py` runs the tasks experiment / slicer / layout / substrate / spec_file / restart / overview / analyse / materials, each also as dry run (`--task demo --dry-run` runs all, checked end to end); `mains/Experiments/default_experiment.py` writes out every spec field and slicer option with an explanation; `backends.dummy.dry_run` for dry runs from scripts; the former main is `mains/main_legacy.py`. Follow-ups T111, T112. — commits: `9bd6c74`, `76138ba`, `e374b12`, `268f1c4`
 - [x] T108: Material states and the SZ2080 seed — 2026-11-18 — States `uncured` / `cured_in_resin` / `cured_developed` / `any` with schema migration 2 → 3 (`cured` → `cured_in_resin`, old CSV files and snapshots still load); SZ2080 at 674.994 nm in `config/material_seed.csv`; versioned JSON export `MaterialRegistry.export_json`; `require_refractive_index` / `contract_snapshot` raise `MissingPropertyError` instead of a default — commits: `e79a531`, `0108f7f`, `698cc5c`.
 - [x] T98: Turn `Information_Mehrere_Experimente.txt` into an English user guide — 2026-11-18 — Guide `docs/guides/SUBSTRATE_AND_EXPERIMENT_SPECS.md` (`3101a96`); the German original moved to the local attic per X-A / X-B and is listed in `docs/ATTIC_INDEX.md` (`32d04e2`).

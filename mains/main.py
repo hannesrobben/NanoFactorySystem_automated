@@ -89,7 +89,7 @@ def experiment_spec() -> ExperimentSpec:
     """ The experiment of task ``experiment``: the default experiment with every setting.
 
     Replace this by the spec of your own experiment script, e.g.
-    ``from Experiments.Kailas import parametric_4q`` and
+    ``from Experiments.old_experiment.Kailas import parametric_4q`` and
     ``parametric_4q.experiment_spec(objective=OBJECTIVE, absolute_center=Point2D(0, 21000))``.
     """
 

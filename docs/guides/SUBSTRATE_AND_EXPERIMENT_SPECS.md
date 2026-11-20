@@ -76,7 +76,7 @@ Where the list is built:
 
 ## 4. An STL experiment as a spec
 
-The former `mains/Experiments/historical/Model_3D_experiment.py` passed `Model3D_Slicer(...)` directly to
+The former `mains/Experiments/old_experiment/historical/Model_3D_experiment.py` passed `Model3D_Slicer(...)` directly to
 `add_structure`. In the new form the same experiment looks like this (values from the old 63x branch;
 replace the STL path with your own file):
 
@@ -134,7 +134,7 @@ Copy `mains/substrate_main.py` once per substrate, e.g. as `mains/substrate_hr26
 places, `SUBSTRATE` and `experiments()`:
 
 ```python
-from Experiments.Kailas import power_z_pitch_lines, parametric_4q
+from Experiments.old_experiment.Kailas import power_z_pitch_lines, parametric_4q
 from stl_lens import stl_lens_spec     # or wherever you keep the function above
 
 OBJECTIVE = "Zeiss 63x"

@@ -19,7 +19,7 @@ import dataclasses
 from pathlib import Path
 from typing import Optional
 
-from Experiments.Kailas import Quadrants_line_power_gap, parametric_4q
+from Experiments.old_experiment.Kailas import Quadrants_line_power_gap, parametric_4q
 from nanofactorysystem.devices.coordinate_system import Point2D
 from nanofactorysystem.experiment_spec import messagebox_confirm
 from nanofactorysystem.substrate_plan import SubstrateExperiment, SubstrateSpec, run_substrate

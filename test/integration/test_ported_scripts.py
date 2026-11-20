@@ -13,7 +13,7 @@ from nanofactorysystem.devices.coordinate_system import Point2D
 from nanofactorysystem.experiment import StructureType
 from nanofactorysystem.experiment_spec import ExperimentSpec
 
-EXPERIMENTS = Path(__file__).parents[2] / "mains" / "Experiments"
+EXPERIMENTS = Path(__file__).parents[2] / "mains" / "Experiments" / "old_experiment"
 # script -> objectives with a complete parameter set
 PORTED = {
     "Kailas/parametric_4q.py": ("Zeiss 20x", "Zeiss 63x"),

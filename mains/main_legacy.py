@@ -6,16 +6,16 @@ import os
 import datetime
 from nanofactorysystem.devices.coordinate_system import Point2D
 
-# from Experiments.parameter_study.line_test.Power_speed_line_test import print_file as print_program
-# from Experiments.historical.Kailas.padding_test_0_5mm import print_file as print_program
-# from Experiments.historical.Kailas.ifovGrating_diffPower_500um import print_file as print_program
-# from Experiments.historical.Kailas.ifovGrating_diffPower_75um import print_file as print_program
-# from Experiments.historical.Kailas.ifovGrating_diffPower_500um import print_file as print_program
-# from Experiments.Kailas.parametric_4q import print_file as print_program
-# from Experiments.historical.Kailas.Rectangle_plane_fitting import print_file as print_program
-from Experiments.Kailas.power_z_pitch_lines import testprint as print_program
+# from Experiments.old_experiment.parameter_study.line_test.Power_speed_line_test import print_file as print_program
+# from Experiments.old_experiment.historical.Kailas.padding_test_0_5mm import print_file as print_program
+# from Experiments.old_experiment.historical.Kailas.ifovGrating_diffPower_500um import print_file as print_program
+# from Experiments.old_experiment.historical.Kailas.ifovGrating_diffPower_75um import print_file as print_program
+# from Experiments.old_experiment.historical.Kailas.ifovGrating_diffPower_500um import print_file as print_program
+# from Experiments.old_experiment.Kailas.parametric_4q import print_file as print_program
+# from Experiments.old_experiment.historical.Kailas.Rectangle_plane_fitting import print_file as print_program
+from Experiments.old_experiment.Kailas.power_z_pitch_lines import testprint as print_program
 
-# from Experiments.historical.IFOV_63.ifov_test import print_file as print_program
+# from Experiments.old_experiment.historical.IFOV_63.ifov_test import print_file as print_program
 
 
 def main():

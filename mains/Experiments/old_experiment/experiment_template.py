@@ -12,7 +12,7 @@ margins, corner sizes) come from ``nanofactorysystem.experiment_spec.OBJECTIVE_D
 and can be overridden in the spec.
 
 Copy this file for a new experiment and change the spec functions. Run it with
-``mains/`` as the working directory (``cd mains && python -m Experiments.experiment_template``).
+``mains/`` as the working directory (``cd mains && python -m Experiments.old_experiment.experiment_template``).
 A dry run on simulated hardware: ``main(backend="dummy")``.
 """
 from pathlib import Path

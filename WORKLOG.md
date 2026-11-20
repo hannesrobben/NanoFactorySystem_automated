@@ -2580,3 +2580,52 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   `experiment_template.py` and the lab check → 2 mm run-up per line on the stages; decision needed before T69).
   The local `~/nanofactory.json` of this PC has neither user `Hannes` nor `Zeiss 63x` (the dry-run helper bridges
   it). The slicer logs "mesh is not watertight" for height maps (harmless).
+
+### 2026-11-20 11:33 CET — [T113] Older experiment scripts to old_experiment/ and an experiment chain
+- **Status:** done
+- **Changes:**
+  - `mains/Experiments/{Big_substrate_20x,DHM_tomography,Kailas,focal_points,historical,parameter_study,refractive_index}/**`,
+    `mains/Experiments/default_exp_file.py`, `mains/Experiments/experiment_template.py` (renamed →
+    `mains/Experiments/old_experiment/...`, unchanged except the run command in `experiment_template.py`)
+  - `mains/Experiments/old_experiment/README.md` (new): content, import path, note on old `experiment_spec.json` files
+  - `mains/Experiments/old_experiment/historical/README.md`: new paths, template is `default_experiment.py`
+  - `mains/main.py`, `mains/substrate_main.py`, `mains/main_legacy.py`, `mains/main_IFOV.py`, `mains/main_3D_model.py`,
+    `mains/grating_try.py`: imports from `Experiments.old_experiment`
+  - `test/integration/test_ported_scripts.py`, `test_dry_run_spec.py`, `test_focal_points.py`,
+    `test_dry_run_default_experiment.py`: paths of the moved scripts (tests unchanged otherwise)
+  - `mains/Experiments/chain_rectangle_doe_lens.py` (new): substrate chain of three IFOV experiments (rectangle,
+    DOE on base, aspheric lens), 3×3 power × hatch grid each, named factories, `--layout`, `--dry-run`
+  - `test/integration/test_experiment_chain.py` (new): 9 tests (1 slow dry run)
+  - `CLAUDE.md`, `test/README.md`, `docs/guides/SUBSTRATE_AND_EXPERIMENT_SPECS.md`: new locations, chain
+  - `TODO.md`: T113 done, new T114, T112 path updated
+- **Tests:** short-path venv: `python -m pytest` 445 passed, 15 skipped (11:14 min). Manual:
+  `cd mains && python -m Experiments.chain_rectangle_doe_lens --dry-run` exit 0 (8 min), all three experiments
+  finished; expected printing time 33:41 / 33:13 / 31:17 min (rectangle / DOE / lens), mostly the 5 s layer overhead.
+- **Commits:** `6c82ef8` chore(mains): move all older experiment scripts to old_experiment/ [T113], `1e4c3f9`
+  feat(mains): add a chain of rectangle, DOE and aspheric lens experiments [T113], `75c3d19` docs: describe
+  old_experiment/ and the experiment chain [T113], plus the `docs(todo)` commit of this entry.
+- **Follow-ups:** T114 (`Rectangle3D_IFOV` always uses the 63x IFOV configuration; alternating hatch mutates the
+  object). Interpretations to confirm by the maintainer: total heights include the 1 µm in the substrate; DOE base
+  hatch = DOE hatch; lens in IFOV; alternating hatch on. Branch based on `feat/t110-main-access-point` (T110 not yet
+  in `main_HR`).
+
+### 2026-11-20 12:14 CET — [T115] Chain decisions and the remaining old entry scripts
+- **Status:** done
+- **Changes:**
+  - `mains/dhm_paper.py`, `mains/dhm_paper_pillowProblem_63.py`, `mains/grating_try.py` (renamed →
+    `mains/Experiments/old_experiment/`, unchanged)
+  - `mains/Experiments/old_experiment/README.md`: lists them
+  - `mains/Experiments/chain_rectangle_doe_lens.py`: `overview_capture=True`; DOE base with explicit
+    `socket_hatch_size`/`socket_slice_size` (same hatch and slice as the fields); docstring states the written height
+    above the substrate (5 µm) and the cross hatching
+  - `test/integration/test_experiment_chain.py`: checks overview, cross hatching, base hatch/slice
+  - `TODO.md`: T115 done
+- **Tests:** `python -m pytest test/integration/test_experiment_chain.py` 9 passed (incl. slow dry run). Manual:
+  chain `--dry-run` exit 0, three experiments finished, `overview_before.png` / `overview_after.png` in every folder.
+  The full suite was not rerun: the change touches only the chain script, its test and file moves without
+  references (`todo_notes.md` is a historical inventory and keeps the old paths).
+- **Commits:** `21806e8` chore(mains): move dhm_paper and grating_try scripts to old_experiment/ [T115], `1ee08c1`
+  feat(mains): cross hatching and overview mosaic in the experiment chain [T115], plus the `docs(todo)` commit of
+  this entry.
+- **Follow-ups:** T114 unchanged (the cross hatching of `Rectangle3D_IFOV` flips its own state; with 25 layers a
+  second iteration starts in the other direction).
