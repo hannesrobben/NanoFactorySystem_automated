@@ -57,25 +57,25 @@ from nanofactorysystem.resin_drop import ellipse_through
 # IMAGE: the only values you have to set
 # =================================================================================================
 PNG = Path(
-    r"C:\Users\Nanofactory\Desktop\Hannes\designs\doe.png"
+    r"C:\Users\Nanofactory\Desktop\Hannes\REAL-TIME ARCHITECTURE\DOE Print\surface_16bit.png"
 )  # 16-bit grayscale PNG
 PIXEL_SIZE_UM = (
     0.25  # size of one pixel in µm; (x, y) for non-square pixels, e.g. (0.5, 1.0)
 )
-HEIGHT_PER_GRAY_UM = 0.001  # µm per gray value step (16 bit: 65535 steps)
+HEIGHT_PER_GRAY_UM = 0.0001  # µm per gray value step (16 bit: 65535 steps)
 GRAY_OFFSET = 0  # gray value of height 0 (top of the socket); darker pixels count as 0
 
 # =================================================================================================
 # Printing: defaults that usually stay as they are
 # =================================================================================================
-POWER_MW = 0.5  # laser power
+POWER_MW = 0.3  # laser power
 SLICE_UM = 0.1  # layer height of the structure
 HATCH_UM: Optional[float] = None  # line distance; None: the pixel size
 SOCKET_HEIGHT_UM = (
-    2.0  # socket under the whole image (incl. SUBSTRATE_DEPTH_UM); 0: none
+    3.0  # socket under the whole image (incl. SUBSTRATE_DEPTH_UM); 0: none
 )
-SOCKET_SLICE_UM: Optional[float] = None  # None: SLICE_UM
-SOCKET_HATCH_UM: Optional[float] = None  # None: HATCH_UM
+SOCKET_SLICE_UM: Optional[float] = 0.25  # None: SLICE_UM
+SOCKET_HATCH_UM: Optional[float] = 0.25  # None: HATCH_UM
 SUBSTRATE_DEPTH_UM = 1.0  # the socket starts this far inside the substrate (adhesion)
 ADAPTIVE_SLICING = (
     False  # True: every distinct height of the image is hit exactly (multi-level DOEs)
