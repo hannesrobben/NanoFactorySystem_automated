@@ -55,6 +55,8 @@ User root  ~/Documents/Femtika_Experiment/<user>/
 └── <user>/                                     the user key passed to Experiment (e.g. "Hannes")
     └── HR-26-001/                              substrate folder = substrate label
         ├── substrate.json                      substrate record and its experiment index (§8)
+        ├── substrate_layout.json               copy: drops and every experiment area (§8, T118)
+        ├── substrate_layout.png                plot of the same (§8, T118)
         ├── HR-26-001-A_20260929-2018/          experiment folder = <experiment label>_<start time>
         │   ├── experiment.h5                   the experiment file (authoritative)
         │   ├── structures.json                 copy, entry point for people
@@ -340,6 +342,16 @@ The copies contain no image data. They are never read by the store except by `re
 legacy reader (§9).
 
 ## 8. Substrates and the experiment index
+
+Every write of the index (also the creation of the substrate) rewrites two copies next to it
+(T118, `storage/substrate_layout.py`): `substrate_layout.json` (schema
+`nanofactory.substrate_layout/1`: substrate, resin drops with their ellipse, every experiment with
+label, planned name, status, state, objective, center and area incl. markers in absolute stage µm,
+folder) and `substrate_layout.png` (drops in grey, areas coloured planned / running / done /
+aborted). They are written without pyplot (no window) and never read back; a failure is only
+logged. `SubstrateStore.write_layout(label)` writes them on request (task `overview` of
+`mains/main.py` does this for every substrate). A planned entry keeps its `name` when the
+experiment replaces it.
 
 `<root>/<substrate label>/substrate.json`:
 
