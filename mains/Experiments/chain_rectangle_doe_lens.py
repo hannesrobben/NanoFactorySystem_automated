@@ -69,12 +69,12 @@ USER = "Hannes"                                      # user key "user:<name>" of
 OBJECTIVE = "Zeiss 63x"                              # the IFOV structures below are set up for 63x
 # LAB: edges of the resin drop measured with the camera: right, left, near, far
 # RESIN_EDGES = [[5720, 22330], [-3333, 22420], [1660, 17212], [1200, 27190]]
-RESIN_EDGES = [[-1600, 20400],[6900, 21800],[1700, 16200],[3000,25000]]
+RESIN_EDGES = [[-4900, -2300], [4300, -700], [-800, -5900], [-200, 3600]]
 # LAB: centers of the three experiment grids, side by side along x (checked by check_layout)
 CENTERS = {
-    "rectangle": Point2D(-300, 22300),
-    "doe": Point2D(1300, 22300),
-    "lens": Point2D(2900, 22300),
+    "rectangle": Point2D(-1600, 0),
+    "doe": Point2D(0, 0),
+    "lens": Point2D(1600, 0),
 }
 SUBSTRATE_LABEL: Optional[str] = None                # LAB: e.g. "HR-26-001"; None = next free label
 # Unattended run: set all three to False, then nothing waits for a click
