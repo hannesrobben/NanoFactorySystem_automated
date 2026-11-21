@@ -549,37 +549,13 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
 
-- [ ] T117: IFOV prints only a cross ("+") of every filled area: the laser exposes only a ~20 µm band of each 50 µm line (found during the chain print HR-26-002, 2026-11-20) [phase: B]
-  - Priority: high
-  - Size: M
-  - Depends on: lab time
-  - Finding (substrate HR-26-002, experiments A/B/C of `chain_rectangle_doe_lens.py`): the layer programs are
-    correct (full 50 x 50 µm square, lines alternating along x and y, correct grid placement and z range, no
-    controller error in `A3200.log`), but the camera images after every layer show that each layer is exposed
-    only in a band of ~20 µm across the scan direction, ~6 µm off the structure center; with cross hatching the
-    union is a "+" instead of a square. Identical for all 9 power x hatch cells (0.25–0.75 mW, 0.2–0.6 µm), so a
-    hard gating of the laser, not a dose effect. Rectangle (`Rectangle3D_IFOV`) and height maps
-    (`HeightMap_IFOV`, DOE, lens) are affected alike, as everything goes through `IFOV_Lines` +
-    `IFOV_AeroBasicProgram.initialise_IFOV_configuration` (unchanged since 2026-06-05). The corner markers (galvo
-    A/B without IFOV, explicit `GALVO LASEROVERRIDE A ON/OFF`, up to ±60 µm deflection, same 5 mm/s) print
-    correctly. The 20x IFOV gratings of 2026-03 used another configuration (no `RAMP RATE 0`, `LOOKAHEAD FAST`,
-    `CRITICAL START`, `IFOV SYNCAXES Z`; other IFOV size and tracking values).
-  - Suspects (to separate in the lab): laser gating with `GALVO LASEROVERRIDE A AUTO` in IFOV mode; the IFOV
-    configuration of 2026-06 (`RAMP RATE 0`, tracking speed/accel, `IFOV TIME`); laser on/off delays of the galvo.
-  - Lab test: one single-layer 50 x 50 µm square per variant on one substrate: (a) current program; (b) explicit
-    `GALVO LASEROVERRIDE A ON/OFF` around every `LINEAR`; (c) configuration of 2026-03; (d) same square without
-    IFOV (galvo only, like the corners).
-  - 2026-11-20: lab test script `mains/Experiments/ifov_laser_test.py` (variants a–d, 4 squares each) built
-    and dry-run; waiting for the lab print.
-  - Done when: the cause is known, IFOV squares print as full squares, and the fix is in `IFOV_Lines` /
-    `initialise_IFOV_configuration` with updated golden files. Until then no IFOV print (incl. `main_PNG.py`)
-    should be started for real work.
 
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T117: IFOV prints only a cross ("+") of every filled area (found during the chain print HR-26-002, 2026-11-20) — 2026-11-21 — Cause found by the maintainer in the lab: a wrong configuration on the A3200 controller, not the generated programs; no change to `IFOV_Lines` / `initialise_IFOV_configuration` and the golden files. The lab test `mains/Experiments/ifov_laser_test.py` and the switches `ASK_EACH_STEP` / `ASK_BETWEEN` / `SHOW_PLOTS` stay; IFOV prints (incl. `main_PNG.py`) are cleared again. — commits: `114c55b`, `7cf1403`, `4719134`, `c936384`, `6020906`
 - [x] T120: Lab run aborted with `Tcl_AsyncDelete` during plane detection (maintainer report 2026-11-21, main_PNG with SHOW_PLOTS = False) — 2026-11-21 — Hidden plots are built without pyplot (no Tk objects), shown plots and the message box free their Tk objects in the main thread right away. — commits: `7360a3c`
 - [x] T119: `SUBSTRATE_LABEL` in `main_PNG.py` and the import error `No module named 'main'` (maintainer report 2026-11-21) — 2026-11-21 — With `SUBSTRATE_LABEL` the PNG experiment runs through `run_substrate` (substrate created below `dataRoot` if new, overlap checked, layout files updated); `None` keeps `OUTPUT_ROOT`; the script puts `mains/` on `sys.path` itself. — commits: `b2cff99`
 - [x] T118: Substrate layout as JSON and image in the substrate folder (maintainer request 2026-11-21) — 2026-11-21 — Every write of the substrate index rewrites `substrate_layout.json` (drops, every experiment with label, name, status, center and area in stage µm) and `substrate_layout.png` (no window); a planned entry keeps its name after registration; task `overview` regenerates both for older substrates. — commits: `1b110d0`, `b191ac0`
