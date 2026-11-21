@@ -81,7 +81,7 @@ ADAPTIVE_SLICING = (
     False  # True: every distinct height of the image is hit exactly (multi-level DOEs)
 )
 ALTERNATING_HATCH = True  # turn the raster lines by 90° from layer to layer
-CENTER: Optional[Point2D] = (
+CENTER: Optional[Point2D] = Point2D(
     500, -25000  # absolute stage position (µm); None: center of the resin drop
 )
 CAMERA_CAPTURE = True  # camera image after every layer

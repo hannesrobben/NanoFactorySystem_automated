@@ -484,6 +484,17 @@ class ExperimentSpec:
     description: str = ""
     tags: list = field(default_factory=list)
 
+    def __post_init__(self):
+        # A center written as a plain (x, y) pair is accepted and converted,
+        # every consumer expects a Point2D (e.g. substrate_plan.experiment_area).
+        if not isinstance(self.center, Point2D):
+            try:
+                x, y = self.center
+            except (TypeError, ValueError):
+                raise TypeError(f"ExperimentSpec.center must be a Point2D or an (x, y) pair in µm, "
+                                f"got {self.center!r}") from None
+            self.center = Point2D(float(x), float(y))
+
     # ------------------------------------------------------------ serialised form (T77)
 
     def to_json(self, folder: Optional[Path] = None) -> dict:

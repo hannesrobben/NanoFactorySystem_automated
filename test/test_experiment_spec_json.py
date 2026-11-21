@@ -164,3 +164,15 @@ def test_structure_file_on_its_own():
     assert (structure.name, structure.axes, structure.power_mw, structure.repeat) == ("rect", "XYZ", 1.2, 1)
     with pytest.raises(SpecSerialisationError, match="unknown geometry kind"):
         StructureSpec.from_json(dict(data, geometry={"kind": "mesh"}))
+
+
+def test_center_given_as_pair_becomes_point2d():
+    """A center written as a plain (x, y) tuple is converted, so substrate_plan can use it."""
+    from nanofactorysystem.substrate_plan import experiment_area
+
+    spec = ExperimentSpec(name="pair", objective="Zeiss 20x", center=(500, -25000), grid=(1, 1))
+    assert spec.center == Point2D(500.0, -25000.0)
+    area = experiment_area(spec)
+    assert area.name == "pair"
+    with pytest.raises(TypeError, match="center"):
+        ExperimentSpec(name="bad", objective="Zeiss 20x", center=500, grid=(1, 1))
