@@ -2744,3 +2744,11 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** full `python -m pytest`: 468 passed, 15 skipped.
 - **Commits:** `7360a3c` fix(experiment): stop hidden plots from crashing the run with Tcl_AsyncDelete [T120]
 - **Follow-ups:** verify on the lab PC (start main_PNG with SHOW_PLOTS = False up to the print start).
+
+### 2026-11-21 15:03 CET — [T117] IFOV "+" prints closed: controller configuration
+- **Status:** done
+- **Changes:**
+  - `TODO.md`: T117 moved from In Progress to Done. The maintainer found the cause in the lab: a wrong configuration on the A3200 controller, not the generated programs. No code change to the IFOV generation, golden files unchanged.
+- **Tests:** none (bookkeeping only).
+- **Commits:** see `git log` on `docs/t117-close` (docs(todo): close T117, the cause was the controller configuration)
+- **Follow-ups:** none; `mains/Experiments/ifov_laser_test.py` stays as a lab check for the IFOV laser gating.
