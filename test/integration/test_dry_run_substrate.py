@@ -50,6 +50,13 @@ def test_two_experiments_on_one_substrate(test_config, dummy_backend, no_sleep, 
     assert [(e["label"], e["status"]) for e in index] == [("TU-26-007-A", "finished"), ("TU-26-007-B", "finished")]
     assert [Path(e["folder"]) for e in index] == folders
 
+    # T118: layout copy and plot of the whole substrate next to substrate.json
+    import json
+    layout = json.loads((root / "TU-26-007" / "substrate_layout.json").read_text())
+    assert [(e["label"], e["name"], e["state"]) for e in layout["experiments"]] == \
+        [("TU-26-007-A", "left", "done"), ("TU-26-007-B", "right", "done")]
+    assert (root / "TU-26-007" / "substrate_layout.png").is_file()
+
     # The planned area is the rectangle of the experiment as printed
     for experiment, stored in zip(planned, records):
         area = experiment_area(experiment.spec)

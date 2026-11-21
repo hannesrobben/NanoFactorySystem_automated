@@ -336,6 +336,8 @@ def task_overview(session: Session) -> list[dict]:
         print(f"Substrate {label} ({record.substrate_type or 'type ?'}, {len(record.resin_drops)} resin drop(s))")
         for item in substrate_overview(root, label):
             print(f"  {item.name:18s} {item.state:8s} {item.status:9s} {item.objective:10s} {item.folder or ''}")
+        layout_json, layout_png = store.write_layout(label)  # also for substrates from before T118
+        print(f"  layout: {layout_png} / {layout_json.name}")
     finished = find_experiments(root, status="finished")
     print(f"{len(finished)} finished experiment(s) in {root}")
     return finished

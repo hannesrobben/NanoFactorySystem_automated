@@ -8,6 +8,8 @@
 Layout below the data root of a user::
 
     <root>/<substrate label>/substrate.json
+    <root>/<substrate label>/substrate_layout.json   (copy for the lab, T118)
+    <root>/<substrate label>/substrate_layout.png    (plot of all experiments, T118)
     <root>/<substrate label>/<experiment label>_<YYYYMMDD-HHMM>/experiment.h5
 
 Record version 2 (T76, docs/design/INFORMATION_MODEL.md §3.2) adds the
@@ -17,9 +19,12 @@ written as version 2 only when the record changes. Index entries may be
 ``planned`` (written by a substrate main before the run) and carry the area
 the experiment occupies and the index of its resin drop;
 :func:`substrate_overview` lists them with the status of the experiment file.
+Every write of the index also rewrites ``substrate_layout.json`` and
+``substrate_layout.png`` (:mod:`.substrate_layout`, T118).
 """
 import datetime
 import json
+import logging
 import re
 import string
 import uuid as uuid_module
@@ -373,6 +378,7 @@ class SubstrateStore:
                                  substrate_type=substrate_type, dimensions=dict(dimensions or {}))
         self.folder(label).mkdir(parents=True, exist_ok=True)
         write_json(self._file(label), record.to_dict())
+        self._write_layout(record)
         return record
 
     def get(self, label_or_uuid: str) -> SubstrateRecord:
@@ -399,9 +405,40 @@ class SubstrateStore:
             record = self.get(label)
             change(record)
             write_json(self._file(label), record.to_dict())
+            self._write_layout(record)
             return record
         finally:
             lock.release()
+
+    def _write_layout(self, record: SubstrateRecord) -> None:
+        """ Rewrite the layout copy; a failure is logged and never stops the experiment. """
+
+        try:
+            from .substrate_layout import write_substrate_layout
+            write_substrate_layout(self.folder(record.label), record)
+        except Exception as error:  # noqa: BLE001 - the layout copy must never break printing
+            logging.getLogger(__name__).warning(f"Substrate layout of {record.label} not written: {error!r}")
+
+    def write_layout(self, label: str) -> tuple[Path, Path]:
+        """ Write ``substrate_layout.json`` and ``substrate_layout.png`` of a substrate now.
+
+        They are rewritten automatically on every change of the index; use this
+        for substrates created before T118.
+
+        Parameters
+        ----------
+        label : str
+            Substrate label or UUID.
+
+        Returns
+        -------
+        (Path, Path)
+            The JSON file and the image.
+        """
+
+        from .substrate_layout import write_substrate_layout
+        record = self.get(label)
+        return write_substrate_layout(self.folder(record.label), record)
 
     def add_resin_drop(self, label: str, edges_um: list, *, material: str = "", batch: str = "",
                        thickness_um: Optional[float] = None, application: str = "drop") -> SubstrateRecord:
@@ -480,7 +517,7 @@ class SubstrateStore:
             ``resin_drop`` (index or None).
         replaces : str, optional
             ``plan_id`` of a planned entry (:meth:`plan_experiment`) that this
-            entry takes the place of.
+            entry takes the place of; its ``name`` is kept.
 
         Raises
         ------
@@ -494,7 +531,9 @@ class SubstrateStore:
             for index, existing in enumerate(record.experiments):
                 if replaces is not None and existing.get("status") == STATUS_PLANNED \
                         and existing.get("plan_id") == replaces:
-                    record.experiments[index] = {**dict(entry), "plan_id": replaces}
+                    # keep the planned name (ExperimentSpec.name) next to the label
+                    record.experiments[index] = {"name": existing.get("name", ""), **dict(entry),
+                                                 "plan_id": replaces}
                     return
             record.experiments.append(dict(entry))
 
