@@ -2704,3 +2704,18 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** `test_main_png.py`, `test_ifov_laser_test.py`, `test_main_entry.py` (incl. slow demo dry run): 21 passed; `test_experiment_chain.py -m "not slow"`: 8 passed.
 - **Commits:** see `git log` on `feat/t117-show-plots-switch` (feat(mains): add SHOW_PLOTS to run the lab scripts unattended [T117])
 - **Follow-ups:** none; `experiment.png` is still written with the windows off.
+
+### 2026-11-21 09:45 CET — [T118] Substrate layout as JSON and image in the substrate folder
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/storage/substrate_layout.py` (new): `layout_dict`, `plot_layout` (plain matplotlib Figure, no window), `write_substrate_layout` → `substrate_layout.json` (schema `nanofactory.substrate_layout/1`) and `substrate_layout.png`.
+  - `nanofactorysystem/storage/substrate_store.py`: `create` and `_update` rewrite the layout after every index write (failure only logged); `write_layout(label)`; a planned entry keeps its `name` on registration.
+  - `mains/main.py`: task `overview` writes the layout of every substrate (also for substrates from before T118).
+  - `test/storage/test_substrate_layout.py` (new): 5 tests.
+  - `test/integration/test_dry_run_substrate.py`: checks the layout after the two-experiment dry run.
+  - `test/README.md`: new row, extended row.
+  - `docs/design/EXPERIMENT_STORAGE.md`, `CLAUDE.md`: layout files documented.
+  - `TODO.md`: T118 in Done (maintainer request, added directly as done).
+- **Tests:** full `python -m pytest`: 465 passed, 15 skipped.
+- **Commits:** `1b110d0` feat(storage): write the substrate layout as JSON and image [T118], `b191ac0` docs(storage): describe substrate_layout.json and .png [T118]
+- **Follow-ups:** none.
