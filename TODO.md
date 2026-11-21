@@ -108,6 +108,15 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
 
 ## Open
 
+- [ ] T122: Entry-script tests depend on the lab settings in `main.py` / `main_PNG.py` (found during T121) [phase: B]
+  - Priority: medium
+  - Size: S
+  - Depends on: –
+  - Done when: `test_main_entry.py::test_main_substrate_layout_is_valid`, `::test_main_layout_and_materials_dry_run`
+    and `test_main_png.py::test_spec_is_one_ifov_structure_in_the_drop_center` pass whatever lab values
+    (`RESIN_EDGES`, `CENTER`) are set in the SETTINGS blocks (tests patch the settings they rely on);
+    they fail on `main_HR` since `bdba4c6` / `973c166` (areas leave the drop, `CENTER` no longer `None`).
+
 ### Phase 5 — Concept
 
 ### Phase 6 — Information model
@@ -555,6 +564,7 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T121: Lab run aborted with `'tuple' object has no attribute 'as_tuple'` in `experiment_area` (maintainer report 2026-11-21, main_PNG) — 2026-11-21 — `CENTER` in `main_PNG.py` was a plain tuple; `ExperimentSpec` now converts an `(x, y)` center to `Point2D` (TypeError for anything else) and the script writes `Point2D` again. — commits: `e460cf5`
 - [x] T117: IFOV prints only a cross ("+") of every filled area (found during the chain print HR-26-002, 2026-11-20) — 2026-11-21 — Cause found by the maintainer in the lab: a wrong configuration on the A3200 controller, not the generated programs; no change to `IFOV_Lines` / `initialise_IFOV_configuration` and the golden files. The lab test `mains/Experiments/ifov_laser_test.py` and the switches `ASK_EACH_STEP` / `ASK_BETWEEN` / `SHOW_PLOTS` stay; IFOV prints (incl. `main_PNG.py`) are cleared again. — commits: `114c55b`, `7cf1403`, `4719134`, `c936384`, `6020906`
 - [x] T120: Lab run aborted with `Tcl_AsyncDelete` during plane detection (maintainer report 2026-11-21, main_PNG with SHOW_PLOTS = False) — 2026-11-21 — Hidden plots are built without pyplot (no Tk objects), shown plots and the message box free their Tk objects in the main thread right away. — commits: `7360a3c`
 - [x] T119: `SUBSTRATE_LABEL` in `main_PNG.py` and the import error `No module named 'main'` (maintainer report 2026-11-21) — 2026-11-21 — With `SUBSTRATE_LABEL` the PNG experiment runs through `run_substrate` (substrate created below `dataRoot` if new, overlap checked, layout files updated); `None` keeps `OUTPUT_ROOT`; the script puts `mains/` on `sys.path` itself. — commits: `b2cff99`

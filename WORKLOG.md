@@ -2752,3 +2752,15 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** none (bookkeeping only).
 - **Commits:** see `git log` on `docs/t117-close` (docs(todo): close T117, the cause was the controller configuration)
 - **Follow-ups:** none; `mains/Experiments/ifov_laser_test.py` stays as a lab check for the IFOV laser gating.
+
+### 2026-11-21 15:30 CET — [T121] Experiment center given as tuple aborts the layout check
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/experiment_spec.py`: `ExperimentSpec.__post_init__` converts a two-element center to `Point2D`, TypeError naming the field otherwise.
+  - `mains/main_PNG.py`: `CENTER = Point2D(500, -25000)` instead of a plain tuple (cause of the lab traceback in `substrate_plan.experiment_area`).
+  - `test/test_experiment_spec_json.py`: new test (tuple center converted, `experiment_area` works, invalid center refused).
+  - `test/README.md`: row of `test_experiment_spec_json.py` updated.
+  - `TODO.md`: T121 added as done, T122 added to Open.
+- **Tests:** short-path venv `python -m pytest -m "not slow"`: 437 passed, 15 skipped, 3 failed. The 3 failures (`test_main_entry.py::test_main_substrate_layout_is_valid`, `::test_main_layout_and_materials_dry_run`, `test_main_png.py::test_spec_is_one_ifov_structure_in_the_drop_center`) fail identically without this change: they depend on the lab values committed in `bdba4c6` / `973c166` → T122.
+- **Commits:** `e460cf5` fix(spec): accept an (x, y) pair as experiment center [T121]
+- **Follow-ups:** T122 (entry-script tests independent of the SETTINGS values).
