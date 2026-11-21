@@ -8,8 +8,11 @@
 Only the image block below has to be filled in: where the PNG is, how large one pixel is and how
 many µm one gray value step is. Everything else has a working default:
 
-- user, objective, resin drop, output folder and substrate label come from the SETTINGS block of
-  ``main.py`` (the same values as every other task);
+- user, objective, resin drop and substrate data come from the SETTINGS block of ``main.py``
+  (the same values as every other task);
+- with ``SUBSTRATE_LABEL`` the experiment goes into that substrate below ``dataRoot`` (created if
+  new, overlap with earlier experiments checked, ``substrate_layout.json``/``.png`` updated);
+  with ``SUBSTRATE_LABEL = None`` into ``OUTPUT_ROOT`` of ``main.py``;
 - the structure is placed in the center of the resin drop (``CENTER = None``);
 - the experiment is named ``png_<file name>``.
 
@@ -27,11 +30,17 @@ a restart refuses a changed file).
 """
 
 import argparse
+import dataclasses
 import datetime
+import sys
 from pathlib import Path
 from typing import Optional
 
-import main as settings
+# main.py lies next to this file; make it importable however the script is started
+# (from another working directory, the VS Code run button, an interactive window, ...)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import main as settings  # noqa: E402
 from nanofactorysystem.aerobasic.programs.drawings.height_map import HeightMap_IFOV
 from nanofactorysystem.aerobasic.programs.drawings.lines import HatchingDirection
 from nanofactorysystem.devices.coordinate_system import Point2D, Point3D
@@ -84,7 +93,11 @@ SHOW_PLOTS = (
     False  # preview and layout windows (must be closed to continue); False: none,
 )
 # experiment.png is written into the folder anyway
-SUBSTRATE_LABEL = "DOE_circle_V1"
+SUBSTRATE_LABEL: Optional[str] = "DOE_circle_V1"
+# Substrate (folder below dataRoot of the user in ~/nanofactory.json) the experiment is entered
+# into: created if new, otherwise the experiment is added and checked for overlap with the
+# experiments already on it; substrate_layout.json/.png are updated.
+# None: a single experiment in OUTPUT_ROOT of main.py (no substrate index, no layout files).
 
 
 def structure() -> HeightMap_IFOV:
@@ -222,6 +235,47 @@ def preview(height_map: HeightMap_IFOV, show: bool = True) -> dict:
     return stats
 
 
+def execute(spec: ExperimentSpec, session) -> Path:
+    """Run the experiment on the substrate ``SUBSTRATE_LABEL``, or alone in ``OUTPUT_ROOT``.
+
+    With a substrate label, the substrate of ``main.substrate_spec()`` (material, type,
+    resin drop) is used under that label: created if new, and the experiment area is checked
+    against the experiments already on it before anything is printed
+    (``substrate_plan.run_substrate``).
+
+    Parameters
+    ----------
+    spec : ExperimentSpec
+        The experiment (see :func:`experiment_spec`).
+    session : main.Session
+        Backend, plane, confirmation, plots, data root and material registry.
+
+    Returns
+    -------
+    Path
+        The experiment folder.
+    """
+
+    if SUBSTRATE_LABEL is None:
+        return session.run(spec)
+    from nanofactorysystem.substrate_plan import SubstrateExperiment, run_substrate
+
+    substrate = dataclasses.replace(settings.substrate_spec(), label=SUBSTRATE_LABEL)
+    if session.data_root is not None:
+        substrate = dataclasses.replace(substrate, data_root=session.data_root)
+    [folder] = run_substrate(
+        substrate,
+        [SubstrateExperiment(spec)],
+        backend=session.backend,
+        plane=session.plane,
+        confirm=session.confirm,
+        show_plot=session.show_plot,
+        material_registry=session.material_registry,
+    )
+    session.last_experiment = Path(folder)
+    return session.last_experiment
+
+
 def run(
     *, dry: bool = False, preview_only: bool = False, workdir: Optional[Path] = None
 ):
@@ -252,9 +306,13 @@ def run(
         return stats
     spec = experiment_spec(height_map)
     if not dry:
-        return settings.Session(
-            confirm=messagebox_confirm if ASK_EACH_STEP else None, show_plot=SHOW_PLOTS
-        ).run(spec)
+        return execute(
+            spec,
+            settings.Session(
+                confirm=messagebox_confirm if ASK_EACH_STEP else None,
+                show_plot=SHOW_PLOTS,
+            ),
+        )
 
     from nanofactorysystem.backends.dummy.dry_run import dry_run
 
@@ -263,13 +321,14 @@ def run(
             backend=simulated.backend,
             plane=simulated.plane,
             output_root=simulated.workdir / "out",
+            data_root=simulated.workdir / "data_root",
             show_plot=False,
             material_registry=settings.dry_run_registry(simulated.workdir),
         )
         session.output_root.mkdir(parents=True, exist_ok=True)
         print(f"DRY RUN on simulated hardware, output in {simulated.workdir}")
         try:
-            return session.run(spec)
+            return execute(spec, session)
         finally:
             session.material_registry.close()
 

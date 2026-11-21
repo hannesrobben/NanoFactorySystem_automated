@@ -1,5 +1,6 @@
 """The PNG height map entry script mains/main_PNG.py (T116)."""
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -68,9 +69,32 @@ def test_preview_only_needs_no_hardware(main_png):
     assert stats["lines"] > 0
 
 
+def test_script_imports_main_from_any_working_directory(tmp_path):
+    # The script puts mains/ on sys.path itself (ModuleNotFoundError: No module named 'main' before)
+    import subprocess
+    result = subprocess.run([sys.executable, str(MAINS / "main_PNG.py"), "--help"], cwd=tmp_path,
+                            capture_output=True, text=True, timeout=300)
+    assert result.returncode == 0, result.stderr
+    assert "--dry-run" in result.stdout
+
+
 @pytest.mark.slow
-def test_dry_run(main_png, tmp_path):
+def test_dry_run_into_a_substrate(main_png, tmp_path, monkeypatch):
+    monkeypatch.setattr(main_png, "SUBSTRATE_LABEL", "TU-26-PNG")
     folder = main_png.run(dry=True, workdir=tmp_path / "dry")
     assert (folder / "experiment.h5").is_file()
     record = ExperimentStore(folder).read()
     assert [s.name for s in record.structures if s.name == "block"] == ["block"]
+    assert record.substrate_label == "TU-26-PNG" and folder.parent.name == "TU-26-PNG"
+    assert folder.parent.parent == tmp_path / "dry" / "data_root"
+    layout = json.loads((folder.parent / "substrate_layout.json").read_text())
+    assert [(e["name"], e["state"]) for e in layout["experiments"]] == [("png_block", "done")]
+    assert (folder.parent / "substrate_layout.png").is_file()
+
+
+@pytest.mark.slow
+def test_dry_run_without_substrate(main_png, tmp_path, monkeypatch):
+    monkeypatch.setattr(main_png, "SUBSTRATE_LABEL", None)
+    folder = main_png.run(dry=True, workdir=tmp_path / "dry")
+    assert folder.parent == tmp_path / "dry" / "out"
+    assert ExperimentStore(folder).read().substrate_label == ""
