@@ -82,7 +82,7 @@ ADAPTIVE_SLICING = (
 )
 ALTERNATING_HATCH = True  # turn the raster lines by 90° from layer to layer
 CENTER: Optional[Point2D] = (
-    None  # absolute stage position (µm); None: center of the resin drop
+    500, -25000  # absolute stage position (µm); None: center of the resin drop
 )
 CAMERA_CAPTURE = True  # camera image after every layer
 OVERVIEW_CAPTURE = False  # stitched camera mosaic of the area before and after printing
