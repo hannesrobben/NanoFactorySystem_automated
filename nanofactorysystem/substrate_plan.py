@@ -271,10 +271,11 @@ def plot_substrate(substrate: SubstrateSpec, areas: list[Area], existing: Option
     matplotlib.figure.Figure
     """
 
-    import matplotlib.pyplot as plt
     from matplotlib.patches import Rectangle
 
-    figure, ax = plt.subplots()
+    from .utils.figures import finish_figure, new_figure
+
+    figure, ax = new_figure(show)  # no Tk objects unless shown (T120)
     lower, upper = substrate.bounds()
     edges = np.asarray(substrate.resin_edges, dtype=float)
     ax.add_patch(Rectangle(lower, *(upper - lower), fill=False, linestyle="--", color="grey"))
@@ -293,8 +294,7 @@ def plot_substrate(substrate: SubstrateSpec, areas: list[Area], existing: Option
     ax.set_xlabel("x [µm]")
     ax.set_ylabel("y [µm]")
     ax.set_title(f"Substrate {substrate.label or '(new)'}: {len(areas)} experiments")
-    if show:
-        plt.show()
+    finish_figure(figure, show)
     return figure
 
 

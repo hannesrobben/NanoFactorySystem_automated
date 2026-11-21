@@ -855,5 +855,18 @@ def script_output(path: Optional[Path], default: Path, folder_name: str) -> tupl
 def messagebox_confirm(question: str) -> bool:
     """ Ask a yes/no question in a message box (lab PC). """
 
+    import gc
+    import tkinter
     from tkinter import messagebox
-    return messagebox.askyesno(message=question)
+
+    # Own hidden root, destroyed and collected in this (main) thread: a Tk object freed later by
+    # another thread aborts the process (Tcl_AsyncDelete, T120)
+    root = tkinter.Tk()
+    root.withdraw()
+    root.attributes("-topmost", True)
+    try:
+        return messagebox.askyesno(message=question, parent=root)
+    finally:
+        root.destroy()
+        del root
+        gc.collect()
