@@ -5,6 +5,7 @@
 ##########################################################################
 import copy
 import datetime
+import gc
 import json
 import logging
 import os.path
@@ -39,6 +40,7 @@ from nanofactorysystem.storage import (CaptureRecord, CornerRecord, ExperimentRe
                                        LayoutRecord, PlaneFitRecord, StructureRecord, export_json,
                                        software_info, utc_timestamp, z_function_to_json)
 from nanofactorysystem.storage.json_copies import export_progress, structures_list, write_json
+from nanofactorysystem.utils.figures import finish_figure, new_figure
 from nanofactorysystem.storage.legacy import LegacyExperiment, is_legacy_folder, read_legacy
 from nanofactorysystem.storage.summary import SUMMARY_NAME, format_table, summary
 from nanofactorysystem.overview import Mosaic, field_of_view_um, grid_positions, stitch
@@ -902,15 +904,15 @@ class Experiment(object):
         Parameters
         ----------
         show : bool
-            Show the plot window; otherwise the figure is closed after saving.
+            Show the plot window (blocks until it is closed); otherwise the
+            figure is built without pyplot and never opens a window.
 
         Returns
         -------
         matplotlib.figure.Figure
         """
 
-        fig, ax = plt.subplots()
-        assert isinstance(ax, plt.Axes)
+        fig, ax = new_figure(show)  # no Tk objects unless shown (T120)
 
         # Draw the ellipse
         ellipse = Ellipse(self.center_point, self.resin_size[0], self.resin_size[1], edgecolor='lightblue',
@@ -974,10 +976,7 @@ class Experiment(object):
         fig.tight_layout()
         fig.savefig(self.path / "experiment.png")
         self.store.write_layout(layout, (self.path / "experiment.png").read_bytes())
-        if show:
-            plt.show()
-        else:
-            plt.close(fig)
+        finish_figure(fig, show)
         return fig
 
     def plane_fit(self, force: bool = False, *, plane: Optional[ZFunction] = None):
@@ -1470,9 +1469,10 @@ class Experiment(object):
             # Plot structure to image file
             self.log.info(f"Plotting {name}")
             movements = read_file(structure_pgm_path)
-            plot_movements(movements, calibration=PowerCalibration(self.system.controller.attenuator.data))
-            plt.savefig(path / f"plot_{name}.png")
-            plt.close()
+            figure = plot_movements(movements, calibration=PowerCalibration(self.system.controller.attenuator.data))
+            figure.savefig(path / f"plot_{name}.png")
+            plt.close(figure)
+            gc.collect()  # free its Tk objects in this thread (T120)
 
         # Done
         return layer_pgm_paths, structure_config

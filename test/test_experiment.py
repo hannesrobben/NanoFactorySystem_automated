@@ -450,6 +450,7 @@ def test_experiment_plot_shows_corners_and_qr_code(test_config, dummy_backend, n
     with make_experiment(path, dummy_backend, skip_corner=False) as experiment:
         fig = experiment.plot_experiment(show=False)
 
+        assert fig.canvas.manager is None  # T120: a hidden plot is no pyplot window (no Tk objects)
         ax = fig.axes[0]
         labels = ax.get_legend_handles_labels()[1]
         assert {"Corners", "Double corner (orientation)", "QR code", "Resin Drop"} <= set(labels)
