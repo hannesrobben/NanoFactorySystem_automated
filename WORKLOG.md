@@ -2730,3 +2730,17 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** `test/integration/test_main_png.py`: 7 passed (incl. slow).
 - **Commits:** `b2cff99` feat(mains): enter the PNG experiment into a substrate [T119]
 - **Follow-ups:** none.
+
+### 2026-11-21 14:43 CET — [T120] Tcl_AsyncDelete crash of hidden plots
+- **Status:** done (fix not yet verified on the lab PC)
+- **Changes:**
+  - `nanofactorysystem/utils/figures.py` (new): `new_figure(show)` (plain Figure without pyplot when hidden), `finish_figure` (show, close, `gc.collect()` in the main thread).
+  - `nanofactorysystem/experiment.py`: `plot_experiment` uses them; structure plots (`plot_structures`) close their figure and collect at once.
+  - `nanofactorysystem/substrate_plan.py`: `plot_substrate` uses them.
+  - `nanofactorysystem/experiment_spec.py`: `messagebox_confirm` with its own hidden, topmost root, destroyed and collected in the main thread.
+  - `test/test_experiment.py`, `test/test_substrate_plan.py`: hidden plots have no pyplot manager.
+  - `test/README.md`: rows updated. `TODO.md`: T120 added as done.
+- **Cause:** TkAgg creates Tk objects for every pyplot figure; after `plt.close` they were freed by the garbage collector in a non-main thread (camera driver) during the layer detection, which aborts the process.
+- **Tests:** full `python -m pytest`: 468 passed, 15 skipped.
+- **Commits:** `7360a3c` fix(experiment): stop hidden plots from crashing the run with Tcl_AsyncDelete [T120]
+- **Follow-ups:** verify on the lab PC (start main_PNG with SHOW_PLOTS = False up to the print start).
