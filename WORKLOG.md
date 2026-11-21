@@ -2719,3 +2719,14 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** full `python -m pytest`: 465 passed, 15 skipped.
 - **Commits:** `1b110d0` feat(storage): write the substrate layout as JSON and image [T118], `b191ac0` docs(storage): describe substrate_layout.json and .png [T118]
 - **Follow-ups:** none.
+
+### 2026-11-21 13:14 CET — [T119] PNG experiment into a substrate, import fix
+- **Status:** done
+- **Changes:**
+  - `mains/main_PNG.py`: `SUBSTRATE_LABEL` (set by the maintainer, previously unused) now runs the experiment via `run_substrate` with `main.substrate_spec()` under that label; `None` runs it into `OUTPUT_ROOT`; `sys.path` gets the script folder before `import main` (fixes `ModuleNotFoundError: No module named 'main'` when started from another working directory); dry run uses its own data root.
+  - `test/integration/test_main_png.py`: import from another working directory (subprocess `--help`), slow dry runs with and without substrate.
+  - `test/README.md`: row updated.
+  - `TODO.md`: T119 added as done (maintainer report).
+- **Tests:** `test/integration/test_main_png.py`: 7 passed (incl. slow).
+- **Commits:** `b2cff99` feat(mains): enter the PNG experiment into a substrate [T119]
+- **Follow-ups:** none.
