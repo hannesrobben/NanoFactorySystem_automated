@@ -108,6 +108,15 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
 
 ## Open
 
+- [ ] T124: Whole-structure program duplicated uncompressed in `experiment.h5` (found during T123) [phase: B]
+  - Priority: medium
+  - Size: S
+  - Depends on: –
+  - Done when: `Experiment` no longer stores `structures/<name>/program` as a second uncompressed copy
+    of the layer programs (e.g. stored compressed, or only a reference/hash when it is the concatenation
+    of the layers); a 48-million-line structure (main_PNG print 2026-11-21, > 2 GB text) is stored
+    and read back by `ExperimentStore` and `ExperimentFile` without a 2 GB scalar string; old files still read.
+
 - [ ] T122: Entry-script tests depend on the lab settings in `main.py` / `main_PNG.py` (found during T121) [phase: B]
   - Priority: medium
   - Size: S
@@ -564,6 +573,7 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T123: Unpacking aborted with `string too large to store inside array` (maintainer report 2026-11-22, main_PNG experiment) — 2026-11-22 — `write_dataset` takes scalar-ness from the dataset shape and writes scalar text unchanged, so text over 2 GB (the whole-structure program of a 48-million-line print) unpacks. Storage side: T124. — commits: `314d634`
 - [x] T121: Lab run aborted with `'tuple' object has no attribute 'as_tuple'` in `experiment_area` (maintainer report 2026-11-21, main_PNG) — 2026-11-21 — `CENTER` in `main_PNG.py` was a plain tuple; `ExperimentSpec` now converts an `(x, y)` center to `Point2D` (TypeError for anything else) and the script writes `Point2D` again. — commits: `e460cf5`
 - [x] T117: IFOV prints only a cross ("+") of every filled area (found during the chain print HR-26-002, 2026-11-20) — 2026-11-21 — Cause found by the maintainer in the lab: a wrong configuration on the A3200 controller, not the generated programs; no change to `IFOV_Lines` / `initialise_IFOV_configuration` and the golden files. The lab test `mains/Experiments/ifov_laser_test.py` and the switches `ASK_EACH_STEP` / `ASK_BETWEEN` / `SHOW_PLOTS` stay; IFOV prints (incl. `main_PNG.py`) are cleared again. — commits: `114c55b`, `7cf1403`, `4719134`, `c936384`, `6020906`
 - [x] T120: Lab run aborted with `Tcl_AsyncDelete` during plane detection (maintainer report 2026-11-21, main_PNG with SHOW_PLOTS = False) — 2026-11-21 — Hidden plots are built without pyplot (no Tk objects), shown plots and the message box free their Tk objects in the main thread right away. — commits: `7360a3c`
