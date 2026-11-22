@@ -2777,3 +2777,35 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Commits:** `314d634` fix(analysis): unpack text datasets larger than 2 GB [T123]
 - **Follow-ups:** T124 (do not store the whole-structure program as a second uncompressed copy).
 
+
+### 2026-11-22 17:52 CET — [T125] Layer programs over 80 000 lines: split into parts, reprint missing layers
+- **Status:** done (lab check of the split programs open)
+- **Cause (from the logs of the DOE print 2026-11-21, `surface_16bit`):** `PROGRAM 1 LOAD` failed for 57 of 73 layers ("An out of memory error occurred." for 12–30 MB, `!` for 44–78 MB and for 96 737 lines); 81 751 lines still loaded. The experiment logged each failure and went on, so only the socket (layers 0–13) and layers 71/72 were printed. The maintainer's research (A3200 help) confirms the 60 000–80 000-line limit of the LOAD path and names queue mode (`BUFFEREDRUN`) as the fix (T126).
+- **Changes:**
+  - `nanofactorysystem/aerobasic/programs/split.py` (new): `count_lines`, `plan_split`, `split_lines`, `split_program_file`, `ProgramSplitError`, `MAX_PROGRAM_LINES = 80_000` (maintainer decision). Body = trailing motion/laser-gate/power/feed lines; cuts only before a RAPID/LINEAR with the laser off that names every body axis; header and footer in every part; power and feed rates replayed.
+  - `nanofactorysystem/experiment.py`: `max_program_lines` (None disables), `_layer_parts`, `_run_layer` (parts in order, part named in the error, parts deleted after the layer), `_check_program_lengths` after the time estimate (warning, trial split of the longest layer), `ProgramSplitError` recorded as failed layer; `reprint_layers(name, layer_ids=None)`.
+  - `nanofactorysystem/reprint.py` (new): `missing_layers`, `select_layers` (refuses unknown and already printed layers), `reprint_plan`, `format_plan`.
+  - `mains/reprint_layers.py` (new): lab script (SETTINGS, `--plan` without hardware, asks before printing).
+  - `test/test_aerobasic/test_program_split.py` (new), `test/test_experiment.py`: split print gives the same exposures as unsplit, unsplittable layer recorded as failed, reprint of a failed layer through the script.
+  - `test/README.md`, `CLAUDE.md`: new tests and the program length / reprint behaviour.
+  - `TODO.md`: T125 added as done; T126, T127, T128 added to Open.
+- **Tests:** short-path venv `python -m pytest`: 478 passed, 15 skipped, 4 failed. The failures (`test_main_entry.py::test_main_substrate_layout_is_valid`, `::test_main_layout_and_materials_dry_run`, `::test_main_restart_and_analyse_dry_run`, `test_main_png.py::test_spec_is_one_ifov_structure_in_the_drop_center`) come from the lab SETTINGS in `main.py` / `main_PNG.py` (T122); `test_main_restart_and_analyse_dry_run` fails identically with the changes stashed (experiment center outside the resin edges in `main.py`). Manual: the real DOE layer programs split correctly (layer 71: 2 parts, 70: 5, 23 with 2 193 987 lines: 28 parts, ≤ 79 992 lines each; parts reassemble to the original body; every cut before a RAPID); about 15–35 s for the largest layer.
+- **Commits:** `76b8839` fix(experiment): print layer programs over 80 000 lines in parts [T125], `d46ad4a` feat(experiment): reprint the layers a structure is missing [T125], `a6db390` docs: describe program splitting and the layer reprint [T125]
+- **Follow-ups:** T126 (queue mode, the real fix), T127 (REMOVEPROGRAM name), T128 (`~LASTERROR` for `!`, stop on load failure). Lab: run `mains/reprint_layers.py --plan`, then a split layer with the laser off/shutter closed before reprinting the DOE.
+
+### 2026-11-22 18:35 CET — [T125] Maintainer review: split while building, setup per part, reprint order
+- **Status:** done (lab check of the split programs open)
+- **Review points and answers:**
+  - The build must not skip a layer that cannot be loaded: `build_programs()` now splits every too long layer program and raises `ProgramSplitError` if one cannot be split (experiment not built, `structure_configs` stays None, nothing printed). Before, the build only warned and split at print time; an unsplittable layer was recorded as failed during printing.
+  - Setup per part: the experiment setup (`DefaultSetup` / `SetupIFOV`) is sent once per experiment as immediate commands (also on restart / reprint); every IFOV layer program carries its whole setup (`initialise_IFOV_configuration`), which every part repeats as header; nothing else is sent between layers except camera captures. Checked by a new test on every part of a built IFOV structure.
+  - The interim solution splits too: `reprint_layers()` → `print_structure()` prepares (splits) all missing layers before the first one is printed; old experiments built without parts are split then.
+  - Order: the reprint follows the drop direction, DOWN prints the highest missing layer first (layers 70 → 14 for the DOE); new test.
+- **Changes:**
+  - `nanofactorysystem/aerobasic/programs/split.py`: `existing_parts` (reuse only if complete, not older than the program, within the limit), `remove_parts`; `split_program_file` removes stale parts first.
+  - `nanofactorysystem/experiment.py`: `_split_long_programs` in the build, `_prepare_layers` before printing, `_run_layer(parts)`, parts removed after a printed layer, `ProgramSplitError` no longer a failed layer; docstrings; German comments in `print_structure` removed.
+  - `mains/reprint_layers.py`: docstring.
+  - `test/test_aerobasic/test_program_split.py`, `test/test_experiment.py`: new tests (see commit).
+  - `CLAUDE.md`, `test/README.md`: updated. `TODO.md`: T125 entry updated.
+- **Tests:** short-path venv `python -m pytest`: 482 passed, 15 skipped, 4 failed (the same four T122 failures as in the previous entry, lab SETTINGS in `main.py` / `main_PNG.py`).
+- **Commits:** `9974a31` fix(experiment): split too long layer programs while building, stop if one cannot be split [T125], `2e7ad3a` docs: describe the split while building and the reprint order [T125]
+- **Follow-ups:** unchanged (T126, T127, T128); lab: `reprint_layers.py --plan`, one split layer with the laser off before the DOE reprint. Splitting the 57 missing DOE layers before the reprint takes roughly 15–30 min and about 3.7 GB of disk space next to the layer programs.
