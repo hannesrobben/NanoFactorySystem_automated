@@ -2764,3 +2764,16 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** short-path venv `python -m pytest -m "not slow"`: 437 passed, 15 skipped, 3 failed. The 3 failures (`test_main_entry.py::test_main_substrate_layout_is_valid`, `::test_main_layout_and_materials_dry_run`, `test_main_png.py::test_spec_is_one_ifov_structure_in_the_drop_center`) fail identically without this change: they depend on the lab values committed in `bdba4c6` / `973c166` → T122.
 - **Commits:** `e460cf5` fix(spec): accept an (x, y) pair as experiment center [T121]
 - **Follow-ups:** T122 (entry-script tests independent of the SETTINGS values).
+
+### 2026-11-22 11:49 CET — [T123] Unpack text datasets larger than 2 GB
+- **Status:** done (not yet re-run on the lab file)
+- **Changes:**
+  - `analysis/experiment_analysis/convert.py`: `write_dataset` decides scalar vs. array from `dataset.shape` and writes scalar byte text unchanged; `np.ndim(data)` converted the text to a NumPy string, which fails above 2 GB.
+  - `test/analysis/test_experiment_analysis.py`: new test for scalar text and text arrays.
+  - `test/README.md`: row of `test_experiment_analysis.py` updated.
+  - `TODO.md`: T123 added as done, T124 added to Open.
+- **Cause:** the main_PNG experiment (2048 x 2048 µm height map, 47 993 944 lines) stores its whole-structure program `structures/<name>/program` as one uncompressed text of more than 2 GB.
+- **Tests:** short-path venv `python -m pytest test/analysis`: 13 passed.
+- **Commits:** `314d634` fix(analysis): unpack text datasets larger than 2 GB [T123]
+- **Follow-ups:** T124 (do not store the whole-structure program as a second uncompressed copy).
+
