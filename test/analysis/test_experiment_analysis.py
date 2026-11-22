@@ -266,3 +266,21 @@ def test_command_line(printed, tmp_path, capsys):
     assert "experiment_uuid" in capsys.readouterr().out
     assert cli(["tree", str(printed), "--depth", "1"]) == 0
     assert "structures/" in capsys.readouterr().out
+
+
+def test_text_datasets_are_written_without_numpy_conversion(tmp_path):
+    """Scalar text is written as stored (no np.ndim on it: fails above 2 GB, T123); text arrays line by line."""
+    import h5py
+
+    from experiment_analysis.convert import write_dataset
+
+    text = "G1 X1 Y2\nG1 X3 Y4 ; µm\n"
+    with h5py.File(tmp_path / "t.h5", "w") as f:
+        f.create_dataset("program", data=text, dtype=h5py.string_dtype())
+        f.create_dataset("names", data=["a", "b"], dtype=h5py.string_dtype())
+        out = tmp_path / "out"
+        out.mkdir()
+        write_dataset(f["program"], out)
+        write_dataset(f["names"], out)
+    assert (out / "program.txt").read_text(encoding="utf-8") == text
+    assert (out / "names.txt").read_text(encoding="utf-8") == "a\nb"

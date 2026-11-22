@@ -322,10 +322,16 @@ def write_dataset(dataset: h5py.Dataset, folder: Path, options: ConvertOptions =
     fmt = attrs.get("format")
     data = dataset[()]
     if h5py.check_string_dtype(dataset.dtype) is not None or dataset.dtype.kind in "OSU":
-        lines = [data] if np.ndim(data) == 0 else list(np.ravel(data))
-        text = "\n".join(plain(v) if isinstance(v, (bytes, np.bytes_)) else str(v) for v in lines)
         path = folder / f"{name}.txt"
-        path.write_text(text, encoding="utf-8")
+        if dataset.shape == () and isinstance(data, (bytes, np.bytes_)):
+            # Written as stored: np.ndim() on a scalar string over 2 GB fails
+            # ("string too large to store inside array"), and decoding would
+            # double the memory. The stored text is UTF-8 already.
+            path.write_bytes(bytes(data))
+        else:
+            lines = [data] if dataset.shape == () else list(np.ravel(data))
+            text = "\n".join(plain(v) if isinstance(v, (bytes, np.bytes_)) else str(v) for v in lines)
+            path.write_text(text, encoding="utf-8")
         files.append(path)
     elif isinstance(fmt, str) and dataset.dtype == np.uint8 and dataset.ndim == 1:
         suffix = "." + fmt.lower().lstrip(".")
