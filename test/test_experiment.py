@@ -860,3 +860,49 @@ def test_layer_that_cannot_be_split_is_recorded_as_failed(experiment, monkeypatc
     assert rect["status"] == "failed" and rect["printed_layers"] == 0
     assert all("no place to cut" in layer["error"] for layer in rect["layers"])
 
+
+def test_reprint_failed_layers(test_config, dummy_backend, no_sleep, tmp_path):
+    # T125 interim solution: layers that failed to load are printed afterwards (restart skips them)
+    import importlib.util
+    from nanofactorysystem.reprint import select_layers
+
+    path = tmp_path / "experiment"
+    path.mkdir()
+    with make_experiment(path, dummy_backend) as experiment:
+        experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+        add_rectangle(experiment)
+        experiment.build_programs()
+        n_layers = len(experiment.structure_configs[0]["layer_files"])
+        dummy_backend.transport.program_error_next(error_code=42, running_polls=1)
+        experiment.print_experiment()
+    record = ExperimentStore.open(path).read()
+    failed = [e["layer_id"] for e in record.progress["rect"] if e["status"] == "failed"]
+    assert len(failed) == 1 and record.structure("rect").status == "failed"
+    with pytest.raises(ValueError, match="no layers"):
+        select_layers(record, "rect", [99])
+    with pytest.raises(ValueError, match="No structure"):
+        select_layers(record, "missing")
+
+    script = Path(__file__).parents[1] / "mains" / "reprint_layers.py"
+    spec = importlib.util.spec_from_file_location("reprint_layers", script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)  # does not print on import
+    plan = module.plan(path, "rect")
+    assert "1 layers to print" in plan and "failed" in plan and "42" in plan
+    dummy_backend.calllog.clear()
+
+    assert module.reprint(path, "rect", backend=dummy_backend, ask=False) == failed
+
+    assert len(dummy_backend.calllog.filter(device="program")) == 1
+    record = ExperimentStore.open(path).read()
+    assert record.structure("rect").status == "printed" and record.status == "finished"
+    assert sorted(printed_layers(path)) == list(range(n_layers))
+    assert [s["kind"] for s in record.sessions] == ["new", "restart"]
+    rect = json.loads((path / "print_progress.json").read_text())["structures"][0]
+    assert (rect["status"], rect["printed_layers"], rect["failed_layers"]) == ("printed", n_layers, 1)
+    # Nothing is left to print, and a printed layer is never exposed twice
+    with Experiment(**Experiment.parameters_from_dictionary(path), backend=dummy_backend) as experiment:
+        assert experiment.reprint_layers("rect") == []
+        with pytest.raises(ValueError, match="already printed"):
+            experiment.reprint_layers("rect", failed)
+    assert module.plan(path, "rect") == "Structure 'rect': no layers to print."

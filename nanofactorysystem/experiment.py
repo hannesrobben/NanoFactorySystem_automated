@@ -46,6 +46,7 @@ from nanofactorysystem.utils.figures import finish_figure, new_figure
 from nanofactorysystem.storage.legacy import LegacyExperiment, is_legacy_folder, read_legacy
 from nanofactorysystem.storage.summary import SUMMARY_NAME, format_table, summary
 from nanofactorysystem.overview import Mosaic, field_of_view_um, grid_positions, stitch
+from nanofactorysystem.reprint import missing_layers, select_layers
 from nanofactorysystem.resin_drop import drop_outline, has_drop_boundary
 from nanofactorysystem.time_estimate import (DEFAULT_LAYER_OVERHEAD_S, TimeEstimate, estimate_program_s,
                                              format_duration)
@@ -1960,6 +1961,58 @@ class Experiment(object):
         self.store.set_status(schema.STATUS_FINISHED)
         self._save_exp_dict()
         self.log.info("Experiment summary:\n" + format_table(self._write_summary()))
+
+    def reprint_layers(self, name: str, layer_ids: Optional[list[int]] = None) -> list[int]:
+        """ Print layers of a stored structure again, by default every layer that was never printed (T125).
+
+        Interim solution for layers that failed to load (programs longer
+        than about 80 000 lines). :meth:`restart_experiment` skips them,
+        because they were attempted already. The layers are printed in the
+        order of the drop direction from the layer programs stored in the
+        experiment file, too long programs in parts (``max_program_lines``).
+        No plane fit is done: the programs keep the absolute coordinates of
+        the original session, so the sample must still be mounted as it was.
+        Afterwards the structure is ``printed`` if every layer has been
+        printed once, else ``failed``.
+
+        Parameters
+        ----------
+        name : str
+            Structure name.
+        layer_ids : list of int, optional
+            Layers to print; default: every layer without a successful print.
+
+        Returns
+        -------
+        list of int
+            The layers that were printed (or attempted), ascending.
+
+        Raises
+        ------
+        ValueError
+            If the structure is unknown, a layer does not exist or was
+            already printed.
+        """
+
+        record = self.store.read(include_captures=False)
+        ids = select_layers(record, name, layer_ids)
+        if not ids:
+            self.log.info(f"Structure '{name}': every layer is printed, nothing to reprint")
+            return []
+        config = next(c for c in self._with_absolute_paths(structures_list(record)) if c["name"] == name)
+        files = {self._layer_id(f): Path(f) for f in config["layer_files"]}
+        self.log.info(f"Reprinting {len(ids)} layers of '{name}': {ids}")
+        self.print_structure([files[i] for i in ids], x=config["center_x"], y=config["center_y"], name=name,
+                             power=config["power"], dhm_image_count=config["number of dhm images"], restart=True)
+
+        # The status covers every layer of the structure, not only the reprinted ones
+        complete = not missing_layers(self.store.read(include_captures=False), name)
+        self.store.set_structure_status(name, "printed" if complete else "failed")
+        self.store.set_status(schema.STATUS_FINISHED)
+        self._save_exp_dict()
+        export_progress(self.store.read(include_captures=False), self.path)
+        self.log.info("Experiment summary:\n" + format_table(self._write_summary()))
+        return ids
 
     def measure(self,
                 coordinate: Coordinate,
