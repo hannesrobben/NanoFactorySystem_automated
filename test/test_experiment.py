@@ -807,3 +807,56 @@ def test_overview_area_includes_the_corner_markers(test_config, dummy_backend, n
     clearance = max(50, QR_CODE_WIDTH_UM) / 2 + OVERVIEW_BORDER_UM  # corner width 50 um in make_experiment
     assert np.allclose(lower, rectangle_low - clearance)
     assert not ExperimentStore.open(tmp_path).read_overview("before")  # overview_capture is off by default
+
+
+def exposure_segments(world, since=0):
+    """ Start, end (mm, rounded) and power of the exposures after index ``since``. """
+
+    return [(tuple(np.round(e.start, 6)), tuple(np.round(e.end, 6)), round(e.power, 3))
+            for e in world.exposures[since:]]
+
+
+def test_long_layer_programs_are_printed_in_parts(test_config, dummy_backend, no_sleep, tmp_path, caplog):
+    # T125: PROGRAM LOAD fails above about 80 000 lines; a longer layer program is run in parts
+    world = dummy_backend.world
+    runs = {}
+    for limit in (None, 30):
+        path = tmp_path / f"limit_{limit}"
+        path.mkdir()
+        with make_experiment(path, dummy_backend, max_program_lines=limit) as experiment:
+            experiment.plane_fit(plane=world.sample.plane())
+            add_rectangle(experiment)
+            experiment.build_programs()
+            exposures, programs = len(world.exposures), len(dummy_backend.calllog.filter(device="program"))
+            experiment.print_experiment()
+            runs[limit] = (exposure_segments(world, exposures),
+                           len(dummy_backend.calllog.filter(device="program")) - programs,
+                           len(experiment.structure_configs[0]["layer_files"]), progress(experiment, "rect"))
+            split_dir = path / "structures" / "rect" / "programs" / "split"
+
+    (whole, n_whole, n_layers, _), (parts, n_parts, _, rect) = runs[None], runs[30]
+    assert n_whole == n_layers and n_parts > n_layers
+    # The parts write exactly what the whole layer programs write
+    assert parts == whole and len(parts) > 0
+    assert (rect["status"], rect["printed_layers"], rect["failed_layers"]) == ("printed", n_layers, 0)
+    assert "have more than 30 lines" in caplog.text and "printed in" in caplog.text
+    # The parts of a printed layer are removed again
+    assert split_dir.is_dir() and not any(split_dir.iterdir())
+
+
+def test_layer_that_cannot_be_split_is_recorded_as_failed(experiment, monkeypatch):
+    from nanofactorysystem.aerobasic.programs.split import ProgramSplitError
+
+    def refuse(*args, **kwargs):
+        raise ProgramSplitError("no place to cut")
+
+    monkeypatch.setattr("nanofactorysystem.experiment.split_program_file", refuse)
+    experiment.max_program_lines = 30
+    add_rectangle(experiment)
+    experiment.build_programs()
+    experiment.print_experiment()
+
+    rect = progress(experiment, "rect")
+    assert rect["status"] == "failed" and rect["printed_layers"] == 0
+    assert all("no place to cut" in layer["error"] for layer in rect["layers"])
+

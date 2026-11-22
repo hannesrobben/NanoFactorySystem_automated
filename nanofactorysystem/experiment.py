@@ -30,6 +30,8 @@ from nanofactorysystem.aerobasic.programs.drawings import DrawableObject, Drawab
 from nanofactorysystem.aerobasic.programs.drawings.lines import Corner
 from nanofactorysystem.aerobasic.programs.drawings.qr_code import QRCode, QrErrorCorrection
 from nanofactorysystem.aerobasic.programs.setups import DefaultSetup, SetupIFOV
+from nanofactorysystem.aerobasic.programs.split import (MAX_PROGRAM_LINES, ProgramSplitError, count_lines,
+                                                        plan_split, split_program_file)
 from nanofactorysystem.backends import BackendLike
 from nanofactorysystem.devices.coordinate_system import CoordinateSystem, DropDirection, Unit, \
     Point2D, Point3D, Coordinate, ZFunction
@@ -156,7 +158,8 @@ class Experiment(object):
                  program_source: ProgramSource | str = ProgramSource.DRAWING,
                  materials: Optional[dict[str, str]] = None,
                  material_registry=None,
-                 plan_id: Optional[str] = None):
+                 plan_id: Optional[str] = None,
+                 max_program_lines: Optional[int] = MAX_PROGRAM_LINES):
         """ Experiment on one substrate.
 
         Only the newer parameters are documented here; see the class
@@ -237,6 +240,10 @@ class Experiment(object):
             experiment file is opened and its UUID is kept. Without
             ``resume``, a folder that already contains an experiment file is
             refused, so that no earlier experiment is overwritten.
+        max_program_lines : int or None
+            A layer program with more lines is split into parts that are run
+            one after another (``PROGRAM LOAD`` fails above about 80 000
+            lines, T125; ``aerobasic.programs.split``); None never splits.
 
         Raises
         ------
@@ -251,6 +258,7 @@ class Experiment(object):
         self.user = str(user)
         self.objective = str(objective)
         self.log = logger
+        self.max_program_lines = None if max_program_lines is None else int(max_program_lines)
 
         # Substrate record and experiment folder
         self.substrate: Optional[SubstrateRecord] = None
@@ -1571,6 +1579,7 @@ class Experiment(object):
                                   grid_index=grid_index, reference=(x, y))
 
         self._write_time_estimate()
+        self._check_program_lengths()
 
         # structures.json is a copy of the structures in the experiment file
         self.store.set_status(schema.STATUS_BUILT)
@@ -1652,6 +1661,80 @@ class Experiment(object):
         self.log.info(f"Expected printing time: {format_duration(estimate.total_s)} for {n_layers} layers "
                       f"({self.layer_overhead_s:g} s overhead per layer)")
         return estimate
+
+    def _check_program_lengths(self) -> None:
+        """ Warn about layer programs longer than ``max_program_lines`` and check that they can be split (T125).
+
+        ``PROGRAM LOAD`` fails above about 80 000 lines; such layers are run
+        as several parts (:meth:`_layer_parts`). The longest layer program of
+        every structure is split on trial, so that a program that cannot be
+        split is reported before printing starts.
+        """
+
+        if self.max_program_lines is None:
+            return
+        for paths in self.structure_programs:
+            lengths = {Path(p): count_lines(p) for p in paths}
+            long = {p: n for p, n in lengths.items() if n > self.max_program_lines}
+            if not long:
+                continue
+            name = Path(paths[0]).parent.parent.name
+            longest = max(long, key=long.get)
+            text = (f"{len(long)} of {len(paths)} layer programs of {name} have more than {self.max_program_lines} "
+                    f"lines (longest: layer {self._layer_id(longest)}, {long[longest]} lines)")
+            try:
+                plan = plan_split(longest.read_text().splitlines(), self.max_program_lines)
+            except ProgramSplitError as error:
+                self.log.error(f"{text} and cannot be split: {error} These layers will fail to load (T125).")
+                continue
+            self.log.warning(f"{text}. PROGRAM LOAD fails above about 80 000 lines, so these layers are printed in "
+                             f"parts (the longest in {plan.n_parts}) with a stop at every cut (T125).")
+
+    def _layer_parts(self, path: Path, name: str, layer_id: int) -> list[Path]:
+        """ The program files a layer is run as: its program, or the parts of a too long program (T125).
+
+        Raises
+        ------
+        ProgramSplitError
+            If the program is too long and cannot be split.
+        """
+
+        if self.max_program_lines is None:
+            return [Path(path)]
+        n_lines = count_lines(path)
+        if n_lines <= self.max_program_lines:
+            return [Path(path)]
+        parts = split_program_file(path, self.max_program_lines)
+        self.log.warning(f"Layer {layer_id} of {name} has {n_lines} program lines (more than "
+                         f"{self.max_program_lines}, PROGRAM LOAD fails above about 80 000): printed in "
+                         f"{len(parts)} parts")
+        return parts
+
+    def _run_layer(self, path: Path, name: str, layer_id: int) -> None:
+        """ Run one layer program (or its parts) as task 1 and wait until it has finished.
+
+        Raises
+        ------
+        AerotechError
+            If a program fails; the message names the part.
+        ProgramSplitError
+            If the program is too long and cannot be split.
+        """
+
+        parts = self._layer_parts(path, name, layer_id)
+        for k, part in enumerate(parts, start=1):
+            try:
+                task = self.a3200.run_program_as_task(part, task_id=1)
+                task.wait_to_finish()
+                task.finish()
+            except AerotechError as error:
+                if len(parts) == 1:
+                    raise
+                raise type(error)(f"part {k} of {len(parts)} ({Path(part).name}): {error}") from error
+        # Parts of a finished layer are not needed any more (the layer program is in the experiment file)
+        for part in parts:
+            if Path(part) != Path(path):
+                Path(part).unlink(missing_ok=True)
 
     def log_duration(self) -> None:
         """ Log the actual printing time next to the expected one (T28). """
@@ -1776,15 +1859,13 @@ class Experiment(object):
             layer_pgm_path = pgm_files_list[index]
             layer_id = self._layer_id(layer_pgm_path)
             started = utc_timestamp()
-            # Details about the program: if a program exceeds a certain size, consider splitting it
             try:
-                task = self.a3200.run_program_as_task(layer_pgm_path, task_id=1)
-                task.wait_to_finish()
-                task.finish()
+                # A program longer than max_program_lines runs as several parts (T125)
+                self._run_layer(layer_pgm_path, name, layer_id)
                 self.store.update_progress(name, layer_id, "ok", started=started)
                 self.measure(structure_center_absolute_mm, structure=name, phase="layer", layer_id=layer_id,
                              dhm_image_count=dhm_image_count)
-            except AerotechError as e:
+            except (AerotechError, ProgramSplitError) as e:
                 self.log.error(f"Program failed for {name}: {e}")
                 failed = True
                 self.store.update_progress(name, layer_id, "failed", started=started, error=str(e))
