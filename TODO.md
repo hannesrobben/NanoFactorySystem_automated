@@ -108,6 +108,44 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
 
 ## Open
 
+- [ ] T126: Run layer programs in queue mode (`PROGRAM 1 BUFFEREDRUN`) instead of `PROGRAM LOAD` (follow-up of T125) [phase: B]
+  - Priority: high
+  - Size: M
+  - Depends on: –
+  - Background (maintainer research 2026-11-22, A3200 help 6.04 / library 6.4.5.5): `PROGRAM LOAD` compiles the
+    whole file and keeps it resident; the knowledge base names 60 000–80 000 lines as the usual limit; "An out of
+    memory error occurred." is ErrorCode 88 OutOfMemory (CoreLibrary, Windows side). Queue mode
+    (`PROGRAM <task> BUFFEREDRUN <file>` sent from task 0, task state 9 while running, `QueueBufferSize` per task,
+    `QueueStatus` bits 0x01 active / 0x02 empty / 0x04 full / 0x10 paused) runs programs of any size. Starvation
+    stops LINEAR moves in VELOCITY ON (dose peaks). `LOOKAHEAD FAST` has no function since 6.01; a `CRITICAL`
+    section over the whole layer may starve the Windows side that refills the queue. Open: whether IFOV commands,
+    `CRITICAL` and `$AO[...]` are allowed in queue mode (lab test first).
+  - Done when: layer programs run with `BUFFEREDRUN` (queue pre-filled, e.g. `PROGRAM PAUSE` as first line and
+    `PROGRAM 1 START` once `QueueLineCount` ≥ 90 % of `QueueLineCapacity`; progress and end markers via `$global`;
+    queue-empty events logged with time and line); generated programs without `LOOKAHEAD FAST` and without a
+    whole-layer `CRITICAL START/END` (golden files updated deliberately); the dummy backend simulates
+    `BUFFEREDRUN` and the queue status; the T125 split is kept only for the LOAD path or removed; lab check with the
+    largest DOE layer (2.2 M lines, 78 MB) without load error and without queue-empty events.
+
+- [ ] T127: `REMOVEPROGRAM` names the layer file instead of the loaded program (found during T125) [phase: B]
+  - Priority: high
+  - Size: S
+  - Depends on: –
+  - Done when: after a layer the task is stopped, idle is awaited and `REMOVEPROGRAM "python_aerobasic_program.pgm"`
+    (the name given to `PROGRAM LOAD`, without path) is sent instead of the original layer file name
+    (`Task.finish`, `devices/aerotech/task.py`); the same after a failed load; the dummy transport records
+    which programs are loaded and refuses or flags removing an unknown name; a test checks the name; golden
+    command logs updated deliberately.
+
+- [ ] T128: Load failures: log `~LASTERROR` for `!` replies and stop instead of skipping the layer (found during T125) [phase: B]
+  - Priority: high
+  - Size: S
+  - Depends on: –
+  - Done when: after every `!` or `#` reply the ASCII client sends `~LASTERROR` on the same connection and puts the
+    text into the `AerotechError` (the INVALID case of 2026-11-21 logged only "has an invalid syntax!", a text of
+    this client, not of the controller); `Experiment` stops printing a structure when a layer program cannot be
+    loaded (option, default on), so that no structure with gaps is printed; dummy-backend tests.
+
 - [ ] T124: Whole-structure program duplicated uncompressed in `experiment.h5` (found during T123) [phase: B]
   - Priority: medium
   - Size: S
@@ -573,6 +611,7 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T125: DOE print printed only 16 of 73 layers: `PROGRAM LOAD` refused every layer program above about 80 000 lines (maintainer report 2026-11-22, `surface_16bit`) — 2026-11-22 — Hotfix: a layer program with more than `max_program_lines` (default 80 000) lines is split at print time into parts (header/footer repeated, cut with the laser off at an absolute move, power/feed replayed) and `build_programs()` warns; interim solution `Experiment.reprint_layers()` / `mains/reprint_layers.py` prints the missing layers from the experiment file. Real fix: T126; follow-ups T127, T128; lab check of the parts open. — commits: `76b8839`, `d46ad4a`, `a6db390`
 - [x] T123: Unpacking aborted with `string too large to store inside array` (maintainer report 2026-11-22, main_PNG experiment) — 2026-11-22 — `write_dataset` takes scalar-ness from the dataset shape and writes scalar text unchanged, so text over 2 GB (the whole-structure program of a 48-million-line print) unpacks. Storage side: T124. — commits: `314d634`
 - [x] T121: Lab run aborted with `'tuple' object has no attribute 'as_tuple'` in `experiment_area` (maintainer report 2026-11-21, main_PNG) — 2026-11-21 — `CENTER` in `main_PNG.py` was a plain tuple; `ExperimentSpec` now converts an `(x, y)` center to `Point2D` (TypeError for anything else) and the script writes `Point2D` again. — commits: `e460cf5`
 - [x] T117: IFOV prints only a cross ("+") of every filled area (found during the chain print HR-26-002, 2026-11-20) — 2026-11-21 — Cause found by the maintainer in the lab: a wrong configuration on the A3200 controller, not the generated programs; no change to `IFOV_Lines` / `initialise_IFOV_configuration` and the golden files. The lab test `mains/Experiments/ifov_laser_test.py` and the switches `ASK_EACH_STEP` / `ASK_BETWEEN` / `SHOW_PLOTS` stay; IFOV prints (incl. `main_PNG.py`) are cleared again. — commits: `114c55b`, `7cf1403`, `4719134`, `c936384`, `6020906`
