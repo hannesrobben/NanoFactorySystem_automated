@@ -40,8 +40,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-__all__ = ["MAX_PROGRAM_LINES", "ProgramSplitError", "SplitPlan", "count_lines", "plan_split", "split_lines",
-           "split_program_file"]
+__all__ = ["MAX_PROGRAM_LINES", "ProgramSplitError", "SplitPlan", "count_lines", "existing_parts", "plan_split",
+           "remove_parts", "split_lines", "split_program_file"]
 
 #: Maximum number of lines of a program loaded with ``PROGRAM LOAD`` (maintainer decision 2026-11-22).
 MAX_PROGRAM_LINES = 80_000
@@ -322,8 +322,9 @@ def split_program_file(path: Path | str, max_lines: int = MAX_PROGRAM_LINES,
     if count_lines(path) <= max_lines:
         return [path]
     parts = split_lines(path.read_text().splitlines(), max_lines, source=path.name)
-    out_dir = Path(out_dir) if out_dir is not None else path.parent / "split"
+    out_dir = _parts_dir(path, out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    remove_parts(path, out_dir)
     width = len(str(len(parts)))
     files = []
     for k, part in enumerate(parts, start=1):
@@ -331,3 +332,62 @@ def split_program_file(path: Path | str, max_lines: int = MAX_PROGRAM_LINES,
         file.write_text("\n".join(part) + "\n")
         files.append(file)
     return files
+
+
+def _parts_dir(path: Path, out_dir: Optional[Path | str]) -> Path:
+    return Path(out_dir) if out_dir is not None else path.parent / "split"
+
+
+def _part_files(path: Path, out_dir: Optional[Path | str]) -> list[Path]:
+    folder = _parts_dir(path, out_dir)
+    if not folder.is_dir():
+        return []
+    pattern = re.compile(re.escape(path.stem) + r"\.part(\d+)of(\d+)" + re.escape(path.suffix) + "$")
+    return [f for f in folder.iterdir() if pattern.match(f.name)]
+
+
+def existing_parts(path: Path | str, max_lines: int = MAX_PROGRAM_LINES,
+                   out_dir: Optional[Path | str] = None) -> Optional[list[Path]]:
+    """ Return the parts written by :func:`split_program_file` if they are complete and still valid.
+
+    Valid means: parts 1 to n of the same split all exist, none is older
+    than the program and none is longer than ``max_lines`` lines.
+
+    Parameters
+    ----------
+    path : str or Path
+        Program file.
+    max_lines : int
+        Maximum number of lines per part.
+    out_dir : str or Path, optional
+        Folder of the parts (default: ``split/`` next to the program).
+
+    Returns
+    -------
+    list of Path or None
+        The parts in print order, or None.
+    """
+
+    path = Path(path)
+    pattern = re.compile(re.escape(path.stem) + r"\.part(\d+)of(\d+)" + re.escape(path.suffix) + "$")
+    found = {}
+    for file in _part_files(path, out_dir):
+        k, n = map(int, pattern.match(file.name).groups())
+        found.setdefault(n, {})[k] = file
+    if len(found) != 1:
+        return None
+    (n, files), = found.items()
+    if sorted(files) != list(range(1, n + 1)):
+        return None
+    parts = [files[k] for k in range(1, n + 1)]
+    mtime = path.stat().st_mtime
+    if any(p.stat().st_mtime < mtime or count_lines(p) > max_lines for p in parts):
+        return None
+    return parts
+
+
+def remove_parts(path: Path | str, out_dir: Optional[Path | str] = None) -> None:
+    """ Delete the part files of a program (see :func:`split_program_file`). """
+
+    for file in _part_files(Path(path), out_dir):
+        file.unlink(missing_ok=True)

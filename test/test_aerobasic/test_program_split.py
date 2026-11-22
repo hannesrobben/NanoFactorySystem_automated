@@ -1,8 +1,11 @@
 """Tests for splitting too long AeroBasic programs (aerobasic/programs/split.py, T125)."""
+import os
+
 import pytest
 
 from nanofactorysystem.aerobasic.programs.split import (MAX_PROGRAM_LINES, ProgramSplitError, count_lines,
-                                                        plan_split, split_lines, split_program_file)
+                                                        existing_parts, plan_split, remove_parts, split_lines,
+                                                        split_program_file)
 
 IFOV_HEADER = [
     "' Created on 2026-11-21 by (AeroBasicProgram)",
@@ -144,6 +147,30 @@ def test_split_program_file_and_count_lines(tmp_path):
     assert all(count_lines(p) <= 200 for p in parts)
     # A short program is returned unchanged and nothing is written
     assert split_program_file(path, len(lines)) == [path]
+
+
+def test_existing_parts_are_reused_only_while_valid(tmp_path):
+    lines, _ = ifov_program(500)
+    path = tmp_path / "program_doe.070.txt"
+    path.write_text("\n".join(lines) + "\n")
+    assert existing_parts(path, 200) is None
+
+    parts = split_program_file(path, 200)
+
+    assert existing_parts(path, 200) == parts
+    assert existing_parts(path, 100) is None  # a part is longer than the new limit
+    # A new split with another limit leaves no stale parts of the old one
+    smaller = split_program_file(path, 150)
+    assert sorted((tmp_path / "split").iterdir()) == sorted(smaller) and existing_parts(path, 150) == smaller
+    # A program changed after the split needs a new split
+    later = max(p.stat().st_mtime for p in smaller) + 10
+    os.utime(path, (later, later))
+    assert existing_parts(path, 150) is None
+    # A missing part makes the split incomplete; remove_parts deletes all of them
+    smaller[1].unlink()
+    assert existing_parts(path, 1000) is None
+    remove_parts(path)
+    assert not any((tmp_path / "split").iterdir())
 
 
 def test_default_limit():

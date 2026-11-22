@@ -6,10 +6,12 @@ and the experiment went on with the next layer. ``restart_experiment.py`` does n
 those layers count as attempted. This script prints them now:
 
 - the layers come from the experiment file (default: every layer without a successful print),
-- they are printed in the order of the drop direction (DOWN: from the highest layer id down),
-- a layer program with more than ``MAX_PROGRAM_LINES`` lines is split into parts that are loaded
-  and run one after another (the laser is off at every cut; each part moves to the layer start and
-  switches IFOV on again),
+- they are printed in the order of the drop direction (DOWN: the highest missing layer first, as in
+  the original print; the socket below is already there),
+- every layer program with more than ``MAX_PROGRAM_LINES`` lines is split into parts before the first
+  layer is printed; if one cannot be split, nothing is printed. The parts are loaded and run one after
+  another; each part carries the whole setup of the layer program (IFOV configuration, modes, power,
+  feed rates, move to the layer start, IFOV ON) and the laser is off at every cut,
 - progress, captures and the controller log go into the same experiment file (a new session).
 
 Before printing, check:

@@ -827,12 +827,14 @@ def test_long_layer_programs_are_printed_in_parts(test_config, dummy_backend, no
             experiment.plane_fit(plane=world.sample.plane())
             add_rectangle(experiment)
             experiment.build_programs()
+            split_dir = path / "structures" / "rect" / "programs" / "split"
+            # The build split the long layer programs already (T125: fixed before printing, not skipped)
+            assert (limit is None) != (split_dir.is_dir() and any(split_dir.iterdir()))
             exposures, programs = len(world.exposures), len(dummy_backend.calllog.filter(device="program"))
             experiment.print_experiment()
             runs[limit] = (exposure_segments(world, exposures),
                            len(dummy_backend.calllog.filter(device="program")) - programs,
                            len(experiment.structure_configs[0]["layer_files"]), progress(experiment, "rect"))
-            split_dir = path / "structures" / "rect" / "programs" / "split"
 
     (whole, n_whole, n_layers, _), (parts, n_parts, _, rect) = runs[None], runs[30]
     assert n_whole == n_layers and n_parts > n_layers
@@ -844,21 +846,72 @@ def test_long_layer_programs_are_printed_in_parts(test_config, dummy_backend, no
     assert split_dir.is_dir() and not any(split_dir.iterdir())
 
 
-def test_layer_that_cannot_be_split_is_recorded_as_failed(experiment, monkeypatch):
+def test_build_stops_if_a_layer_cannot_be_split(experiment, dummy_backend, monkeypatch):
+    # T125: a layer that cannot be loaded is fixed while building or the build stops; nothing is printed
     from nanofactorysystem.aerobasic.programs.split import ProgramSplitError
 
     def refuse(*args, **kwargs):
-        raise ProgramSplitError("no place to cut")
+        raise ProgramSplitError("no place to cut.")
 
     monkeypatch.setattr("nanofactorysystem.experiment.split_program_file", refuse)
     experiment.max_program_lines = 30
     add_rectangle(experiment)
+
+    with pytest.raises(ProgramSplitError, match="cannot be split into programs of at most 30 lines"):
+        experiment.build_programs()
+
+    assert experiment.structure_configs is None
+    assert not dummy_backend.calllog.filter(device="program")
+    assert ExperimentStore.open(experiment.path).read().status != "built"
+
+
+def test_print_uses_the_parts_written_by_the_build(experiment, dummy_backend, monkeypatch):
+    from nanofactorysystem.aerobasic.programs.split import ProgramSplitError
+
+    experiment.max_program_lines = 30
+    add_rectangle(experiment)
     experiment.build_programs()
+
+    def refuse(*args, **kwargs):
+        raise ProgramSplitError("the print must not split again")
+
+    monkeypatch.setattr("nanofactorysystem.experiment.split_program_file", refuse)
     experiment.print_experiment()
 
     rect = progress(experiment, "rect")
-    assert rect["status"] == "failed" and rect["printed_layers"] == 0
-    assert all("no place to cut" in layer["error"] for layer in rect["layers"])
+    assert rect["status"] == "printed" and rect["failed_layers"] == 0
+
+
+def test_every_part_of_an_ifov_layer_carries_the_layer_setup(test_config, dummy_backend, no_sleep, tmp_path):
+    # T125: each part is loaded as its own program, so it repeats the whole setup of the layer program
+    # (IFOV configuration, modes, power, feed rates, positioning, IFOV ON) and closes it (CRITICAL END, IFOV OFF)
+    from nanofactorysystem.aerobasic.programs.drawings.ifov_gratings import Rectangle3D_IFOV
+
+    with make_experiment(tmp_path, dummy_backend, setup="IFOV_on", max_program_lines=100) as experiment:
+        experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+        experiment.add_structure(StructureType.IFOV, "ifov", axes="ABZ", power=0.7,
+                                 structure=Rectangle3D_IFOV(Point3D(0, 0, -1), 20, 20, 1, hatch_size=0.2,
+                                                            slice_size=1.0, velocity=1000, power=0.7))
+        experiment.build_programs()
+        layers = [Path(f) for f in experiment.structure_configs[0]["layer_files"]]
+        split_dir = layers[0].parent / "split"
+        checked = 0
+        for layer in layers:
+            original = layer.read_text().splitlines()
+            setup = original[:original.index("IFOV ON") + 1]
+            closing = original[original.index("CRITICAL END"):]
+            parts = sorted(split_dir.glob(layer.stem + ".part*"))
+            for part in parts:
+                lines = part.read_text().splitlines()
+                assert len(lines) <= 100
+                assert lines[1:1 + len(setup)] == setup and lines[-len(closing):] == closing
+                checked += 1
+            assert {"CRITICAL START", "ABSOLUTE", "IFOV AXISPAIR 0, A, X", "IFOV ON"} <= set(setup)
+            assert any(line.startswith("$AO[") for line in setup)
+        assert checked > len(layers)
+        experiment.print_experiment()
+    ifov = progress(experiment, "ifov")
+    assert ifov["status"] == "printed" and ifov["printed_layers"] == len(layers)
 
 
 def test_reprint_failed_layers(test_config, dummy_backend, no_sleep, tmp_path):
@@ -906,3 +959,36 @@ def test_reprint_failed_layers(test_config, dummy_backend, no_sleep, tmp_path):
         with pytest.raises(ValueError, match="already printed"):
             experiment.reprint_layers("rect", failed)
     assert module.plan(path, "rect") == "Structure 'rect': no layers to print."
+
+
+def test_reprint_prints_the_highest_missing_layer_first_and_splits(test_config, dummy_backend, no_sleep, tmp_path):
+    # T125: drop direction DOWN prints the highest layer first; the reprint keeps this order and splits too long
+    # programs itself (the experiment of 2026-11-21 was built without parts)
+    import shutil
+
+    path = tmp_path / "experiment"
+    path.mkdir()
+    with make_experiment(path, dummy_backend, drop_direction=DropDirection.DOWN) as experiment:
+        experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+        add_rectangle(experiment)
+        experiment.build_programs()
+        n_layers = len(experiment.structure_configs[0]["layer_files"])
+        for _ in range(2):
+            dummy_backend.transport.program_error_next(error_code=42, running_polls=1)
+        experiment.print_experiment()
+    failed = [e["layer_id"] for e in ExperimentStore.open(path).read().progress["rect"] if e["status"] == "failed"]
+    assert failed == [n_layers - 1, n_layers - 2]  # the two highest layers were printed (attempted) first
+    split_dir = path / "structures" / "rect" / "programs" / "split"
+    shutil.rmtree(split_dir, ignore_errors=True)
+    dummy_backend.calllog.clear()
+
+    with Experiment(**Experiment.parameters_from_dictionary(path), backend=dummy_backend,
+                    max_program_lines=30) as experiment:
+        assert experiment.reprint_layers("rect") == sorted(failed)
+
+    events = ExperimentStore.open(path).read().progress["rect"]
+    reprinted = [e["layer_id"] for e in events if e["session"] == "001"]
+    assert reprinted == [n_layers - 1, n_layers - 2]  # highest first
+    assert all(e["status"] == "ok" for e in events if e["session"] == "001")
+    assert len(dummy_backend.calllog.filter(device="program")) > len(failed)  # printed in parts
+    assert not any(split_dir.iterdir())  # parts removed after printing
