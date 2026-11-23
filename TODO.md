@@ -161,6 +161,22 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
     fallback, the next layer is loaded on a second task while the current one prints, the T125 split is only used
     for the ASCII path, the dummy backend simulates the library loader, and the T126 queue mode is reconsidered.
 
+- [ ] T130: Program optimiser that shortens generated AeroBasic programs (maintainer request 2026-11-23) [phase: B]
+  - Priority: high
+  - Size: M
+  - Depends on: –
+  - Background: the DOE layer programs have up to 2.2 M lines (78 MB); coordinates are written with 10 decimals
+    in mm (0.1 nm, e.g. `RAPID A0.0000000000 B-1.0238750000`), axis words and feed rates are repeated although
+    they are modal, and collinear segments with the same laser state are separate moves. Fewer and shorter
+    lines lower the compile time and memory of every load path (T129) and the line rate a queue must sustain
+    (T126).
+  - Done when: an optimiser (usable on any generated program and as a build step) removes trailing zeros, limits
+    coordinates to a configurable precision (default 5 decimals in mm = 10 nm), omits unchanged axis words and
+    feed rates, and merges consecutive collinear moves of the same kind and laser state; it never changes the
+    exposed path beyond the chosen precision (test: the exposure segments of the dummy backend are equal within
+    the tolerance before and after); it reports lines and bytes before and after; golden programs are changed
+    only if it becomes a default build step (maintainer decision).
+
 - [ ] T124: Whole-structure program duplicated uncompressed in `experiment.h5` (found during T123) [phase: B]
   - Priority: medium
   - Size: S

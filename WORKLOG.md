@@ -2818,3 +2818,12 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** smoke test on the development PC (`inspect` without an Aerotech installation; netstat, tasklist and header-prototype parsers, memory sampler checked with sample input). No pytest module: the script lives in `mains/` and needs the lab PC; unit tests follow with the loader in T129.
 - **Commits:** `9e7365a` feat(lab): add a lab check that loads a layer program via the A3200 C library [T129]
 - **Follow-ups:** lab run of `inspect`, `load` (layer 68 or 69, full length) and optionally `ascii-load`; then the loader in T129. The uncommitted phase-1 safety edits on `fix/load-failures` (`ascii.py`, `devices/aerotech/__init__.py`) are still incomplete (missing `TaskFailedError` import, `Task(program_name=)`); layer 70 of `surface_16bit` was skipped on purpose by the maintainer; layers printed by hand in Motion Composer are not in `experiment.h5`.
+
+### 2026-11-23 15:05 CET — [T129] Lab check: compiled .ogm over ASCII; program optimiser noted as T130
+- **Status:** partial
+- **Changes:**
+  - `mains/lab_checks/library_load_check.py`: `inspect` lists every program and compiler function declared in the installed A3200 headers; the procedure gains a step that loads the `.ogm` object file Motion Composer wrote over ASCII (separates "the ASCII interface cannot hold large programs" from "its own compilation of the source fails").
+  - `TODO.md`: T130 (program optimiser) added to Open.
+- **Tests:** compiler-function discovery checked with a sample header; no pytest module (lab script, see the previous entry).
+- **Commits:** `b9fc573` feat(lab): list compiler functions and test loading a compiled .ogm over ASCII [T129]
+- **Follow-ups:** lab steps `inspect`, `load`, `ascii-load` with the `.ogm`; the 10 s `program_ready_timeout` of `run_program_as_task` is not a cause (LOAD over ASCII blocks until the compile is done, the 10 s start afterwards) but must be revisited for an asynchronous library loader (T129). `nanofactorysystem/aerobasic/ascii.py` shows formatting changes in the working tree (probably the IDE formatter) besides the unfinished T128 edit; keep them out of functional commits.
