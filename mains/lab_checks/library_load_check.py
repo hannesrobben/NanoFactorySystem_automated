@@ -25,8 +25,13 @@ Steps (run them in this order, each writes into the report folder):
    time and the memory of this Python process and of the port-8000 process, reads the task state,
    then stops the task and removes the program again. Run it after the running layer has finished,
    or accept that the compiler shares the Windows cores with the running print.
-3. Optional, last: ``python library_load_check.py ascii-load --file <same file> --task 3``
-   The same file with ``PROGRAM <task> LOAD`` over the ASCII interface, with memory sampling.
+3. ``python library_load_check.py ascii-load --file <layer program>.ogm --task 3``
+   The object file Motion Composer wrote when it compiled the same layer, loaded with ``PROGRAM <task> LOAD``
+   over the ASCII interface. If this works where the source failed, the ASCII interface can hold large
+   programs and only its own compilation of the source fails: compiling beforehand would be enough.
+   The program may stay loaded under another name than the file; restart before printing if in doubt.
+4. Optional, last: ``python library_load_check.py ascii-load --file <layer program>.pgm --task 3``
+   The source file over the ASCII interface, with memory sampling (the failing path, for comparison).
    If this fails with "out of memory", the ASCII load path is likely broken until the A3200 software
    is restarted. Restart before printing again.
 
@@ -268,13 +273,17 @@ def inspect(report: Report) -> None:
     for path in libraries:
         report.say(f"  {path}")
     report.say(f"\nA3200 headers: {len(headers)} found")
+    # Every program and compiler function the headers declare (a compile step could replace PROGRAM LOAD's own)
+    names = sorted({name for path in headers
+                    for name in re.findall(r"\b(A3200\w*(?:Program|Compil)\w*)\s*\(", path.read_text(errors="replace"))}
+                   | set(FUNCTIONS))
     prototypes: dict[str, str] = {}
     for path in headers:
-        found = extract_prototypes(path.read_text(errors="replace"), FUNCTIONS)
+        found = extract_prototypes(path.read_text(errors="replace"), names)
         for name, text in found.items():
             prototypes.setdefault(name, f"{text}    [{path.name}]")
     report.say("\nPrototypes:")
-    for name in FUNCTIONS:
+    for name in names:
         report.say(f"  {prototypes.get(name, name + ': not found')}")
     taskid = next((m.group(0) for p in headers
                    if (m := re.search(r"typedef\s+enum\s*\w*\s*\{[^}]*TASKID_01[^}]*\}\s*TASKID\s*;",
