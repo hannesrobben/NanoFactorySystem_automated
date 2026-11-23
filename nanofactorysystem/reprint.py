@@ -153,6 +153,7 @@ def reprint_plan(path: Path | str, name: str, layer_ids: Optional[Iterable[int]]
     structure = _structure(record, name)
     files = {layer_id_of(f): path / f for f in structure.layer_files}
     last = {}
+    # note: wozu? reihenfolge? Liste machen?
     for event in record.progress.get(name, []):
         last[int(event["layer_id"])] = event
     rows = []
@@ -189,5 +190,5 @@ def format_plan(rows: list[ReprintLayer], name: str) -> str:
     for r in rows:
         error = r.error.replace("\n", " ")
         lines.append(f"{r.layer_id:>5}  {r.n_lines:>9}  {r.n_parts:>5}  {r.last_status or 'not attempted'}"
-                     f"{' / ' + error[:80] if error else ''}")
+                     f"{' / ' + error[:180] if error else ''}")
     return "\n".join(lines)
