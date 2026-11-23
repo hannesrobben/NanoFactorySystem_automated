@@ -9,7 +9,7 @@ from nanofactorysystem.utils.typing import StatusQueryType
 
 
 class AerotechError(RuntimeError):
-    """ Error reported by the A3200 controller.
+    """Error reported by the A3200 controller.
 
     It is a ``RuntimeError``, the exception the older ``A3200`` controller
     class raised, so existing handlers for both keep working.
@@ -17,7 +17,7 @@ class AerotechError(RuntimeError):
 
 
 class TaskFailedError(AerotechError, ValueError):
-    """ A controller task (program) ended in a state other than ``program_complete``.
+    """A controller task (program) ended in a state other than ``program_complete``.
 
     It is an :class:`AerotechError`, so callers handling controller errors
     catch it, and a ``ValueError`` for code that caught the previous
@@ -26,7 +26,7 @@ class TaskFailedError(AerotechError, ValueError):
 
 
 def recv_line(sock, terminator: str = chr(10), bufsize: int = 4096) -> str:
-    """ Read from a socket until the terminating character arrives.
+    """Read from a socket until the terminating character arrives.
 
     Parameters
     ----------
@@ -53,7 +53,9 @@ def recv_line(sock, terminator: str = chr(10), bufsize: int = 4096) -> str:
     while not data.endswith(end):
         chunk = sock.recv(bufsize)
         if not chunk:
-            raise ConnectionError(f"Connection closed while waiting for a response (received {data!r})")
+            raise ConnectionError(
+                f"Connection closed while waiting for a response (received {data!r})"
+            )
         data += chunk
     return data.decode()
 
@@ -118,10 +120,16 @@ class AsciiCommandResponse:
 class AerotechAsciiInterface(AeroBasicAPI):
     COMMAND_TERMINATING_CHARACTER = 10  # \n
 
-    def __init__(self, hostname: str = "127.0.0.1", port: int = 8000, *,
-                 transport_factory: Optional[Callable[[], "socket.socket"]] = None,
-                 connect_timeout: Optional[float] = 10.0, response_timeout: Optional[float] = None):
-        """ ASCII command interface of the Aerotech A3200 controller.
+    def __init__(
+        self,
+        hostname: str = "127.0.0.1",
+        port: int = 8000,
+        *,
+        transport_factory: Optional[Callable[[], "socket.socket"]] = None,
+        connect_timeout: Optional[float] = 10.0,
+        response_timeout: Optional[float] = None,
+    ):
+        """ASCII command interface of the Aerotech A3200 controller.
 
         Parameters
         ----------
@@ -160,6 +168,7 @@ class AerotechAsciiInterface(AeroBasicAPI):
 
     def __call__(self, program):
         from nanofactorysystem.aerobasic.programs import AeroBasicProgram
+
         if isinstance(program, str):
             for line in program.split("\n"):
                 self.send(line)
@@ -195,9 +204,11 @@ class AerotechAsciiInterface(AeroBasicAPI):
                 self.socket.connect((self.hostname, self.port))
                 self.socket.settimeout(self.response_timeout)
             except (ConnectionRefusedError, TimeoutError):
-                self.socket.close()
+                self.socket.close()  # bug? None cannot close
                 self.socket = None
-                self.logger.error(f"Connection to A3200 controller failed! ({self.hostname}:{self.port})")
+                self.logger.error(
+                    f"Connection to A3200 controller failed! ({self.hostname}:{self.port})"
+                )
                 raise
         return self
 
@@ -207,12 +218,12 @@ class AerotechAsciiInterface(AeroBasicAPI):
             self.socket = None
 
     def send_with_simple_protocol(self, cmd: str):
-        """ Run the given AeroBasic command on the A3200 controller. """
+        """Run the given AeroBasic command on the A3200 controller."""
 
-        cmdTerminatingChar= 10
-        cmdSuccessChar= 37
-        cmdInvalidChar= 33
-        cmdFaultChar= 35
+        cmdTerminatingChar = 10
+        cmdSuccessChar = 37
+        cmdInvalidChar = 33
+        cmdFaultChar = 35
         if not self.is_opened:
             raise RuntimeError("Not connected!")
 
@@ -239,15 +250,14 @@ class AerotechAsciiInterface(AeroBasicAPI):
         return data
 
     def send_one(self, command: str) -> str:
-        """ Send a command; on an AerotechError retry it with the old, simpler protocol handling. """
+        """Send a command; on an AerotechError retry it with the old, simpler protocol handling."""
         try:
             return self.send(command)
         except AerotechError:
             return self.send_with_simple_protocol(command)
 
     def send(self, command: str) -> str:
-
-        """ Run the given AeroBasic command on the A3200 controller. """
+        """Run the given AeroBasic command on the A3200 controller."""
 
         if not self.is_opened:
             raise RuntimeError("Not connected!")
@@ -264,7 +274,9 @@ class AerotechAsciiInterface(AeroBasicAPI):
         self.socket.send(command.encode())
 
         # Read and return response
-        code, *data = recv_line(self.socket, chr(self.COMMAND_TERMINATING_CHARACTER)).strip()
+        code, *data = recv_line(
+            self.socket, chr(self.COMMAND_TERMINATING_CHARACTER)
+        ).strip()
         cmd_resp.timestamp_received = time.time()
         data = "".join(data)
         cmd_resp.return_code = ReturnCode(ord(code))
@@ -275,10 +287,20 @@ class AerotechAsciiInterface(AeroBasicAPI):
         if cmd_resp.return_code == ReturnCode.SUCCESS:
             return data
 
-        # Error handling -> Invalid Syntax
+        # Error handling -> command refused ("!"): the controller sends no reason, ~LASTERROR on the same
+        # connection does (T128; e.g. PROGRAM LOAD of a too long program answered "!" on 2026-11-21)
         if cmd_resp.return_code == ReturnCode.INVALID:
+            error = (
+                self.LAST_ERROR()
+                if self._follow_errors
+                else "Error retrieving last error..."
+            )
+            cmd_resp.error = error
             self.logger.error(str(cmd_resp))
-            raise AerotechError(f"Command '{command.strip()}' has an invalid syntax!")
+            raise AerotechError(
+                f"Command '{command.strip()}' has an invalid syntax or was refused! "
+                f"Last error: {error}"
+            )
 
         # Error handling -> Code execution failed
         if cmd_resp.return_code == ReturnCode.FAULT:
@@ -294,7 +316,7 @@ class AerotechAsciiInterface(AeroBasicAPI):
         raise RuntimeError(f"Could not identify return code {code}")
 
     def _check_z_limit(self, command: str) -> None:
-        """ Refuse an immediate absolute z move beyond :attr:`z_limit`.
+        """Refuse an immediate absolute z move beyond :attr:`z_limit`.
 
         Raises
         ------
@@ -313,19 +335,26 @@ class AerotechAsciiInterface(AeroBasicAPI):
             return
         match = re.match(r"(LINEAR|RAPID|G0|G1)\b(.*)", text)
         if match:
-            z = re.search(r"(?<![A-Z$_])Z\s*(-?\d+\.?\d*(?:E[-+]?\d+)?)", match.group(2))
+            z = re.search(
+                r"(?<![A-Z$_])Z\s*(-?\d+\.?\d*(?:E[-+]?\d+)?)", match.group(2)
+            )
         else:
             z = re.match(r"MOVEABS\s+Z\s+(-?\d+\.?\d*(?:E[-+]?\d+)?)", text)
         if z is not None and float(z.group(1)) > self.z_limit:
-            raise AerotechError(f"Refused '{command.strip()}': z {float(z.group(1))} mm exceeds the "
-                                f"maximum z position {self.z_limit} mm (zMax)")
+            raise AerotechError(
+                f"Refused '{command.strip()}': z {float(z.group(1))} mm exceeds the "
+                f"maximum z position {self.z_limit} mm (zMax)"
+            )
 
     # SYSTEM COMMANDS
     def LAST_ERROR(self) -> str:
+        """Return the last error of commands sent on this connection (``~LASTERROR``)."""
+
         self._follow_errors = False
-        resp = self.send("~LASTERROR")
-        self._follow_errors = True
-        return resp
+        try:
+            return self.send("~LASTERROR")
+        finally:
+            self._follow_errors = True
 
     def VERSION(self) -> Version:
         """
@@ -368,13 +397,15 @@ class AerotechAsciiInterface(AeroBasicAPI):
 
     def STATUS(self, *query_tuples: StatusQueryType):
         def stringify_query(query):
-            """ Converts all arguments to strings if necessary """
+            """Converts all arguments to strings if necessary"""
             args = []
             for item in query:
                 if isinstance(item, str):
                     args.append(item)
                 elif isinstance(item, DataItemEnum):
-                    args.append(str(item.name))  # Need value here and not DataItem_value!
+                    args.append(
+                        str(item.name)
+                    )  # Need value here and not DataItem_value!
                 elif isinstance(item, SingleAxis):
                     args.append(item.parameter_name)
                 else:
@@ -382,15 +413,14 @@ class AerotechAsciiInterface(AeroBasicAPI):
 
             return args
 
-        query_string = " ".join([
-            f"({', '.join(stringify_query(query))})"
-            for query in query_tuples
-        ])
+        query_string = " ".join(
+            [f"({', '.join(stringify_query(query))})" for query in query_tuples]
+        )
         return self.send(f"~STATUS {query_string}")
 
 
 class DummyAsciiInterface(AerotechAsciiInterface):
-    """ Deprecated: echoes every command instead of answering it.
+    """Deprecated: echoes every command instead of answering it.
 
     Use ``nanofactorysystem.backends.dummy.FakeA3200Transport`` (via
     ``AerotechAsciiInterface(transport_factory=...)`` or the dummy backend),
