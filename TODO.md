@@ -146,6 +146,21 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
     this client, not of the controller); `Experiment` stops printing a structure when a layer program cannot be
     loaded (option, default on), so that no structure with gaps is printed; dummy-backend tests.
 
+- [ ] T129: Load layer programs through the A3200 C library instead of `PROGRAM LOAD` over ASCII (found during T125) [phase: B]
+  - Priority: high
+  - Size: M
+  - Depends on: lab result of `mains/lab_checks/library_load_check.py`
+  - Background: on 2026-11-21 `PROGRAM 1 LOAD` over the ASCII interface answered "An out of memory error occurred."
+    (FAULT, 1.6 s and 19 s) for layer 70 after layer 71 (81 751 lines) had loaded in 10 s; every later LOAD was
+    refused with `!` within 0.4 s until the A3200 software was restarted. On 2026-11-23 the maintainer loaded the
+    full layers 69 and 68 (millions of lines) by hand in Motion Composer 6.04.005 on tasks 1 and 2 while layer 69
+    ran ("Program Running", not queue mode). Hypothesis: the ASCII interface compiles inside the process serving
+    port 8000 (possibly 32 bit), Motion Composer through the library in its own process.
+  - Done when: the lab check confirms or refutes the hypothesis; if confirmed, `run_program_as_task` loads through
+    `A3200C64.dll` (ctypes, signatures from the installed headers) behind a loader seam with the ASCII path as
+    fallback, the next layer is loaded on a second task while the current one prints, the T125 split is only used
+    for the ASCII path, the dummy backend simulates the library loader, and the T126 queue mode is reconsidered.
+
 - [ ] T124: Whole-structure program duplicated uncompressed in `experiment.h5` (found during T123) [phase: B]
   - Priority: medium
   - Size: S

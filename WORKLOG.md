@@ -2809,3 +2809,12 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** short-path venv `python -m pytest`: 482 passed, 15 skipped, 4 failed (the same four T122 failures as in the previous entry, lab SETTINGS in `main.py` / `main_PNG.py`).
 - **Commits:** `9974a31` fix(experiment): split too long layer programs while building, stop if one cannot be split [T125], `2e7ad3a` docs: describe the split while building and the reprint order [T125]
 - **Follow-ups:** unchanged (T126, T127, T128); lab: `reprint_layers.py --plan`, one split layer with the laser off before the DOE reprint. Splitting the 57 missing DOE layers before the reprint takes roughly 15–30 min and about 3.7 GB of disk space next to the layer programs.
+
+### 2026-11-23 14:34 CET — [T129] Lab check: load a layer program through the A3200 C library
+- **Status:** partial
+- **Changes:**
+  - `mains/lab_checks/library_load_check.py` (new): standalone lab check (standard library only). `inspect` lists the A3200 libraries, the header prototypes of the program functions, and name, bitness and memory of the process serving port 8000; `load` loads a layer program through `A3200C64.dll` on an idle task (prototypes checked against the installed headers first, memory of Python and of the port-8000 process sampled), then stops the task and removes the program; `ascii-load` does the same with `PROGRAM <task> LOAD` for comparison. It never starts a program.
+  - `TODO.md`: T129 added to Open.
+- **Tests:** smoke test on the development PC (`inspect` without an Aerotech installation; netstat, tasklist and header-prototype parsers, memory sampler checked with sample input). No pytest module: the script lives in `mains/` and needs the lab PC; unit tests follow with the loader in T129.
+- **Commits:** `9e7365a` feat(lab): add a lab check that loads a layer program via the A3200 C library [T129]
+- **Follow-ups:** lab run of `inspect`, `load` (layer 68 or 69, full length) and optionally `ascii-load`; then the loader in T129. The uncommitted phase-1 safety edits on `fix/load-failures` (`ascii.py`, `devices/aerotech/__init__.py`) are still incomplete (missing `TaskFailedError` import, `Task(program_name=)`); layer 70 of `surface_16bit` was skipped on purpose by the maintainer; layers printed by hand in Motion Composer are not in `experiment.h5`.
