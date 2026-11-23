@@ -21,11 +21,27 @@ LayerFactory -> Iterator[AerobasicProgram]
 
 
 class Task:
-    def __init__(self, api: AerotechAsciiInterface, task_id: int, *, file_path: Optional[Path | str] = None):
+    def __init__(self, api: AerotechAsciiInterface, task_id: int, *, file_path: Optional[Path | str] = None,
+                 program_name: Optional[str] = None):
+        """ Handle of a controller task running a program.
+
+        Parameters
+        ----------
+        api : AerotechAsciiInterface
+        task_id : int
+        file_path : str or Path, optional
+            Program file (its line count is the expected last line).
+        program_name : str, optional
+            Name under which the program was loaded on the controller (the
+            file name given to ``PROGRAM LOAD``, without path). Kept for
+            removing the program under that name (T127); ``finish`` still
+            removes ``file_path`` until T127 is done.
+        """
         self.api = api
         self.task_id = task_id
 
         self.file_path = Path(file_path) if file_path is not None else None
+        self.program_name = program_name
 
         self._task_status0 = None
         self._task_status1 = None

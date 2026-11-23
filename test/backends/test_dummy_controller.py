@@ -179,7 +179,8 @@ def test_program_error_before_start(tmp_path, transport, world, no_sleep):
     program = AeroBasicProgram()
     program.send("LINEAR X1 F1")
 
-    with pytest.raises(RuntimeError, match="Program did not start"):
+    # The task is in error right after START: reported as TaskFailedError with the task state
+    with pytest.raises(TaskFailedError, match=r"did not start .*\(task state error\)"):
         a3200.run_program_as_task(program, task_id=1, program_start_running_timeout=1)
 
 

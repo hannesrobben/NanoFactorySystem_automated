@@ -2809,3 +2809,32 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** short-path venv `python -m pytest`: 482 passed, 15 skipped, 4 failed (the same four T122 failures as in the previous entry, lab SETTINGS in `main.py` / `main_PNG.py`).
 - **Commits:** `9974a31` fix(experiment): split too long layer programs while building, stop if one cannot be split [T125], `2e7ad3a` docs: describe the split while building and the reprint order [T125]
 - **Follow-ups:** unchanged (T126, T127, T128); lab: `reprint_layers.py --plan`, one split layer with the laser off before the DOE reprint. Splitting the 57 missing DOE layers before the reprint takes roughly 15–30 min and about 3.7 GB of disk space next to the layer programs.
+
+### 2026-11-23 14:34 CET — [T129] Lab check: load a layer program through the A3200 C library
+- **Status:** partial
+- **Changes:**
+  - `mains/lab_checks/library_load_check.py` (new): standalone lab check (standard library only). `inspect` lists the A3200 libraries, the header prototypes of the program functions, and name, bitness and memory of the process serving port 8000; `load` loads a layer program through `A3200C64.dll` on an idle task (prototypes checked against the installed headers first, memory of Python and of the port-8000 process sampled), then stops the task and removes the program; `ascii-load` does the same with `PROGRAM <task> LOAD` for comparison. It never starts a program.
+  - `TODO.md`: T129 added to Open.
+- **Tests:** smoke test on the development PC (`inspect` without an Aerotech installation; netstat, tasklist and header-prototype parsers, memory sampler checked with sample input). No pytest module: the script lives in `mains/` and needs the lab PC; unit tests follow with the loader in T129.
+- **Commits:** `9e7365a` feat(lab): add a lab check that loads a layer program via the A3200 C library [T129]
+- **Follow-ups:** lab run of `inspect`, `load` (layer 68 or 69, full length) and optionally `ascii-load`; then the loader in T129. The uncommitted phase-1 safety edits on `fix/load-failures` (`ascii.py`, `devices/aerotech/__init__.py`) are still incomplete (missing `TaskFailedError` import, `Task(program_name=)`); layer 70 of `surface_16bit` was skipped on purpose by the maintainer; layers printed by hand in Motion Composer are not in `experiment.h5`.
+
+### 2026-11-23 15:13 CET — [T129] Lab check: compiled .ogm over ASCII; program optimiser noted as T130
+- **Status:** partial
+- **Changes:**
+  - `mains/lab_checks/library_load_check.py`: `inspect` lists every program and compiler function declared in the installed A3200 headers; the procedure gains a step that loads the `.ogm` object file Motion Composer wrote over ASCII (separates "the ASCII interface cannot hold large programs" from "its own compilation of the source fails").
+  - `TODO.md`: T130 (program optimiser) added to Open.
+- **Tests:** compiler-function discovery checked with a sample header; no pytest module (lab script, see the previous entry).
+- **Commits:** `b9fc573` feat(lab): list compiler functions and test loading a compiled .ogm over ASCII [T129]
+- **Follow-ups:** lab steps `inspect`, `load`, `ascii-load` with the `.ogm`; the 10 s `program_ready_timeout` of `run_program_as_task` is not a cause (LOAD over ASCII blocks until the compile is done, the 10 s start afterwards) but must be revisited for an asynchronous library loader (T129). `nanofactorysystem/aerobasic/ascii.py` shows formatting changes in the working tree (probably the IDE formatter) besides the unfinished T128 edit; keep them out of functional commits.
+
+### 2026-11-23 15:38 CET — [T128] Repair run_program_as_task after the unfinished T128 edits landed on main_HR
+- **Status:** partial (T128 and T127 remain open)
+- **Changes:**
+  - `fe2dba9` merge of `main_HR` into `fix/load-failures`: brings `596a451`, `0593145` (maintainer updates of `mains/reprint_layers.py`, `nanofactorysystem/reprint.py`) and `67fd927` "clean up docs", which contains the unfinished T128 edits of `nanofactorysystem/aerobasic/ascii.py` (`~LASTERROR` after `!`, `LAST_ERROR` with try/finally, plus formatting) and `nanofactorysystem/devices/aerotech/__init__.py` (`Task(program_name=)`, `TaskFailedError` raises).
+  - `nanofactorysystem/devices/aerotech/task.py`: `Task` accepts and stores `program_name`; without it every `run_program_as_task` raised a `TypeError` on `main_HR`. `finish()` still removes `file_path` (T127 open, golden command logs unchanged).
+  - `nanofactorysystem/devices/aerotech/__init__.py`: missing `TaskFailedError` import added.
+  - `test/backends/test_dummy_controller.py`: `test_program_error_before_start` expects `TaskFailedError` with the task state.
+- **Tests:** short-path venv: `test/backends test/devices test/test_aerobasic test/test_system.py` 171 passed, 4 skipped; `test/test_experiment.py test/storage` 77 passed. Full suite run after the push (see the next entry or the session report).
+- **Commits:** `236b85c` fix(devices): make run_program_as_task work again after the T128 edits [T128]
+- **Follow-ups:** the rest of phase 1 (early end as failure, state 8 with error code, stop the structure on the first failure, T127 removal name) stays open; `fix/load-failures` merged into `main_HR` and pushed at the maintainer's request.

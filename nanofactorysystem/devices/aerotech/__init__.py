@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 from nanofactorysystem.aerobasic import AxisStatusDataItem, SingleAxis, SystemStatusDataItem, WaitMode, Axis
-from nanofactorysystem.aerobasic.ascii import AerotechAsciiInterface
+from nanofactorysystem.aerobasic.ascii import AerotechAsciiInterface, TaskFailedError
 from nanofactorysystem.aerobasic.constants import AxisStatus
 from nanofactorysystem.aerobasic.constants.tasks import ProgrammingMode, TaskState, VelocityMode
 from nanofactorysystem.aerobasic.programs import AeroBasicProgram
