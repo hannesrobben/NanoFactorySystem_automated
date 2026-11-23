@@ -38,6 +38,7 @@ from nanofactorysystem.reprint import format_plan, reprint_plan
 # Experiment folder (the one containing experiment.h5). For the DOE print of 2026-11-21 it is
 # <dataRoot of Hannes>\DOE_circle_V1\DOE_circle_V1-B_<YYYYMMDD-HHMM> on the lab PC.
 EXP_PATH = r""
+EXP_PATH = r"C:\Users\Nanofactory\Documents\Femtika_Experiment\Hannes\DOE_circle_V1\DOE_circle_V1-B_20261121-2020"
 # Structure whose layers are printed
 STRUCTURE = "surface_16bit"
 # None: every layer without a successful print; or a list of layer ids, e.g. [70, 69, 68]
