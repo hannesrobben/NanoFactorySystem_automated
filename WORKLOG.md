@@ -2819,7 +2819,7 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Commits:** `9e7365a` feat(lab): add a lab check that loads a layer program via the A3200 C library [T129]
 - **Follow-ups:** lab run of `inspect`, `load` (layer 68 or 69, full length) and optionally `ascii-load`; then the loader in T129. The uncommitted phase-1 safety edits on `fix/load-failures` (`ascii.py`, `devices/aerotech/__init__.py`) are still incomplete (missing `TaskFailedError` import, `Task(program_name=)`); layer 70 of `surface_16bit` was skipped on purpose by the maintainer; layers printed by hand in Motion Composer are not in `experiment.h5`.
 
-### 2026-11-23 15:05 CET — [T129] Lab check: compiled .ogm over ASCII; program optimiser noted as T130
+### 2026-11-23 15:13 CET — [T129] Lab check: compiled .ogm over ASCII; program optimiser noted as T130
 - **Status:** partial
 - **Changes:**
   - `mains/lab_checks/library_load_check.py`: `inspect` lists every program and compiler function declared in the installed A3200 headers; the procedure gains a step that loads the `.ogm` object file Motion Composer wrote over ASCII (separates "the ASCII interface cannot hold large programs" from "its own compilation of the source fails").
