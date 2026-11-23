@@ -190,11 +190,10 @@ class AerotechController:
         # Load program
         if task_id is None:
             task_id = 2
-# here error occurs - HR - 20x objective - binary program loading
         self.api.PROGRAM_LOAD(task_id, exec_path)
 
-        # Wait for program to be ready
-        task = Task(self.api, task_id, file_path=path)
+        # Wait for program to be ready; the program is removed under the name it was loaded with (T127)
+        task = Task(self.api, task_id, file_path=path, program_name=exec_path.name)
         query_delay = 0.1
         for i in range(int(program_ready_timeout / query_delay)):
             task.update()
@@ -203,7 +202,8 @@ class AerotechController:
             time.sleep(query_delay)
         else:
             # path is the individual filename of the layer. exec_path is the universal path which is loaded and printed
-            raise RuntimeError(f"Could not load program {path} after {program_ready_timeout} seconds!")
+            raise TaskFailedError(f"Could not load program {path} after {program_ready_timeout} seconds "
+                                  f"(task state {task.task_state.name})!")
 
         # Start program
         self.api.PROGRAM_START(task_id)
@@ -215,7 +215,8 @@ class AerotechController:
                 break
             time.sleep(query_delay)
         else:
-            raise RuntimeError("Program did not start")
+            raise TaskFailedError(f"Program {path} did not start within {program_start_running_timeout} seconds "
+                                  f"(task state {task.task_state.name})")
 
         return task
 
