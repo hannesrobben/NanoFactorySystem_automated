@@ -36,7 +36,7 @@ Added for lab session 2 (T134, ``docs/guides/PROGRAM_LOADING_LAB_TESTS.md`` sect
                     header of a real layer (T132).
 ``recover-ascii``   recovery level R1: terminate ``A3200AsciiInterface.exe``; is it started again, and does LOAD
                     over ASCII work afterwards?
-``reset``           recovery level R2: ``A3200Reset`` through the library (operator confirmation); which states
+``reset``           recovery level R2: ``~RESETCONTROLLER`` over ASCII (or ``A3200Reset``; confirmation); which states
                     survive (axis enable, home, position, task states, added programs)?
 ``restart-service`` recovery level R3: ``Restart-Service A3200CommService`` (administrator); time until the
                     ASCII interface and the library are usable again, states before/after.
@@ -1236,13 +1236,19 @@ def step_recover_ascii(session: Session, args) -> None:
 
 
 def step_reset(session: Session, args) -> None:
-    """ Recovery level R2: ``A3200Reset`` through the library, states before and after. """
+    """ Recovery level R2: controller reset (``~RESETCONTROLLER`` over ASCII or ``A3200Reset``), states before/after.
 
-    headers = "\n".join(h.read_text(errors="replace") for h in find_files(SEARCH_ROOTS, ["A3200*.h"]))
-    if not re.search(RESET_SIGNATURE, headers):
-        session.log(f"A3200Reset(A3200Handle) not found in the installed headers ({prototype(headers, 'A3200Reset')}). "
-                    f"Not called.")
-        sys.exit(1)
+    ``~RESETCONTROLLER`` is the documented ASCII command with the function of "Reset Controller" in Motion
+    Composer; the interface answers when the reset is complete. The library path is used only if the
+    installed headers declare ``A3200Reset(A3200Handle)``.
+    """
+
+    if args.reset_via == "library":
+        headers = "\n".join(h.read_text(errors="replace") for h in find_files(SEARCH_ROOTS, ["A3200*.h"]))
+        if not re.search(RESET_SIGNATURE, headers):
+            session.log(f"A3200Reset(A3200Handle) not found in the installed headers "
+                        f"({prototype(headers, 'A3200Reset')}). Not called; use --reset-via ascii.")
+            sys.exit(1)
     warning = ("R2 resets the controller like 'Reset Controller' in Motion Composer. Axes may be disabled and lose "
                "their home; a Z axis without brake may move when disabled. Move the objective to a safe Z first, "
                "close the shutter.")
@@ -1255,12 +1261,25 @@ def step_reset(session: Session, args) -> None:
             session.log(f"Task {task_id} is running. Stopped.")
             sys.exit(1)
     lib.close()
-    record = {"before": controller_snapshot(args.dll, args.reply_timeout)}
-    lib = Library(args.dll)
+    record = {"before": controller_snapshot(args.dll, args.reply_timeout), "via": args.reset_via}
     start = time.time()
-    ok, error = lib.reset()
+    if args.reset_via == "library":
+        lib = Library(args.dll)
+        ok, error = lib.reset()
+        lib.close()
+    else:
+        client = try_ascii(args.wait_s)
+        if client is None:
+            session.log("ASCII interface not reachable; use --reset-via library. Stopped.")
+            sys.exit(1)
+        try:
+            code, data, _ = client.send("~RESETCONTROLLER")
+            ok = code == "%"
+            error = "" if ok else f"{code}{data} {client.last_error()}"
+        except (TimeoutError, OSError) as exc:
+            ok, error = False, f"no reply within {args.wait_s} s ({exc})"
+        client.close()
     record.update(reset_ok=ok, reset_error=error, reset_call_s=round(time.time() - start, 1))
-    lib.close()
     record["library_usable_s"] = wait_until(lambda: library_usable(args.dll), args.wait_s)
     record["ascii_reachable_s"] = wait_until(lambda: ascii_reachable(), args.wait_s)
     record["after"] = controller_snapshot(args.dll, args.reply_timeout)
@@ -1339,6 +1358,8 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--no-probe", action="store_true", help="system: skip the ASCII LOAD probe")
     parser.add_argument("--confirm", action="store_true", help="recover-ascii, reset, restart-service")
     parser.add_argument("--wait-s", type=float, default=180.0, help="seconds to wait for a recovery (default 180)")
+    parser.add_argument("--reset-via", choices=["ascii", "library"], default="ascii",
+                        help="reset: ~RESETCONTROLLER over ASCII (default) or A3200Reset through the library")
     parser.add_argument("--mode", choices=["load", "add"], default="load", help=argparse.SUPPRESS)
     parser.add_argument("--source-lines", type=int, default=None, help=argparse.SUPPRESS)
     parser.add_argument("--task", type=int, default=2, help="task for load-only steps (default 2)")

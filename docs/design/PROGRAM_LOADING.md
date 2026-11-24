@@ -207,7 +207,7 @@ with the laser on: the laser is set to 0 and the gate closed first.
 |---|---|---|---|
 | R0 | Stop tasks 1/2, remove every added program (by listed name), `ACKNOWLEDGEALL` | none on axes or positions | automatic before a print and after a failure |
 | R1 | Restart only the ASCII interface (terminate `A3200AsciiInterface.exe`, if the CommService starts it again; lab session 2) | ASCII connection lost, reconnect | software after operator confirmation |
-| R2 | Controller reset through the library (`A3200Reset`, if present in the headers, like "Reset Controller" in Motion Composer) | Axes disabled, home and IFOV/galvo settings possibly lost → enable axes, possibly home, re-initialise the setup | operator confirms on the console; homing only with the objective at a safe Z |
+| R2 | Controller reset with the documented ASCII command `~RESETCONTROLLER` (the "Reset Controller" button of Motion Composer; `A3200Reset` of the library as alternative) | Axes disabled, home and IFOV/galvo settings possibly lost → enable axes, possibly home, re-initialise the setup | operator confirms on the console; homing only with the objective at a safe Z |
 | R3 | Restart the A3200 software (`Restart-Service A3200CommService`, admin rights) | as R2, plus all connections | operator confirms; only if R1/R2 do not help |
 
 Each level is followed by the health check again. The experiment continues only if it passes. The
