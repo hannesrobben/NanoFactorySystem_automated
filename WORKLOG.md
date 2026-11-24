@@ -2838,3 +2838,11 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** short-path venv: `test/backends test/devices test/test_aerobasic test/test_system.py` 171 passed, 4 skipped; `test/test_experiment.py test/storage` 77 passed. Full suite run after the push (see the next entry or the session report).
 - **Commits:** `236b85c` fix(devices): make run_program_as_task work again after the T128 edits [T128]
 - **Follow-ups:** the rest of phase 1 (early end as failure, state 8 with error code, stop the structure on the first failure, T127 removal name) stays open; `fix/load-failures` merged into `main_HR` and pushed at the maintainer's request.
+
+### 2026-11-24 10:52 CET — [T129] Evaluation of the library load lab check
+- **Status:** partial (loader not implemented yet)
+- **Changes:**
+  - `TODO.md`: T129 gets the lab result and the design consequences (32-bit `A3200AsciiInterface.exe` serves port 8000; library load of the full layer 68 works in 129 s with a 19.3 GB peak in the 64-bit client; `.ogm` cannot be loaded over ASCII; a failed build leaves every later ASCII LOAD refused within 0.1 s; task 3 inactive).
+- **Tests:** none (evaluation of lab output; the result folders `mains/lab_checks/library_load_check_2026112*` and `mains/lab_checks/console_logs.txt` stay untracked).
+- **Commits:** see the docs(todo) commit of this entry.
+- **Follow-ups:** T129 implementation (library loader in a worker process, task alternation 1/2); lab check whether a failed build blocks only the same program name or every load (small program of another name over ASCII after a refusal).
