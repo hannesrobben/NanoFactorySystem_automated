@@ -14,7 +14,7 @@ Goal: answer what session 1 left open:
 - the compile path of Motion Composer (.NET);
 - the recovery levels R1–R3 for the health check (T133).
 
-Plan about 75 minutes. The session needs one restart of the A3200 software at the start, and possibly
+Plan about 80 minutes. The session needs one restart of the A3200 software at the start, and possibly
 one more after step 11.
 
 ### Safety
@@ -59,6 +59,7 @@ one more after step 11.
 | 5 | `python program_loading_lab.py add-associate` | 1 min | `A3200ProgramAdd` (compile without a task) and `A3200ProgramAssociate` (bind to task 2): time, memory, and which name works |
 | 6 | `python program_loading_lab.py hold --file $ogm68 --file2 $ogm69` | 5 min | Loads the full layers 68 and 69 on tasks 1 and 2 at the same time. The script asks three times for the INtime memory (before, loaded, after removal). Read it in the INtime tool (tray icon "INtime Status" or INtime Explorer: memory of the node) and type what you see. |
 | 7 | `python program_loading_lab.py taskspeed --axes-safe` | 15 min | Runs the same 100k-line galvo program on task 1 and task 2, first with the bare header and then with the header of a real layer (`SECONDS`, `METRIC`, `LOOKAHEAD FAST`, `CRITICAL START`, …). Reports the time per line and the ratio task 2 / task 1. |
+| 7b | `python program_loading_lab.py runner --axes-safe` | 6 min | The library loader of the package (T129, `ProgramRunner`) with 4 synthetic galvo parts of 200k lines on tasks 1/2, laser gate off: does the integrated path run every part to its last line with small gaps? (P5 of the work order) |
 | 8 | Configuration Manager → task parameters of task 1 and task 2: note every value that differs (checklist item 2) | 5 min | Cause of T132 |
 | 9 | stop `watch` with Ctrl+C | – | – |
 | 10 | `python program_loading_lab.py sticky` | 2 min | Starts with a probe and stops if LOAD over ASCII is already refused. Then loads a valid program, an invalid program, a valid program of another name, valid content under the failed name, the first program again, and finally a program through the library. Each reply waits at most 60 s. **This leaves the ASCII interface refusing.** |

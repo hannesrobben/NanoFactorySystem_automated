@@ -34,6 +34,8 @@ Added for lab session 2 (T134, ``docs/guides/PROGRAM_LOADING_LAB_TESTS.md`` sect
                     operator notes the INtime memory before, during and after.
 ``taskspeed``       dry run: the same synthetic program on task 1 and task 2, with the bare header and with the
                     header of a real layer (T132).
+``runner``          dry run of the package's library loader (T129: ``LibraryLoader`` + ``ProgramRunner``) with
+                    synthetic galvo parts alternating on tasks 1/2, like ``cycle``.
 ``recover-ascii``   recovery level R1: terminate ``A3200AsciiInterface.exe``; is it started again, and does LOAD
                     over ASCII work afterwards?
 ``reset``           recovery level R2: ``~RESETCONTROLLER`` over ASCII (or ``A3200Reset``; confirmation); which states
@@ -1176,6 +1178,53 @@ def step_taskspeed(session: Session, args) -> None:
             session.log(f"{style} header: task 2 / task 1 = {times[2] / times[1]:.2f}")
 
 
+def step_runner(session: Session, args) -> None:
+    """ Dry: the package's LibraryLoader + ProgramRunner (T129) with synthetic galvo parts on tasks 1/2. """
+
+    if not args.axes_safe:
+        session.log("runner moves the galvo axes A/B (laser gate forced off). Close the shutter, make sure the galvo "
+                    "may move, then repeat with --axes-safe.")
+        sys.exit(1)
+    import logging
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from nanofactorysystem.aerobasic.ascii import AerotechAsciiInterface
+    from nanofactorysystem.devices.aerotech.loader import LibraryLoader, MemoryBudget, ProgramRunner
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    folder = session.programs / "runner"
+    parts = [write_program(folder / f"runner_part{k + 1}of{args.parts}.pgm",
+                           synthetic_program(args.lines, segment_um=args.segment_um, title=f"runner part {k + 1}"))
+             for k in range(args.parts)]
+    api = AerotechAsciiInterface(load_timeout=args.reply_timeout)
+    try:
+        api.connect()
+        loader = LibraryLoader(args.dll)
+    except (OSError, RuntimeError) as exc:
+        session.log(f"Controller not usable ({type(exc).__name__}: {exc}). Stopped.")
+        sys.exit(1)
+    runner = ProgramRunner(loader, api, MemoryBudget(budget_gb=args.budget_gb), exec_dir=folder / "exec",
+                           logger=logging.getLogger("runner"))
+    session.log(f"runner: {args.parts} parts of {args.lines} lines through the package loader")
+    error = ""
+    try:
+        runner.run([(k, [part]) for k, part in enumerate(parts)])
+    except Exception as exc:  # record every failure of the integrated path
+        error = f"{type(exc).__name__}: {exc}"
+        session.log(f"runner failed: {error}")
+    finally:
+        loader.close()
+        api.close()
+    for record in runner.records:
+        session.record("runner_part", {k: v for k, v in vars(record).items()})
+        session.log(f"  part {record.part} task {record.task}: load {record.load_s} s, waited "
+                    f"{record.waited_for_load_s} s, run {record.run_s} s, gap {record.gap_s} s, last line "
+                    f"{record.last_line}, PC {record.used_gb} GB")
+    session.record("runner", {"parts": args.parts, "lines": args.lines, "completed": len(runner.records),
+                              "error": error})
+    for part in parts:
+        part.unlink(missing_ok=True)
+
+
 def confirmed(phrase: str, text: str) -> bool:
     print(text)
     return input(f"Type {phrase} to continue: ").strip() == phrase
@@ -1343,7 +1392,7 @@ def step_watch(session: Session, args) -> None:
 STEPS = {"system": step_system, "ladder": step_ladder, "precision": step_precision, "ogm": step_ogm,
          "cycle": step_cycle, "sticky": step_sticky, "watch": step_watch,
          "api": step_api, "ogm-clean": step_ogm_clean, "add-associate": step_add_associate, "hold": step_hold,
-         "taskspeed": step_taskspeed, "recover-ascii": step_recover_ascii, "reset": step_reset,
+         "taskspeed": step_taskspeed, "runner": step_runner, "recover-ascii": step_recover_ascii, "reset": step_reset,
          "restart-service": step_restart_service}
 
 
