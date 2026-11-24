@@ -65,6 +65,14 @@ QR_CODE_WIDTH_UM = 140.0
 OVERVIEW_BORDER_UM = 20.0
 
 
+class PrintStoppedError(AerotechError):
+    """Printing stopped at the first failed layer (``Experiment(stop_on_failure=True)``, T128).
+
+    The failed layer is recorded in the experiment file with its error;
+    ``Experiment.restart_experiment()`` prints it again and continues.
+    """
+
+
 class CornerPosition(Enum):
     TL = 0
     TR = 1
@@ -160,7 +168,8 @@ class Experiment(object):
                  materials: Optional[dict[str, str]] = None,
                  material_registry=None,
                  plan_id: Optional[str] = None,
-                 max_program_lines: Optional[int] = MAX_PROGRAM_LINES):
+                 max_program_lines: Optional[int] = MAX_PROGRAM_LINES,
+                 stop_on_failure: bool = True):
         """ Experiment on one substrate.
 
         Only the newer parameters are documented here; see the class
@@ -247,6 +256,13 @@ class Experiment(object):
             split) and the parts are run one after another (``PROGRAM LOAD``
             fails above about 80 000 lines, T125;
             ``aerobasic.programs.split``); None never splits.
+        stop_on_failure : bool
+            Stop printing at the first layer that fails (load refused, task
+            error, early end), so that no structure is printed with gaps
+            (T128, default). The failed layer is recorded with its error and
+            :class:`PrintStoppedError` is raised; :meth:`restart_experiment`
+            prints that layer again and continues. False: log the failure
+            and continue with the next layer (the behaviour before T128).
 
         Raises
         ------
@@ -262,6 +278,7 @@ class Experiment(object):
         self.objective = str(objective)
         self.log = logger
         self.max_program_lines = None if max_program_lines is None else int(max_program_lines)
+        self.stop_on_failure = bool(stop_on_failure)
 
         # Substrate record and experiment folder
         self.substrate: Optional[SubstrateRecord] = None
@@ -1746,11 +1763,16 @@ class Experiment(object):
         """
 
         for k, part in enumerate(parts, start=1):
+            task = None
             try:
                 task = self.a3200.run_program_as_task(part, task_id=1)
                 task.wait_to_finish()
                 task.finish()
             except AerotechError as error:
+                # Stop the task and remove the program, so that the next program can be loaded (T127/T128);
+                # run_program_as_task cleans up after its own failures
+                if task is not None:
+                    task.abort()
                 if len(parts) == 1:
                     raise
                 raise type(error)(f"part {k} of {len(parts)} ({Path(part).name}): {error}") from error
@@ -1870,6 +1892,10 @@ class Experiment(object):
         ProgramSplitError
             If a layer program is longer than ``max_program_lines`` and cannot
             be split; nothing of the structure is printed then (T125).
+        PrintStoppedError
+            If a layer fails and ``stop_on_failure`` is set (T128). The layer
+            is recorded as failed, the structure stays ``printing``, and no
+            "after" capture is taken.
         """
 
         self._ensure_structure(name, pgm_files_list, x, y, power, dhm_image_count)
@@ -1914,7 +1940,14 @@ class Experiment(object):
                 self.log.error(f"Program failed for {name}: {e}")
                 failed = True
                 self.store.update_progress(name, layer_id, "failed", started=started, error=str(e))
-                self._stop_failed_task(task_id=1)
+                if self.stop_on_failure:
+                    export_progress(self.store.read(include_captures=False), self.path)
+                    self._save_exp_dict()
+                    self._write_summary()
+                    raise PrintStoppedError(
+                        f"Printing of '{name}' stopped at layer {layer_id}: {e}. Nothing after this layer was "
+                        f"printed. Fix the cause, then restart_experiment() prints layer {layer_id} again and "
+                        f"continues (T128).") from e
             export_progress(self.store.read(include_captures=False), self.path)
         t2 = time.time()
         self.log.info(f"Making {name} took {t2 - t1:.2f}s")
@@ -1925,14 +1958,6 @@ class Experiment(object):
         self.store.set_structure_status(name, "failed" if failed else "printed")
         self._save_exp_dict()
         self._write_summary()
-
-    def _stop_failed_task(self, task_id: int) -> None:
-        """ Stop a task after a failed program, so that the next program can be loaded. """
-
-        try:
-            self.a3200.api.PROGRAM_STOP(task_id)
-        except AerotechError as error:
-            self.log.error(f"Could not stop task {task_id}: {error}")
 
     def print_experiment(self):
         if self.structure_configs is None:
@@ -1962,9 +1987,13 @@ class Experiment(object):
 
         The resume point comes from the experiment file: structures that
         were printed (or failed) completely are skipped, and of the other
-        structures every layer that was already printed or attempted in an
-        earlier session is skipped. This works after any number of aborts.
-        Structures that were never started get their "before" capture.
+        structures every layer that was already printed in an earlier
+        session is skipped. A layer that failed is printed again (it may be
+        exposed twice, which the maintainer accepts), unless a layer after
+        it in the print order was printed: older runs continued after a
+        failure, and such gaps are filled by :meth:`reprint_layers`. This
+        works after any number of aborts. Structures that were never started
+        get their "before" capture.
 
         Raises
         ------
@@ -1985,10 +2014,11 @@ class Experiment(object):
             if structure.status in ("printed", "failed"):
                 continue
             config = configs[structure.name]
-            attempted = {event["layer_id"] for event in record.progress.get(structure.name, [])}
+            events = record.progress.get(structure.name, [])
+            skip = self._layers_to_skip_on_restart(events, structure.name)
             layer_files = sorted((Path(f) for f in config["layer_files"]
-                                  if self._layer_id(f) not in attempted), key=self._layer_id)
-            started = bool(attempted) or structure.status == "printing"
+                                  if self._layer_id(f) not in skip), key=self._layer_id)
+            started = bool(events) or structure.status == "printing"
             self.log.info(f"Resuming structure '{structure.name}': {len(layer_files)} of {structure.n_layers} "
                           f"layers left")
             self.print_structure(
@@ -2006,12 +2036,31 @@ class Experiment(object):
         self._save_exp_dict()
         self.log.info("Experiment summary:\n" + format_table(self._write_summary()))
 
+    def _layers_to_skip_on_restart(self, events: list[dict], name: str) -> set[int]:
+        """ Layers :meth:`restart_experiment` does not print: printed ones, and failed ones behind a printed layer.
+
+        A failed layer is printed again only if no layer after it in the
+        print order (drop direction) was printed; otherwise it would be
+        printed out of order and is left to :meth:`reprint_layers`.
+        """
+
+        order = self._layer_order()
+        printed = {e["layer_id"] for e in events if e.get("status") == "ok"}
+        failed = {e["layer_id"] for e in events if e.get("status") != "ok"} - printed
+        last = max((layer * order for layer in printed), default=None)
+        behind = {layer for layer in failed if last is not None and layer * order < last}
+        if behind:
+            self.log.warning(f"Structure '{name}': failed layers {sorted(behind)} lie before printed layers in the "
+                             f"print order and are not printed by the restart; use reprint_layers() for them.")
+        return printed | behind
+
     def reprint_layers(self, name: str, layer_ids: Optional[list[int]] = None) -> list[int]:
         """ Print layers of a stored structure again, by default every layer that was never printed (T125).
 
         Interim solution for layers that failed to load (programs longer
-        than about 80 000 lines). :meth:`restart_experiment` skips them,
-        because they were attempted already. The layers are printed in the
+        than about 80 000 lines) when printing continued after them
+        (``stop_on_failure=False``); :meth:`restart_experiment` does not print
+        a failed layer that lies behind a printed one. The layers are printed in the
         order of the drop direction (DOWN: the highest layer first, as in the
         original print) from the layer programs stored in the experiment file.
         Programs longer than ``max_program_lines`` are split into parts, all
