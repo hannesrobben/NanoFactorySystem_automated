@@ -2859,3 +2859,39 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** `test/lab_checks` 6 passed; `program_loading_lab.py system` run on the development PC (no A3200 installation: library and ASCII reported as unavailable). The library and controller steps run for the first time on the lab PC.
 - **Commits:** `6912824` feat(lab): add the lab tests for library loading within a memory budget [T129], `b3ece21` docs(design): work order and lab guide for program loading through the A3200 library [T129]
 - **Follow-ups:** lab session per `docs/guides/PROGRAM_LOADING_LAB_TESTS.md`; results into section 6 of the work order; then P1-P5 of the work order.
+
+### 2026-11-24 13:05 CET — [T129] Evaluation of program loading lab session 1, plan and new todos
+- **Status:** partial (implementation of T129 and the new todos open)
+- **Changes:**
+  - `docs/design/PROGRAM_LOADING.md`: section 6 holds the results of lab session 1 (linear compile cost 19.6 kB and 96 µs per line; memory freed at `A3200Disconnect`; programs survive the worker; removal verified for `.pgm`; `.ogm` load of a full layer in 5.9 s / 1.87 GB; cycle gaps 0.15 s; task 2 1.8× slower than task 1; Motion Composer compiles with a third of the memory; the A3200 software had not been restarted, so `sticky` is unanswered; an ASCII LOAD got no reply within 600 s); new section 7 (plan after the lab, default part size 400 000 lines from the budget) and section 8 (health check and recovery levels R0-R3, maintainer idea); section 5 marked superseded; acceptance renumbered to 9.
+  - `docs/guides/PROGRAM_LOADING_LAB_TESTS.md`: step 8 says in words why `sticky` runs last (the maintainer read "last" as an option `--last`).
+  - `TODO.md`: T128 gets the ASCII LOAD response timeout; T129 gets the lab result; new T131 (precompiled `.ogm`), T132 (task 2 slower), T133 (health check and recovery), T134 (lab session 2).
+- **Tests:** none (documentation and evaluation of lab output; `mains/lab_checks/program_loading_lab_20261124` and `console_log_loading_lab.txt` stay untracked).
+- **Commits:** see the commits of this branch (`docs/load-lab-results`).
+- **Follow-ups:** T134 (extend the lab script, lab session 2), then P1 (T127/T128), T129 P2-P5, T131-T133.
+
+### 2026-11-24 14:15 CET — [T134, T127, T128, T129, T133, T130] Lab session 2 tools, load safety, library loader, health check, optimiser
+- **Status:** T127, T128 done; T129, T130, T133 partial (see In Progress); T134 blocked (lab session 2 on the lab PC)
+- **Changes:**
+  - `mains/lab_checks/program_loading_lab.py`: session 2 steps `api`, `ogm-clean`, `add-associate`, `hold`, `taskspeed`, `runner`, `recover-ascii`, `reset` (`~RESETCONTROLLER` or `A3200Reset`), `restart-service`; restart check (process start times) and ASCII LOAD probe in `system`; ASCII replies wait 60 s; removal by candidate names verified with the added-program count; kB per line of an `.ogm` from its source `.pgm`.
+  - `test/lab_checks/test_program_loading_lab.py`: tests of the new hardware-free helpers.
+  - `docs/guides/PROGRAM_LOADING_LAB_TESTS.md`: section "Session 2" (procedure, checklist, decisions).
+  - `docs/design/PROGRAM_LOADING.md`: R2 via `~RESETCONTROLLER`; implementation status of section 8.
+  - `nanofactorysystem/aerobasic/ascii.py`: `send_timed`, `PROGRAM_LOAD` with `load_timeout` (connection reopened after a timeout).
+  - `nanofactorysystem/devices/a3200.py`: config `loadTimeout`, `libraryDll`, `memoryBudgetGb`, `memoryReserveGb`, `compileKbPerLine`.
+  - `nanofactorysystem/devices/aerotech/task.py`: `error_info`, early end raises `TaskFailedError`, `remove_program`/`abort` remove the loaded name (T127).
+  - `nanofactorysystem/devices/aerotech/__init__.py`: `run_program_as_task` decodes task errors, cleans up after every failure, logs the load time.
+  - `nanofactorysystem/backends/dummy/a3200.py`: loaded programs and unknown removals, `program_incomplete_next`, `hang_next`.
+  - `nanofactorysystem/experiment.py`: `stop_on_failure` + `PrintStoppedError`, restart prints a failed layer again (not behind printed ones), `program_loader="library"` with `max_program_lines="auto"`, health check before every structure and after a failure (`/logs/health`).
+  - `nanofactorysystem/devices/aerotech/library.py` (new): ctypes wrapper of `A3200C64.dll`, memory queries.
+  - `nanofactorysystem/devices/aerotech/loader.py` (new): `LibraryLoader` (worker process), `MemoryBudget`, `ProgramRunner` (tasks 1/2 with prefetch).
+  - `nanofactorysystem/backends/dummy/loader.py` (new), `backends/dummy/__init__.py`, `backends/real.py`: `program_loader()`.
+  - `nanofactorysystem/devices/aerotech/health.py` (new), `mains/controller_health.py` (new): health check and R0.
+  - `nanofactorysystem/aerobasic/programs/optimize.py` (new): program optimiser (T130).
+  - `mains/reprint_layers.py`: docstring on what the restart prints now.
+  - Tests: `test/backends/test_dummy_controller.py`, `test/test_experiment.py` (old continue-after-failure tests opt out with `stop_on_failure=False`, justified: the default changed by T128), `test/devices/test_program_loader.py` (new), `test/devices/test_health.py` (new), `test/test_aerobasic/test_optimize.py` (new); golden command logs `test/golden/commands_experiment_ifov_off.txt` / `_on.txt` re-recorded deliberately (REMOVEPROGRAM name, health check queries).
+  - `CLAUDE.md`, `test/README.md`: documentation of all of the above.
+  - `TODO.md`: T127, T128 done; T129, T130, T133 in progress with status; T134 blocked by the lab session; new T135 (z-line program shares task 1 with layer programs).
+- **Tests:** short-path venv: targeted runs passed (`test/backends test/devices test/test_experiment.py test/lab_checks test/test_aerobasic/test_optimize.py`); full suite 4 failed, 522 passed, 15 skipped (the 4 failures are the known T122 entry-script tests); `test/test_aerobasic/test_optimize.py` 8 passed (added after the full run started).
+- **Commits:** `b052ff3` feat(lab): add lab session 2 steps for .ogm loading, task speed and recovery [T134]; `2a6e48f` feat(lab): reset the controller with ~RESETCONTROLLER in the R2 lab step [T134]; `79a789d` fix(devices): remove programs under their loaded name and report load and task failures [T127, T128]; `3f773a3` feat(experiment): stop printing at the first failed layer and print it again on restart [T128]; `0a4e261` feat(devices): load programs through the A3200 library on alternating tasks [T129]; `e77f48b` feat(lab): add a dry lab run of the package library loader [T134, T129]; `1d969e6` feat(devices): check the controller before printing and run recovery level R0 [T133]; `b063502` feat(aerobasic): add an optimiser that shortens generated programs [T130]; this docs(todo) commit.
+- **Follow-ups:** lab session 2 (T134); then T129 P5 and the default switch, T131, T132, T133 R1-R3, T130 build-step option, T135.

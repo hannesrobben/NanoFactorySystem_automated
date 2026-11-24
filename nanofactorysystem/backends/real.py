@@ -40,5 +40,12 @@ class RealBackend:
 
         return None
 
+    def program_loader(self, dll: Optional[str] = None):
+        """ Return a :class:`LibraryLoader` (A3200 C library, T129); raises if the library is not usable. """
+
+        from nanofactorysystem.devices.aerotech.library import DEFAULT_DLL
+        from nanofactorysystem.devices.aerotech.loader import LibraryLoader
+        return LibraryLoader(dll or DEFAULT_DLL)
+
     def __repr__(self) -> str:
         return "RealBackend()"

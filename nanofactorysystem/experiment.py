@@ -25,6 +25,8 @@ from scidatacontainer import Container
 from nanofactorysystem import System, ImageContainer, mkdir, getLogger
 from nanofactorysystem.aerobasic import SingleAxis, AxisStatusDataItem
 from nanofactorysystem.aerobasic.ascii import AerotechError
+from nanofactorysystem.devices.aerotech.health import HealthReport, controller_health, recover_r0
+from nanofactorysystem.devices.aerotech.loader import DEFAULT_KB_PER_LINE, MemoryBudget, ProgramRunner, max_part_lines
 from nanofactorysystem.aerobasic.programs import AeroBasicProgram
 from nanofactorysystem.aerobasic.programs.drawings import DrawableObject, DrawableAeroBasicProgram
 from nanofactorysystem.aerobasic.programs.drawings.lines import Corner
@@ -63,6 +65,14 @@ from nanofactorysystem.utils.visualization import read_file, plot_movements
 QR_CODE_WIDTH_UM = 140.0
 # Extra border of the overview image around the corner markers in µm (T28)
 OVERVIEW_BORDER_UM = 20.0
+
+
+class PrintStoppedError(AerotechError):
+    """Printing stopped at the first failed layer (``Experiment(stop_on_failure=True)``, T128).
+
+    The failed layer is recorded in the experiment file with its error;
+    ``Experiment.restart_experiment()`` prints it again and continues.
+    """
 
 
 class CornerPosition(Enum):
@@ -160,7 +170,9 @@ class Experiment(object):
                  materials: Optional[dict[str, str]] = None,
                  material_registry=None,
                  plan_id: Optional[str] = None,
-                 max_program_lines: Optional[int] = MAX_PROGRAM_LINES):
+                 max_program_lines: Optional[int] | str = "auto",
+                 stop_on_failure: bool = True,
+                 program_loader: str = "ascii"):
         """ Experiment on one substrate.
 
         Only the newer parameters are documented here; see the class
@@ -241,12 +253,30 @@ class Experiment(object):
             experiment file is opened and its UUID is kept. Without
             ``resume``, a folder that already contains an experiment file is
             refused, so that no earlier experiment is overwritten.
-        max_program_lines : int or None
+        max_program_lines : int, None or "auto"
             A layer program with more lines is split into parts by
             ``build_programs()`` (the build stops if a program cannot be
             split) and the parts are run one after another (``PROGRAM LOAD``
             fails above about 80 000 lines, T125;
-            ``aerobasic.programs.split``); None never splits.
+            ``aerobasic.programs.split``); None never splits. ``"auto"``
+            (default): 80 000 lines for the ASCII loader, and for the library
+            loader the largest part the memory budget allows (T129).
+        stop_on_failure : bool
+            Stop printing at the first layer that fails (load refused, task
+            error, early end), so that no structure is printed with gaps
+            (T128, default). The failed layer is recorded with its error and
+            :class:`PrintStoppedError` is raised; :meth:`restart_experiment`
+            prints that layer again and continues. False: log the failure
+            and continue with the next layer (the behaviour before T128).
+        program_loader : {"ascii", "library"}
+            How layer programs are loaded. ``"ascii"`` (default):
+            ``PROGRAM LOAD`` over the ASCII interface on task 1. ``"library"``:
+            compiled through the A3200 C library in a worker process within
+            the memory budget of the config section ``controller``
+            (``memoryBudgetGb``, ``memoryReserveGb``, ``compileKbPerLine``,
+            ``libraryDll``), run alternately on tasks 1 and 2 while the next
+            part is loaded (T129, ``devices/aerotech/loader.py``). Opt-in until
+            the lab validation.
 
         Raises
         ------
@@ -261,7 +291,13 @@ class Experiment(object):
         self.user = str(user)
         self.objective = str(objective)
         self.log = logger
-        self.max_program_lines = None if max_program_lines is None else int(max_program_lines)
+        self.max_program_lines = max_program_lines
+        self.stop_on_failure = bool(stop_on_failure)
+        self.program_loader = str(program_loader).lower()
+        if self.program_loader not in ("ascii", "library"):
+            raise ValueError(f"program_loader must be 'ascii' or 'library', not {program_loader!r}")
+        self._loader = None
+        self._health_log: list[str] = []
 
         # Substrate record and experiment folder
         self.substrate: Optional[SubstrateRecord] = None
@@ -427,6 +463,9 @@ class Experiment(object):
 
     def __exit__(self, errtype, value, traceback):
         try:
+            if self._loader is not None:
+                self._loader.close()
+                self._loader = None
             self.system.close()
         finally:
             self._end_session(errtype)
@@ -1736,6 +1775,152 @@ class Experiment(object):
                              f"in {sum(item[2] for item in long)} parts with a stop at every cut (T125).")
         return prepared
 
+    @property
+    def max_program_lines(self) -> Optional[int]:
+        """ Lines above which a layer program is split (T125); ``"auto"`` depends on the loader (T129). """
+
+        if self._max_program_lines != "auto":
+            return self._max_program_lines
+        if self.program_loader == "ascii":
+            return MAX_PROGRAM_LINES
+        return max_part_lines(self.memory_budget())
+
+    @max_program_lines.setter
+    def max_program_lines(self, value: Optional[int] | str) -> None:
+        if value is not None and value != "auto":
+            value = int(value)
+        self._max_program_lines = value
+
+    def memory_budget(self) -> MemoryBudget:
+        """ Memory budget of the PC for compiling programs, from the config section ``controller`` (T129). """
+
+        def setting(key, default):
+            try:
+                value = self.a3200[key]
+            except (KeyError, AttributeError):
+                return default
+            return default if value is None else value
+
+        return MemoryBudget(budget_gb=float(setting("memoryBudgetGb", 22.0)),
+                            reserve_gb=float(setting("memoryReserveGb", 3.0)),
+                            kb_per_line=float(setting("compileKbPerLine", DEFAULT_KB_PER_LINE)))
+
+    def _program_runner(self) -> ProgramRunner:
+        """ Runner of the library loader (T129); the loader is created on first use. """
+
+        if self._loader is None:
+            dll = None
+            try:
+                dll = self.a3200["libraryDll"]
+            except (KeyError, AttributeError):
+                pass
+            self._loader = self.system.backend.program_loader(dll)
+        return ProgramRunner(self._loader, self.a3200.api, self.memory_budget(), exec_dir=self.path / "exec",
+                             logger=self.log)
+
+    def check_controller(self, context: str, *, recover: bool = False) -> HealthReport:
+        """ Run the controller health check (T133) and store it in the experiment log ``/logs/health``.
+
+        Parameters
+        ----------
+        context : str
+            When the check runs (for the log).
+        recover : bool
+            Run recovery level R0 first (stop the printing tasks, remove the package's programs,
+            acknowledge faults; nothing moves).
+
+        Returns
+        -------
+        HealthReport
+        """
+
+        api = self.a3200.api
+        tasks = (1, 2) if self.program_loader == "library" else (1,)
+        lines = [f"[{utc_timestamp()}] {context}"]
+        if recover:
+            lines += [f"  R0: {step}" for step in recover_r0(api, tasks=tasks)]
+        report = controller_health(api, tasks=tasks, check_processes=self.system.backend.name == "real")
+        lines.append(report.text())
+        text = "\n".join(lines)
+        (self.log.info if report.ok and not report.warnings else self.log.warning)(text)
+        self._health_log.append(text)
+        self.store.write_log("health", "\n\n".join(self._health_log))
+        return report
+
+    def _ensure_controller_ready(self) -> None:
+        """ Health check before printing; on a problem R0 and a second check (T133).
+
+        Raises
+        ------
+        AerotechError
+            If the controller is still not healthy after R0.
+        """
+
+        report = self.check_controller("before printing")
+        if report.ok:
+            return
+        report = self.check_controller("after a problem before printing", recover=True)
+        if not report.ok:
+            raise AerotechError("The controller is not ready to print: " + "; ".join(report.problems)
+                                + ". See /logs/health in the experiment file (T133).")
+
+    def _stop_printing(self, name: str, layer_id: int, error: Exception) -> None:
+        """ Store everything and raise :class:`PrintStoppedError` (``stop_on_failure``, T128). """
+
+        try:
+            self.check_controller(f"after the failure of layer {layer_id} of {name}", recover=True)
+        except Exception as health_error:  # the original failure is the one to report
+            self.log.error(f"Health check after the failure not possible: {health_error}")
+        export_progress(self.store.read(include_captures=False), self.path)
+        self._save_exp_dict()
+        self._write_summary()
+        raise PrintStoppedError(
+            f"Printing of '{name}' stopped at layer {layer_id}: {error}. Nothing after this layer was "
+            f"printed. Fix the cause, then restart_experiment() prints layer {layer_id} again and "
+            f"continues (T128).") from error
+
+    def _print_layers_with_library(self, files: list[Path], layer_parts: dict[Path, list[Path]], name: str,
+                                   center_mm: dict, dhm_image_count: int) -> bool:
+        """ Print layers (in the given order) through the library loader on tasks 1/2 with prefetch (T129).
+
+        Returns
+        -------
+        bool
+            True if a layer failed (only with ``stop_on_failure`` False; otherwise PrintStoppedError).
+        """
+
+        remaining = [(self._layer_id(f), Path(f)) for f in files]
+        failed = False
+        while remaining:
+            paths = dict(remaining)
+            done: list[int] = []
+            layer_start = [utc_timestamp()]
+
+            def on_layer_done(layer_id: int) -> None:
+                self.store.update_progress(name, layer_id, "ok", started=layer_start[0])
+                remove_parts(paths[layer_id])
+                export_progress(self.store.read(include_captures=False), self.path)
+                done.append(layer_id)
+                self.measure(center_mm, structure=name, phase="layer", layer_id=layer_id,
+                             dhm_image_count=dhm_image_count)
+                layer_start[0] = utc_timestamp()
+
+            try:
+                self._program_runner().run([(lid, layer_parts[path]) for lid, path in remaining], on_layer_done)
+                remaining = []
+            except AerotechError as error:
+                layer_id = getattr(error, "key", None)
+                if layer_id is None:
+                    layer_id = next(lid for lid, _ in remaining if lid not in done)
+                self.log.error(f"Program failed for {name}: {error}")
+                failed = True
+                self.store.update_progress(name, layer_id, "failed", started=layer_start[0], error=str(error))
+                if self.stop_on_failure:
+                    self._stop_printing(name, layer_id, error)
+                export_progress(self.store.read(include_captures=False), self.path)
+                remaining = [(lid, path) for lid, path in remaining if lid not in done and lid != layer_id]
+        return failed
+
     def _run_layer(self, parts: list[Path]) -> None:
         """ Run the program files of one layer as task 1, one after another, and wait until each has finished.
 
@@ -1746,11 +1931,16 @@ class Experiment(object):
         """
 
         for k, part in enumerate(parts, start=1):
+            task = None
             try:
                 task = self.a3200.run_program_as_task(part, task_id=1)
                 task.wait_to_finish()
                 task.finish()
             except AerotechError as error:
+                # Stop the task and remove the program, so that the next program can be loaded (T127/T128);
+                # run_program_as_task cleans up after its own failures
+                if task is not None:
+                    task.abort()
                 if len(parts) == 1:
                     raise
                 raise type(error)(f"part {k} of {len(parts)} ({Path(part).name}): {error}") from error
@@ -1870,12 +2060,17 @@ class Experiment(object):
         ProgramSplitError
             If a layer program is longer than ``max_program_lines`` and cannot
             be split; nothing of the structure is printed then (T125).
+        PrintStoppedError
+            If a layer fails and ``stop_on_failure`` is set (T128). The layer
+            is recorded as failed, the structure stays ``printing``, and no
+            "after" capture is taken.
         """
 
         self._ensure_structure(name, pgm_files_list, x, y, power, dhm_image_count)
         # Every layer must be loadable before the first one is printed: too long programs are split (or were
         # split by the build); a program that cannot be split raises ProgramSplitError here (T125)
         layer_parts = self._prepare_layers([Path(p) for p in pgm_files_list], name)
+        self._ensure_controller_ready()
         self.store.set_status(schema.STATUS_PRINTING)
         self.store.set_structure_status(name, "printing")
 
@@ -1898,7 +2093,13 @@ class Experiment(object):
         # Write all layers of the structure
         failed = False
         t1 = time.time()
-        for index in range(len(pgm_files_list))[::order]:
+        layer_indices = list(range(len(pgm_files_list)))[::order]
+        if self.program_loader == "library":
+            # Tasks 1/2 alternate, the next part is loaded while the current one runs (T129)
+            failed = self._print_layers_with_library([Path(pgm_files_list[i]) for i in layer_indices], layer_parts,
+                                                     name, structure_center_absolute_mm, dhm_image_count)
+            layer_indices = []
+        for index in layer_indices:
             layer_pgm_path = pgm_files_list[index]
             layer_id = self._layer_id(layer_pgm_path)
             started = utc_timestamp()
@@ -1914,7 +2115,8 @@ class Experiment(object):
                 self.log.error(f"Program failed for {name}: {e}")
                 failed = True
                 self.store.update_progress(name, layer_id, "failed", started=started, error=str(e))
-                self._stop_failed_task(task_id=1)
+                if self.stop_on_failure:
+                    self._stop_printing(name, layer_id, e)
             export_progress(self.store.read(include_captures=False), self.path)
         t2 = time.time()
         self.log.info(f"Making {name} took {t2 - t1:.2f}s")
@@ -1925,14 +2127,6 @@ class Experiment(object):
         self.store.set_structure_status(name, "failed" if failed else "printed")
         self._save_exp_dict()
         self._write_summary()
-
-    def _stop_failed_task(self, task_id: int) -> None:
-        """ Stop a task after a failed program, so that the next program can be loaded. """
-
-        try:
-            self.a3200.api.PROGRAM_STOP(task_id)
-        except AerotechError as error:
-            self.log.error(f"Could not stop task {task_id}: {error}")
 
     def print_experiment(self):
         if self.structure_configs is None:
@@ -1962,9 +2156,13 @@ class Experiment(object):
 
         The resume point comes from the experiment file: structures that
         were printed (or failed) completely are skipped, and of the other
-        structures every layer that was already printed or attempted in an
-        earlier session is skipped. This works after any number of aborts.
-        Structures that were never started get their "before" capture.
+        structures every layer that was already printed in an earlier
+        session is skipped. A layer that failed is printed again (it may be
+        exposed twice, which the maintainer accepts), unless a layer after
+        it in the print order was printed: older runs continued after a
+        failure, and such gaps are filled by :meth:`reprint_layers`. This
+        works after any number of aborts. Structures that were never started
+        get their "before" capture.
 
         Raises
         ------
@@ -1985,10 +2183,11 @@ class Experiment(object):
             if structure.status in ("printed", "failed"):
                 continue
             config = configs[structure.name]
-            attempted = {event["layer_id"] for event in record.progress.get(structure.name, [])}
+            events = record.progress.get(structure.name, [])
+            skip = self._layers_to_skip_on_restart(events, structure.name)
             layer_files = sorted((Path(f) for f in config["layer_files"]
-                                  if self._layer_id(f) not in attempted), key=self._layer_id)
-            started = bool(attempted) or structure.status == "printing"
+                                  if self._layer_id(f) not in skip), key=self._layer_id)
+            started = bool(events) or structure.status == "printing"
             self.log.info(f"Resuming structure '{structure.name}': {len(layer_files)} of {structure.n_layers} "
                           f"layers left")
             self.print_structure(
@@ -2006,12 +2205,31 @@ class Experiment(object):
         self._save_exp_dict()
         self.log.info("Experiment summary:\n" + format_table(self._write_summary()))
 
+    def _layers_to_skip_on_restart(self, events: list[dict], name: str) -> set[int]:
+        """ Layers :meth:`restart_experiment` does not print: printed ones, and failed ones behind a printed layer.
+
+        A failed layer is printed again only if no layer after it in the
+        print order (drop direction) was printed; otherwise it would be
+        printed out of order and is left to :meth:`reprint_layers`.
+        """
+
+        order = self._layer_order()
+        printed = {e["layer_id"] for e in events if e.get("status") == "ok"}
+        failed = {e["layer_id"] for e in events if e.get("status") != "ok"} - printed
+        last = max((layer * order for layer in printed), default=None)
+        behind = {layer for layer in failed if last is not None and layer * order < last}
+        if behind:
+            self.log.warning(f"Structure '{name}': failed layers {sorted(behind)} lie before printed layers in the "
+                             f"print order and are not printed by the restart; use reprint_layers() for them.")
+        return printed | behind
+
     def reprint_layers(self, name: str, layer_ids: Optional[list[int]] = None) -> list[int]:
         """ Print layers of a stored structure again, by default every layer that was never printed (T125).
 
         Interim solution for layers that failed to load (programs longer
-        than about 80 000 lines). :meth:`restart_experiment` skips them,
-        because they were attempted already. The layers are printed in the
+        than about 80 000 lines) when printing continued after them
+        (``stop_on_failure=False``); :meth:`restart_experiment` does not print
+        a failed layer that lies behind a printed one. The layers are printed in the
         order of the drop direction (DOWN: the highest layer first, as in the
         original print) from the layer programs stored in the experiment file.
         Programs longer than ``max_program_lines`` are split into parts, all

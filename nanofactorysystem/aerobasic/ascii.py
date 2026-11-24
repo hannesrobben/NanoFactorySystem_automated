@@ -1,6 +1,7 @@
 import re
 import socket
 import time
+from pathlib import Path
 from typing import Callable, Optional
 
 from nanofactorysystem.aerobasic import AeroBasicAPI, SingleAxis
@@ -128,6 +129,7 @@ class AerotechAsciiInterface(AeroBasicAPI):
         transport_factory: Optional[Callable[[], "socket.socket"]] = None,
         connect_timeout: Optional[float] = 10.0,
         response_timeout: Optional[float] = None,
+        load_timeout: Optional[float] = 600.0,
     ):
         """ASCII command interface of the Aerotech A3200 controller.
 
@@ -146,6 +148,11 @@ class AerotechAsciiInterface(AeroBasicAPI):
         response_timeout : float or None
             Timeout in seconds for each response. Default None (no limit),
             because motion commands may legitimately take long.
+        load_timeout : float or None
+            Timeout in seconds for the reply to ``PROGRAM <task> LOAD``
+            (:meth:`PROGRAM_LOAD`). On 2026-11-24 a LOAD got no reply within
+            600 s; without a limit the experiment would wait forever. None:
+            no limit.
         """
         super().__init__()
         self.hostname = hostname
@@ -153,6 +160,7 @@ class AerotechAsciiInterface(AeroBasicAPI):
         self.transport_factory = transport_factory
         self.connect_timeout = connect_timeout
         self.response_timeout = response_timeout
+        self.load_timeout = load_timeout
 
         # Safety limit for immediate absolute z moves in mm (None: no limit).
         # The programming mode is tracked from the ABSOLUTE/INCREMENTAL
@@ -314,6 +322,60 @@ class AerotechAsciiInterface(AeroBasicAPI):
             raise AerotechError(f"Execution failed for {command}. Reason: {error}")
 
         raise RuntimeError(f"Could not identify return code {code}")
+
+    def send_timed(self, command: str, timeout: Optional[float]) -> str:
+        """Send a command and wait at most ``timeout`` seconds for its reply.
+
+        A reply that comes later would be read as the reply to the next
+        command, so after a timeout the connection is closed and opened again.
+
+        Parameters
+        ----------
+        command : str
+            Command without terminating character.
+        timeout : float or None
+            Seconds to wait for the reply; None waits like :meth:`send`.
+
+        Raises
+        ------
+        AerotechError
+            If no reply arrives within ``timeout`` (or the controller refuses
+            the command, see :meth:`send`).
+        """
+
+        if timeout is None or self.socket is None:
+            return self.send(command)
+        self.socket.settimeout(timeout)
+        try:
+            return self.send(command)
+        except TimeoutError as error:  # socket.timeout is TimeoutError
+            self.logger.error(f"No reply to '{command.strip()}' within {timeout} s; reopening the connection")
+            self.close()
+            try:
+                self.connect()
+            except OSError as reconnect_error:
+                self.logger.error(f"Could not reconnect to the A3200 controller: {reconnect_error}")
+            raise AerotechError(
+                f"No reply to '{command.strip()}' within {timeout} s. The ASCII interface may be blocked "
+                f"(restart the A3200 software if every LOAD fails)."
+            ) from error
+        finally:
+            if self.socket is not None:
+                self.socket.settimeout(self.response_timeout)
+
+    def PROGRAM_LOAD(self, task_id: int, program_path, *, absolute_path=True) -> str:
+        """Load (compile) a program file on a task, waiting at most :attr:`load_timeout` for the reply.
+
+        Raises
+        ------
+        AerotechError
+            If the controller refuses the program (with the text of
+            ``~LASTERROR``) or does not reply in time.
+        """
+
+        if absolute_path:
+            program_path = Path(program_path).absolute()
+        return self.send_timed(f"PROGRAM {task_id} LOAD \"{program_path}\"", self.load_timeout)
 
     def _check_z_limit(self, command: str) -> None:
         """Refuse an immediate absolute z move beyond :attr:`z_limit`.

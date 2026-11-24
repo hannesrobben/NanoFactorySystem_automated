@@ -1,6 +1,7 @@
 """Tests for Experiment (experiment.py) on the dummy backend."""
 import json
 import re
+from contextlib import nullcontext
 from pathlib import Path
 
 import matplotlib
@@ -9,7 +10,7 @@ import pytest
 
 from nanofactorysystem.aerobasic.programs.drawings import Rectangle3D
 from nanofactorysystem.devices.coordinate_system import DropDirection, Point2D, Point3D
-from nanofactorysystem.experiment import Experiment, StructureType
+from nanofactorysystem.experiment import Experiment, PrintStoppedError, StructureType
 from nanofactorysystem.runtime import getLogger
 from nanofactorysystem.storage import ExperimentStore
 
@@ -101,7 +102,9 @@ def test_print_experiment_runs_all_layers(experiment, dummy_backend):
     assert (rect["status"], rect["printed_layers"], rect["failed_layers"]) == ("printed", len(layers), 0)
 
 
-def test_failed_layer_is_logged_and_printing_continues(experiment, dummy_backend):
+def test_failed_layer_is_logged_and_printing_continues_without_stop_on_failure(experiment, dummy_backend):
+    # The behaviour before T128, still available with stop_on_failure=False
+    experiment.stop_on_failure = False
     add_rectangle(experiment)
     experiment.build_programs()
     dummy_backend.transport.program_error_next(error_code=42, running_polls=1)
@@ -116,6 +119,166 @@ def test_failed_layer_is_logged_and_printing_continues(experiment, dummy_backend
     layers = experiment.structure_configs[0]["layer_files"]
     assert len(dummy_backend.calllog.filter(device="program")) == len(layers)
     assert (rect["status"], rect["printed_layers"], rect["failed_layers"]) == ("failed", len(layers) - 1, 1)
+
+
+def test_failed_layer_stops_the_structure(experiment, dummy_backend):
+    # T128: the first failed layer stops printing, so that no structure is printed with gaps
+    add_rectangle(experiment)
+    experiment.build_programs()
+    layers = experiment.structure_configs[0]["layer_files"]
+    dummy_backend.transport.program_error_next(error_code=42, running_polls=1)
+
+    with pytest.raises(PrintStoppedError, match=r"stopped at layer 0: .*42"):
+        experiment.print_experiment()
+
+    rect = progress(experiment, "rect")
+    assert [layer["status"] for layer in rect["layers"]] == ["failed"]
+    assert "42" in rect["layers"][0]["error"] and rect["status"] == "printing"
+    assert len(dummy_backend.calllog.filter(device="program")) == 1 < len(layers)
+    # The task was stopped and the program removed under the name it was loaded with (T127)
+    commands = dummy_backend.calllog.commands()
+    assert "PROGRAM 1 STOP" in commands and 'REMOVEPROGRAM "python_aerobasic_program.pgm"' in commands
+    assert "python_aerobasic_program.pgm" not in dummy_backend.transport.loaded_programs
+    # The health check after the failure ran recovery level R0 and is stored in the experiment file (T133)
+    health = "".join(ExperimentStore.open(experiment.path).read_logs("health").values())
+    assert "R0: task 1 stopped" in health and "before printing" in health
+
+
+def test_early_end_counts_as_failure(experiment, dummy_backend):
+    # 2026-11-22: parts reported "complete" after 4-10 % of their lines
+    add_rectangle(experiment)
+    experiment.build_programs()
+    dummy_backend.transport.program_incomplete_next(3)
+
+    with pytest.raises(PrintStoppedError, match=r"ended early: task 1 reported complete at line 3 of"):
+        experiment.print_experiment()
+
+    assert [layer["status"] for layer in progress(experiment, "rect")["layers"]] == ["failed"]
+
+
+def test_restart_prints_the_failed_layer_again(test_config, dummy_backend, no_sleep, tmp_path):
+    path = tmp_path / "experiment"
+    path.mkdir()
+    with pytest.raises(PrintStoppedError):
+        with make_experiment(path, dummy_backend) as experiment:
+            experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+            add_rectangle(experiment)
+            experiment.build_programs()
+            n_layers = len(experiment.structure_configs[0]["layer_files"])
+            dummy_backend.transport.program_incomplete_next(3)
+            dummy_backend.transport.program_incomplete_next(3)  # also the first layer after the restart
+            experiment.print_experiment()
+    assert ExperimentStore.open(path).read().status == "failed"
+
+    # The failed layer 0 is printed again (and fails again), then the restart works
+    for expected_status in ("failed", "finished"):
+        with pytest.raises(PrintStoppedError) if expected_status == "failed" else nullcontext():
+            with Experiment(**Experiment.parameters_from_dictionary(path), backend=dummy_backend) as experiment:
+                experiment.restart_experiment()
+        assert ExperimentStore.open(path).read().status == expected_status
+
+    events = ExperimentStore.open(path).read().progress["rect"]
+    assert [(e["layer_id"], e["status"]) for e in events] == (
+        [(0, "failed"), (0, "failed"), (0, "ok")] + [(i, "ok") for i in range(1, n_layers)])
+    assert ExperimentStore.open(path).read().structure("rect").status == "printed"
+
+
+def test_restart_leaves_failed_layers_behind_printed_ones_to_reprint(test_config, dummy_backend, no_sleep, tmp_path):
+    # Runs without stop_on_failure (before T128) printed past a failed layer; the restart does not print it out of
+    # order, reprint_layers() does
+    path = tmp_path / "experiment"
+    path.mkdir()
+    with pytest.raises(RuntimeError, match="abort"):
+        with make_experiment(path, dummy_backend, stop_on_failure=False) as experiment:
+            experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+            add_rectangle(experiment)
+            experiment.build_programs()
+            n_layers = len(experiment.structure_configs[0]["layer_files"])
+            assert n_layers > 2
+            dummy_backend.transport.program_error_next(error_code=42, running_polls=1)
+            abort_after(experiment, 2)  # layer 0 fails, layer 1 is printed, then the run is aborted
+            experiment.print_experiment()
+    dummy_backend.calllog.clear()
+
+    with Experiment(**Experiment.parameters_from_dictionary(path), backend=dummy_backend) as experiment:
+        assert experiment._layers_to_skip_on_restart(
+            ExperimentStore.open(path).read().progress["rect"], "rect") == {0, 1}
+        experiment.restart_experiment()
+
+    assert len(dummy_backend.calllog.filter(device="program")) == n_layers - 2
+
+
+def test_library_loader_prints_every_layer_on_alternating_tasks(test_config, dummy_backend, no_sleep, tmp_path,
+                                                                  monkeypatch):
+    # T129: programs are compiled through the library loader and run alternately on tasks 1 and 2
+    from nanofactorysystem.devices.aerotech import loader as loader_module
+    monkeypatch.setattr(loader_module, "used_memory_gb", lambda: 4.0)
+    path = tmp_path / "experiment"
+    path.mkdir()
+    with make_experiment(path, dummy_backend, program_loader="library") as experiment:
+        # Part size from the memory budget: (22 - 3 - 4) GB / (19.7 kB x 1.2), rounded down to 10 000 lines
+        assert experiment.max_program_lines == 660_000
+        experiment.max_program_lines = 30  # small parts, so that layers have several parts
+        experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+        add_rectangle(experiment)
+        experiment.build_programs()
+        n_layers = len(experiment.structure_configs[0]["layer_files"])
+        experiment.print_experiment()
+
+    loads = dummy_backend.calllog.filter(device="loader")
+    tasks = [load.args[1] for load in loads]
+    assert len(loads) > n_layers and tasks == [1, 2] * (len(tasks) // 2) + [1] * (len(tasks) % 2)
+    assert len(dummy_backend.calllog.filter(device="program")) == len(loads)
+    assert printed_layers(path) == list(range(n_layers))
+    # Only the z-line program of the plane fit stays loaded (it is kept on purpose, init_zline)
+    assert set(dummy_backend.transport.loaded_programs) == {"__zline__.pgm"}
+    assert dummy_backend.transport.unknown_removals == []
+    assert not any((path / "exec").iterdir())
+    assert "python_aerobasic_program" not in " ".join(dummy_backend.calllog.commands())  # no ASCII load
+
+
+def test_library_loader_stops_at_the_first_failed_layer(test_config, dummy_backend, no_sleep, tmp_path, monkeypatch):
+    from nanofactorysystem.devices.aerotech import loader as loader_module
+    monkeypatch.setattr(loader_module, "used_memory_gb", lambda: 4.0)
+    path = tmp_path / "experiment"
+    path.mkdir()
+    with pytest.raises(PrintStoppedError, match="stopped at layer 1: .*ended in state error"):
+        with make_experiment(path, dummy_backend, program_loader="library") as experiment:
+            experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+            add_rectangle(experiment)
+            experiment.build_programs()
+            dummy_backend.world.calllog.clear()
+            original = dummy_backend.transport._program_start
+            calls = []
+
+            def start(task_id):
+                calls.append(task_id)
+                if len(calls) == 2:
+                    dummy_backend.transport.program_error_next(error_code=42, running_polls=1)
+                return original(task_id)
+
+            dummy_backend.transport._program_start = start
+            experiment.print_experiment()
+
+    events = ExperimentStore.open(path).read().progress["rect"]
+    assert [(e["layer_id"], e["status"]) for e in events] == [(0, "ok"), (1, "failed")]
+    assert set(dummy_backend.transport.loaded_programs) == {"__zline__.pgm"}
+
+
+def test_unhealthy_controller_is_refused_before_printing(experiment, dummy_backend):
+    # T133: the health check runs before a structure; an axis fault that R0 cannot clear stops the print
+    from nanofactorysystem.aerobasic.ascii import AerotechError
+    add_rectangle(experiment)
+    experiment.build_programs()
+    original = dummy_backend.transport._axis_item
+    dummy_backend.transport._axis_item = lambda axis, item: (
+        "4" if (axis, item) == ("Z", "AxisFault") else original(axis, item))
+
+    with pytest.raises(AerotechError, match="not ready to print: axis Z has fault 4"):
+        experiment.print_experiment()
+
+    assert not dummy_backend.calllog.filter(device="program")
+    assert "ACKNOWLEDGEALL" in dummy_backend.calllog.commands()  # R0 was tried
 
 
 def test_experiment_dictionary(experiment):
@@ -921,7 +1084,8 @@ def test_reprint_failed_layers(test_config, dummy_backend, no_sleep, tmp_path):
 
     path = tmp_path / "experiment"
     path.mkdir()
-    with make_experiment(path, dummy_backend) as experiment:
+    # Printing continues after the failed layer (before T128), so the failed layer is a gap
+    with make_experiment(path, dummy_backend, stop_on_failure=False) as experiment:
         experiment.plane_fit(plane=dummy_backend.world.sample.plane())
         add_rectangle(experiment)
         experiment.build_programs()
@@ -968,7 +1132,8 @@ def test_reprint_prints_the_highest_missing_layer_first_and_splits(test_config, 
 
     path = tmp_path / "experiment"
     path.mkdir()
-    with make_experiment(path, dummy_backend, drop_direction=DropDirection.DOWN) as experiment:
+    with make_experiment(path, dummy_backend, drop_direction=DropDirection.DOWN,
+                         stop_on_failure=False) as experiment:
         experiment.plane_fit(plane=dummy_backend.world.sample.plane())
         add_rectangle(experiment)
         experiment.build_programs()

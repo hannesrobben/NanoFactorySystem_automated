@@ -179,9 +179,97 @@ def test_program_error_before_start(tmp_path, transport, world, no_sleep):
     program = AeroBasicProgram()
     program.send("LINEAR X1 F1")
 
-    # The task is in error right after START: reported as TaskFailedError with the task state
-    with pytest.raises(TaskFailedError, match=r"did not start .*\(task state error\)"):
+    # The task is in error right after START: reported as TaskFailedError with the task state and the decoded
+    # error code (T128), and the task is cleaned up
+    with pytest.raises(TaskFailedError, match=r"did not start .*\(task state error\): 7: Simulated error 7"):
         a3200.run_program_as_task(program, task_id=1, program_start_running_timeout=1)
+    assert transport.loaded_programs == {} and TaskState(world.task(1).state) == TaskState.idle
+
+
+def test_program_is_removed_under_its_loaded_name(tmp_path, transport, world):
+    # T127: the program is loaded as python_aerobasic_program.pgm, so it must be removed under that name
+    a3200 = Aerotech3200(transport_factory=lambda: transport, program_dir=tmp_path)
+    a3200.connect()
+    layer = tmp_path / "program_rect.000.txt"
+    layer.write_text("LINEAR X1 F1\n")
+
+    task = a3200.run_program_as_task(layer, task_id=1)
+    assert set(transport.loaded_programs) == {"python_aerobasic_program.pgm"}
+    task.wait_to_finish()
+    task.finish()
+
+    assert transport.loaded_programs == {} and transport.unknown_removals == []
+    assert 'REMOVEPROGRAM "python_aerobasic_program.pgm"' in world.calllog.commands()
+
+
+def test_early_complete_is_a_failure(tmp_path, transport, world, no_sleep):
+    a3200 = Aerotech3200(transport_factory=lambda: transport, program_dir=tmp_path)
+    a3200.connect()
+    program = AeroBasicProgram()
+    for i in range(10):
+        program.send(f"LINEAR X{i} F1")
+    transport.program_incomplete_next(4)
+
+    task = a3200.run_program_as_task(program, task_id=1)
+    with pytest.raises(TaskFailedError, match=r"ended early: task 1 reported complete at line 4 of 1\d"):
+        task.wait_to_finish()
+
+
+def test_trailing_empty_lines_do_not_count_as_early_end(tmp_path, transport, world):
+    a3200 = Aerotech3200(transport_factory=lambda: transport, program_dir=tmp_path)
+    a3200.connect()
+    path = tmp_path / "layer.pgm"
+    path.write_text("LINEAR X1 F1\nEND PROGRAM\n\n\n")
+    transport.program_incomplete_next(2)  # the controller reports the END PROGRAM line
+
+    task = a3200.run_program_as_task(path, task_id=1)
+    task.wait_to_finish()
+    task.finish()
+
+
+def test_refused_load_reports_the_controller_reason_and_cleans_up(tmp_path, transport, world):
+    a3200 = Aerotech3200(transport_factory=lambda: transport, program_dir=tmp_path)
+    a3200.connect()
+    transport.fail_next(r"PROGRAM 1 LOAD", code="INVALID", error="An out of memory error occurred.")
+    program = AeroBasicProgram()
+    program.send("LINEAR X1 F1")
+
+    with pytest.raises(AerotechError, match=r"Could not load program .* on task 1: .*out of memory"):
+        a3200.run_program_as_task(program, task_id=1)
+    commands = world.calllog.commands()
+    stop, remove = commands.index("PROGRAM 1 STOP"), commands.index('REMOVEPROGRAM "python_aerobasic_program.pgm"')
+    assert stop < remove and "PROGRAM 1 START" not in commands
+
+
+def test_load_without_reply_times_out_and_reconnects(tmp_path, transport, world):
+    # 2026-11-24: a PROGRAM LOAD over ASCII got no reply within 600 s
+    a3200 = Aerotech3200(transport_factory=lambda: transport, program_dir=tmp_path)
+    a3200.connect()
+    a3200.api.load_timeout = 5.0
+    transport.hang_next(r"PROGRAM 1 LOAD")
+    program = AeroBasicProgram()
+    program.send("LINEAR X1 F1")
+
+    with pytest.raises(AerotechError, match=r"No reply to 'PROGRAM 1 LOAD .*' within 5.0 s"):
+        a3200.run_program_as_task(program, task_id=1)
+
+    # The connection was reopened and works; the response timeout is back to "no limit"
+    assert a3200.api.VERSION().major == "4"
+    assert transport.timeout is None
+
+
+def test_failed_removal_does_not_raise(tmp_path, transport, world):
+    a3200 = Aerotech3200(transport_factory=lambda: transport, program_dir=tmp_path)
+    a3200.connect()
+    program = AeroBasicProgram()
+    program.send("LINEAR X1 F1")
+    task = a3200.run_program_as_task(program, task_id=1)
+    task.wait_to_finish()
+    transport.fail_next(r"^REMOVEPROGRAM", error="Program is not loaded")
+
+    task.finish()  # logged, not raised
+
+    assert task.task_state == TaskState.idle
 
 
 def test_call_log_records_commands_and_responses(api, world):

@@ -111,6 +111,11 @@ class A3200(Parameter, AerotechController):
         "softwareVersion": None,
         "connectTimeout": 10.0,  # s
         "responseTimeout": None,  # s, None: no limit (motion commands may take long)
+        "loadTimeout": 600.0,  # s, reply to PROGRAM LOAD (a LOAD got no reply within 600 s on 2026-11-24)
+        "libraryDll": None,  # A3200C64.dll for the library loader (T129); None: the default installation path
+        "memoryBudgetGb": 22.0,  # memory all processes of the PC may use while compiling (T129, 32 GB RAM)
+        "memoryReserveGb": 3.0,  # kept free for the experiment process during a print (T129)
+        "compileKbPerLine": 19.7,  # compile memory per program line (lab 2026-11-24: 19.6 kB)
         "waitTimeout": 600.0,  # s, upper bound for waiting until axes are in position
         "zlineTimeout": 600.0,  # s, upper bound for a z-line program
     })
@@ -152,7 +157,8 @@ class A3200(Parameter, AerotechController):
         api = AerotechAsciiInterface(
             self["host"], self["port"],
             transport_factory=(lambda: transport) if transport is not None else None,
-            connect_timeout=self["connectTimeout"], response_timeout=self["responseTimeout"])
+            connect_timeout=self["connectTimeout"], response_timeout=self["responseTimeout"],
+            load_timeout=self["loadTimeout"])
         api.z_limit = self["zMax"] / 1000
         self._init_controller(api, program_dir)
         self.opened = False

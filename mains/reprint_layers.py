@@ -2,8 +2,9 @@
 
 The DOE print of 2026-11-21 (``surface_16bit``) printed only 16 of 73 layers: the controller
 refused to load every layer program with more than about 80 000 lines ("out of memory" or "!"),
-and the experiment went on with the next layer. ``restart_experiment.py`` does not help, because
-those layers count as attempted. This script prints them now:
+and the experiment went on with the next layer. ``restart_experiment.py`` does not print a failed
+layer that lies behind a printed one (since T128 a failed layer stops printing, and the restart prints
+it again). This script prints such layers now:
 
 - the layers come from the experiment file (default: every layer without a successful print),
 - they are printed in the order of the drop direction (DOWN: the highest missing layer first, as in
