@@ -81,3 +81,62 @@ def test_worker_result_reads_the_last_json_line(lab):
             return "noise\n" + json.dumps({"ok": True, "load_s": 1.0}) + "\n", ""
 
     assert lab.worker_result(Proc()) == {"ok": True, "load_s": 1.0}
+
+
+def test_real_header_variant_keeps_the_length_and_closes_the_critical_section(lab):
+    lines = lab.synthetic_program(500, header_style="real")
+
+    assert len(lines) == 500 and lines[-1] == "END PROGRAM"
+    assert lines.index("CRITICAL START") < lines.index("CRITICAL END")
+    assert all(mode in lines for mode in ("SECONDS", "METRIC", "LOOKAHEAD FAST"))
+    with pytest.raises(ValueError):
+        lab.synthetic_program(500, header_style="other")
+
+
+def test_source_lines_of_a_compiled_program_come_from_the_pgm(lab, tmp_path):
+    pgm = lab.write_program(tmp_path / "part.pgm", ["LINEAR A1", "LINEAR A2", "END PROGRAM"])
+    ogm = tmp_path / "PART.OGM"
+    ogm.write_bytes(bytes([0, 10]) * 50)  # binary content with many line breaks
+
+    assert lab.source_line_count(pgm) == 3
+    assert lab.source_line_count(ogm) == 3
+    assert lab.compiled_file(pgm) == ogm
+    assert lab.source_line_count(tmp_path / "alone.ogm") is None
+
+
+def test_program_name_candidates(lab, tmp_path):
+    names = lab.program_name_candidates(tmp_path / "part_1.ogm")
+
+    assert names[0] == "part_1.ogm"
+    assert {"part_1.pgm", "part_1", "PART_1.OGM"} <= set(names)
+    assert len(names) == len(set(names))
+
+
+def test_process_age_and_stale_a3200_processes(lab):
+    import datetime
+    now = datetime.datetime(2026, 11, 25, 9, 0, 0)
+
+    assert lab.process_age_minutes("2026-11-25T08:30:00", now) == 30.0
+    assert lab.process_age_minutes(None) is None and lab.process_age_minutes("garbage") is None
+    rows = [{"name": "A3200AsciiInterface.exe", "pid": 1, "created": "x", "age_min": 1500.0},
+            {"name": "A3200CommService.exe", "pid": 2, "created": "y", "age_min": 5.0},
+            {"name": "python.exe", "pid": 3, "created": "z", "age_min": 9999.0}]
+    assert lab.stale_a3200_processes(rows) == ["A3200AsciiInterface.exe (PID 1, started x)"]
+
+
+def test_parse_axis_states(lab):
+    data = " ".join(["1 1 10,5", "0 1 0", "1 0 -2.25", "1 1 0", "1 1 0"])
+
+    states = lab.parse_axis_states(data)
+
+    assert states["X"] == {"enabled": True, "homed": True, "position": 10.5}
+    assert states["Y"]["enabled"] is False and states["Z"]["homed"] is False
+    assert states["Z"]["position"] == -2.25
+
+
+def test_reset_prototype_is_recognised(lab):
+    header = "BOOL DLLENTRYDECLARATION A3200Reset(A3200Handle handle);\nBOOL A3200Other(int x);"
+
+    assert re.search(lab.RESET_SIGNATURE, header)
+    assert lab.prototype(header, "A3200Reset") == "BOOL DLLENTRYDECLARATION A3200Reset(A3200Handle handle);"
+    assert lab.prototype(header, "A3200Missing") is None
