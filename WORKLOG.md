@@ -2846,3 +2846,16 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** none (evaluation of lab output; the result folders `mains/lab_checks/library_load_check_2026112*` and `mains/lab_checks/console_logs.txt` stay untracked).
 - **Commits:** see the docs(todo) commit of this entry.
 - **Follow-ups:** T129 implementation (library loader in a worker process, task alternation 1/2); lab check whether a failed build blocks only the same program name or every load (small program of another name over ASCII after a refusal).
+
+### 2026-11-24 11:34 CET — [T129] Work order and lab tests for library loading within a memory budget
+- **Status:** partial (lab results and implementation open)
+- **Changes:**
+  - `mains/lab_checks/program_loading_lab.py` (new): lab steps `system`, `ladder`, `precision`, `ogm`, `cycle`, `sticky`, `watch`; one session folder per day; loads run in worker processes and are refused above the memory budget (default 22 GB for the whole PC); the cycle runs synthetic galvo-only programs with the laser gate forced off on tasks 1/2 with prefetch.
+  - `test/lab_checks/test_program_loading_lab.py` (new): hardware-free helpers (synthetic and truncated programs, memory queries, budget estimate, worker result parsing).
+  - `test/README.md`: row for the new test module.
+  - `docs/design/PROGRAM_LOADING.md` (new): work order for T129 (findings, requirements R1-R10 of the maintainer: 32 GB RAM, at most 20-25 GB used, bounded compilation, tasks 1/2 alternating, work packages, open points, acceptance).
+  - `docs/guides/PROGRAM_LOADING_LAB_TESTS.md` (new): lab procedure, safety, manual checklist, decision table.
+  - `TODO.md`: T129 links the work order and the lab guide.
+- **Tests:** `test/lab_checks` 6 passed; `program_loading_lab.py system` run on the development PC (no A3200 installation: library and ASCII reported as unavailable). The library and controller steps run for the first time on the lab PC.
+- **Commits:** `6912824` feat(lab): add the lab tests for library loading within a memory budget [T129], `b3ece21` docs(design): work order and lab guide for program loading through the A3200 library [T129]
+- **Follow-ups:** lab session per `docs/guides/PROGRAM_LOADING_LAB_TESTS.md`; results into section 6 of the work order; then P1-P5 of the work order.
