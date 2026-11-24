@@ -37,16 +37,16 @@ from nanofactorysystem.reprint import format_plan, reprint_plan
 # ---------------------------------------------------------------------------------------------
 # Experiment folder (the one containing experiment.h5). For the DOE print of 2026-11-21 it is
 # <dataRoot of Hannes>\DOE_circle_V1\DOE_circle_V1-B_<YYYYMMDD-HHMM> on the lab PC.
-EXP_PATH = r""
 EXP_PATH = r"C:\Users\Nanofactory\Documents\Femtika_Experiment\Hannes\DOE_circle_V1\DOE_circle_V1-B_20261121-2020"
 # Structure whose layers are printed
 STRUCTURE = "surface_16bit"
 # None: every layer without a successful print; or a list of layer ids, e.g. [70, 69, 68]
 LAYER_IDS = None
 # A layer program with more lines is printed in parts (PROGRAM LOAD fails above about 80 000 lines)
-MAX_PROGRAM_LINES_SETTING = MAX_PROGRAM_LINES
+# MAX_PROGRAM_LINES_SETTING = MAX_PROGRAM_LINES
+MAX_PROGRAM_LINES_SETTING = 20_000
 # Ask on the console before the printing starts
-ASK_BEFORE_PRINT = True
+ASK_BEFORE_PRINT = False
 
 
 def plan(path=EXP_PATH, structure=STRUCTURE, layer_ids=LAYER_IDS, max_program_lines=MAX_PROGRAM_LINES_SETTING):
@@ -84,6 +84,7 @@ def reprint(path=EXP_PATH, structure=STRUCTURE, layer_ids=LAYER_IDS, max_program
     if ask and input("Print these layers now? [yes/no] ").strip().lower() not in ("y", "yes", "j", "ja"):
         print("Nothing printed.")
         return []
+    # note kontrollieren qr code und abspeichern der uuid - vergleichen ob gleich wie in experiment.h5 - vergleich alt neu
     with Experiment(**Experiment.parameters_from_dictionary(path), backend=backend,
                     max_program_lines=max_program_lines) as experiment:
         return experiment.reprint_layers(structure, layer_ids)
