@@ -53,3 +53,10 @@ MANIFEST
 # Voxel database (T53); the seed CSV in config/ is versioned
 *.sqlite
 analysis/exp_20112026.py
+/mains/lab_checks/library_load_check_20261123-163153
+/mains/lab_checks/library_load_check_20261124-102139
+/mains/lab_checks/library_load_check_20261124-103305
+/mains/lab_checks/library_load_check_20261124-103310
+/mains/lab_checks/library_load_check_20261124-103343
+/mains/lab_checks/library_load_check_20261124-102308
+mains/lab_checks/console_logs.txt
