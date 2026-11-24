@@ -31,6 +31,9 @@ GALVO ROTATION A -0.6
 AXISSTATUS(X, DATAITEM_AccelerationRate)
 AXISSTATUS(Z, DATAITEM_AccelerationRate)
 LINEAR X1.3100000000 Y19.5000000000 Z20.0000000000 F2.000000
+~VERSION
+~STATUS (1, TaskState)
+~STATUS (X, AxisFault) (X, DriveStatus) (X, AxisStatus) (Y, AxisFault) (Y, DriveStatus) (Y, AxisStatus) (Z, AxisFault) (Z, DriveStatus) (Z, AxisStatus) (A, AxisFault) (A, DriveStatus) (A, AxisStatus) (B, AxisFault) (B, DriveStatus) (B, AxisStatus)
 $AO[0].A=1.870823
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.6350000000 Y19.1750000000 F20.000000
@@ -196,6 +199,9 @@ AXISSTATUS(Y, DATAITEM_PositionFeedback)
 AXISSTATUS(Z, DATAITEM_PositionFeedback)
 AXISSTATUS(A, DATAITEM_PositionFeedback)
 AXISSTATUS(B, DATAITEM_PositionFeedback)
+~VERSION
+~STATUS (1, TaskState)
+~STATUS (X, AxisFault) (X, DriveStatus) (X, AxisStatus) (Y, AxisFault) (Y, DriveStatus) (Y, AxisStatus) (Z, AxisFault) (Z, DriveStatus) (Z, AxisStatus) (A, AxisFault) (A, DriveStatus) (A, AxisStatus) (B, AxisFault) (B, DriveStatus) (B, AxisStatus)
 $AO[0].A=1.870823
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X0.9850000000 Y19.1750000000 F20.000000
@@ -361,6 +367,9 @@ AXISSTATUS(Y, DATAITEM_PositionFeedback)
 AXISSTATUS(Z, DATAITEM_PositionFeedback)
 AXISSTATUS(A, DATAITEM_PositionFeedback)
 AXISSTATUS(B, DATAITEM_PositionFeedback)
+~VERSION
+~STATUS (1, TaskState)
+~STATUS (X, AxisFault) (X, DriveStatus) (X, AxisStatus) (Y, AxisFault) (Y, DriveStatus) (Y, AxisStatus) (Z, AxisFault) (Z, DriveStatus) (Z, AxisStatus) (A, AxisFault) (A, DriveStatus) (A, AxisStatus) (B, AxisFault) (B, DriveStatus) (B, AxisStatus)
 $AO[0].A=1.870823
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X0.9850000000 Y19.8250000000 F20.000000
@@ -526,6 +535,9 @@ AXISSTATUS(Y, DATAITEM_PositionFeedback)
 AXISSTATUS(Z, DATAITEM_PositionFeedback)
 AXISSTATUS(A, DATAITEM_PositionFeedback)
 AXISSTATUS(B, DATAITEM_PositionFeedback)
+~VERSION
+~STATUS (1, TaskState)
+~STATUS (X, AxisFault) (X, DriveStatus) (X, AxisStatus) (Y, AxisFault) (Y, DriveStatus) (Y, AxisStatus) (Z, AxisFault) (Z, DriveStatus) (Z, AxisStatus) (A, AxisFault) (A, DriveStatus) (A, AxisStatus) (B, AxisFault) (B, DriveStatus) (B, AxisStatus)
 $AO[0].A=1.870823
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.6350000000 Y19.8250000000 F20.000000
@@ -691,6 +703,9 @@ AXISSTATUS(Y, DATAITEM_PositionFeedback)
 AXISSTATUS(Z, DATAITEM_PositionFeedback)
 AXISSTATUS(A, DATAITEM_PositionFeedback)
 AXISSTATUS(B, DATAITEM_PositionFeedback)
+~VERSION
+~STATUS (1, TaskState)
+~STATUS (X, AxisFault) (X, DriveStatus) (X, AxisStatus) (Y, AxisFault) (Y, DriveStatus) (Y, AxisStatus) (Z, AxisFault) (Z, DriveStatus) (Z, AxisStatus) (A, AxisFault) (A, DriveStatus) (A, AxisStatus) (B, AxisFault) (B, DriveStatus) (B, AxisStatus)
 $AO[0].A=1.870823
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.3100000000 Y19.0500000000 F20.000000
@@ -856,6 +871,9 @@ AXISSTATUS(Y, DATAITEM_PositionFeedback)
 AXISSTATUS(Z, DATAITEM_PositionFeedback)
 AXISSTATUS(A, DATAITEM_PositionFeedback)
 AXISSTATUS(B, DATAITEM_PositionFeedback)
+~VERSION
+~STATUS (1, TaskState)
+~STATUS (X, AxisFault) (X, DriveStatus) (X, AxisStatus) (Y, AxisFault) (Y, DriveStatus) (Y, AxisStatus) (Z, AxisFault) (Z, DriveStatus) (Z, AxisStatus) (A, AxisFault) (A, DriveStatus) (A, AxisStatus) (B, AxisFault) (B, DriveStatus) (B, AxisStatus)
 $AO[0].A=1.870823
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.3100000000 Y19.5000000000 F20.000000

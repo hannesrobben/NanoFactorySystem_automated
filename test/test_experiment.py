@@ -138,7 +138,10 @@ def test_failed_layer_stops_the_structure(experiment, dummy_backend):
     # The task was stopped and the program removed under the name it was loaded with (T127)
     commands = dummy_backend.calllog.commands()
     assert "PROGRAM 1 STOP" in commands and 'REMOVEPROGRAM "python_aerobasic_program.pgm"' in commands
-    assert dummy_backend.transport.unknown_removals == []
+    assert "python_aerobasic_program.pgm" not in dummy_backend.transport.loaded_programs
+    # The health check after the failure ran recovery level R0 and is stored in the experiment file (T133)
+    health = "".join(ExperimentStore.open(experiment.path).read_logs("health").values())
+    assert "R0: task 1 stopped" in health and "before printing" in health
 
 
 def test_early_end_counts_as_failure(experiment, dummy_backend):
@@ -260,6 +263,22 @@ def test_library_loader_stops_at_the_first_failed_layer(test_config, dummy_backe
     events = ExperimentStore.open(path).read().progress["rect"]
     assert [(e["layer_id"], e["status"]) for e in events] == [(0, "ok"), (1, "failed")]
     assert set(dummy_backend.transport.loaded_programs) == {"__zline__.pgm"}
+
+
+def test_unhealthy_controller_is_refused_before_printing(experiment, dummy_backend):
+    # T133: the health check runs before a structure; an axis fault that R0 cannot clear stops the print
+    from nanofactorysystem.aerobasic.ascii import AerotechError
+    add_rectangle(experiment)
+    experiment.build_programs()
+    original = dummy_backend.transport._axis_item
+    dummy_backend.transport._axis_item = lambda axis, item: (
+        "4" if (axis, item) == ("Z", "AxisFault") else original(axis, item))
+
+    with pytest.raises(AerotechError, match="not ready to print: axis Z has fault 4"):
+        experiment.print_experiment()
+
+    assert not dummy_backend.calllog.filter(device="program")
+    assert "ACKNOWLEDGEALL" in dummy_backend.calllog.commands()  # R0 was tried
 
 
 def test_experiment_dictionary(experiment):

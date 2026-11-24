@@ -25,6 +25,7 @@ from scidatacontainer import Container
 from nanofactorysystem import System, ImageContainer, mkdir, getLogger
 from nanofactorysystem.aerobasic import SingleAxis, AxisStatusDataItem
 from nanofactorysystem.aerobasic.ascii import AerotechError
+from nanofactorysystem.devices.aerotech.health import HealthReport, controller_health, recover_r0
 from nanofactorysystem.devices.aerotech.loader import DEFAULT_KB_PER_LINE, MemoryBudget, ProgramRunner, max_part_lines
 from nanofactorysystem.aerobasic.programs import AeroBasicProgram
 from nanofactorysystem.aerobasic.programs.drawings import DrawableObject, DrawableAeroBasicProgram
@@ -296,6 +297,7 @@ class Experiment(object):
         if self.program_loader not in ("ascii", "library"):
             raise ValueError(f"program_loader must be 'ascii' or 'library', not {program_loader!r}")
         self._loader = None
+        self._health_log: list[str] = []
 
         # Substrate record and experiment folder
         self.substrate: Optional[SubstrateRecord] = None
@@ -1816,9 +1818,59 @@ class Experiment(object):
         return ProgramRunner(self._loader, self.a3200.api, self.memory_budget(), exec_dir=self.path / "exec",
                              logger=self.log)
 
+    def check_controller(self, context: str, *, recover: bool = False) -> HealthReport:
+        """ Run the controller health check (T133) and store it in the experiment log ``/logs/health``.
+
+        Parameters
+        ----------
+        context : str
+            When the check runs (for the log).
+        recover : bool
+            Run recovery level R0 first (stop the printing tasks, remove the package's programs,
+            acknowledge faults; nothing moves).
+
+        Returns
+        -------
+        HealthReport
+        """
+
+        api = self.a3200.api
+        tasks = (1, 2) if self.program_loader == "library" else (1,)
+        lines = [f"[{utc_timestamp()}] {context}"]
+        if recover:
+            lines += [f"  R0: {step}" for step in recover_r0(api, tasks=tasks)]
+        report = controller_health(api, tasks=tasks, check_processes=self.system.backend.name == "real")
+        lines.append(report.text())
+        text = "\n".join(lines)
+        (self.log.info if report.ok and not report.warnings else self.log.warning)(text)
+        self._health_log.append(text)
+        self.store.write_log("health", "\n\n".join(self._health_log))
+        return report
+
+    def _ensure_controller_ready(self) -> None:
+        """ Health check before printing; on a problem R0 and a second check (T133).
+
+        Raises
+        ------
+        AerotechError
+            If the controller is still not healthy after R0.
+        """
+
+        report = self.check_controller("before printing")
+        if report.ok:
+            return
+        report = self.check_controller("after a problem before printing", recover=True)
+        if not report.ok:
+            raise AerotechError("The controller is not ready to print: " + "; ".join(report.problems)
+                                + ". See /logs/health in the experiment file (T133).")
+
     def _stop_printing(self, name: str, layer_id: int, error: Exception) -> None:
         """ Store everything and raise :class:`PrintStoppedError` (``stop_on_failure``, T128). """
 
+        try:
+            self.check_controller(f"after the failure of layer {layer_id} of {name}", recover=True)
+        except Exception as health_error:  # the original failure is the one to report
+            self.log.error(f"Health check after the failure not possible: {health_error}")
         export_progress(self.store.read(include_captures=False), self.path)
         self._save_exp_dict()
         self._write_summary()
@@ -2018,6 +2070,7 @@ class Experiment(object):
         # Every layer must be loadable before the first one is printed: too long programs are split (or were
         # split by the build); a program that cannot be split raises ProgramSplitError here (T125)
         layer_parts = self._prepare_layers([Path(p) for p in pgm_files_list], name)
+        self._ensure_controller_ready()
         self.store.set_status(schema.STATUS_PRINTING)
         self.store.set_structure_status(name, "printing")
 

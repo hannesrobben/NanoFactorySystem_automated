@@ -189,6 +189,8 @@ T126 (queue mode) stays in the backlog: loading with prefetch already gives gaps
 Goal: our software detects a controller in a bad state before and during a print, and brings it back
 in defined steps. Today the operator has to recognise this and restart the A3200 software by hand.
 
+Implemented on 2026-11-24 (T133, partial): the health check and R0 in `nanofactorysystem/devices/aerotech/health.py`, called by `print_structure()` before every structure and after a failed layer, stored in `/logs/health`; `mains/controller_health.py`. R1–R3 follow after lab session 2.
+
 **Health check** (no side effects, before every experiment and after every failure):
 - ASCII reachable (`~VERSION`);
 - tasks 1/2 idle;
