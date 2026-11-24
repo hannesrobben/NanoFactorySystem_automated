@@ -97,6 +97,7 @@ python -m pytest test/test_aerobasic/test_golden_programs.py --update-golden   #
   - `hatch_generator.py`, `laser_segments.py`, `apertures.py` (reusable components)
   - `tile_manager.py` (stitching of structures larger than the FOV)
 - The directories `old_to-delete/` and `new/` and the files `*_old.py` are legacy or experimental code, not the active path.
+- `aerobasic/programs/optimize.py` (T130): `optimize_lines()` / `optimize_file()` / `python -m nanofactorysystem.aerobasic.programs.optimize <file>` shorten a program without changing the exposed path beyond `decimals` (default 5 = 10 nm): trailing zeros, modal feed rates, unchanged axis words and empty moves are dropped, consecutive collinear LINEAR moves merged; lines with variables and commands that may move an axis reset what is known. Not a build default (maintainer decision); the golden programs shrink by 37-53 % in bytes.
 - `aerobasic/slicer/` is a separate mesh/heightmap → toolpath pipeline (`pipeline.slice_geometry`). It is a self-contained port of `tpp_slicer`, and its layout is described in `tree_overview_slicer.txt`.
 
 **Voxel database** (`voxel/`, design in `docs/design/VOXEL_DATABASE.md`)
