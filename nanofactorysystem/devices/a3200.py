@@ -111,6 +111,7 @@ class A3200(Parameter, AerotechController):
         "softwareVersion": None,
         "connectTimeout": 10.0,  # s
         "responseTimeout": None,  # s, None: no limit (motion commands may take long)
+        "loadTimeout": 600.0,  # s, reply to PROGRAM LOAD (a LOAD got no reply within 600 s on 2026-11-24)
         "waitTimeout": 600.0,  # s, upper bound for waiting until axes are in position
         "zlineTimeout": 600.0,  # s, upper bound for a z-line program
     })
@@ -152,7 +153,8 @@ class A3200(Parameter, AerotechController):
         api = AerotechAsciiInterface(
             self["host"], self["port"],
             transport_factory=(lambda: transport) if transport is not None else None,
-            connect_timeout=self["connectTimeout"], response_timeout=self["responseTimeout"])
+            connect_timeout=self["connectTimeout"], response_timeout=self["responseTimeout"],
+            load_timeout=self["loadTimeout"])
         api.z_limit = self["zMax"] / 1000
         self._init_controller(api, program_dir)
         self.opened = False

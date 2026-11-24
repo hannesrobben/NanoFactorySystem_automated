@@ -46,7 +46,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_tr.000.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.6350000000 Y19.1750000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -61,7 +61,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_tr.001.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.6350000000 Y19.1750000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -76,7 +76,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_tr.002.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.6350000000 Y19.1750000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -91,7 +91,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_tr.003.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.6350000000 Y19.1750000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -106,7 +106,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_tr.004.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.6350000000 Y19.1750000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -121,7 +121,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_tr.005.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.6350000000 Y19.1750000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -136,7 +136,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_tr.006.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.6350000000 Y19.1750000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -151,7 +151,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_tr.007.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.6350000000 Y19.1750000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -166,7 +166,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_tr.008.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.6350000000 Y19.1750000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -181,7 +181,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_tr.009.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.6350000000 Y19.1750000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -211,7 +211,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_tl.000.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X0.9850000000 Y19.1750000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -226,7 +226,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_tl.001.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X0.9850000000 Y19.1750000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -241,7 +241,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_tl.002.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X0.9850000000 Y19.1750000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -256,7 +256,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_tl.003.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X0.9850000000 Y19.1750000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -271,7 +271,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_tl.004.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X0.9850000000 Y19.1750000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -286,7 +286,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_tl.005.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X0.9850000000 Y19.1750000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -301,7 +301,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_tl.006.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X0.9850000000 Y19.1750000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -316,7 +316,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_tl.007.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X0.9850000000 Y19.1750000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -331,7 +331,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_tl.008.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X0.9850000000 Y19.1750000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -346,7 +346,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_tl.009.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X0.9850000000 Y19.1750000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -376,7 +376,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_bl.000.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X0.9850000000 Y19.8250000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -391,7 +391,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_bl.001.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X0.9850000000 Y19.8250000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -406,7 +406,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_bl.002.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X0.9850000000 Y19.8250000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -421,7 +421,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_bl.003.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X0.9850000000 Y19.8250000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -436,7 +436,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_bl.004.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X0.9850000000 Y19.8250000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -451,7 +451,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_bl.005.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X0.9850000000 Y19.8250000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -466,7 +466,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_bl.006.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X0.9850000000 Y19.8250000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -481,7 +481,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_bl.007.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X0.9850000000 Y19.8250000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -496,7 +496,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_bl.008.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X0.9850000000 Y19.8250000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -511,7 +511,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_bl.009.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X0.9850000000 Y19.8250000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -541,7 +541,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_br.000.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.6350000000 Y19.8250000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -556,7 +556,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_br.001.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.6350000000 Y19.8250000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -571,7 +571,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_br.002.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.6350000000 Y19.8250000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -586,7 +586,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_br.003.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.6350000000 Y19.8250000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -601,7 +601,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_br.004.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.6350000000 Y19.8250000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -616,7 +616,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_br.005.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.6350000000 Y19.8250000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -631,7 +631,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_br.006.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.6350000000 Y19.8250000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -646,7 +646,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_br.007.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.6350000000 Y19.8250000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -661,7 +661,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_br.008.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.6350000000 Y19.8250000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -676,7 +676,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_corner_br.009.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.6350000000 Y19.8250000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -706,7 +706,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_qrcode.000.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.3100000000 Y19.0500000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -721,7 +721,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_qrcode.001.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.3100000000 Y19.0500000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -736,7 +736,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_qrcode.002.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.3100000000 Y19.0500000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -751,7 +751,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_qrcode.003.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.3100000000 Y19.0500000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -766,7 +766,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_qrcode.004.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.3100000000 Y19.0500000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -781,7 +781,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_qrcode.005.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.3100000000 Y19.0500000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -796,7 +796,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_qrcode.006.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.3100000000 Y19.0500000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -811,7 +811,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_qrcode.007.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.3100000000 Y19.0500000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -826,7 +826,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_qrcode.008.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.3100000000 Y19.0500000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -841,7 +841,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_qrcode.009.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.3100000000 Y19.0500000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -871,7 +871,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_rect.000.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.3100000000 Y19.5000000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -886,7 +886,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_rect.001.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.3100000000 Y19.5000000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)
@@ -901,7 +901,7 @@ PROGRAM 1 START
 ~STATUS (1, ProgramLineNumber)
 PROGRAM 1 STOP
 ~STATUS (1, TaskMode) (1, TaskState) (1, TaskStatus0) (1, TaskStatus1) (1, TaskStatus2) (1, ProgramLineNumber)
-REMOVEPROGRAM "program_rect.002.txt"
+REMOVEPROGRAM "python_aerobasic_program.pgm"
 LINEAR A0.0000000000 B0.0000000000 F20.000000
 LINEAR X1.3100000000 Y19.5000000000 F20.000000
 AXISSTATUS(X, DATAITEM_PositionFeedback)

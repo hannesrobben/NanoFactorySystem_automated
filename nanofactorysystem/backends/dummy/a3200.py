@@ -76,6 +76,11 @@ class FakeA3200Transport:
     ----------
     unhandled : list of str
         Commands that were accepted without simulation.
+    loaded_programs : dict of str to str
+        Programs loaded with ``PROGRAM n LOAD``, by file name (lower case), with their path.
+    unknown_removals : list of str
+        ``REMOVEPROGRAM`` names that matched no loaded program. The real
+        controller answers success and removes nothing (T127).
     """
 
     def __init__(self, world: SimulatedWorld, *, strict: bool = False, decimal_comma: bool = False,
@@ -104,6 +109,11 @@ class FakeA3200Transport:
         self._overrides: list[tuple[re.Pattern, Response]] = []
         self._faults: list[list[Any]] = []
         self._program_errors: deque[tuple[int, int, int]] = deque()
+        self._incomplete: deque[int] = deque()
+        self._hangs: list[list[Any]] = []
+        self._hanging = False
+        self.loaded_programs: dict[str, str] = {}
+        self.unknown_removals: list[str] = []
 
     # Socket interface
 
@@ -155,10 +165,18 @@ class FakeA3200Transport:
 
         Raises
         ------
+        TimeoutError
+            If a command set up with :meth:`hang_next` is waiting and a
+            timeout is set (a real socket raises ``socket.timeout``).
         RuntimeError
             If no response is pending. A real socket would block forever.
         """
 
+        if self._hanging:
+            if self.timeout is None:
+                raise RuntimeError("FakeA3200Transport.recv() without timeout on a command that never answers "
+                                   "(the real controller connection would block forever)")
+            raise TimeoutError("timed out")
         if not self._outq and self._inbuf.strip():
             line, self._inbuf = self._inbuf, ""
             self._process(line)
@@ -174,9 +192,12 @@ class FakeA3200Transport:
         return frame
 
     def close(self) -> None:
-        """ Simulate closing the connection. """
+        """ Simulate closing the connection; a command that never answers is dropped with it. """
 
         self.connected = False
+        self._hanging = False
+        self._inbuf = ""
+        self._outq.clear()
 
     # Configuration of responses
 
@@ -225,10 +246,35 @@ class FakeA3200Transport:
 
         self._program_errors.append((error_code, error_location, running_polls))
 
+    def program_incomplete_next(self, line_number: int) -> None:
+        """ Let the next started program end as ``program_complete`` at ``line_number`` instead of its last line.
+
+        Simulates the early "complete" of 2026-11-22 (parts of 79 992 lines that
+        reported complete at line 8357 and 4198).
+        """
+
+        self._incomplete.append(int(line_number))
+
+    def hang_next(self, pattern: str, *, count: int = 1) -> None:
+        """ Never answer the next command(s) matching ``pattern``.
+
+        Simulates the ``PROGRAM LOAD`` over ASCII that got no reply within 600 s
+        on 2026-11-24. ``recv`` raises ``TimeoutError`` while such a command
+        waits, if a timeout is set.
+        """
+
+        self._hangs.append([re.compile(pattern), count])
+
     # Processing
 
     def _process(self, line: str) -> None:
         line = line.rstrip("\r")
+        for hang in self._hangs:
+            if hang[1] > 0 and hang[0].search(line):
+                hang[1] -= 1
+                self._hanging = True
+                self.world.calllog.record("controller", line, (), "(no reply)", self.world.clock.now)
+                return
         code, data = self._respond(line)
         self.world.calllog.record("controller", line, (), code + data, self.world.clock.now)
         self._outq.append(code + data + "\n")
@@ -374,7 +420,10 @@ class FakeA3200Transport:
             world.task(task_id).state = _IDLE
             world.task(task_id).running_polls = 0
             return ""
-        if re.fullmatch(r'REMOVEPROGRAM\s+"(.*)"', s, re.IGNORECASE):
+        if m := re.fullmatch(r'REMOVEPROGRAM\s+"(.*)"', s, re.IGNORECASE):
+            # The controller answers success also for a name that is not loaded (and removes nothing)
+            if self.loaded_programs.pop(Path(m.group(1)).name.lower(), None) is None:
+                self.unknown_removals.append(m.group(1))
             return ""
         if re.fullmatch(rf"[XYZAB]?F{_NUMBER}", u):  # connected speed "F10" or axis speed "AF5", "BF5", "ZF1"
             return ""
@@ -443,6 +492,8 @@ class FakeA3200Transport:
         task.state = _READY
         task.line_number = 0
         task.error_code = task.error_location = 0
+        if check_file:
+            self.loaded_programs[Path(path).name.lower()] = path
         return ""
 
     def _program_start(self, task_id: int) -> str:
@@ -454,6 +505,8 @@ class FakeA3200Transport:
         lines = path.read_text().splitlines() if path.is_file() else []
         executed, not_simulated = self.run_program(lines)
         task.line_number = len(lines)
+        if self._incomplete:
+            task.line_number = min(self._incomplete.popleft(), len(lines))
         if self._program_errors:
             task.error_code, task.error_location, task.running_polls = self._program_errors.popleft()
             task.state = _ERROR

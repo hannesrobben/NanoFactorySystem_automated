@@ -5,7 +5,7 @@ from typing import Optional
 from tqdm import tqdm
 
 from nanofactorysystem.aerobasic import TaskStatusDataItem, WaitMode
-from nanofactorysystem.aerobasic.ascii import AerotechAsciiInterface, TaskFailedError
+from nanofactorysystem.aerobasic.ascii import AerotechAsciiInterface, AerotechError, TaskFailedError
 from nanofactorysystem.aerobasic.constants.tasks import TaskMode, TaskStatus0, TaskState, TaskStatus2, TaskStatus1
 
 """
@@ -33,9 +33,9 @@ class Task:
             Program file (its line count is the expected last line).
         program_name : str, optional
             Name under which the program was loaded on the controller (the
-            file name given to ``PROGRAM LOAD``, without path). Kept for
-            removing the program under that name (T127); ``finish`` still
-            removes ``file_path`` until T127 is done.
+            file name given to ``PROGRAM LOAD``, without path).
+            :meth:`finish` and :meth:`abort` remove the program under this
+            name (T127); without it, the name of ``file_path`` is used.
         """
         self.api = api
         self.task_id = task_id
@@ -83,6 +83,38 @@ class Task:
         if self.file_path is None:
             return None
         return len(self.file_path.read_text().splitlines())
+
+    @property
+    def last_statement_line(self) -> Optional[int]:
+        """ Line number (1-based) of the last non-empty line of the program file; None without a file. """
+
+        if self.file_path is None:
+            return None
+        lines = self.file_path.read_text().splitlines()
+        return max((i for i, line in enumerate(lines, start=1) if line.strip()), default=0)
+
+    @property
+    def removal_name(self) -> Optional[str]:
+        """ Name passed to ``REMOVEPROGRAM``: the loaded name, else the name of the program file. """
+
+        if self.program_name:
+            return self.program_name
+        return self.file_path.name if self.file_path is not None else None
+
+    def error_info(self) -> str:
+        """ Decoded task error: ``"<code>: <text>"`` from ``TaskErrorCode`` and ``TaskErrorLocation``.
+
+        Returns a note instead of raising if the error cannot be read.
+        """
+
+        try:
+            error_code, error_location = self.api.STATUS(
+                (self.task_id, TaskStatusDataItem.TaskErrorCode),
+                (self.task_id, TaskStatusDataItem.TaskErrorLocation)
+            ).split(" ")
+            return f"{error_code}: {self.api.ERROR_DECODE(int(error_code), int(error_location))}"
+        except (AerotechError, ValueError) as error:
+            return f"(error code not readable: {error})"
 
     @property
     def task_mode(self) -> TaskMode:
@@ -172,29 +204,28 @@ class Task:
         self.api.logger.info(f"Task {self.task_id} finished with task state {self.task_state}")
 
         if self.task_state != TaskState.program_complete:
-            additional_info = ""
-            if self.task_state == TaskState.error:
-                error_code, error_location = self.api.STATUS(
-                    (self.task_id, TaskStatusDataItem.TaskErrorCode),
-                    (self.task_id, TaskStatusDataItem.TaskErrorLocation)
-                ).split(" ")
-                error_string = self.api.ERROR_DECODE(int(error_code), int(error_location))
-                additional_info = f" {error_code}:{error_string}"
+            additional_info = f" {self.error_info()}" if self.task_state == TaskState.error else ""
             pbar.close()
             raise TaskFailedError(
                 f"Program not finished! {self.task_state}.{additional_info}"
             )
 
-        if int(self.current_line) != self.total_lines:
-            self.api.logger.warning(
-                f"Task {self.task_id} finished at line {self.current_line} of {self.total_lines}: "
-                f"mode {self.task_mode}, state {self.task_state}, status0 {self.task_status0}, "
-                f"status1 {self.task_status1}, status2 {self.task_status2}")
+        # A program that reports "complete" before its last line did not print everything (2026-11-22:
+        # parts of 79 992 lines complete at line 8357 and 4198). Every normal end so far was at the last line.
+        last_line = self.last_statement_line
+        if last_line is not None and int(self.current_line) < last_line:
+            pbar.close()
+            raise TaskFailedError(
+                f"Program ended early: task {self.task_id} reported complete at line {self.current_line} of "
+                f"{last_line} (mode {self.task_mode}, status0 {self.task_status0}, status1 {self.task_status1}, "
+                f"status2 {self.task_status2})")
 
         pbar.close()
 
     def finish(self, *, timeout: float = 30.0, update_interval: float = 0.1):
-        """ Stop the task and wait until it is idle.
+        """ Stop the task, wait until it is idle and remove the program under its loaded name (T127).
+
+        A failed removal is logged and does not raise: the program has run.
 
         Raises
         ------
@@ -210,5 +241,42 @@ class Task:
             time.sleep(update_interval)
             waited += update_interval
             self.update()
-        if self.file_path is not None:
-            self.api.REMOVE_PROGRAM(self.file_path)
+        self.remove_program()
+
+    def remove_program(self) -> bool:
+        """ Send ``REMOVEPROGRAM`` with :attr:`removal_name`; log a failure instead of raising.
+
+        Returns
+        -------
+        bool
+            False if the controller refused the removal or there is no name.
+        """
+
+        name = self.removal_name
+        if name is None:
+            return False
+        try:
+            self.api.REMOVE_PROGRAM(name)
+            return True
+        except AerotechError as error:
+            self.api.logger.warning(f"Could not remove program '{name}' after task {self.task_id}: {error}")
+            return False
+
+    def abort(self, *, timeout: float = 10.0, update_interval: float = 0.1) -> None:
+        """ Clean up after a failed program: stop the task, wait for idle, remove the program.
+
+        Never raises; every problem is logged, so that the original error
+        stays the one reported.
+        """
+
+        try:
+            self.api.PROGRAM_STOP(self.task_id)
+            self.reset()
+            waited = 0.0
+            while self.task_state != TaskState.idle and waited < timeout:
+                time.sleep(update_interval)
+                waited += update_interval
+                self.update()
+        except AerotechError as error:
+            self.api.logger.error(f"Could not stop task {self.task_id}: {error}")
+        self.remove_program()

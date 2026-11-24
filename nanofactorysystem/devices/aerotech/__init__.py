@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 from nanofactorysystem.aerobasic import AxisStatusDataItem, SingleAxis, SystemStatusDataItem, WaitMode, Axis
-from nanofactorysystem.aerobasic.ascii import AerotechAsciiInterface, TaskFailedError
+from nanofactorysystem.aerobasic.ascii import AerotechAsciiInterface, AerotechError, TaskFailedError
 from nanofactorysystem.aerobasic.constants import AxisStatus
 from nanofactorysystem.aerobasic.constants.tasks import ProgrammingMode, TaskState, VelocityMode
 from nanofactorysystem.aerobasic.programs import AeroBasicProgram
@@ -170,6 +170,40 @@ class AerotechController:
             program_ready_timeout=10,  # Seconds
             program_start_running_timeout=10,  # Seconds
     ) -> Task:
+        """ Load a program on a task over ASCII, start it and return the running task.
+
+        The program is copied to ``python_aerobasic_program.pgm`` (one name
+        on the controller for every program) and loaded under that name; the
+        returned :class:`Task` removes it under that name (T127).
+
+        Parameters
+        ----------
+        program : path or AeroBasicProgram
+            Program file, or a program that is written to a temporary file.
+        task_id : int, optional
+            Controller task (default 2).
+        program_ready_timeout : float
+            Seconds after the LOAD reply until the task must be ready. The
+            compile itself happens before the reply (limited by the
+            interface's ``load_timeout``).
+        program_start_running_timeout : float
+            Seconds after START until the task must be running or complete.
+
+        Returns
+        -------
+        Task
+            The started task.
+
+        Raises
+        ------
+        AerotechError
+            If the controller refuses the LOAD or does not reply in time
+            (message with the controller's reason).
+        TaskFailedError
+            If the task goes into the error state (message with the decoded
+            error code) or is not ready/running in time. The task is stopped
+            and the program removed before the error is raised.
+        """
         # Either use path as program or convert AeroBasicProgram to temporary file
         if isinstance(program, AeroBasicProgram):
             now = datetime.datetime.now()
@@ -187,36 +221,58 @@ class AerotechController:
         exec_path = exec_dir / "python_aerobasic_program.pgm"
         exec_path.write_bytes(path.read_bytes())
 
-        # Load program
+        # Load program; the program is removed under the name it was loaded with (T127)
         if task_id is None:
             task_id = 2
-        self.api.PROGRAM_LOAD(task_id, exec_path)
-
-        # Wait for program to be ready; the program is removed under the name it was loaded with (T127)
         task = Task(self.api, task_id, file_path=path, program_name=exec_path.name)
+        load_start = time.time()
+        try:
+            self.api.PROGRAM_LOAD(task_id, exec_path)
+        except AerotechError as error:
+            task.abort()
+            raise type(error)(f"Could not load program {path} on task {task_id}: {error}") from error
+        self.api.logger.info(f"Loaded {path.name} on task {task_id} in {time.time() - load_start:.1f} s")
+
+        # Wait for program to be ready
         query_delay = 0.1
         for i in range(int(program_ready_timeout / query_delay)):
             task.update()
             if task.task_state == TaskState.program_ready or task.task_state == TaskState.program_complete:
                 break
+            if task.task_state == TaskState.error:
+                info = task.error_info()
+                task.abort()
+                raise TaskFailedError(f"Could not load program {path} (task state error): {info}")
             time.sleep(query_delay)
         else:
             # path is the individual filename of the layer. exec_path is the universal path which is loaded and printed
+            state = task.task_state.name
+            task.abort()
             raise TaskFailedError(f"Could not load program {path} after {program_ready_timeout} seconds "
-                                  f"(task state {task.task_state.name})!")
+                                  f"(task state {state})!")
 
         # Start program
-        self.api.PROGRAM_START(task_id)
+        try:
+            self.api.PROGRAM_START(task_id)
+        except AerotechError as error:
+            task.abort()
+            raise type(error)(f"Could not start program {path} on task {task_id}: {error}") from error
 
         # Wait for program to run
         for i in range(int(program_start_running_timeout / query_delay)):
             task.update()
             if task.task_state == TaskState.program_running or task.task_state == TaskState.program_complete:
                 break
+            if task.task_state == TaskState.error:
+                info = task.error_info()
+                task.abort()
+                raise TaskFailedError(f"Program {path} did not start (task state error): {info}")
             time.sleep(query_delay)
         else:
+            state = task.task_state.name
+            task.abort()
             raise TaskFailedError(f"Program {path} did not start within {program_start_running_timeout} seconds "
-                                  f"(task state {task.task_state.name})")
+                                  f"(task state {state})")
 
         return task
 
