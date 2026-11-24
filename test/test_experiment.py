@@ -205,6 +205,63 @@ def test_restart_leaves_failed_layers_behind_printed_ones_to_reprint(test_config
     assert len(dummy_backend.calllog.filter(device="program")) == n_layers - 2
 
 
+def test_library_loader_prints_every_layer_on_alternating_tasks(test_config, dummy_backend, no_sleep, tmp_path,
+                                                                  monkeypatch):
+    # T129: programs are compiled through the library loader and run alternately on tasks 1 and 2
+    from nanofactorysystem.devices.aerotech import loader as loader_module
+    monkeypatch.setattr(loader_module, "used_memory_gb", lambda: 4.0)
+    path = tmp_path / "experiment"
+    path.mkdir()
+    with make_experiment(path, dummy_backend, program_loader="library") as experiment:
+        # Part size from the memory budget: (22 - 3 - 4) GB / (19.7 kB x 1.2), rounded down to 10 000 lines
+        assert experiment.max_program_lines == 660_000
+        experiment.max_program_lines = 30  # small parts, so that layers have several parts
+        experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+        add_rectangle(experiment)
+        experiment.build_programs()
+        n_layers = len(experiment.structure_configs[0]["layer_files"])
+        experiment.print_experiment()
+
+    loads = dummy_backend.calllog.filter(device="loader")
+    tasks = [load.args[1] for load in loads]
+    assert len(loads) > n_layers and tasks == [1, 2] * (len(tasks) // 2) + [1] * (len(tasks) % 2)
+    assert len(dummy_backend.calllog.filter(device="program")) == len(loads)
+    assert printed_layers(path) == list(range(n_layers))
+    # Only the z-line program of the plane fit stays loaded (it is kept on purpose, init_zline)
+    assert set(dummy_backend.transport.loaded_programs) == {"__zline__.pgm"}
+    assert dummy_backend.transport.unknown_removals == []
+    assert not any((path / "exec").iterdir())
+    assert "python_aerobasic_program" not in " ".join(dummy_backend.calllog.commands())  # no ASCII load
+
+
+def test_library_loader_stops_at_the_first_failed_layer(test_config, dummy_backend, no_sleep, tmp_path, monkeypatch):
+    from nanofactorysystem.devices.aerotech import loader as loader_module
+    monkeypatch.setattr(loader_module, "used_memory_gb", lambda: 4.0)
+    path = tmp_path / "experiment"
+    path.mkdir()
+    with pytest.raises(PrintStoppedError, match="stopped at layer 1: .*ended in state error"):
+        with make_experiment(path, dummy_backend, program_loader="library") as experiment:
+            experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+            add_rectangle(experiment)
+            experiment.build_programs()
+            dummy_backend.world.calllog.clear()
+            original = dummy_backend.transport._program_start
+            calls = []
+
+            def start(task_id):
+                calls.append(task_id)
+                if len(calls) == 2:
+                    dummy_backend.transport.program_error_next(error_code=42, running_polls=1)
+                return original(task_id)
+
+            dummy_backend.transport._program_start = start
+            experiment.print_experiment()
+
+    events = ExperimentStore.open(path).read().progress["rect"]
+    assert [(e["layer_id"], e["status"]) for e in events] == [(0, "ok"), (1, "failed")]
+    assert set(dummy_backend.transport.loaded_programs) == {"__zline__.pgm"}
+
+
 def test_experiment_dictionary(experiment):
     data = json.loads((experiment.path / "experiment_dictionary.json").read_text())
 

@@ -102,3 +102,9 @@ class DummyBackend:
         """ Return the directory for program files. """
 
         return self.workdir
+
+    def program_loader(self, dll: Optional[str] = None):
+        """ Return a :class:`DummyLoader` on the simulated controller (T129); ``dll`` is ignored. """
+
+        from nanofactorysystem.backends.dummy.loader import DummyLoader
+        return DummyLoader(self.transport)
