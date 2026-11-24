@@ -127,78 +127,6 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
     `BUFFEREDRUN` and the queue status; the T125 split is kept only for the LOAD path or removed; lab check with the
     largest DOE layer (2.2 M lines, 78 MB) without load error and without queue-empty events.
 
-- [ ] T127: `REMOVEPROGRAM` names the layer file instead of the loaded program (found during T125) [phase: B]
-  - Priority: high
-  - Size: S
-  - Depends on: –
-  - Done when: after a layer the task is stopped, idle is awaited and `REMOVEPROGRAM "python_aerobasic_program.pgm"`
-    (the name given to `PROGRAM LOAD`, without path) is sent instead of the original layer file name
-    (`Task.finish`, `devices/aerotech/task.py`); the same after a failed load; the dummy transport records
-    which programs are loaded and refuses or flags removing an unknown name; a test checks the name; golden
-    command logs updated deliberately.
-
-- [ ] T128: Load failures: log `~LASTERROR` for `!` replies and stop instead of skipping the layer (found during T125) [phase: B]
-  - Priority: high
-  - Size: S
-  - Depends on: –
-  - Done when: after every `!` or `#` reply the ASCII client sends `~LASTERROR` on the same connection and puts the
-    text into the `AerotechError` (the INVALID case of 2026-11-21 logged only "has an invalid syntax!", a text of
-    this client, not of the controller); `Experiment` stops printing a structure when a layer program cannot be
-    loaded (option, default on), so that no structure with gaps is printed; dummy-backend tests; `PROGRAM LOAD` over
-    ASCII has a response timeout (configurable) and a timeout counts as a load failure (lab 2026-11-24: a LOAD got no
-    reply within 600 s, the client waits without limit today).
-
-- [ ] T129: Load layer programs through the A3200 C library instead of `PROGRAM LOAD` over ASCII (found during T125) [phase: B]
-  - Priority: high
-  - Size: M
-  - Depends on: lab result of `mains/lab_checks/library_load_check.py`
-  - Background: on 2026-11-21 `PROGRAM 1 LOAD` over the ASCII interface answered "An out of memory error occurred."
-    (FAULT, 1.6 s and 19 s) for layer 70 after layer 71 (81 751 lines) had loaded in 10 s; every later LOAD was
-    refused with `!` within 0.4 s until the A3200 software was restarted. On 2026-11-23 the maintainer loaded the
-    full layers 69 and 68 (millions of lines) by hand in Motion Composer 6.04.005 on tasks 1 and 2 while layer 69
-    ran ("Program Running", not queue mode). Hypothesis: the ASCII interface compiles inside the process serving
-    port 8000 (possibly 32 bit), Motion Composer through the library in its own process.
-  - Lab result 2026-11-24 (`mains/lab_checks/library_load_check_2026112*`): confirmed. Port 8000 is served by
-    `A3200AsciiInterface.exe`, a 32-bit process. `A3200ProgramLoad` from 64-bit Python (`A3200C64.dll`) loaded the
-    full layer 68 (1 253 745 lines, 45.8 MB) in 129 s to `program_ready`; the Python process peaked at 19.3 GB
-    (about 15 kB per line) and still held 12.4 GB after the load. `PROGRAM LOAD` of Motion Composer's `.ogm` over
-    ASCII is refused ("Build Result: -536325553" = 0xE008524F, it is compiled as source); after that every LOAD over
-    ASCII (also the `.pgm`, tasks 1 and 2) was refused within 0.1 s with the same text until a restart. Task 3 is
-    `inactive` (not enabled on this controller); tasks 1 and 2 are usable.
-  - Work order: `docs/design/PROGRAM_LOADING.md` (requirements R1-R10: memory budget 20-25 GB for the whole PC,
-    compilation bounded by a memory-based split, tasks 1/2 alternating with prefetch); lab tests:
-    `docs/guides/PROGRAM_LOADING_LAB_TESTS.md` with `mains/lab_checks/program_loading_lab.py`.
-  - Lab session 1 of the work order (2026-11-24, details in section 6 of `docs/design/PROGRAM_LOADING.md`):
-    compiling costs 19.6 kB and 96 µs per line (linear up to 400k lines); the memory is freed at `A3200Disconnect`;
-    a program stays loaded after the worker process exits and can be started and removed by another process;
-    removal works for `.pgm` loads (count verified); the cycle of 4 × 200k lines alternating on tasks 1/2 with
-    prefetch had gaps of 0.15 s and every part ended at its last line. Default part size for the library path:
-    400 000 lines (from the budget, not fixed). Follow-ups T131 (precompiled `.ogm`), T132 (task 2 1.8× slower),
-    T133 (health check and recovery), T134 (lab session 2).
-  - Design consequences: load through the library in a short-lived 64-bit worker process (memory returned after
-    each load); alternate tasks 1 and 2 so the next layer compiles while the current one prints (about 2 min per
-    1.25 M-line layer); check the PC's RAM against the 19 GB peak; keep ASCII for START/status.
-  - Done when: the lab check confirms or refutes the hypothesis; if confirmed, `run_program_as_task` loads through
-    `A3200C64.dll` (ctypes, signatures from the installed headers) behind a loader seam with the ASCII path as
-    fallback, the next layer is loaded on a second task while the current one prints, the T125 split is only used
-    for the ASCII path, the dummy backend simulates the library loader, and the T126 queue mode is reconsidered.
-
-- [ ] T130: Program optimiser that shortens generated AeroBasic programs (maintainer request 2026-11-23) [phase: B]
-  - Priority: high
-  - Size: M
-  - Depends on: –
-  - Background: the DOE layer programs have up to 2.2 M lines (78 MB); coordinates are written with 10 decimals
-    in mm (0.1 nm, e.g. `RAPID A0.0000000000 B-1.0238750000`), axis words and feed rates are repeated although
-    they are modal, and collinear segments with the same laser state are separate moves. Fewer and shorter
-    lines lower the compile time and memory of every load path (T129) and the line rate a queue must sustain
-    (T126).
-  - Done when: an optimiser (usable on any generated program and as a build step) removes trailing zeros, limits
-    coordinates to a configurable precision (default 5 decimals in mm = 10 nm), omits unchanged axis words and
-    feed rates, and merges consecutive collinear moves of the same kind and laser state; it never changes the
-    exposed path beyond the chosen precision (test: the exposure segments of the dummy backend are equal within
-    the tolerance before and after); it reports lines and bytes before and after; golden programs are changed
-    only if it becomes a default build step (maintainer decision).
-
 - [ ] T131: Precompile layer parts to `.ogm` and load the compiled file while printing (follow-up of T129) [phase: B]
   - Priority: medium
   - Size: M
@@ -224,34 +152,16 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
     layer); the generated programs set every relevant mode explicitly or the controller configuration is
     aligned (maintainer decision); both tasks run a real layer part within 5 % of the same time.
 
-- [ ] T133: Controller health check and recovery levels (maintainer idea 2026-11-24) [phase: B]
-  - Priority: high
-  - Size: M
-  - Depends on: T129 (library wrapper), T134 (which recovery levels work and what they reset)
-  - Design: section 8 of `docs/design/PROGRAM_LOADING.md`.
-  - Done when: `controller_health()` reports ASCII reachability, task states, added programs, axis faults, PC
-    memory and the memory and start time of the A3200 processes (warning above 1.5 GB for 32-bit processes), and
-    optionally test-loads a tiny program; it runs before every experiment and after every load or task failure
-    and is stored in the experiment log; recovery level R0 (stop tasks, remove all added programs by listed name,
-    acknowledge faults) runs automatically; levels R1-R3 (restart the ASCII interface, controller reset, restart
-    the A3200 software) run only after operator confirmation, never with a running task or the laser on, and are
-    each followed by the health check and a re-initialisation of the setup; the print resumes with
-    `restart_experiment()`; a script `mains/controller_health.py`; dummy-backend tests of the check and R0.
-
-- [ ] T134: Lab session 2 for program loading and controller recovery (follow-up of T129) [phase: B]
-  - Priority: high
+- [ ] T135: The z-line program and the layer programs share task 1 (found during T129) [phase: B]
+  - Priority: medium
   - Size: S
   - Depends on: –
-  - Done when: `program_loading_lab.py` is extended and run on the lab PC after a verified restart (the `system`
-    step reports the start time of the A3200 processes and warns if they are older than the last boot of the
-    software); answered: `sticky` after a clean restart (with a 60 s reply timeout instead of 600 s); clean
-    `.ogm` load of a part compiled by our own load (no program of that name added before) and the name it is added
-    under; `A3200ProgramAdd` + `A3200ProgramAssociate` timing and memory; task parameters of tasks 1/2 and the
-    cycle with the real layer header on each task (T132); memory of the INtime side with two loaded full-layer
-    `.ogm`; whether the .NET assemblies in `A3200\DotNet` offer the compile path of Motion Composer (types and
-    methods listed, one compile of layer 68 with its memory); recovery levels R1-R3 of T133 (does it work, time,
-    which states survive: axis enable, home, position, galvo/IFOV settings); the `ogm` step computes kB per line
-    from the source line count; the results are entered in `docs/design/PROGRAM_LOADING.md`.
+  - Background: `A3200.init_zline()` loads `__zline__.pgm` once on the first free task (task 1) and keeps it
+    there; `zline()` later only sends `PROGRAM 1 START`. The ASCII loader also loads every layer program on task 1
+    (and since T127 removes it afterwards), so a z-line after a print starts no program or, before T127, the last
+    layer program again. Plane fits run before printing, so it has not happened in a print so far.
+  - Done when: `zline()` checks that its own program is associated with its task before START (or loads it again),
+    or the z-line uses a task that layer programs never use; a dummy test runs a z-line after a printed layer.
 
 - [ ] T124: Whole-structure program duplicated uncompressed in `experiment.h5` (found during T123) [phase: B]
   - Priority: medium
@@ -712,12 +622,107 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
 
+- [ ] T129: Load layer programs through the A3200 C library instead of `PROGRAM LOAD` over ASCII (found during T125) [phase: B]
+  - Priority: high
+  - Size: M
+  - Depends on: lab result of `mains/lab_checks/library_load_check.py`
+  - Background: on 2026-11-21 `PROGRAM 1 LOAD` over the ASCII interface answered "An out of memory error occurred."
+    (FAULT, 1.6 s and 19 s) for layer 70 after layer 71 (81 751 lines) had loaded in 10 s; every later LOAD was
+    refused with `!` within 0.4 s until the A3200 software was restarted. On 2026-11-23 the maintainer loaded the
+    full layers 69 and 68 (millions of lines) by hand in Motion Composer 6.04.005 on tasks 1 and 2 while layer 69
+    ran ("Program Running", not queue mode). Hypothesis: the ASCII interface compiles inside the process serving
+    port 8000 (possibly 32 bit), Motion Composer through the library in its own process.
+  - Lab result 2026-11-24 (`mains/lab_checks/library_load_check_2026112*`): confirmed. Port 8000 is served by
+    `A3200AsciiInterface.exe`, a 32-bit process. `A3200ProgramLoad` from 64-bit Python (`A3200C64.dll`) loaded the
+    full layer 68 (1 253 745 lines, 45.8 MB) in 129 s to `program_ready`; the Python process peaked at 19.3 GB
+    (about 15 kB per line) and still held 12.4 GB after the load. `PROGRAM LOAD` of Motion Composer's `.ogm` over
+    ASCII is refused ("Build Result: -536325553" = 0xE008524F, it is compiled as source); after that every LOAD over
+    ASCII (also the `.pgm`, tasks 1 and 2) was refused within 0.1 s with the same text until a restart. Task 3 is
+    `inactive` (not enabled on this controller); tasks 1 and 2 are usable.
+  - Work order: `docs/design/PROGRAM_LOADING.md` (requirements R1-R10: memory budget 20-25 GB for the whole PC,
+    compilation bounded by a memory-based split, tasks 1/2 alternating with prefetch); lab tests:
+    `docs/guides/PROGRAM_LOADING_LAB_TESTS.md` with `mains/lab_checks/program_loading_lab.py`.
+  - Lab session 1 of the work order (2026-11-24, details in section 6 of `docs/design/PROGRAM_LOADING.md`):
+    compiling costs 19.6 kB and 96 µs per line (linear up to 400k lines); the memory is freed at `A3200Disconnect`;
+    a program stays loaded after the worker process exits and can be started and removed by another process;
+    removal works for `.pgm` loads (count verified); the cycle of 4 × 200k lines alternating on tasks 1/2 with
+    prefetch had gaps of 0.15 s and every part ended at its last line. Default part size for the library path:
+    400 000 lines (from the budget, not fixed). Follow-ups T131 (precompiled `.ogm`), T132 (task 2 1.8× slower),
+    T133 (health check and recovery), T134 (lab session 2).
+  - Design consequences: load through the library in a short-lived 64-bit worker process (memory returned after
+    each load); alternate tasks 1 and 2 so the next layer compiles while the current one prints (about 2 min per
+    1.25 M-line layer); check the PC's RAM against the 19 GB peak; keep ASCII for START/status.
+  - Done when: the lab check confirms or refutes the hypothesis; if confirmed, `run_program_as_task` loads through
+    `A3200C64.dll` (ctypes, signatures from the installed headers) behind a loader seam with the ASCII path as
+    fallback, the next layer is loaded on a second task while the current one prints, the T125 split is only used
+    for the ASCII path, the dummy backend simulates the library loader, and the T126 queue mode is reconsidered.
+  - Status 2026-11-24: P1 (T127/T128) done; P2-P4 implemented opt-in: `Experiment(program_loader="library")`
+    (`devices/aerotech/library.py`, `loader.py`: worker process, `MemoryBudget`, `ProgramRunner` on tasks 1/2 with
+    prefetch; dummy loader), commit `0a4e261`. Open: lab check of the integrated path (`program_loading_lab.py
+    runner`, then one real layer with laser off, P5), then switch the default (R9, maintainer decision).
+
+- [ ] T130: Program optimiser that shortens generated AeroBasic programs (maintainer request 2026-11-23) [phase: B]
+  - Priority: high
+  - Size: M
+  - Depends on: –
+  - Background: the DOE layer programs have up to 2.2 M lines (78 MB); coordinates are written with 10 decimals
+    in mm (0.1 nm, e.g. `RAPID A0.0000000000 B-1.0238750000`), axis words and feed rates are repeated although
+    they are modal, and collinear segments with the same laser state are separate moves. Fewer and shorter
+    lines lower the compile time and memory of every load path (T129) and the line rate a queue must sustain
+    (T126).
+  - Done when: an optimiser (usable on any generated program and as a build step) removes trailing zeros, limits
+    coordinates to a configurable precision (default 5 decimals in mm = 10 nm), omits unchanged axis words and
+    feed rates, and merges consecutive collinear moves of the same kind and laser state; it never changes the
+    exposed path beyond the chosen precision (test: the exposure segments of the dummy backend are equal within
+    the tolerance before and after); it reports lines and bytes before and after; golden programs are changed
+    only if it becomes a default build step (maintainer decision).
+  - Status 2026-11-24: optimiser done (`aerobasic/programs/optimize.py`, commit `b063502`; golden programs 37-53 %
+    fewer bytes, same exposed path within 10 nm). Open: the build-step option (e.g. `Experiment(optimize_programs=)`)
+    and the maintainer decision whether it becomes a default (golden files).
+
+- [ ] T133: Controller health check and recovery levels (maintainer idea 2026-11-24) [phase: B]
+  - Priority: high
+  - Size: M
+  - Depends on: T129 (library wrapper), T134 (which recovery levels work and what they reset)
+  - Design: section 8 of `docs/design/PROGRAM_LOADING.md`.
+  - Done when: `controller_health()` reports ASCII reachability, task states, added programs, axis faults, PC
+    memory and the memory and start time of the A3200 processes (warning above 1.5 GB for 32-bit processes), and
+    optionally test-loads a tiny program; it runs before every experiment and after every load or task failure
+    and is stored in the experiment log; recovery level R0 (stop tasks, remove all added programs by listed name,
+    acknowledge faults) runs automatically; levels R1-R3 (restart the ASCII interface, controller reset, restart
+    the A3200 software) run only after operator confirmation, never with a running task or the laser on, and are
+    each followed by the health check and a re-initialisation of the setup; the print resumes with
+    `restart_experiment()`; a script `mains/controller_health.py`; dummy-backend tests of the check and R0.
+  - Status 2026-11-24: health check and R0 done (`devices/aerotech/health.py`, checks before every structure and
+    after a failed layer, `/logs/health`, `mains/controller_health.py`; commit `1d969e6`). Open: R1-R3 after the lab
+    results of T134 (R2 via `~RESETCONTROLLER`).
+
 
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
 
+- [ ] T134: Lab session 2 for program loading and controller recovery (follow-up of T129) [phase: B]
+  - Priority: high
+  - Size: S
+  - Depends on: –
+  - Done when: `program_loading_lab.py` is extended and run on the lab PC after a verified restart (the `system`
+    step reports the start time of the A3200 processes and warns if they are older than the last boot of the
+    software); answered: `sticky` after a clean restart (with a 60 s reply timeout instead of 600 s); clean
+    `.ogm` load of a part compiled by our own load (no program of that name added before) and the name it is added
+    under; `A3200ProgramAdd` + `A3200ProgramAssociate` timing and memory; task parameters of tasks 1/2 and the
+    cycle with the real layer header on each task (T132); memory of the INtime side with two loaded full-layer
+    `.ogm`; whether the .NET assemblies in `A3200\DotNet` offer the compile path of Motion Composer (types and
+    methods listed, one compile of layer 68 with its memory); recovery levels R1-R3 of T133 (does it work, time,
+    which states survive: axis enable, home, position, galvo/IFOV settings); the `ogm` step computes kB per line
+    from the source line count; the results are entered in `docs/design/PROGRAM_LOADING.md`.
+  - Blocked by: lab session 2 on the lab PC (maintainer, planned 2026-11-25). Lab tooling done: steps `api`,
+    `ogm-clean`, `add-associate`, `hold`, `taskspeed`, `runner`, `recover-ascii`, `reset`, `restart-service`, the
+    restart check in `system` (commits `b052ff3`, `2a6e48f`, `e77f48b`); guide section "Session 2".
+
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T127: `REMOVEPROGRAM` names the layer file instead of the loaded program (found during T125) — 2026-11-24 — Programs are removed under the loaded name `python_aerobasic_program.pgm` (`Task.finish()`/`abort()`, failures logged); the dummy controller records loaded programs and unknown removals; golden command logs updated deliberately. — commits: `79a789d`
+- [x] T128: Load failures: log `~LASTERROR` for `!` replies and stop instead of skipping the layer (found during T125) — 2026-11-24 — Refusals carry the `~LASTERROR` text, `PROGRAM LOAD` has a response timeout (`controller.loadTimeout`, connection reopened), task errors are decoded, an early "complete" is a failure; `Experiment(stop_on_failure=True)` (default) stops at the first failed layer with `PrintStoppedError` and `restart_experiment()` prints it again. — commits: `79a789d`, `3f773a3`
 - [x] T125: DOE print printed only 16 of 73 layers: `PROGRAM LOAD` refused every layer program above about 80 000 lines (maintainer report 2026-11-22, `surface_16bit`) — 2026-11-22 — Hotfix: `build_programs()` splits every layer program with more than `max_program_lines` (default 80 000) lines into parts (whole layer setup and footer repeated, cut with the laser off at an absolute move, power/feed replayed) and stops if one cannot be split; printing prepares all layers before the first one; interim solution `Experiment.reprint_layers()` / `mains/reprint_layers.py` prints the missing layers from the experiment file, split, in drop-direction order (DOWN: highest first). Real fix: T126; follow-ups T127, T128; lab check of the parts open. — commits: `76b8839`, `d46ad4a`, `a6db390`, `9974a31`, `2e7ad3a`
 - [x] T123: Unpacking aborted with `string too large to store inside array` (maintainer report 2026-11-22, main_PNG experiment) — 2026-11-22 — `write_dataset` takes scalar-ness from the dataset shape and writes scalar text unchanged, so text over 2 GB (the whole-structure program of a 48-million-line print) unpacks. Storage side: T124. — commits: `314d634`
 - [x] T121: Lab run aborted with `'tuple' object has no attribute 'as_tuple'` in `experiment_area` (maintainer report 2026-11-21, main_PNG) — 2026-11-21 — `CENTER` in `main_PNG.py` was a plain tuple; `ExperimentSpec` now converts an `(x, y)` center to `Point2D` (TypeError for anything else) and the script writes `Point2D` again. — commits: `e460cf5`
