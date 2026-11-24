@@ -51,7 +51,7 @@ CSV files). **Send that folder back**, together with the answers of the manual c
 | 6 | `python program_loading_lab.py cycle --axes-safe` | 6–8 min | The planned operation, dry: 4 parts of 200k lines alternate between tasks 1 and 2, and the next part is loaded while the current one runs. Records the gap between two parts (target: about 0 s), whether every part ends at its last line, and the memory timeline (`cycle_memory.csv`). |
 | 6b | optional: `python program_loading_lab.py cycle --axes-safe --lines 600000 --parts 3` | 10–15 min | The same near the planned part size (refused automatically if over budget) |
 | 7 | stop `watch` with Ctrl+C | – | – |
-| 8 | `python program_loading_lab.py sticky` — **last** | 1 min | After one refused `PROGRAM LOAD` over ASCII: does a valid program of another name still load? Does valid content under the failed name load? Does the library still load while ASCII refuses? |
+| 8 | `python program_loading_lab.py sticky` (run this step last: it leaves the ASCII interface refusing every LOAD) | 1 min | After one refused `PROGRAM LOAD` over ASCII: does a valid program of another name still load? Does valid content under the failed name load? Does the library still load while ASCII refuses? |
 | 9 | restart the A3200 software | – | Leaves the ASCII interface usable for the next user |
 
 If a step stops with "Task … is not idle": stop the task in Motion Composer (or restart the A3200
