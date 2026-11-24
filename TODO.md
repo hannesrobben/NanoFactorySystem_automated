@@ -156,6 +156,19 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
     full layers 69 and 68 (millions of lines) by hand in Motion Composer 6.04.005 on tasks 1 and 2 while layer 69
     ran ("Program Running", not queue mode). Hypothesis: the ASCII interface compiles inside the process serving
     port 8000 (possibly 32 bit), Motion Composer through the library in its own process.
+  - Lab result 2026-11-24 (`mains/lab_checks/library_load_check_2026112*`): confirmed. Port 8000 is served by
+    `A3200AsciiInterface.exe`, a 32-bit process. `A3200ProgramLoad` from 64-bit Python (`A3200C64.dll`) loaded the
+    full layer 68 (1 253 745 lines, 45.8 MB) in 129 s to `program_ready`; the Python process peaked at 19.3 GB
+    (about 15 kB per line) and still held 12.4 GB after the load. `PROGRAM LOAD` of Motion Composer's `.ogm` over
+    ASCII is refused ("Build Result: -536325553" = 0xE008524F, it is compiled as source); after that every LOAD over
+    ASCII (also the `.pgm`, tasks 1 and 2) was refused within 0.1 s with the same text until a restart. Task 3 is
+    `inactive` (not enabled on this controller); tasks 1 and 2 are usable.
+  - Work order: `docs/design/PROGRAM_LOADING.md` (requirements R1-R10: memory budget 20-25 GB for the whole PC,
+    compilation bounded by a memory-based split, tasks 1/2 alternating with prefetch); lab tests:
+    `docs/guides/PROGRAM_LOADING_LAB_TESTS.md` with `mains/lab_checks/program_loading_lab.py` (results open).
+  - Design consequences: load through the library in a short-lived 64-bit worker process (memory returned after
+    each load); alternate tasks 1 and 2 so the next layer compiles while the current one prints (about 2 min per
+    1.25 M-line layer); check the PC's RAM against the 19 GB peak; keep ASCII for START/status.
   - Done when: the lab check confirms or refutes the hypothesis; if confirmed, `run_program_as_task` loads through
     `A3200C64.dll` (ctypes, signatures from the installed headers) behind a loader seam with the ASCII path as
     fallback, the next layer is loaded on a second task while the current one prints, the T125 split is only used
