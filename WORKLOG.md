@@ -2859,3 +2859,13 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** `test/lab_checks` 6 passed; `program_loading_lab.py system` run on the development PC (no A3200 installation: library and ASCII reported as unavailable). The library and controller steps run for the first time on the lab PC.
 - **Commits:** `6912824` feat(lab): add the lab tests for library loading within a memory budget [T129], `b3ece21` docs(design): work order and lab guide for program loading through the A3200 library [T129]
 - **Follow-ups:** lab session per `docs/guides/PROGRAM_LOADING_LAB_TESTS.md`; results into section 6 of the work order; then P1-P5 of the work order.
+
+### 2026-11-24 13:05 CET — [T129] Evaluation of program loading lab session 1, plan and new todos
+- **Status:** partial (implementation of T129 and the new todos open)
+- **Changes:**
+  - `docs/design/PROGRAM_LOADING.md`: section 6 holds the results of lab session 1 (linear compile cost 19.6 kB and 96 µs per line; memory freed at `A3200Disconnect`; programs survive the worker; removal verified for `.pgm`; `.ogm` load of a full layer in 5.9 s / 1.87 GB; cycle gaps 0.15 s; task 2 1.8× slower than task 1; Motion Composer compiles with a third of the memory; the A3200 software had not been restarted, so `sticky` is unanswered; an ASCII LOAD got no reply within 600 s); new section 7 (plan after the lab, default part size 400 000 lines from the budget) and section 8 (health check and recovery levels R0-R3, maintainer idea); section 5 marked superseded; acceptance renumbered to 9.
+  - `docs/guides/PROGRAM_LOADING_LAB_TESTS.md`: step 8 says in words why `sticky` runs last (the maintainer read "last" as an option `--last`).
+  - `TODO.md`: T128 gets the ASCII LOAD response timeout; T129 gets the lab result; new T131 (precompiled `.ogm`), T132 (task 2 slower), T133 (health check and recovery), T134 (lab session 2).
+- **Tests:** none (documentation and evaluation of lab output; `mains/lab_checks/program_loading_lab_20261124` and `console_log_loading_lab.txt` stay untracked).
+- **Commits:** see the commits of this branch (`docs/load-lab-results`).
+- **Follow-ups:** T134 (extend the lab script, lab session 2), then P1 (T127/T128), T129 P2-P5, T131-T133.
