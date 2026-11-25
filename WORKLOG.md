@@ -2994,6 +2994,42 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Commits:** `461f4f2` feat(lab): add the lab session 3 steps for names, add-ahead and P5 [T153]; `6cc29c1` docs(guide): describe lab session 3 for program loading [T153]; this docs(todo) commit.
 - **Follow-ups:** lab session 3 (maintainer); evaluation into `docs/design/PROGRAM_LOADING.md`; T135 before the library loader becomes the default.
 
+### 2026-11-25 15:14 CET — [T137–T147, T150, T151] PTD-01 implementation: test-print library, field scripts, chain, evaluation
+- **Status:** done (T137, T138, T139, T140, T141, T142, T143, T144, T145, T146, T147, T150, T151); open: T148, T149 (lab), T155, T156 (new decisions)
+- **Changes:**
+  - `nanofactorysystem/testprint/__init__.py` (new): package API; registers the PTD-01 builders and factories.
+  - `nanofactorysystem/testprint/structure.py` (new, T137): field-builder registry, `merge_groups_by_z`, `ParameterFieldStructure` (IR → IFOV blocks per power run, element order kept, objective as argument, `dwell_after_power_s`).
+  - `nanofactorysystem/testprint/cells.py` (new, T138): cell primitives, analytic height maps, `sliced` on the aligned grid with substrate anchoring (D15), slicing cache.
+  - `nanofactorysystem/testprint/voxel_fit.py` (new, T150): `VoxelFitModel` with registered kinds, no extrapolation, slicer protocol.
+  - `nanofactorysystem/testprint/calibration.py` (new, T140): `ProcessCalibration`, `StageAAxes`.
+  - `nanofactorysystem/testprint/ordering.py`, `field.py` (new, T139): in-layer ordering registry (`row_by_row`, D16), `ParameterField`, `CellSpec`, header, validation, cell table.
+  - `nanofactorysystem/testprint/ptd01.py` (new, T141–T143): field builders F0–F7 (decisions D10, D11, D15 applied).
+  - `nanofactorysystem/testprint/factories.py` (new, T144): named factories `ptd01.f0` … `ptd01.f7`.
+  - `mains/Experiments/ptd01/` (new, T145, T146): `common.py`, `f0_interface.py` … `f7_pillars.py`, `chain_ptd01.py`, `stage_a_SZ2080.json`, `calibration_example_SZ2080_Zeiss63x.json`, `README.md`.
+  - `mains/Experiments/old_experiment/README.md`: pointer to `ptd01/`.
+  - `analysis/experiment_analysis/ptd.py` (new, T147), `voxel_fit.py` (new, T151), `__init__.py`, `analysis/README.md`: cell table from `/spec`, voxel import, fit and calibration file.
+  - Tests (new): `test/testprint/` (`conftest.py`, `ptd_examples.py`, `test_testprint_structure.py`, `_cells.py`, `_field.py`, `_voxel_fit.py`, `_calibration.py`, `_ptd01.py`, `_factories.py`), `test/integration/test_ptd01_fields.py`, `test_ptd01_chain.py`, `test/analysis/test_ptd_analysis.py`, `test_voxel_fit_analysis.py`; golden `test/golden/ptd01_f3.txt` (new, D6; no existing golden file changed).
+  - `test/README.md`, `CLAUDE.md`: documentation of the new modules and tests.
+  - `docs/design/TEST_PRINT_PTD01.md`: open decisions D17, D18; §13 implementation notes.
+  - `TODO.md`: T137–T147, T150, T151 → Done; new T155 (D18), T156 (D17); phase-plan and decision rows.
+- **Deviations / findings (design §13):**
+  - `dot` is an in-plane short line (IFOV writes in one plane).
+  - Fields that need w/l at the cell power start at p_rel 1.25, because the threshold model is zero at P_th.
+  - F1 lines are 5 µm (7 µm do not fit 6 rows).
+  - Cell parameters clashed with measurement columns; fixed in `7b2d8fe`.
+  - Analysis results are stored under `/analysis/experiment/ptd01_*` (ExperimentFile API).
+  - Layer count with the example calibration: F0 8, F1 9, F2 16, F3 9, F4 29, F5 229, F6 12, F7 127. F1–F7 ≈ 37 min of layer programs instead of ≈ 10 min → T155 / D18.
+  - n_eff of `threshold_ln` is only identifiable with fixed scales → T156 / D17.
+- **Existing code:** unchanged (`git diff --stat main_HR -- nanofactorysystem/aerobasic nanofactorysystem/experiment*.py test/golden` shows only `test/golden/ptd01_f3.txt` as new file).
+- **Environment:** the test venv `%LOCALAPPDATA%\Temp\nfsv` is broken (files missing after a temp cleanup); tests ran with `NFS_RUN_ENV`. A parallel session checked out `main_HR` in the same working tree during this work; the remaining work moved to a separate worktree (`%LOCALAPPDATA%\Temp\nfs_ptd01_wt`), `main_HR` merged into the feature branch (`cb85c5b`); the new todos are T155/T156 because T152–T154 were taken by that session.
+- **Tests:** `test/testprint` 90 passed; `test/integration/test_ptd01_fields.py` 12 passed (5:45 min), `test_ptd01_chain.py` 5 passed (4:48 min), `test/analysis/test_ptd_analysis.py` 4 passed, `test_voxel_fit_analysis.py` 7 passed. Full suite in the worktree (NFS_RUN_ENV, 20:43 min): 664 passed, 15 skipped, 4 failed; the 4 failures are the known T122 entry-script tests (`test_main_entry.py` x3, `test_main_png.py` x1), which depend on the lab settings of `main.py` / `main_PNG.py`.
+- **Commits:** `a191b60` [T137]; `7c2622a` [T138]; `8a50a07` [T150]; `a36a19b` [T140]; `da90ec9` [T139]; `2d66f3e` perf [T141]; `c662a1b` [T141–T143]; `61eaa91` test [T141]; `7334c06` [T144]; `7c97bce` [T145]; `0c8ae6f` [T146]; `7b2d8fe` fix [T147]; `3e6b81a` [T147]; `dc42135` [T151]; `cb85c5b` merge of main_HR; `8adc720` docs(testprint) (CLAUDE.md, design); this docs(todo) commit.
+- **Follow-ups:**
+  - T148: lab check of the attenuator settling (D9).
+  - T155, T156: decisions.
+  - LAB: check the stage-A start values in `stage_a_SZ2080.json` and `CENTERS` / `RESIN_EDGES` in `common.py`.
+  - T149: stage A and stage B on the lab PC.
+
 ### 2026-11-25 15:25 CET — [T153] Evaluation of lab session 3 and preparation of session 3b
 - **Status:** partial (session 3 evaluated; the motion checks repeat in session 3b)
 - **Changes:**

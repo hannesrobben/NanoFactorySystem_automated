@@ -1,0 +1,37 @@
+{
+  "schema": "nanofactory.process_calibration/1",
+  "material": "SZ2080",
+  "objective": "Zeiss 63x",
+  "setup": "IFOV_on",
+  "velocity_um_s": 5000.0,
+  "p_th_mw": 0.3,
+  "p_dam_mw": 1.5,
+  "z0_um": 0.4,
+  "p_ref_factor": 1.5,
+  "plane_fit": {
+    "mode": "CORNERS",
+    "interface_power_mw": 0.7,
+    "exposure": 120
+  },
+  "polarisation_deg": null,
+  "provisional": true,
+  "source": "example values for dry runs and layout checks, not measured",
+  "date": "2026-11-25",
+  "voxel_model": {
+    "schema": "nanofactory.voxel_fit_model/1",
+    "kind": "threshold_ln",
+    "params": {
+      "w_scale_um": 0.25,
+      "l_scale_um": 0.75,
+      "p_th_mw": 0.3,
+      "n_eff": 2.0
+    },
+    "valid_power_mw": [
+      0.33,
+      1.2
+    ],
+    "velocity_um_s": 5000.0,
+    "source": "example values, not measured",
+    "residuals": {}
+  }
+}

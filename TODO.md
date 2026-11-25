@@ -42,7 +42,7 @@ with an evaluation after every layer capture; a camera live feed; a core that a 
 | 8 | Operating modes and calibration | T88, T89, T90, T91, T92, T104, T107 | T90 needs MIRA MI-53 for the real evaluator; T104 needs MIRA MI-41 for the fit; T107 needs OffAxisHolo K10 for the sweep |
 | 9 | Camera live feed | T102, T93, T94, T95 | T102 before T93 (hard prerequisite, `CAMERA_LIVE.md`) |
 | 10 | Core ready for a GUI | T96, T97 | – |
-| 11 | Standard test prints (PTD-01), **priority** (decision D7 of `TEST_PRINT_PTD01.md`) | T136 (done), T137, T138, T139, T140, T141, T142, T143, T144, T145, T146, T147, T148, T149, T150, T151 | T136 approved 2026-11-25; T148 before T149 |
+| 11 | Standard test prints (PTD-01), **priority** (decision D7 of `TEST_PRINT_PTD01.md`) | T136–T147, T150, T151 (done), T148, T149, T155, T156 | T148 before T149; T155 before the stage-B print |
 | B | Backlog (from T19 `todo_notes.md`, lab checks, follow-ups) | T67, T69, T109, T111, T112, T114 | – |
 
 Phases 6, 9 and 10 are independent of each other. Phase 7 can start with T82, T83 and T85 before
@@ -87,6 +87,8 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
 | – | Final defaults for positions / frames / offset of the plan generator | after the speckle / position study (M4) | final values in T85 (start values exist) |
 | – | Final default z per objective | focus study OffAxisHolo K10 | fallback value of T107 |
 | PTD-01 D9 | Does `SET_POWER` inside a running program wait for the attenuator? (`docs/design/TEST_PRINT_PTD01.md` §12.1) | lab check T148 before stage A | `dwell_after_power_s` value; T149 |
+| PTD-01 D17 | Scales of the `threshold_ln` fit (n_eff identifiability) | T156 | evaluation of stage A |
+| PTD-01 D18 | Layer count of F4 / F5 / F7 (Δz per row vs. per column) | T155 | time budget of T149 |
 
 ## Decided
 
@@ -569,190 +571,40 @@ only) and the new tests is changed, apart from documentation (`test/README.md`, 
 golden files stay untouched (except a new F3 golden file if D6 is accepted). Improvements of existing code
 found on the way are future todos (F18–F30, F36), not part of these todos.
 
-- [ ] T137: `ParameterFieldStructure`: toolpath IR → IFOV programs without changing existing code (design §4.1) [phase: 11]
-  - Priority: high
-  - Size: M
-  - Depends on: T136
-  - Done when:
-    - `nanofactorysystem/testprint/structure.py` holds `ParameterFieldStructure(DrawableObject)`: one
-      program per z level (ascending), runs of consecutive elements with equal power → one
-      `IFOV_PolyLines`/`IFOV_Lines` block each, following `Model3D_Slicer.iterate_layers`; the element order
-      of the job is kept; `objective` as constructor argument (`build_programs()` passes none);
-      `dwell_after_power_s` (default 0, decision D9 / T148); `element_powers_mw`, `statistics()`; NumPy docstrings;
-    - no file outside `nanofactorysystem/testprint/` and the new tests is changed; all golden files are
-      untouched (`git diff --stat` in the WORKLOG entry);
-    - unit test: a hand-made `ToolpathJob` with three powers in two layers gives three IFOV blocks with the
-      right `SET_POWER` values per layer; a dwell > 0 appears after every power change only; per-element
-      powers without a structure power raise `ValueError`.
-  - Note: merging this translation with `Model3D_Slicer` is future todo F18, not part of this todo.
 
-- [ ] T138: Cell primitives for test fields with aligned z grid and substrate anchoring (design §4.2) [phase: 11]
-  - Priority: high
-  - Size: M
-  - Depends on: T136 (decisions D12, D15)
-  - Done when:
-    - `nanofactorysystem/testprint/cells.py` provides `line`, `line_set`, `polyline`, `dot`, `sliced`,
-      `suspended_line`, `woodpile`; each returns `list[ElementGroup]` in cell-local µm with `power_mw` on
-      every element and `meta["cell"]`;
-    - `sliced` builds its geometry from analytic height maps (`numpy`, no files, no RNG) through
-      `slice_geometry` with `run_preprocess=False`; every height map starts at z = 0 and is sliced with
-      `voxel_height_um = 0`, so cells with the same Δz share their planes (aligned grid without a slicer
-      change, z rounded to 1 nm); stacked parts (pillar on base) are one height map; helpers `pad_map`,
-      `wedge_map`, `cap_map`, `pillar_on_base_map`, `pedestal_map`;
-    - substrate anchoring: `sliced(…, anchor_depth_um=…)` repeats the first slice (z = 0) downwards at
-      z = −k·Δz until the anchor depth is reached (default 1.5 µm for volume cells, D15; 0 disables it); the anchor layers carry
-      `meta["part"] = "anchor"`;
-    - unit tests per primitive: element count, bounding box, z levels (aligned grid, anchor layers), every
-      element has a power, invalid input raises `ValueError` naming the cell.
-  - Note: anchoring as a general slicer option is future todo F36.
 
-- [ ] T150: Voxel fit models w(P), l(P) (design §4.4) [phase: 11]
-  - Priority: high
-  - Size: M
-  - Depends on: T136
-  - Done when:
-    - `nanofactorysystem/testprint/voxel_fit.py` holds `VoxelFitModel` with the kinds `threshold_ln`
-      (with fitted `n_eff`), `power_law` and `tabulated`, registered by name (new kinds without changing the
-      class), `width_um`, `length_um`, and `voxel_size(power_mw, velocity_um_s)` that satisfies the slicer
-      protocol `aerobasic/slicer/voxel.VoxelModel`;
-    - outside `valid_power_mw` every evaluation raises (no extrapolation); parameters, validity range,
-      source and residuals are stored in the JSON form;
-    - unit tests: each kind reproduces known points, raises outside the range, round-trips through JSON;
-      `Model3D_Slicer(voxel_model=…)` accepts a `VoxelFitModel` in a dry build (no change to the slicer).
 
-- [ ] T140: `ProcessCalibration` and `StageAAxes` with their JSON files (design §4.4) [phase: 11]
+
+
+
+
+
+
+
+
+
+
+- [ ] T155: Decision: layer count of the PTD-01 volume fields F4, F5, F7 (found during T142) [phase: 11]
   - Priority: high
   - Size: S
-  - Depends on: T150 (decisions D3, D8, D13)
-  - Done when:
-    - `nanofactorysystem/testprint/calibration.py` holds `ProcessCalibration` (material, objective, setup,
-      velocity, P_th, P_dam, z0, **required** `voxel_model: VoxelFitModel`, `p_ref_factor`, `plane_fit`
-      settings, polarisation direction (D13), `provisional`, source, date) with `power_mw`, `p_ref_mw`,
-      `hatch_um(h_rel, power_mw)` and `slice_um(dz_rel, power_mw)` evaluated with the fit model at the power
-      of the cell;
-    - `StageAAxes` (`material`, `p_min_mw`, `p_max_mw`, `n_levels`, `z_offsets_um`, `label_power_mw`), schema
-      `nanofactory.ptd_stage_a/1`, one file per material (`stage_a_<material>.json`, D8);
-    - `to_json`/`from_json`/`save`/`load` (schema `nanofactory.process_calibration/1`, model included); a
-      missing physical value or model raises `MissingPropertyError`, a wrong schema `SpecSerialisationError`;
-    - unit tests: conversions with a `threshold_ln` model, a power outside the model range raises, both
-      round trips.
+  - Depends on: –
+  - Background: Δz = dz_rel · l(P_cell) differs per row, so the rows share no layer programs. With the example
+    calibration F4 has 29, F5 229 and F7 127 layer programs; F1–F7 need about 37 min of layer programs
+    (5 s overhead each) instead of the ≈ 10 min of the design. Options in design §12.1 (D18).
+  - Decision: keep, Δz per column from l(P_ref), or fewer dz_rel levels in F5 (proposal: Δz per column from
+    l(P_ref) for F5, keep F4/F7; the cell table records the true dz_rel at the cell power).
+  - Done when: D18 decided and, if needed, `ptd01.py` / tests changed; layer counts and the chain time estimate
+    recorded in WORKLOG.md.
 
-- [ ] T139: `ParameterField`: layout, header, merge by z, in-layer ordering, validation, cell table (design §4.3) [phase: 11]
-  - Priority: high
-  - Size: M
-  - Depends on: T137, T138, T140 (decisions D5, D16)
-  - Done when:
-    - `nanofactorysystem/testprint/field.py` holds `CellSpec`, `ParameterField`, `FieldLayoutError`; the
-      field is printed through `ParameterFieldStructure` (T137) whose constructor arguments are JSON values
-      (round trip with `structure_from_json` tested);
-    - header: L mark and 3-bit id at `label_power_mw`, optional REF pad at P_ref;
-    - `to_toolpath_job()` merges groups of equal z (rounded to 1 nm) and orders the elements of each layer
-      with the strategy named by `order`;
-    - `nanofactorysystem/testprint/ordering.py`: registry of named in-layer ordering strategies
-      (`register_ordering`), shipped with `row_by_row` (default per D16); an unknown name raises; the name is
-      stored in `to_json()` (the order of a layer is expected to change later: outline-following, cross hatch);
-    - class names start with `Parameter…` (pytest collects imported `Test*` classes);
-    - validation reports every problem at once (outside the field, gap below `min_gap_um`, cell in the
-      header, z out of range, cell power outside the fit-model range);
-    - `cell_table()` / `write_cell_table()` (CSV, incl. `anchor_depth_um`) and `plot()` (top view with cell ids);
-    - building the same field twice gives identical programs and the same order (unit test).
-
-- [ ] T141: PTD-01 field builders F0–F2 (design §5) [phase: 11]
-  - Priority: high
-  - Size: M
-  - Depends on: T139, T140 (decisions D1, D8, D11)
-  - Done when:
-    - `nanofactorysystem/testprint/ptd01.py` has `field_f0(stage_a: dict, label_power_mw)`,
-      `field_f1(calibration, …)`, `field_f2(calibration, …)` with the axis levels of design §5 as module
-      constants; the builders take no `BuildContext`;
-    - F0: 10 power rows × 8 z offsets = 8 layers + header, 80 IFOV blocks;
-    - F2 writes the suspended line inside the pedestal top (`z = pedestal height − l0/2`, design §9.1);
-      pedestals 2 × 3 × 3 µm and a 2 µm gap between bridge cells (D11), so that the field validation passes;
-    - tests: cell counts (80 / 24 / 24), axis levels, every power inside the given range, every layer
-      program below `MAX_PROGRAM_LINES`, field validation passes.
-
-- [ ] T142: PTD-01 field builders F3–F5 (design §5) [phase: 11]
-  - Priority: high
-  - Size: M
-  - Depends on: T141 (decision D6)
-  - Done when:
-    - `field_f3`, `field_f4`, `field_f5` exist; F4 pads use `linear_x` and the 1.6 µm ramp; F5 wedges and
-      caps use their own slice distance per column and share layers where the z levels coincide; volume cells
-      are anchored (T138);
-    - tests as in T141 (cell counts 30 / 16 / 16); for F5 the number of distinct z levels is logged and
-      checked against an upper bound; if D6 is accepted, a new golden program `test/golden/ptd01_f3.txt`.
-
-- [ ] T143: PTD-01 field builders F6–F7 (design §5) [phase: 11]
-  - Priority: high
-  - Size: M
-  - Depends on: T141 (decision D10)
-  - Done when:
-    - `field_f6` (star 0/45/90/135°, 3 × 3 grid, 4-layer woodpile) and `field_f7` (pillars Ø 1.5 µm on bases
-      6 × 6 × 1.4 µm, heights 2 / 4 / 6 / 8 / 10 µm above the base, D10, design §5/§9.1) exist;
-    - tests as in T141 (cell counts 15 / 20); F7 layer count logged and checked against an upper bound.
-
-- [ ] T144: Named factories `ptd01.f0` … `ptd01.f7` (design §4.5) [phase: 11]
-  - Priority: high
-  - Size: S
-  - Depends on: T137, T141, T142, T143
-  - Done when:
-    - `nanofactorysystem/testprint/factories.py` registers one factory per field; arguments are JSON values
-      only (calibration as dict); every factory checks all powers of the field with `context.check_power`
-      only when the attenuator range is known (pattern `_check_power` of
-      `mains/Experiments/chain_rectangle_doe_lens.py`) and passes `context.objective` to the structure;
-    - test: `StructureSpec(factory=…)` → `ExperimentSpec.to_json()` → `from_json()` → build gives identical
-      programs; an out-of-range power raises before any program is written; a build without a known range
-      works (offline / `--layout`).
-
-- [ ] T145: One experiment script per field in `mains/Experiments/ptd01/` (design §6.1) [phase: 11]
-  - Priority: high
-  - Size: M
-  - Depends on: T144 (decisions D2, D4)
-  - Done when:
-    - `common.py` (substrate, objective check, `CornerSpec` of D2, `field_spec()`), `f0_interface.py` …
-      `f7_pillars.py` with `experiment_spec()`, `main()` and the CLI `--layout` / `--dry-run`, and a
-      `README.md`;
-    - `test/integration/test_ptd01_fields.py` (`slow`) dry-runs every field on the dummy backend; every
-      AeroBasic statement is simulated; the time estimate of each field is logged;
-    - `test/README.md` and `mains/Experiments/old_experiment/README.md` (pointer) updated.
-
-- [ ] T146: Chain `chain_ptd01.py` with stages A/B (design §6.2) [phase: 11]
-  - Priority: high
-  - Size: M
-  - Depends on: T145 (decisions D4, D14)
-  - Done when:
-    - `--stage A`, `--stage B --calibration`, `--stage all`, `--only`, `--replicates`, `--layout`,
-      `--dry-run` work; stage B refuses a missing or mismatching calibration file before anything moves;
-    - `check_layout` passes for the default `CENTERS` with all eight fields on the T113 resin drop;
-    - the calibration file is copied into every stage-B experiment folder;
-    - the recalibration rule of D14 is documented in the README of `mains/Experiments/ptd01/`;
-    - `test/integration/test_ptd01_chain.py` (`slow`) dry-runs stage A and stage B and checks the substrate
-      index lists every experiment with its tags; the summed time estimate is printed.
-
-- [ ] T147: Cell table from the experiment file and measurement import (design §8) [phase: 11]
+- [ ] T156: Decision: scales of the `threshold_ln` fit (found during T151) [phase: 11]
   - Priority: medium
-  - Size: M
-  - Depends on: T139, T145 (decision D12)
-  - Done when:
-    - `analysis/experiment_analysis/ptd.py` regenerates the cell table from `/spec` of an `experiment.h5`
-      by calling the pure field builder with the stored factory arguments (no `BuildContext`; field position
-      in stage coordinates included) and exports it as CSV with empty measurement columns;
-    - `import_voxel_measurements(csv, database)` writes filled F0/F1/F2 rows into the `VoxelDatabase`
-      (method, experiment UUID); results under `/analysis/ptd01` only through `ExperimentFile`;
-    - test on the dry-run experiment of T145: regenerated table equals the factory's table.
-
-- [ ] T151: Fit procedure for the voxel model from PTD measurements (design §4.4, §7) [phase: 11]
-  - Priority: high
-  - Size: M
-  - Depends on: T147, T150
-  - Done when:
-    - `analysis/experiment_analysis/voxel_fit.py` fits every model kind to (P, w, l) data from the filled
-      cell tables of F0 (stage A, provisional) and F1/F2 (refined): weighted least squares, P_th and n_eff
-      with uncertainties, residuals, model comparison (e.g. AIC), a plot per fit;
-    - writes a `ProcessCalibration` JSON with the chosen model and stores fit inputs and results under
-      `/analysis/ptd01/voxel_fit` through `ExperimentFile`;
-    - test on synthetic data with known parameters and noise: P_th and n_eff are recovered within the
-      stated uncertainty.
+  - Size: S
+  - Depends on: –
+  - Background: `d = d_scale · sqrt(n_eff · ln(P/P_th))` depends only on `d_scale² · n_eff`; n_eff is only
+    identifiable with fixed `w_scale_um` / `l_scale_um` (design §12.1, D17). The fit currently uses free scales
+    with n_eff = 1 unless scales are given; P_th is unaffected.
+  - Decision: where the scales come from (optics of the 63x, a reference measurement, or leave n_eff = 1).
+  - Done when: D17 decided and documented in `analysis/README.md` and design §12; the evaluation of stage A uses it.
 
 - [ ] T148: Lab check: does `SET_POWER` inside a running program wait for the attenuator? (decision D9) [phase: 11]
   - Priority: high
@@ -1026,6 +878,19 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T137: `ParameterFieldStructure`: toolpath IR → IFOV programs without changing existing code — 2026-11-25 — `nanofactorysystem/testprint/structure.py`: one IFOV layer per z level, one block per run of equal power and leaf kind, element order kept, `dwell_after_power_s`, built from a registered field builder (JSON round trip); no existing file changed. — commits: `a191b60`
+- [x] T138: Cell primitives for test fields with aligned z grid and substrate anchoring — 2026-11-25 — `cells.py`: line primitives, woodpile, analytic height maps and `sliced` on the aligned grid `k·Δz` with anchoring by repeating the first slice (D15); `dot` is an in-plane short line (IFOV writes in one plane); slicing cache for identical maps. — commits: `7c2622a`, `2d66f3e`
+- [x] T150: Voxel fit models w(P), l(P) — 2026-11-25 — `voxel_fit.py`: `VoxelFitModel` with registered kinds `threshold_ln`, `power_law`, `tabulated`, no extrapolation, slicer `VoxelModel` protocol (works in `Model3D_Slicer`). — commits: `8a50a07`
+- [x] T140: `ProcessCalibration` and `StageAAxes` with their JSON files — 2026-11-25 — `calibration.py`: conversions with the voxel size at the cell power, schemas `nanofactory.process_calibration/1` and `nanofactory.ptd_stage_a/1`, `MissingPropertyError` / `SpecSerialisationError`, example sources refused for real prints. — commits: `a36a19b`
+- [x] T139: `ParameterField`: layout, header, merge by z, ordering, validation, cell table — 2026-11-25 — `field.py` and `ordering.py`: header (L mark, 3-bit id, REF pad), merge by z, named in-layer ordering (`row_by_row`, D16), validation of every problem, cell table / CSV, plot. — commits: `da90ec9`
+- [x] T141: PTD-01 field builders F0–F2 — 2026-11-25 — `ptd01.py` F0 (80 cells, 8 layers, 81 blocks), F1, F2 (pedestals 2 × 3 × 3 µm, 2 µm gap, bridge inside the pedestal top). — commits: `c662a1b`, `61eaa91`
+- [x] T142: PTD-01 field builders F3–F5 — 2026-11-25 — F3 (s = s_rel·w(P)), F4 (3 layers, ramp, `linear_x`), F5 (wedges and caps); fields needing w/l at the cell power start at p_rel 1.25; golden program `test/golden/ptd01_f3.txt` (D6). F5 has 229 layers with the example calibration (T155). — commits: `c662a1b`, `7b2d8fe`
+- [x] T143: PTD-01 field builders F6–F7 — 2026-11-25 — F6 (star, grid, woodpile) and F7 (pillars 2–10 µm on 6 × 6 × 1.4 µm bases, D10); F7 has 127 layers with the example calibration (T155). — commits: `c662a1b`
+- [x] T144: Named factories `ptd01.f0` … `ptd01.f7` — 2026-11-25 — `factories.py`: JSON arguments only, power check only with a known attenuator range, objective from the context; spec round trip gives identical programs. — commits: `7334c06`
+- [x] T145: One experiment script per field in `mains/Experiments/ptd01/` — 2026-11-25 — `common.py`, `f0_interface.py` … `f7_pillars.py`, stage-A start values and example calibration files, README; dry run of every field on the dummy backend. — commits: `7c97bce`
+- [x] T146: Chain `chain_ptd01.py` with stages A/B — 2026-11-25 — Stages A / B / all, `--only`, `--replicates`, `--layout`, `--dry-run`; stage B refuses missing, mismatching or example calibrations; calibration copied into stage-B folders; time summary. — commits: `0c8ae6f`
+- [x] T147: Cell table from the experiment file and measurement import — 2026-11-25 — `analysis/experiment_analysis/ptd.py`: cell table from `/spec` (incl. REPEAT copies, stage positions), CSV template, voxel import of F0–F2, result via `ExperimentFile` (`/analysis/experiment/ptd01_cell_table`); fixed cell parameters that clashed with measurement columns. — commits: `7b2d8fe`, `3e6b81a`
+- [x] T151: Fit procedure for the voxel model from PTD measurements — 2026-11-25 — `analysis/experiment_analysis/voxel_fit.py`: weighted least squares of all kinds, standard errors, AIC, plot, calibration file, storage via `ExperimentFile`; n_eff only identifiable with fixed scales (T156). — commits: `dc42135`
 - [x] T136: Design of the standard parameter test print PTD-01 (maintainer request 2026-11-25) — 2026-11-25 — `docs/design/TEST_PRINT_PTD01.md` approved with the decisions D1–D8, D10–D16 (D9 by the lab check T148); phase 11 todos T137–T151 scheduled with priority, improvement ideas F18–F37 in `future_todo.md`. — commits: `5881afa`, `0d4bb72`, this decision commit
 - [x] T152: The ASCII path loads every layer program under one fixed name, so one refused compile blocks every later layer (found during T134) — 2026-11-25 — `run_program_as_task` loads every program under a fresh name `nfs_<session>_<counter>_<stem>.pgm`, removes it under that name and deletes the copy; R0 in `Experiment` removes the names still listed; the dummy controller blocks a name after a failed LOAD like the real one, and a test shows that the following layers still print. Golden command logs re-recorded (name lines only). — commits: `5b856bb`
 - [x] T127: `REMOVEPROGRAM` names the layer file instead of the loaded program (found during T125) — 2026-11-24 — Programs are removed under the loaded name `python_aerobasic_program.pgm` (`Task.finish()`/`abort()`, failures logged); the dummy controller records loaded programs and unknown removals; golden command logs updated deliberately. — commits: `79a789d`

@@ -75,3 +75,41 @@ Rules (they keep the printing process safe):
 - Writing takes the lock file for the duration of the write. While an experiment process holds it
   (printing or restart), `save_result()` raises `ExperimentBusyError`, or waits up to `wait_s` seconds.
   Results can be stored as soon as the printing session has ended.
+
+## Test prints (PTD-01)
+
+`experiment_analysis.ptd` (T147) supports the evaluation of the standard test print PTD-01
+(`mains/Experiments/ptd01/`, design `docs/design/TEST_PRINT_PTD01.md` §8):
+
+```python
+from experiment_analysis.ptd import export_cell_table, import_voxel_measurements, save_cell_table
+from nanofactorysystem.voxel import VoxelDatabase
+
+export_cell_table(r"D:/.../HR-26-003-B_20261201-1015", "F1_cells.csv")   # template, fill it during SEM / DHM
+import_voxel_measurements("F1_cells.csv", VoxelDatabase(r"D:/.../voxels.sqlite"))   # F0, F1, F2 rows
+save_cell_table(r"D:/.../HR-26-003-B_20261201-1015")                    # /analysis/experiment/ptd01_cell_table
+```
+
+The cell table is rebuilt from `/spec` (factory name and arguments) with the pure field builder; every
+row has the cell parameters (absolute and normalised), the stage position of the cell and the empty
+measurement columns `width_um`, `height_um`, `width_std_um`, `height_std_um`, `n_lines`, `present`,
+`merged`, `collapsed`, `method`, `notes`. Filled rows of F0, F1 and F2 (with `method`) go into the voxel
+database.
+
+`experiment_analysis.voxel_fit` (T151) fits the voxel model w(P), l(P) to the filled cell tables
+(weighted least squares; kinds `threshold_ln`, `power_law`, `tabulated`; AIC comparison; plot per fit)
+and writes the `ProcessCalibration` file of stage B:
+
+```python
+from experiment_analysis.voxel_fit import points_from_csv, fit_all, choose, plot_fit, store_fit, write_calibration
+points = points_from_csv(["F0_cells.csv"])            # F0 / F2 heights are lengths, F1 heights are clipped
+fits = fit_all(points, velocity_um_s=5000.0, w_scale_um=None, l_scale_um=None)
+best = choose(fits)
+plot_fit(best, points, "fit.png")
+write_calibration(best, "calibration_SZ2080_Zeiss63x.json", material="SZ2080", objective="Zeiss 63x",
+                  setup="IFOV_on", z0_um=0.4, provisional=True, source="HR-26-003-A F0")
+store_fit(r"D:/.../HR-26-003-A_20261201-1015", fits, points, best)   # /analysis/experiment/ptd01_voxel_fit
+```
+
+`n_eff` of `threshold_ln` is only identifiable with fixed scales `w_scale_um` / `l_scale_um`; without them
+the scales are fitted with `n_eff = 1`.
