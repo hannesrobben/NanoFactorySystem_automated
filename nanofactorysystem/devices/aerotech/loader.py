@@ -35,6 +35,7 @@ from nanofactorysystem.aerobasic.ascii import AerotechError, TaskFailedError
 from nanofactorysystem.aerobasic.constants.tasks import TaskState
 from nanofactorysystem.devices.aerotech import exec_program_name
 from nanofactorysystem.devices.aerotech.library import DEFAULT_DLL, A3200Library, used_memory_gb
+from nanofactorysystem.devices.aerotech.task import Task
 
 DEFAULT_KB_PER_LINE = 19.7  # lab session 1: 19.6 kB per line, linear from 50k to 400k lines
 
@@ -480,7 +481,10 @@ class ProgramRunner:
             record.last_line = self._line(task_id)
             expected = last_statement_line(part)
             if state != TaskState.program_complete:
-                raise fail(f"{part.name} on task {task_id} ended in state {state.name} at line {record.last_line}", key)
+                # The decoded error code names the cause (e.g. an axis that is not enabled); read it before the stop
+                detail = f": {Task(self.api, task_id).error_info()}" if state == TaskState.error else ""
+                raise fail(f"{part.name} on task {task_id} ended in state {state.name} at line {record.last_line}"
+                           f"{detail}", key)
             if record.last_line is not None and record.last_line < expected:
                 raise fail(f"Program ended early: {part.name} on task {task_id} reported complete at line "
                            f"{record.last_line} of {expected}", key)

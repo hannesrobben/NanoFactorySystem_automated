@@ -60,6 +60,9 @@ Added for lab session 3 (T153, ``docs/guides/PROGRAM_LOADING_LAB_TESTS.md`` sect
 Since lab session 3 the ``system`` step lists the names of the added programs, and the INtime prompts of
 ``hold`` take a pasted block (end with an empty line).
 
+Since lab session 3b every motion step (``cycle``, ``taskspeed``, ``runner``, ``layer-dry``) stops unless all
+axes are enabled and homed, and ``ascii-names`` writes its execution copies to ``~/nfs_lab`` (short path).
+
 Every step writes into one session folder (``--session``, default ``program_loading_lab_<date>`` in the
 current directory); send that folder back. Standard library only; the script never switches the laser on.
 """
@@ -506,6 +509,40 @@ def try_ascii(timeout: float = ASCII_REPLY_TIMEOUT) -> Optional[Ascii]:
         return None
 
 
+def axes_not_ready(axes: dict, required: tuple[str, ...] = AXES) -> list[str]:
+    """ Axes of ``required`` that are not enabled and homed, as text (``axes`` as from :func:`axis_states`). """
+
+    missing = []
+    for axis in required:
+        state = axes.get(axis, {})
+        if not (state.get("enabled") and state.get("homed")):
+            missing.append(f"{axis} (enabled={state.get('enabled')}, homed={state.get('homed')})")
+    return missing
+
+
+def require_axes_ready(session: "Session", args, required: tuple[str, ...] = AXES) -> None:
+    """ Stop a motion step unless every axis is enabled and homed.
+
+    Lab session 3 ran its motion steps with disabled, unhomed axes (after the R2 reset and after PC restarts);
+    every program then ended in a task error at its first motion line.
+    """
+
+    client = try_ascii(args.reply_timeout)
+    if client is None:
+        session.log("ASCII interface not reachable. Stopped.")
+        sys.exit(1)
+    try:
+        axes = axis_states(client)
+    finally:
+        client.close()
+    missing = axes_not_ready(axes, required)
+    if missing:
+        session.record("axes_not_ready", {"axes": axes, "missing": missing})
+        session.log(f"Axes not ready: {', '.join(missing)}. Enable and home all axes (as after starting the Femtika "
+                    f"software or in Motion Composer), check with 'system', then repeat. Stopped.")
+        sys.exit(1)
+
+
 def ascii_task_state(client: Ascii, task_id: int) -> str:
     code, data, _ = client.send(f"~STATUS ({task_id}, TaskState)")
     return TASK_STATES.get(int(float(data)), data) if code == "%" and data else f"{code}{data}"
@@ -813,6 +850,7 @@ def step_cycle(session: Session, args) -> None:
         session.log("The cycle moves the galvo axes A/B (laser gate forced off). Close the shutter, make sure "
                     "the galvo may move, then repeat with --axes-safe.")
         sys.exit(1)
+    require_axes_ready(session, args)
     ok, text = fits_budget(session, 2 * args.lines, args.budget_gb)  # two parts are loaded at the same time
     session.log(f"Cycle: {args.parts} parts of {args.lines} lines, tasks 1/2 alternating; {text}")
     if not ok:
@@ -1190,6 +1228,7 @@ def step_taskspeed(session: Session, args) -> None:
         session.log("taskspeed moves the galvo axes A/B (laser gate forced off). Close the shutter, make sure the "
                     "galvo may move, then repeat with --axes-safe.")
         sys.exit(1)
+    require_axes_ready(session, args)
     lib = Library(args.dll)
     for task_id in (1, 2):
         require_idle(lib, task_id, session)
@@ -1229,6 +1268,7 @@ def step_runner(session: Session, args) -> None:
         session.log("runner moves the galvo axes A/B (laser gate forced off). Close the shutter, make sure the galvo "
                     "may move, then repeat with --axes-safe.")
         sys.exit(1)
+    require_axes_ready(session, args)
     import logging
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
     from nanofactorysystem.aerobasic.ascii import AerotechAsciiInterface
@@ -1468,11 +1508,14 @@ def step_ascii_names(session: Session, args) -> None:
     from nanofactorysystem.devices.aerotech import Aerotech3200
 
     task_id = 1  # the task of the ASCII print path of Experiment
-    folder = session.programs / "ascii_names"
+    # Short path like the print path (copies in the home folder): in lab session 3 the ASCII interface could not
+    # open the copies at 191 characters, while 162-166 characters worked
+    folder = Path.home() / "nfs_lab"
     valid = write_program(folder / "names_valid.pgm", TINY_PROGRAM)
     invalid = write_program(folder / "names_invalid.pgm", INVALID_PROGRAM)
     lib = Library(args.dll)
     require_idle(lib, task_id, session)
+    session.log(f"ascii-names: execution copies in {folder} (path length {len(str(folder)) + 40} characters)")
     a3200 = Aerotech3200(program_dir=folder)
     a3200.api.load_timeout = args.reply_timeout
     a3200.connect()
@@ -1508,8 +1551,10 @@ def step_ascii_names(session: Session, args) -> None:
     a3200.save_log(session.folder)
     a3200.close()
     lib.close()
+    for path in (valid, invalid):
+        path.unlink(missing_ok=True)
     names = [r.get("name") for r in rows if r.get("name")]
-    passed = all(r["as_expected"] for r in rows) and len(set(names)) == len(names)
+    passed = all(r["as_expected"] for r in rows) and len(set(names)) == len(names) and len(names) >= 3
     session.log(f"ascii-names: {'PASSED' if passed else 'NOT as expected'}: every attempt as expected and "
                 f"{len(set(names))} distinct names for {len(names)} loads")
     session.record("ascii_names_summary", {"passed": passed, "names": names})
@@ -1771,6 +1816,7 @@ def step_layer_dry(session: Session, args) -> None:
                     "forced off; Z never moves. Move the objective to a safe Z, close the shutter, then repeat with "
                     "--axes-safe.")
         sys.exit(1)
+    require_axes_ready(session, args)
     source = Path(args.file)
     client = try_ascii(args.reply_timeout)
     if client is None:
