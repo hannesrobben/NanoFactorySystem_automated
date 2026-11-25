@@ -1,7 +1,61 @@
 # Lab tests: loading layer programs through the A3200 library (T129, T134, T153)
 
-Session 3 (T153) comes first, then session 2 (2026-11-25) and session 1 (2026-11-24). The results of
-sessions 1 and 2 are in section 6 of `docs/design/PROGRAM_LOADING.md`.
+Session 3b comes first, then session 3 (T153), session 2 (2026-11-25) and session 1 (2026-11-24). The
+results are in section 6 of `docs/design/PROGRAM_LOADING.md`.
+
+## Session 3b (T153)
+
+Goal: the three open checks of session 3, this time **with enabled and homed axes**. In session 3 every motion
+step ran with disabled axes and ended in a task error at its first motion line; the loading itself worked.
+After session 3b the library loader can print a real layer with the laser.
+
+Plan about 35 minutes. No step switches the laser on.
+
+### Safety
+
+- `ascii-names` moves nothing.
+- `runner` moves only the galvo (A/B, at most ±0.05 mm, laser gate forced off).
+- `layer-dry` moves the galvo and the stage in X/Y (layer 68: only to its start position, which the script sets
+  to the current position), never Z; the laser gate is forced off and the power set to 0. Objective at a safe Z,
+  shutter closed. Type `DRY` to confirm.
+
+### Preparation
+
+1. `git pull` on `main_HR`.
+2. Start the A3200 software (or restart the PC), start/initialise the Femtika software as for a print,
+   **enable and home all axes**.
+3. Close Motion Composer.
+4. PowerShell:
+   ```
+   cd "C:\Users\Nanofactory\Documents\Automated Nanofactory\Code Github\NanoFactorySystem_automated"
+   git pull
+   .venv\Scripts\Activate.ps1
+   cd mains\lab_checks
+   $layer = "C:\Users\Nanofactory\Documents\Femtika_Experiment\Hannes\DOE_circle_V1\DOE_circle_V1-B_20261121-2020\structures\surface_16bit\programs\program_surface_16bit.068.pgm"
+   ```
+
+### Steps, in this order
+
+| # | Command | Time | Answers |
+|---|---|---|---|
+| 1 | `python program_loading_lab.py system` | 1 min | **Check: every axis `enabled: True, homed: True`.** If not, enable and home them and repeat. (The motion steps refuse to start otherwise.) |
+| 2 | `python program_loading_lab.py ascii-names` | 1 min | T152: must end with `PASSED` (copies under `~\nfs_lab`). |
+| 3 | `python program_loading_lab.py runner --axes-safe --lines 100000` | 12 min | T132: 4 parts on task 1 with add-ahead; every part to its last line, gaps < 1 s. |
+| 4 | objective at a safe Z, shutter closed: `python program_loading_lab.py layer-dry --file $layer --axes-safe --part-lines 200000 --max-parts 3` (type `DRY`) | 15 min | P5: 3 parts of the real layer 68, dry, on task 1; every part to its last line, gaps < 1 s, PC within the budget. |
+| 5 | `python program_loading_lab.py system` | 1 min | Final state |
+
+If a step stops with a task error, the message now names the error code; send the folder anyway.
+
+Send back the session folder `program_loading_lab_<date>` and the console output.
+
+### What session 3b decides
+
+| Result | Consequence |
+|---|---|
+| All three pass | The library loader is ready: next one real layer (or a small structure) with the laser via `Experiment(program_loader="library")`, then the default switch (R9) |
+| `ascii-names` fails again at the short path | The ASCII fallback needs another look (T152); the library loader is not affected |
+| `runner` or `layer-dry` fail with an error code | Evaluate the code; the loader code is changed only if the cause is in it |
+
 
 ## Session 3 (T153)
 
