@@ -1,7 +1,95 @@
-# Lab tests: loading layer programs through the A3200 library (T129, T134)
+# Lab tests: loading layer programs through the A3200 library (T129, T134, T153)
 
-Session 1 (2026-11-24) is described from "Session 1" on; its results are in section 6 of
-`docs/design/PROGRAM_LOADING.md`. Session 2 (T134) follows here.
+Session 3 (T153) comes first, then session 2 (2026-11-25) and session 1 (2026-11-24). The results of
+sessions 1 and 2 are in section 6 of `docs/design/PROGRAM_LOADING.md`.
+
+## Session 3 (T153)
+
+Goal: check on the real controller what was built after session 2, then the first real layer (laser off):
+- T152: every ASCII load gets a fresh program name; a refused load no longer blocks the next one;
+- T132: the library loader runs every part on task 1 and compiles the next part ahead (add-ahead);
+  how long is the gap between two parts now?
+- P5 of T129: a real DOE layer, made dry, split and run through the package loader;
+- the .NET compile path of Motion Composer (`Aerotech.AeroBasic.Builder.Build`): memory per line;
+- which programs stay added (names), whether R1 clears a blocked name, R3 with administrator rights.
+
+Plan about 90 minutes. No step switches the laser on.
+
+### Safety
+
+- `ascii-names`, `dotnet-build` and `recover-blocked` move nothing.
+- `runner` moves only the galvo (A/B, at most ±0.05 mm, laser gate forced off).
+- `layer-dry` runs a real layer with the laser forced off:
+  - every `GALVO LASEROVERRIDE … ON/AUTO` becomes `OFF`, every `$AO[…]` (power) becomes `0`;
+  - **Z never moves** (every Z word is removed);
+  - the **stage moves in X/Y** in the pattern of the layer, shifted so that it starts at the current
+    position; the script prints the X/Y range and asks you to type `DRY`;
+  - the galvo moves as in the real print.
+
+  Before this step: move the objective to a safe Z (no sample under the objective, or raised far enough),
+  make sure the stage can travel the printed X/Y range, close the shutter.
+- `restart-service` (R3) may disable the axes, as in session 2: objective at a safe Z first; afterwards
+  enable and home the axes as after a normal start.
+
+### Preparation
+
+1. `git pull` on `main_HR` (the session needs T152, T132 and the new steps).
+2. **Restart the A3200 software** (step 1 checks it), then enable and home the axes.
+3. Close Motion Composer.
+4. Open PowerShell **as administrator** (needed for step 9):
+   ```
+   cd "C:\Users\Nanofactory\Documents\Automated Nanofactory\Code Github\NanoFactorySystem_automated"
+   git pull
+   .venv\Scripts\Activate.ps1
+   cd mains\lab_checks
+   $layer = "C:\Users\Nanofactory\Documents\Femtika_Experiment\Hannes\DOE_circle_V1\DOE_circle_V1-B_20261121-2020\structures\surface_16bit\programs\program_surface_16bit.068.pgm"
+   ```
+
+### Steps, in this order
+
+| # | Command | Time | Answers |
+|---|---|---|---|
+| 1 | `python program_loading_lab.py system` | 1 min | Restart check, task states, **names of the added programs** (with their tasks), ASCII LOAD probe. If it warns: restart the software and repeat. |
+| 2 | `python program_loading_lab.py watch` in a **second** window, until step 7 | – | Memory timeline |
+| 3 | `python program_loading_lab.py ascii-names` | 2 min | **T152** with the package (`run_program_as_task`, task 1): a tiny program twice (two names), an invalid one (refused), the tiny one again (must load). Ends with `PASSED` or `NOT as expected`; lists the added programs before and after every attempt. |
+| 4 | `python program_loading_lab.py runner --axes-safe --lines 100000` | 12 min | **T132**: 4 synthetic galvo parts through the package loader, all on task 1 with add-ahead. Gap between the parts (target < 1 s; session 2 with alternating tasks: 0.3 s). |
+| 5 | `python program_loading_lab.py dotnet-build --file $layer --lines 400000` | 3 min | Compile 400k lines of layer 68 with the .NET `Builder.Build`: time, peak memory, kB per line (C library 19.6, Motion Composer 5.6), then load the `.ogm` through the library. Stops by itself if the PC exceeds the budget. |
+| 5b | only if step 5 reported at most about 8 kB/line: `python program_loading_lab.py dotnet-build --file $layer --lines 0` | 5–10 min | The same for the whole layer (1.25 M lines) |
+| 6 | objective at a safe Z, shutter closed: `python program_loading_lab.py layer-dry --file $layer --axes-safe --part-lines 200000 --max-parts 3` (type `DRY`) | 15 min | **P5**: the first 3 parts of 200k lines of the real layer 68, dry, on task 1 with add-ahead: does every part end at its last line, how large are the gaps, does the PC stay within the budget? |
+| 6b | optional, if time: the same without `--max-parts` | 30 min | The whole layer (about 7 parts) |
+| 7 | stop `watch` with Ctrl+C | – | – |
+| 8 | `python program_loading_lab.py recover-blocked --confirm` (type `R1`) | 3 min | Blocks a program name with a refused LOAD, terminates the ASCII interface (R1), loads valid content under the blocked name again: **does R1 clear the block?** |
+| 9 | objective at a safe Z: `python program_loading_lab.py restart-service --confirm` (type `RESTART`; **administrator** PowerShell) | 3 min | **R3**: time until ASCII and the library work again; axis states before and after. If it fails, restart the A3200 software as usual. |
+| 10 | enable and home the axes, then `python program_loading_lab.py system` | 2 min | Final state |
+
+Optional, if the INtime memory should be read again: `python program_loading_lab.py hold --file <ogm 68> --file2
+<ogm 69>`. The prompts now take a pasted block: paste the text of INtime Explorer and press Enter on an empty
+line.
+
+Send back the session folder `program_loading_lab_<date>` (including `A3200.log` of `ascii-names`),
+`checklist.txt` and the console output.
+
+### Manual checklist for session 3 (`checklist.txt` in the session folder)
+
+1. Steps 4 and 6: anything unusual in the galvo or stage motion (stops, jerks, sounds) between the parts?
+2. Step 6: the X/Y range the script printed, and whether the stage stayed within it.
+3. Steps 8–9: anything Motion Composer or the A3200 tray icon showed (errors, axis faults).
+4. Step 9: did the PowerShell run as administrator?
+
+### What session 3 decides
+
+| Result | Consequence |
+|---|---|
+| `ascii-names` PASSED | T152 is confirmed on the controller; the ASCII path is a safe fallback |
+| Names of the programs that stay added | R0 removes them by name (T133), or they are left on purpose (z-line) |
+| `runner` gaps < 1 s on task 1 | T132 done; otherwise change the order stop → remove → associate → start |
+| `dotnet-build` at about 6 kB/line or less | T131 is redesigned: compile whole layers to `.ogm` in the build step (no split), load them in about 48 s with 1.9 GB |
+| `dotnet-build` near the C library (about 20 kB/line) or failing | Parts of the budget size stay; T131 keeps the `.OGM` of each part |
+| `layer-dry`: every part to its last line, gaps < 1 s, PC within the budget | P5 (laser off) passed: next lab date one real layer with laser, then the default switch to `program_loader="library"` (R9, maintainer decision) |
+| `recover-blocked`: R1 clears the block | The health check may use R1 when a name is blocked |
+| R1 does not clear it | Fresh names (T152) are the only remedy short of a restart; R1 only for an unresponsive interface |
+| R3 works as administrator | R3 can be offered by the software after operator confirmation (T133) |
+
 
 ## Session 2 (T134)
 

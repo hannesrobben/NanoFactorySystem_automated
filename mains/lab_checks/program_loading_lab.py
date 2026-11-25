@@ -43,6 +43,23 @@ Added for lab session 2 (T134, ``docs/guides/PROGRAM_LOADING_LAB_TESTS.md`` sect
 ``restart-service`` recovery level R3: ``Restart-Service A3200CommService`` (administrator); time until the
                     ASCII interface and the library are usable again, states before/after.
 
+Added for lab session 3 (T153, ``docs/guides/PROGRAM_LOADING_LAB_TESTS.md`` section "Session 3"):
+
+``ascii-names``     T152 on the real controller: the package's ``run_program_as_task`` loads a tiny program twice
+                    (two fresh names), then an invalid one (refused), then the tiny one again (must load); the
+                    names of the added programs before and after every attempt. No motion.
+``recover-blocked`` R1 on a blocked name: block a program name with a refused LOAD, terminate the ASCII interface
+                    (confirmation), and load valid content under the blocked name again.
+``dotnet-build``    compile a layer (or its first ``--lines``) with ``Aerotech.AeroBasic.Builder.Build`` of the
+                    .NET API in a 64-bit PowerShell; time and peak memory (stopped if the PC exceeds the budget),
+                    then load the resulting ``.ogm`` through the library and remove it. No motion.
+``layer-dry``       P5: a real layer program made dry (laser gate off, ``$AO`` 0, no Z move, stage XY shifted to the
+                    current position), split at the budget part size and run through the package's
+                    ``ProgramRunner`` on task 1 with add-ahead (T132): gaps, last lines, memory.
+
+Since lab session 3 the ``system`` step lists the names of the added programs, and the INtime prompts of
+``hold`` take a pasted block (end with an empty line).
+
 Every step writes into one session folder (``--session``, default ``program_loading_lab_<date>`` in the
 current directory); send that folder back. Standard library only; the script never switches the laser on.
 """
@@ -329,6 +346,12 @@ def prototype(header_text: str, name: str) -> Optional[str]:
 
 # ============================================================================================ controller
 
+class _AddedProgram(ctypes.Structure):
+    """ ``A3200AddedProgram`` of ``A3200Program.h``: name, mask of the associated tasks, reserved words. """
+
+    _fields_ = [("name", ctypes.c_char * 128), ("associatedTasks", ctypes.c_uint32), ("spare", wintypes.DWORD * 8)]
+
+
 class Library:
     """ The A3200 C library functions used here (prototypes checked by ``library_load_check.py inspect``). """
 
@@ -344,6 +367,7 @@ class Library:
             "A3200ProgramGetAddedProgramCount": [handle, ctypes.POINTER(dword)],
             "A3200GetLastErrorString": [ctypes.c_char_p, dword],
             "A3200ProgramAdd": [handle, text], "A3200ProgramAssociate": [handle, task, text],
+            "A3200ProgramGetAddedPrograms": [handle, ctypes.POINTER(_AddedProgram), dword],
         }
         for name, argtypes in signatures.items():
             getattr(lib, name).argtypes = argtypes
@@ -423,6 +447,20 @@ class Library:
     def added_programs(self) -> Optional[int]:
         count = wintypes.DWORD(0)
         return count.value if self.lib.A3200ProgramGetAddedProgramCount(self.handle, ctypes.byref(count)) else None
+
+    def added_program_list(self) -> Optional[list[dict]]:
+        """ Name and associated tasks of every added program (``A3200ProgramGetAddedPrograms``), None on failure. """
+
+        count = self.added_programs()
+        if count is None:
+            return None
+        if count == 0:
+            return []
+        array = (_AddedProgram * count)()
+        if not self.lib.A3200ProgramGetAddedPrograms(self.handle, array, count):
+            return None
+        return [{"name": p.name.decode(errors="replace"),
+                 "tasks": [t for t in range(32) if p.associatedTasks >> t & 1]} for p in array]
 
     def close(self) -> None:
         if self.handle:
@@ -519,6 +557,7 @@ def controller_snapshot(dll: str, timeout: float = ASCII_REPLY_TIMEOUT) -> dict:
         lib = Library(dll)
         snapshot["tasks"] = {t: lib.state(t) for t in (1, 2)}
         snapshot["added_programs"] = lib.added_programs()
+        snapshot["added_names"] = lib.added_program_list()
         lib.close()
     except (OSError, RuntimeError) as error:
         snapshot["library"] = f"not usable: {error}"
@@ -666,16 +705,20 @@ def step_system(session: Session, args) -> None:
                     f"the A3200 software for this session, it did not take effect. Restart it and repeat 'system'.")
     svc = services()
     session.log("Services: " + "; ".join(f"{s.get('Name')} ({s.get('State')}, {s.get('StartMode')})" for s in svc))
-    tasks, added = {}, None
+    tasks, added, names = {}, None, None
     try:
         lib = Library(args.dll)
         tasks = {t: lib.state(t) for t in range(1, 5)}
         added = lib.added_programs()
+        names = lib.added_program_list()
         lib.close()
     except (OSError, RuntimeError) as error:
         session.log(f"Library not usable: {error}")
     session.log(f"Task states: {tasks}; programs added on the controller: {added}"
                 + ("  (expected 0 after a restart)" if added else ""))
+    if names:
+        session.log("Added programs (name, associated tasks): "
+                    + "; ".join(f"{n['name']} {n['tasks']}" for n in names))
     ascii_client = try_ascii(args.reply_timeout)
     ascii_state, axes = "not reachable", {}
     if ascii_client:
@@ -690,7 +733,8 @@ def step_system(session: Session, args) -> None:
         if probe.get("reachable") and probe.get("ok") is False:
             session.log("The ASCII interface refuses LOAD: restart the A3200 software before the other steps.")
     session.record("system", {"memory": memory, "processes": rows, "services": svc, "tasks": tasks,
-                              "added_programs": added, "ascii": ascii_state, "axes": axes, "ascii_load_probe": probe,
+                              "added_programs": added, "added_names": names, "ascii": ascii_state, "axes": axes,
+                              "ascii_load_probe": probe,
                               "stale_a3200_processes": stale})
 
 
@@ -1008,7 +1052,7 @@ def step_api(session: Session, args) -> None:
             (target / f"dotnet_{bits}bit.txt").write_text(dump + out.stderr.decode("utf-8", errors="replace"),
                                                          encoding="utf-8")
             dotnet[bits] = {"lines": len(dump.splitlines()), "compile_methods": [
-                line.strip() for line in dump.splitlines() if re.search(r"(?i)compil", line)][:50]}
+                line.strip() for line in dump.splitlines() if re.search(r"(?i)compil|\bbuild", line)][:50]}
             session.log(f".NET dump ({bits} bit): {dotnet[bits]['lines']} lines; compile methods: "
                         f"{dotnet[bits]['compile_methods'][:10]}")
     else:
@@ -1107,7 +1151,7 @@ def step_hold(session: Session, args) -> None:
     lib = Library(args.dll)
     for task_id in (1, 2):
         require_idle(lib, task_id, session)
-    notes = {"before": input("INtime memory before loading (as shown by the INtime tool, free/used): ")}
+    notes = {"before": read_block("INtime memory before loading (as shown by the INtime tool, free/used)")}
     results = []
     for task_id, path in zip((1, 2), files):
         lines = source_line_count(path)
@@ -1117,10 +1161,10 @@ def step_hold(session: Session, args) -> None:
                 session.log(f"{path.name} over budget ({text}). Stopped.")
                 break
         results.append(load_part(session, args, path, task_id, source_lines=lines))
-    notes["loaded"] = input("INtime memory with both programs loaded: ")
+    notes["loaded"] = read_block("INtime memory with both programs loaded")
     for task_id, path in zip((1, 2), files[:len(results)]):
         results[task_id - 1].update(unload_part(session, lib, path, task_id))
-    notes["after"] = input("INtime memory after removing both: ")
+    notes["after"] = read_block("INtime memory after removing both")
     lib.close()
     session.record("hold", {"files": [str(f) for f in files], "results": results, "intime_memory": notes})
 
@@ -1257,6 +1301,18 @@ def library_usable(dll: str) -> bool:
         return False
 
 
+def terminate_ascii_interface(session: Session, wait_s: float) -> dict:
+    """ R1: terminate ``A3200AsciiInterface.exe`` and wait until the service has started it and it answers. """
+
+    old = pid_of("A3200AsciiInterface.exe")
+    out = subprocess.run(["taskkill", "/PID", str(old), "/F"], capture_output=True) if old else None
+    result = {"taskkill": out.stdout.decode(errors="replace") + out.stderr.decode(errors="replace") if out else "no PID"}
+    session.log(f"R1: terminated PID {old}: {result['taskkill'].strip()}")
+    result["respawn_s"] = wait_until(lambda: (pid_of("A3200AsciiInterface.exe") or old) != old, wait_s)
+    result["ascii_reachable_s"] = wait_until(lambda: ascii_reachable(), 60) if result["respawn_s"] is not None else None
+    return result
+
+
 def step_recover_ascii(session: Session, args) -> None:
     """ Recovery level R1: terminate the ASCII interface process; is it started again and does LOAD work? """
 
@@ -1266,13 +1322,7 @@ def step_recover_ascii(session: Session, args) -> None:
         sys.exit(1)
     record = {"before": controller_snapshot(args.dll, args.reply_timeout),
               "probe_before": ascii_load_probe(session.programs, args.task, args.reply_timeout)}
-    old = pid_of("A3200AsciiInterface.exe")
-    out = subprocess.run(["taskkill", "/PID", str(old), "/F"], capture_output=True) if old else None
-    record["taskkill"] = out.stdout.decode(errors="replace") + out.stderr.decode(errors="replace") if out else "no PID"
-    session.log(f"R1: terminated PID {old}: {record['taskkill'].strip()}")
-    record["respawn_s"] = wait_until(lambda: (pid_of("A3200AsciiInterface.exe") or old) != old, args.wait_s)
-    record["ascii_reachable_s"] = wait_until(lambda: ascii_reachable(), 60) \
-        if record["respawn_s"] is not None else None
+    record.update(terminate_ascii_interface(session, args.wait_s))
     record["probe_after"] = ascii_load_probe(session.programs, args.task, args.reply_timeout)
     record["after"] = controller_snapshot(args.dll, args.reply_timeout)
     session.record("recover_ascii", record)
@@ -1388,12 +1438,416 @@ def step_watch(session: Session, args) -> None:
         except KeyboardInterrupt:
             session.log("Memory log stopped.")
 
+# ------------------------------------------------------------------------------------- lab session 3 (T153)
+
+def read_block(prompt: str, reader=input) -> str:
+    """ Read a pasted multi-line block (or one typed line) until an empty line; lab session 2 took one line only. """
+
+    print(f"{prompt}. Paste or type it, then press Enter on an empty line:")
+    lines = []
+    while True:
+        try:
+            line = reader("")
+        except EOFError:
+            break
+        if not line.strip():
+            if lines:
+                break
+            continue
+        lines.append(line.rstrip())
+    return "\n".join(lines)
+
+
+INVALID_PROGRAM = ["' deliberately invalid, program_loading_lab.py", "THIS IS NOT AEROBASIC 123", "END PROGRAM"]
+
+
+def step_ascii_names(session: Session, args) -> None:
+    """ T152 on the real controller: fresh program names per ASCII load, and a refused load does not block the next. """
+
+    from nanofactorysystem.aerobasic.ascii import AerotechError
+    from nanofactorysystem.devices.aerotech import Aerotech3200
+
+    task_id = 1  # the task of the ASCII print path of Experiment
+    folder = session.programs / "ascii_names"
+    valid = write_program(folder / "names_valid.pgm", TINY_PROGRAM)
+    invalid = write_program(folder / "names_invalid.pgm", INVALID_PROGRAM)
+    lib = Library(args.dll)
+    require_idle(lib, task_id, session)
+    a3200 = Aerotech3200(program_dir=folder)
+    a3200.api.load_timeout = args.reply_timeout
+    a3200.connect()
+    session.log(f"ascii-names: package run_program_as_task on task {task_id}, session token {a3200.exec_session}")
+    rows = []
+
+    def attempt(label: str, path: Path, expect_ok: bool) -> None:
+        row = {"attempt": label, "file": path.name, "expected_ok": expect_ok, "added_before": lib.added_program_list()}
+        start = time.time()
+        try:
+            task = a3200.run_program_as_task(path, task_id=task_id)
+            row["name"] = task.program_name
+            task.wait_to_finish(update_interval=0.1, stall_timeout=60)
+            task.finish()
+            row["ok"], row["error"] = True, ""
+        except AerotechError as error:
+            row["ok"], row["error"] = False, str(error)
+        row["seconds"] = round(time.time() - start, 2)
+        row["added_after"] = lib.added_program_list()
+        row["registered"] = sorted(a3200.exec_programs)
+        row["copies_left"] = sorted(p.name for p in folder.glob("nfs_*"))
+        row["as_expected"] = row["ok"] == expect_ok
+        rows.append(row)
+        session.record("ascii_names", row)
+        session.log(f"  {label:<38} ok={row['ok']} (expected {expect_ok}) {row.get('name', '')} {row['error'][:120]}")
+        session.log(f"    added before {[n['name'] for n in row['added_before'] or []]} after "
+                    f"{[n['name'] for n in row['added_after'] or []]}; copies left {row['copies_left']}")
+
+    attempt("1 valid program", valid, True)
+    attempt("2 the same program again (new name)", valid, True)
+    attempt("3 invalid program (refused)", invalid, False)
+    attempt("4 valid program after the refusal", valid, True)
+    a3200.save_log(session.folder)
+    a3200.close()
+    lib.close()
+    names = [r.get("name") for r in rows if r.get("name")]
+    passed = all(r["as_expected"] for r in rows) and len(set(names)) == len(names)
+    session.log(f"ascii-names: {'PASSED' if passed else 'NOT as expected'}: every attempt as expected and "
+                f"{len(set(names))} distinct names for {len(names)} loads")
+    session.record("ascii_names_summary", {"passed": passed, "names": names})
+
+
+def step_recover_blocked(session: Session, args) -> None:
+    """ R1 on a blocked name: does restarting the ASCII interface clear the block of a refused program name? """
+
+    if not args.confirm or not confirmed("R1", "This step blocks a program name with a refused LOAD and then "
+                                                "terminates A3200AsciiInterface.exe (R1; no motion)."):
+        session.log("recover-blocked needs --confirm and the typed confirmation. Stopped.")
+        sys.exit(1)
+    task_id = args.task
+    path = write_program(session.programs / f"blocked_{datetime.datetime.now():%H%M%S}.pgm", INVALID_PROGRAM)
+    record: dict = {"file": path.name, "task": task_id}
+
+    def load(label: str) -> str:
+        client = try_ascii(args.reply_timeout)
+        if client is None:
+            record[label] = "ASCII not reachable"
+            return "-"
+        try:
+            code, data, seconds = client.send(f'PROGRAM {task_id} LOAD "{path.resolve()}"')
+            error = client.last_error() if code != "%" else ""
+            client.send(f"PROGRAM {task_id} STOP")
+            client.send(f'REMOVEPROGRAM "{path.name}"')
+        finally:
+            client.close()
+        record[label] = {"reply": code + data, "seconds": round(seconds, 2), "error": error}
+        session.log(f"  {label:<34} reply '{code}{data}' {error}")
+        return code
+
+    load("1 invalid (blocks the name)")
+    write_program(path, ["' now valid under the blocked name", "DWELL 0.01", "END PROGRAM"])
+    blocked = load("2 valid under the name, before R1") != "%"
+    record.update(terminate_ascii_interface(session, args.wait_s))
+    cleared = load("3 valid under the name, after R1") == "%"
+    record.update({"blocked_before": blocked, "cleared_by_r1": cleared})
+    session.record("recover_blocked", record)
+    session.log(f"recover-blocked: name blocked before R1 = {blocked}, R1 cleared it = {cleared} "
+                f"(ASCII interface back after {record.get('ascii_reachable_s')} s)")
+
+
+DOTNET_BUILD_SCRIPT = r"""
+$ErrorActionPreference = 'Stop'
+$r = @{ ok = $false }
+try {
+  $asm = [Reflection.Assembly]::LoadFrom('@DLL@')
+  $controller = $asm.GetType('Aerotech.A3200.Controller')
+  if ($controller) {
+    $connect = $controller.GetMethod('Connect', [Type[]]@())
+    if ($connect -and $connect.IsStatic) {
+      try { [void]$connect.Invoke($null, @()); $r.connected = $true } catch { $r.connect_error = "$($_.Exception.InnerException)" }
+    }
+  }
+  $t = $asm.GetType('Aerotech.AeroBasic.Builder')
+  $m = $t.GetMethod('Build', [Type[]]@([string]))
+  $r.static = $m.IsStatic
+  $target = $null
+  if (-not $m.IsStatic) {
+    $r.constructors = @($t.GetConstructors() | ForEach-Object { $_.ToString() })
+    $target = [Activator]::CreateInstance($t)
+  }
+  $sw = [Diagnostics.Stopwatch]::StartNew()
+  $res = $m.Invoke($target, @('@FILE@'))
+  $r.seconds = $sw.Elapsed.TotalSeconds
+  $r.errors = @($res.CompilerErrors | Select-Object -First 20 | ForEach-Object { $_.ToString() })
+  $r.properties = @{}
+  foreach ($p in $res.GetType().GetProperties()) { try { $r.properties[$p.Name] = "$($p.GetValue($res, $null))" } catch {} }
+  $r.ok = ($r.errors.Count -eq 0)
+} catch {
+  $text = $_.Exception.ToString()
+  $r.exception = $text.Substring(0, [Math]::Min(3000, $text.Length))
+}
+$proc = [Diagnostics.Process]::GetCurrentProcess()
+$r.peak_working_set_gb = $proc.PeakWorkingSet64 / 1GB
+$r.peak_paged_gb = $proc.PeakPagedMemorySize64 / 1GB
+'RESULT ' + ($r | ConvertTo-Json -Compress -Depth 4)
+"""
+
+
+def step_dotnet_build(session: Session, args) -> None:
+    """ Compile a layer with the .NET ``Aerotech.AeroBasic.Builder`` (Motion Composer's path?), then load the ``.ogm``. """
+
+    assemblies = find_files(SEARCH_ROOTS, ["Aerotech.A3200.dll"])
+    if not assemblies:
+        session.log("Aerotech.A3200.dll not found. Stopped.")
+        sys.exit(1)
+    source = Path(args.file)
+    stamp = datetime.datetime.now().strftime("%H%M%S")
+    folder = session.programs / f"dotnet_{stamp}"
+    lines = read_lines(source)
+    if args.lines and args.lines < len(lines):
+        program = write_program(folder / f"dotnet_{stamp}.pgm", truncated_program(lines, args.lines))
+    else:
+        program = folder / f"dotnet_{stamp}.pgm"
+        folder.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, program)
+    n_lines = count_lines(program)
+    session.log(f"dotnet-build: {program.name} ({n_lines} lines from {source.name}) with "
+                f"{assemblies[0]}; stopped if the PC uses more than {args.budget_gb} GB")
+    script = DOTNET_BUILD_SCRIPT.replace("@DLL@", str(assemblies[0])).replace("@FILE@", str(program.resolve()))
+    start = time.time()
+    proc = subprocess.Popen(["powershell", "-NoProfile", "-Command", script], stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, text=True)
+    peak_private, peak_pc, aborted = 0.0, 0.0, False
+    while proc.poll() is None:
+        mem = process_memory(proc.pid) or {}
+        peak_private = max(peak_private, mem.get("private_gb") or 0.0)
+        used = system_memory().get("used_gb") or 0.0
+        peak_pc = max(peak_pc, used)
+        if used > args.budget_gb:
+            proc.kill()
+            aborted = True
+            session.log(f"  stopped: the PC uses {used:.1f} GB (budget {args.budget_gb} GB)")
+            break
+        time.sleep(0.5)
+    out, err = proc.communicate()
+    wall_s = round(time.time() - start, 1)
+    rows = [line[7:] for line in out.splitlines() if line.startswith("RESULT ")]
+    result = json.loads(rows[-1]) if rows else {"ok": False, "exception": (err or out)[-3000:]}
+    record = {"file": str(source), "lines": n_lines, "wall_s": wall_s, "peak_private_gb_sampled": round(peak_private, 3),
+              "peak_pc_gb": round(peak_pc, 2), "aborted_over_budget": aborted, "result": result}
+    if peak_private:
+        record["kb_per_line"] = round(peak_private * 1024 ** 2 / n_lines, 2)
+    session.log(f"  build ok={result.get('ok')} in {result.get('seconds')} s (wall {wall_s} s), peak private "
+                f"{peak_private:.2f} GB ({record.get('kb_per_line')} kB/line; C library 19.6, Motion Composer 5.6), "
+                f"static={result.get('static')}, connected={result.get('connected')}")
+    if result.get("exception"):
+        session.log(f"  exception: {result['exception'][:600]}")
+    if result.get("errors"):
+        session.log(f"  compiler errors: {result['errors'][:5]}")
+    ogm = compiled_file(program)
+    record["ogm"] = str(ogm) if ogm else None
+    if ogm and ogm.stat().st_mtime >= start - 1:
+        lib = Library(args.dll)
+        require_idle(lib, args.task, session)
+        load_start = time.time()
+        ok, error = lib.load(args.task, ogm)
+        record["ogm_load"] = {"ok": ok, "error": error, "seconds": round(time.time() - load_start, 1),
+                              "state": lib.state(args.task)}
+        lib.stop_and_wait(args.task)
+        record["ogm_removed_as"], record["ogm_remove_attempts"] = lib.remove_verified(ogm)
+        lib.close()
+        session.log(f"  library load of {ogm.name} on task {args.task}: {record['ogm_load']}, removed as "
+                    f"{record['ogm_removed_as']!r}")
+    else:
+        session.log("  no new .ogm next to the program (see the BuildResults properties in results.jsonl)")
+    session.record("dotnet_build", record)
+    if not args.keep:
+        shutil.rmtree(folder, ignore_errors=True)
+
+
+_MOTION = re.compile(r"^\s*(RAPID|LINEAR|G0|G1|G2|G3|CW|CCW)\b", re.IGNORECASE)
+_STAGE_WORD = re.compile(r"(?<![A-Za-z$_])([XYZ])(-?\d+(?:\.\d*)?|-?\.\d+|\$\S+|\s+\S+)", re.IGNORECASE)
+_LASER_GATE = re.compile(r"^(\s*GALVO\s+LASEROVERRIDE\s+\w+\s+)(ON|AUTO)\b", re.IGNORECASE)
+_ANALOG_OUT = re.compile(r"^(\s*\$AO\[\d+\]\.\w+)\s*=.*$", re.IGNORECASE)
+_REFUSED = re.compile(r"^\s*(INCREMENTAL|G91|PSO\w*|\$DO\b|MOVEINC|MOVEABS)", re.IGNORECASE)
+
+
+def _code(line: str) -> str:
+    return line.split("'")[0].split("//")[0]
+
+
+def dry_layer_lines(lines: list[str], x_mm: float, y_mm: float) -> tuple[list[str], dict]:
+    """ Make a generated layer program dry for P5: laser off, Z never moves, stage XY around the current position.
+
+    - ``GALVO LASEROVERRIDE <axis> ON|AUTO`` becomes ``OFF`` (the laser gate stays closed);
+    - every ``$AO[..]`` assignment (laser power) becomes ``= 0``;
+    - motion lines lose their Z word (a line with only Z becomes a comment);
+    - X and Y keep their pattern but are shifted so that the first X and Y of the program are the current
+      stage position ``x_mm``, ``y_mm``.
+
+    Raises
+    ------
+    ValueError
+        For anything that cannot be made dry safely: ``INCREMENTAL``/``G91``, PSO or digital outputs, stage
+        words with variables or separated values.
+    """
+
+    out = [f"' dry copy for lab session 3 (P5): laser off, $AO 0, no Z move, XY shifted to X{x_mm:.6f} Y{y_mm:.6f}"]
+    info = {"laser_gate_lines": 0, "analog_out_lines": 0, "z_words_removed": 0, "stage_lines": 0,
+            "x_range_mm": None, "y_range_mm": None}
+    origin: dict[str, float] = {}
+    target = {"X": x_mm, "Y": y_mm}
+    xs, ys = [], []
+    for number, line in enumerate(lines, start=1):
+        code = _code(line)
+        if _REFUSED.match(code):
+            raise ValueError(f"line {number}: {line.strip()!r} cannot be made dry safely")
+        if _LASER_GATE.match(code):
+            out.append(_LASER_GATE.sub(lambda m: m.group(1) + "OFF", code).rstrip())
+            info["laser_gate_lines"] += 1
+            continue
+        if _ANALOG_OUT.match(code):
+            out.append(_ANALOG_OUT.sub(lambda m: m.group(1) + "=0", code).rstrip())
+            info["analog_out_lines"] += 1
+            continue
+        if _MOTION.match(code) and _STAGE_WORD.search(code):
+            words = _STAGE_WORD.findall(code)
+            for axis, value in words:
+                if not re.fullmatch(r"-?\d+(?:\.\d*)?|-?\.\d+", value):
+                    raise ValueError(f"line {number}: stage word {axis}{value.strip()} is not a plain number")
+
+            def replace(match: re.Match) -> str:
+                axis, value = match.group(1).upper(), float(match.group(2))
+                if axis == "Z":
+                    info["z_words_removed"] += 1
+                    return ""
+                origin.setdefault(axis, value)
+                shifted = value - origin[axis] + target[axis]
+                (xs if axis == "X" else ys).append(shifted)
+                return f"{axis}{shifted:.6f}"
+
+            new = re.sub(r"\s+", " ", _STAGE_WORD.sub(replace, code)).strip()
+            info["stage_lines"] += 1
+            if not re.search(r"(?<![A-Za-z$_])[A-Z]-?[\d.]", new.split(None, 1)[1] if " " in new else ""):
+                out.append(f"' dry: removed {line.strip()}")
+            else:
+                out.append(new)
+            continue
+        out.append(line.rstrip("\n"))
+    if xs:
+        info["x_range_mm"] = (round(min(xs), 4), round(max(xs), 4))
+    if ys:
+        info["y_range_mm"] = (round(min(ys), 4), round(max(ys), 4))
+    return out, info
+
+
+def dry_problems(lines: list[str]) -> list[str]:
+    """ Lines that would switch the laser on or move Z (empty for a program made by :func:`dry_layer_lines`). """
+
+    problems = []
+    for number, line in enumerate(lines, start=1):
+        code = _code(line)
+        if _LASER_GATE.match(code):
+            problems.append(f"{number}: laser gate {line.strip()}")
+        m = _ANALOG_OUT.match(code)
+        if m and not re.match(r"^\s*\$AO\[\d+\]\.\w+\s*=\s*0(\.0*)?\s*$", code, re.IGNORECASE):
+            problems.append(f"{number}: laser power {line.strip()}")
+        if _MOTION.match(code) and any(axis.upper() == "Z" for axis, _ in _STAGE_WORD.findall(code)):
+            problems.append(f"{number}: Z move {line.strip()}")
+        if _REFUSED.match(code):
+            problems.append(f"{number}: {line.strip()}")
+    return problems
+
+
+def step_layer_dry(session: Session, args) -> None:
+    """ P5: a real layer, made dry, split at the budget part size and run with the package loader on task 1. """
+
+    import logging
+
+    from nanofactorysystem.aerobasic.ascii import AerotechAsciiInterface
+    from nanofactorysystem.aerobasic.programs.split import split_lines
+    from nanofactorysystem.devices.aerotech.loader import LibraryLoader, MemoryBudget, ProgramRunner, max_part_lines
+
+    if not args.axes_safe:
+        session.log("layer-dry moves the stage in X/Y (around the current position) and the galvo, with the laser "
+                    "forced off; Z never moves. Move the objective to a safe Z, close the shutter, then repeat with "
+                    "--axes-safe.")
+        sys.exit(1)
+    source = Path(args.file)
+    client = try_ascii(args.reply_timeout)
+    if client is None:
+        session.log("ASCII interface not reachable. Stopped.")
+        sys.exit(1)
+    axes = axis_states(client)
+    client.close()
+    x_mm, y_mm = axes.get("X", {}).get("position"), axes.get("Y", {}).get("position")
+    if x_mm is None or y_mm is None:
+        session.log(f"Stage position not readable ({axes}). Stopped.")
+        sys.exit(1)
+    try:
+        dry, info = dry_layer_lines(read_lines(source), float(x_mm), float(y_mm))
+    except ValueError as error:
+        session.log(f"{source.name} cannot be made dry: {error}. Stopped.")
+        sys.exit(1)
+    problems = dry_problems(dry)
+    if problems:
+        session.log(f"The dry copy still has {len(problems)} unsafe lines, e.g. {problems[:3]}. Stopped.")
+        sys.exit(1)
+    session.log(f"layer-dry: {source.name} ({len(dry)} lines): {info['laser_gate_lines']} gate lines set OFF, "
+                f"{info['analog_out_lines']} $AO set 0, {info['z_words_removed']} Z words removed; stage X "
+                f"{info['x_range_mm']} mm, Y {info['y_range_mm']} mm (now X {float(x_mm):.4f}, Y {float(y_mm):.4f})")
+    text = (f"The stage moves in X within {info['x_range_mm']} mm and in Y within {info['y_range_mm']} mm, the galvo "
+            f"moves, the laser gate is forced off and the power set to 0; Z does not move. The objective must be at "
+            f"a safe Z and the shutter closed.")
+    if not confirmed("DRY", text):
+        session.log("Not confirmed. Stopped.")
+        sys.exit(1)
+    budget = MemoryBudget(budget_gb=args.budget_gb)
+    part_lines = args.part_lines or max_part_lines(budget)
+    parts = split_lines(dry, part_lines, source=source.name)
+    total = len(parts)
+    if args.max_parts:
+        parts = parts[:args.max_parts]
+    folder = session.programs / "layer_dry"
+    files = [write_program(folder / f"{source.stem}_dry.part{k + 1:03d}of{total:03d}.pgm", part)
+             for k, part in enumerate(parts)]
+    session.log(f"  {total} parts of at most {part_lines} lines; running {len(files)} on task 1 with add-ahead")
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    api = AerotechAsciiInterface(load_timeout=args.reply_timeout)
+    try:
+        api.connect()
+        loader = LibraryLoader(args.dll)
+    except (OSError, RuntimeError) as exc:
+        session.log(f"Controller not usable ({type(exc).__name__}: {exc}). Stopped.")
+        sys.exit(1)
+    runner = ProgramRunner(loader, api, budget, exec_dir=folder / "exec", logger=logging.getLogger("layer-dry"))
+    error = ""
+    try:
+        runner.run([(k, [path]) for k, path in enumerate(files)])
+    except Exception as exc:  # record every failure of the integrated path
+        error = f"{type(exc).__name__}: {exc}"
+        session.log(f"layer-dry failed: {error}")
+    finally:
+        loader.close()
+        api.close()
+    for record in runner.records:
+        session.record("layer_dry_part", dict(vars(record)))
+        session.log(f"  part {record.part} task {record.task}: compile {record.load_s} s, waited "
+                    f"{record.waited_for_load_s} s, run {record.run_s} s, gap {record.gap_s} s, last line "
+                    f"{record.last_line}, PC {record.used_gb} GB")
+    gaps = [r.gap_s for r in runner.records if r.gap_s is not None]
+    session.record("layer_dry", {"file": str(source), "lines": len(dry), "parts_total": total, "parts_run": len(files),
+                                 "part_lines": part_lines, "completed": len(runner.records), "max_gap_s": max(gaps,
+                                 default=None), "error": error, **info})
+    session.log(f"layer-dry: {len(runner.records)} of {len(files)} parts completed, largest gap {max(gaps, default=None)} s")
+    if not args.keep:
+        shutil.rmtree(folder, ignore_errors=True)
+
 
 STEPS = {"system": step_system, "ladder": step_ladder, "precision": step_precision, "ogm": step_ogm,
          "cycle": step_cycle, "sticky": step_sticky, "watch": step_watch,
          "api": step_api, "ogm-clean": step_ogm_clean, "add-associate": step_add_associate, "hold": step_hold,
          "taskspeed": step_taskspeed, "runner": step_runner, "recover-ascii": step_recover_ascii, "reset": step_reset,
-         "restart-service": step_restart_service}
+         "restart-service": step_restart_service, "ascii-names": step_ascii_names,
+         "recover-blocked": step_recover_blocked, "dotnet-build": step_dotnet_build, "layer-dry": step_layer_dry}
 
 
 def main(argv: Optional[list[str]] = None) -> None:
@@ -1405,7 +1859,7 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--reply-timeout", type=float, default=ASCII_REPLY_TIMEOUT,
                         help="seconds to wait for an ASCII reply (default 60)")
     parser.add_argument("--no-probe", action="store_true", help="system: skip the ASCII LOAD probe")
-    parser.add_argument("--confirm", action="store_true", help="recover-ascii, reset, restart-service")
+    parser.add_argument("--confirm", action="store_true", help="recover-ascii, recover-blocked, reset, restart-service")
     parser.add_argument("--wait-s", type=float, default=180.0, help="seconds to wait for a recovery (default 180)")
     parser.add_argument("--reset-via", choices=["ascii", "library"], default="ascii",
                         help="reset: ~RESETCONTROLLER over ASCII (default) or A3200Reset through the library")
@@ -1414,11 +1868,16 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--task", type=int, default=2, help="task for load-only steps (default 2)")
     parser.add_argument("--sizes", type=lambda s: [int(x) for x in s.split(",")],
                         default=[50_000, 100_000, 200_000, 400_000, 800_000], help="ladder sizes in lines")
-    parser.add_argument("--lines", type=int, default=200_000, help="lines per synthetic program (precision, cycle)")
+    parser.add_argument("--lines", type=int, default=200_000,
+                        help="lines per synthetic program (precision, cycle); dotnet-build: first N lines (0 = all)")
     parser.add_argument("--parts", type=int, default=4, help="parts in the cycle")
     parser.add_argument("--segment-um", type=float, default=2.0, help="galvo step of the synthetic programs")
     parser.add_argument("--budget-gb", type=float, default=22.0, help="memory budget of the whole PC")
-    parser.add_argument("--axes-safe", action="store_true", help="confirm that the galvo may move (cycle)")
+    parser.add_argument("--axes-safe", action="store_true",
+                        help="confirm that the galvo (cycle, taskspeed, runner) or the stage XY (layer-dry) may move")
+    parser.add_argument("--part-lines", type=int, default=None,
+                        help="layer-dry: lines per part (default: from the memory budget)")
+    parser.add_argument("--max-parts", type=int, default=None, help="layer-dry: run only the first N parts")
     parser.add_argument("--interval", type=float, default=5.0, help="seconds between samples (watch)")
     parser.add_argument("--dll", default=DLL_DEFAULT)
     parser.add_argument("--keep", action="store_true", help=argparse.SUPPRESS)
@@ -1428,7 +1887,8 @@ def main(argv: Optional[list[str]] = None) -> None:
     if args.step == "_worker":
         worker(args)
         return
-    if args.step in ("ladder", "ogm", "hold") and (not args.file or not Path(args.file).is_file()):
+    if args.step in ("ladder", "ogm", "hold", "dotnet-build", "layer-dry") and (not args.file or
+                                                                              not Path(args.file).is_file()):
         parser.error("--file must name an existing program file")
     if args.step == "hold" and (not args.file2 or not Path(args.file2).is_file()):
         parser.error("--file2 must name an existing program file")
