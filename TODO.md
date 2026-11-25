@@ -42,7 +42,7 @@ with an evaluation after every layer capture; a camera live feed; a core that a 
 | 8 | Operating modes and calibration | T88, T89, T90, T91, T92, T104, T107 | T90 needs MIRA MI-53 for the real evaluator; T104 needs MIRA MI-41 for the fit; T107 needs OffAxisHolo K10 for the sweep |
 | 9 | Camera live feed | T102, T93, T94, T95 | T102 before T93 (hard prerequisite, `CAMERA_LIVE.md`) |
 | 10 | Core ready for a GUI | T96, T97 | – |
-| 11 | Standard test prints (PTD-01), **priority** (decision D7 of `TEST_PRINT_PTD01.md`) | T136–T147, T150, T151, T155, T156 (done), T157 (design v2), T158–T163, T148, T149 | T157 approved before T158–T163; T148 before T149 |
+| 11 | Standard test prints (PTD-01), **priority** (decision D7 of `TEST_PRINT_PTD01.md`) | T136–T147, T150, T151, T155, T156 (done), T157 (design v2), T158–T163, T148, T149 | T157 approved 2026-11-25; T148 before T149 |
 | B | Backlog (from T19 `todo_notes.md`, lab checks, follow-ups) | T67, T69, T109, T111, T112, T114 | – |
 
 Phases 6, 9 and 10 are independent of each other. Phase 7 can start with T82, T83 and T85 before
@@ -87,7 +87,6 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
 | – | Final defaults for positions / frames / offset of the plan generator | after the speckle / position study (M4) | final values in T85 (start values exist) |
 | – | Final default z per objective | focus study OffAxisHolo K10 | fallback value of T107 |
 | PTD-01 D9 | Does `SET_POWER` inside a running program wait for the attenuator? (`docs/design/TEST_PRINT_PTD01.md` §12.1) | lab check T148 before stage A | `dwell_after_power_s` value; T149 |
-| Parameter tests v2 | Review of the proposals in `docs/design/PARAMETER_TESTS.md` §8 (label power, anchoring depth, header bits, Quick PT wall groups, F1 / F6 values, Voxel PT-01 layout, material start file) | T157 | T158–T163 |
 
 ## Decided
 
@@ -110,6 +109,7 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
 | DL-A3 a | 2026-11-18 | `config_hash` + parameter-set id in every message; the full parameter set once per hash in `experiment.h5` (T79). |
 | M4 / T85 | 2026-11-18 | One plan generator here (T85), one algorithm in MIRA; at least 9 positions per structure; jitter with stored seed; start values in T85. |
 | M6 | 2026-11-18 | This side rasterises the target at least as fine as the product (T89). |
+| Parameter tests v2 | 2026-11-25 | `docs/design/PARAMETER_TESTS.md` §3–§8: single stage, absolute axes, 0.1–1.0 mW linear, 60 µm fields a/b, label and support power 0.5 mW, anchoring 1 µm, header 3 + 1 bits, Quick PT walls and pads, Full PT-01 values, Voxel PT-01 one power per experiment (gap cells 100 µm apart, 3 × 4), one material start file. |
 | PTD-01 D1–D8, D10–D16 | 2026-11-25 | `docs/design/TEST_PRINT_PTD01.md` §12.2: DOWN order kept; reduced corners with QR; `p_ref_factor` 1.5; 1 replicate (later 3); gaps 2 / 4.5 µm; golden program F3; phase 11 with priority; stage-A start values in one JSON per material; F7 bases 6 × 6 µm with pillars 2–10 µm; F2 pedestals 2 × 3 × 3 µm with 2 µm gap; line middle only; polarisation measured before stage B; recalibration rule documented only; anchoring 1.5 µm for volume cells; in-layer order `row_by_row`. |
 | X-A, X-B, X-C | 2026-11-18 | `Information_Mehrere_Experimente.txt` and `todo_claude/` moved to the local attic; `docs/ATTIC_INDEX.md`. |
 
@@ -876,14 +876,6 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
 
-- [ ] T157: Design version 2 of the parameter tests: Quick PT, Full PT-01, Voxel PT-01 (maintainer review 2026-11-25) [phase: 11]
-  - Priority: high
-  - Size: S
-  - Depends on: –
-  - Done when: `docs/design/PARAMETER_TESTS.md` holds the decisions of the session of 2026-11-25 (single stage,
-    absolute axes, power 0.1–1.0 mW linear, 60 µm fields with sub-fields a/b, three tests) and the maintainer has
-    confirmed the proposals of its §8; the document contains `Status: approved <date>`.
-  - Blocked by: waiting for maintainer approval (draft written 2026-11-25, working rule 2).
 
 - [ ] T153: Lab session 3 for program loading: .NET compile path, added-program names, R1 and R3 (follow-up of
   T134) [phase: B]
@@ -917,6 +909,7 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T157: Design version 2 of the parameter tests: Quick PT, Full PT-01, Voxel PT-01 (maintainer review 2026-11-25) — 2026-11-25 — `docs/design/PARAMETER_TESTS.md` approved: single-stage tests on absolute axes, power 0.1–1.0 mW linear, 60 µm fields with sub-fields a/b, Voxel PT-01 with one power per experiment and gap cells 100 µm apart in a 3 × 4 grid; T158–T163 may start. — commits: `e992b6e`, `cf2a3ab`, this docs commit
 - [x] T155: Decision: layer count of the PTD-01 volume fields F4, F5, F7 (found during T142) — 2026-11-25 — Obsolete: version 2 of the parameter tests (T157) uses absolute slice distances, so the rows of a field share their layers. — commits: this docs(todo) commit
 - [x] T156: Decision: scales of the `threshold_ln` fit (found during T151) — 2026-11-25 — Decided by the maintainer: n_eff = 1 as placeholder in the parameter tests; n_eff is determined in a later dose-matrix test with several velocities (F31). — commits: this docs(todo) commit
 - [x] T137: `ParameterFieldStructure`: toolpath IR → IFOV programs without changing existing code — 2026-11-25 — `nanofactorysystem/testprint/structure.py`: one IFOV layer per z level, one block per run of equal power and leaf kind, element order kept, `dwell_after_power_s`, built from a registered field builder (JSON round trip); no existing file changed. — commits: `a191b60`

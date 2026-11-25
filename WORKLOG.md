@@ -3083,3 +3083,20 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Follow-ups:**
   - Maintainer review of `PARAMETER_TESTS.md` §8, then T158–T163.
   - The code of version 1 (`mains/Experiments/ptd01/` and the stage-B logic in `testprint/`) stays until T158/T162 replace it.
+
+### 2026-11-25 23:33 CET — [T157] Review of the parameter-test proposals and design approval
+- **Status:** done
+- **Decisions (maintainer, 2026-11-25):**
+  - Label power 0.5 mW; anchoring 1 µm in all tests; header 3 bits field + 1 bit sub-field.
+  - Quick PT: two groups of three walls per power.
+  - Full PT-01: F1 with 2 x- and 2 y-lines of 7 µm, 2.5 µm apart, passes 1–4; F6 star and grid 6 µm, grid pitch 2.5 µm.
+  - Voxel PT-01: one power per experiment; the 11 gap cells are separate structures 100 µm apart in a 3 × 4 grid.
+  - One material start file per material.
+  - Design approved.
+- **Changes:**
+  - `docs/design/PARAMETER_TESTS.md`: decisions in §3–§6, review table §8, status approved.
+  - `TODO.md`: T157 moved to Done, decision row, phase-plan gate.
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (documentation only).
+- **Commits:** `cf2a3ab` docs(design): record the review of the parameter-test proposals [T157]; this docs(todo) commit.
+- **Follow-ups:** T158–T163 (implementation of version 2); T148 and T149 (lab).

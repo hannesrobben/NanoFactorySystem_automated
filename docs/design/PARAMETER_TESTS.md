@@ -1,10 +1,10 @@
 # Design: Parameter tests Quick PT, Full PT-01, Voxel PT-01 (version 2)
 
-Status: draft (waiting for maintainer approval)
+Status: approved 2026-11-25 (all proposals decided in the review of 2026-11-25, §8)
 
 Date: 2026-11-25. Todo: T157. Replaces the two-stage plan of `TEST_PRINT_PTD01.md` (version 1, approved
 2026-11-25 and implemented in T137–T147, T150, T151). Decisions of the session of 2026-11-25 (afternoon)
-are marked **[decided]**, proposals that still need the maintainer's confirmation **[proposal]**. The names
+are marked **[decided]** (no open proposals remain). The names
 are provisional (the maintainer will rename the tests later).
 
 ## 1. Why version 2
@@ -105,9 +105,9 @@ the gap is larger than the voxel length can bridge.
 - Base 20 × 20 µm (fast to write, large enough for DHM and SEM evaluation) **[decided]**; base at the support
   power, lid at the tested power **[decided]**.
 - **One power per experiment** **[decided]**: 10 experiments (0.1 … 1.0 mW), each with the 11 gaps; every
-  experiment can be repeated on its own. Inside an experiment **[proposal]**: two cells of neighbouring gaps form
-  one sub-field (2 × 20 µm + 4.5 µm gap = 44.5 µm, one DHM image), 6 sub-fields in a 2 × 3 grid of 150 µm cells
-  (the last sub-field holds the single gap 2.0 µm).
+  experiment can be repeated on its own. Inside an experiment **[decided]**: every gap cell is its own structure;
+  the cells lie 100 µm apart in a 3 × 4 grid (12 places, 11 used: gap 0 … 2.0 µm row by row), each cell on the
+  optical axis of its grid cell and in its own DHM image.
 - Base and lid hatch 0.2 µm, slice 0.25 µm **[decided]** (support values).
 - Evaluation: per power the smallest gap without lid = upper bound of l(P), the largest gap with lid = lower
   bound; with 0.2 µm steps l is known to ±0.1 µm. A finer gap series around the found limit is a follow-up.
@@ -139,4 +139,4 @@ All proposals of the draft were answered by the maintainer on 2026-11-25:
 | 6 | Voxel PT-01 | one power per experiment (10 experiments × 11 gaps) |
 | 7 | Input | one material start file per material |
 
-Remaining proposal: grouping of the 11 gap cells of a Voxel PT-01 experiment into 6 sub-fields of two cells (§6).
+Gap cells of Voxel PT-01: each cell its own structure, 100 µm apart in a 3 × 4 grid (§6). With this the design was approved.
