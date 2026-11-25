@@ -8,6 +8,7 @@
 - :func:`unpack_experiment`: write the whole file as PNG/CSV/TXT/JSON/ZDC files.
 - :class:`ExperimentFile`: read the file at any time (also while printing) and
   store analysis results in it.
+- :mod:`.ptd`: cell tables of the PTD-01 test fields and import of measured voxel sizes (T147).
 """
 
 from .access import ExperimentBusyError, ExperimentFile, lock_holder, resolve_file

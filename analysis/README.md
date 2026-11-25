@@ -75,3 +75,23 @@ Rules (they keep the printing process safe):
 - Writing takes the lock file for the duration of the write. While an experiment process holds it
   (printing or restart), `save_result()` raises `ExperimentBusyError`, or waits up to `wait_s` seconds.
   Results can be stored as soon as the printing session has ended.
+
+## Test prints (PTD-01)
+
+`experiment_analysis.ptd` (T147) supports the evaluation of the standard test print PTD-01
+(`mains/Experiments/ptd01/`, design `docs/design/TEST_PRINT_PTD01.md` §8):
+
+```python
+from experiment_analysis.ptd import export_cell_table, import_voxel_measurements, save_cell_table
+from nanofactorysystem.voxel import VoxelDatabase
+
+export_cell_table(r"D:/.../HR-26-003-B_20261201-1015", "F1_cells.csv")   # template, fill it during SEM / DHM
+import_voxel_measurements("F1_cells.csv", VoxelDatabase(r"D:/.../voxels.sqlite"))   # F0, F1, F2 rows
+save_cell_table(r"D:/.../HR-26-003-B_20261201-1015")                    # /analysis/experiment/ptd01_cell_table
+```
+
+The cell table is rebuilt from `/spec` (factory name and arguments) with the pure field builder; every
+row has the cell parameters (absolute and normalised), the stage position of the cell and the empty
+measurement columns `width_um`, `height_um`, `width_std_um`, `height_std_um`, `n_lines`, `present`,
+`merged`, `collapsed`, `method`, `notes`. Filled rows of F0, F1 and F2 (with `method`) go into the voxel
+database.
