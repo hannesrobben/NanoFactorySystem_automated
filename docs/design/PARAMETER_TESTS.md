@@ -42,14 +42,14 @@ substrate (`run_substrate`), but no test needs the result of another one.
 | Power ladder | 0.1 … 1.0 mW, linear, steps of 0.1 mW (10 levels); intermediate values are tested later, based on the results | **[decided]** |
 | Field size | 60 × 60 µm: DHM field of view about 85 µm minus the propagation border and the centring error | **[decided]** |
 | Power split | every field consists of two sub-fields: **a** = 0.1 / 0.2 / 0.3 / 0.4 / 0.5 mW, **b** = 0.6 … 1.0 mW (5 rows each), both in the same experiment side by side, each on the optical axis of its grid cell; identical layout for every field, so the evaluation needs no special cases | **[decided]** |
-| Header | 5 µm strip: L mark, field number (3 bits) + sub-field bit (a = 0, b = 1) as dots, REF pad | **[proposal]** |
+| Header | 5 µm strip: L mark, field number (3 bits) + sub-field bit (a = 0, b = 1) as dots, REF pad; the test itself is identified by the experiment (QR code) | **[decided]** |
 | Support power | 0.5 mW, hatch 0.2 µm, slice 0.25 µm for pedestals, bases, REF pad, gap-test bases | **[decided]** |
-| Label power | 0.5 mW (same as the supports; version 1 had 0.7 mW) | **[proposal]** |
-| Substrate anchoring | the first layer is repeated into the substrate: Quick PT 1 µm (decided with the walls), Full PT-01 and Voxel PT-01 also 1 µm (version 1: 1.5 µm) | **[proposal]** |
+| Label power | 0.5 mW (same as the supports; version 1 had 0.7 mW) | **[decided]** |
+| Substrate anchoring | the first layer is repeated 1 µm into the substrate in all three tests (version 1: 1.5 µm) | **[decided]** |
 | Cell gaps | 2 µm between line cells, 4.5 µm between volume cells (D5) | **[decided]** (D5) |
 | In-layer order | `row_by_row` (D16) | **[decided]** |
 | Print order 63x | highest layer first (D1) | **[decided]** |
-| Material start file | one JSON per material: power ladder and the axis lists of §4–§6, label and support power; replaces `stage_a_<material>.json`; no calibration file is needed for printing | **[proposal]** |
+| Material start file | one JSON per material (e.g. `parameter_tests_SZ2080.json`): power ladder, the axis lists of §4–§6, label and support power, anchoring depth; all three tests read it; the values are stored in `/spec` of every experiment; replaces `stage_a_<material>.json`; no calibration file is needed for printing | **[decided]** |
 
 ## 4. Quick PT
 
@@ -65,7 +65,7 @@ wall width and, from the 1.5 µm spacing, whether neighbours merge.
 
 | Sub-field | Rows | Columns | Cell | Fits 60 × 55 µm |
 |---|---|---|---|---|
-| Q1a / Q1b | 5 powers | 1 group of 3 walls (optionally 2 groups for statistics **[proposal]**) | 8 × 3 µm | yes |
+| Q1a / Q1b | 5 powers | 2 identical groups of 3 walls side by side (statistics: a missing wall in one group only points to the surface, not the power) **[decided]** | 8 × 3 µm each | yes |
 | Q2a / Q2b | 5 powers | 4 hatches | 5 × 5 µm | yes (4 × 5 + 3 × 4.5 = 33.5 µm) |
 
 ## 5. Full PT-01
@@ -75,12 +75,12 @@ Fields F1–F7 of version 1, single-stage, absolute values; each field as sub-fi
 
 | Field | Rows (per sub-field) | Columns | Fixed | Status |
 |---|---|---|---|---|
-| F1 line test | 5 powers | passes 1 / 2 / 3 / 4 | 2 x-lines + 2 y-lines, 7 µm long, 2.5 µm apart, at z = 0 | **[proposal]** |
+| F1 line test | 5 powers | passes 1 / 2 / 3 / 4 | 2 x-lines + 2 y-lines, 7 µm long, 2.5 µm apart, at z = 0 | **[decided]** |
 | F2 bridges | 5 powers | span 2 / 4 / 7 / 10 µm | pedestals 2 × 3 × 3 µm at the support power; the line 0.5 µm below the pedestal top (z = 2.5 µm); gap 2 µm between cells (D11) | **[decided]** |
 | F3 line pairs | 5 powers | centre distance 0.2 / 0.4 / 0.6 / 0.8 / 1.0 / 1.2 µm | a pair above a group of five 6 µm lines, 1.5 µm between pair and group, at z = 0 (expected: 0.2 / 0.4 merged, 0.6 / 0.8 depend on power, 1.0 / 1.2 separate) | **[decided]** |
 | F4 squares | 5 powers | hatch 0.1 / 0.2 / 0.4 / 0.6 µm | pad 6 × 6 µm, 3 layers of 0.3 µm, 1.6 µm ramp, hatch along x | **[decided]** |
 | F5 layer test | 5 powers (wedges) + 1 row of caps | slice 0.1 / 0.2 / 0.3 / 0.5 µm | wedge 8 × 4 × 3 µm (20.6°), hatch 0.2 µm; caps Ø 8 µm, 2 µm high, at the support power | **[decided]** |
-| F6 crossings | star / 3 × 3 grid / woodpile | 5 powers | star 0/45/90/135° and grid 6 µm, grid pitch 2.5 µm; woodpile 4 layers, rod pitch 1.5 µm, layer distance 0.4 µm | woodpile **[decided]**, star/grid **[proposal]** |
+| F6 crossings | star / 3 × 3 grid / woodpile | 5 powers | star 0/45/90/135° and grid 6 µm, grid pitch 2.5 µm; woodpile 4 layers, rod pitch 1.5 µm, layer distance 0.4 µm | **[decided]** |
 | F7 pillars | 5 powers (F7a 0.1–0.5 mW will mostly not stand; kept for the uniform scheme) | height 2 / 4 / 6 / 8 / 10 µm | Ø 1.5 µm, filled with hatch 0.2 / slice 0.25 µm; base 6 × 6 × 1.4 µm at the support power (D10) | **[decided]** |
 
 F6 is transposed compared with the other fields (type in the rows, power in the columns); for the uniform
@@ -104,10 +104,11 @@ the gap is larger than the voxel length can bridge.
 
 - Base 20 × 20 µm (fast to write, large enough for DHM and SEM evaluation) **[decided]**; base at the support
   power, lid at the tested power **[decided]**.
-- 10 powers × 11 gaps = 110 cells. Layout **[proposal]**: sub-fields of 2 × 2 cells (2 powers × 2 gaps,
-  cell pitch 24.5 µm, 49 µm per sub-field, one DHM image each) in a grid of 5 × 6 sub-fields with 150 µm
-  pitch (about 0.75 × 0.9 mm); every sub-field is one structure of the experiment.
-- Base hatch 0.2 µm **[proposal]**; lid hatch 0.2 µm **[proposal]**.
+- **One power per experiment** **[decided]**: 10 experiments (0.1 … 1.0 mW), each with the 11 gaps; every
+  experiment can be repeated on its own. Inside an experiment **[proposal]**: two cells of neighbouring gaps form
+  one sub-field (2 × 20 µm + 4.5 µm gap = 44.5 µm, one DHM image), 6 sub-fields in a 2 × 3 grid of 150 µm cells
+  (the last sub-field holds the single gap 2.0 µm).
+- Base and lid hatch 0.2 µm, slice 0.25 µm **[decided]** (support values).
 - Evaluation: per power the smallest gap without lid = upper bound of l(P), the largest gap with lid = lower
   bound; with 0.2 µm steps l is known to ±0.1 µm. A finer gap series around the found limit is a follow-up.
 
@@ -124,12 +125,18 @@ the gap is larger than the voxel length can bridge.
 - Evaluation: the cell table holds absolute values; once P_th, w and l are known (Quick PT / Voxel PT-01),
   a function adds the relative columns (P/P_th, h/w, Δz/l) to every cell table.
 
-## 8. Open points for the review
+## 8. Review of the proposals (2026-11-25)
 
-1. [proposal] Label power 0.5 mW (§3).
-2. [proposal] Anchoring depth 1 µm for all three tests (§3).
-3. [proposal] Header: field number 3 bits + sub-field bit (§3).
-4. [proposal] Quick PT Q1: one or two groups of three walls per power (§4).
-5. [proposal] Full PT-01 F1 and F6 star/grid values (§5).
-6. [proposal] Voxel PT-01 layout and hatches (§6).
-7. [proposal] Material start file as the single input of all three tests (§3).
+All proposals of the draft were answered by the maintainer on 2026-11-25:
+
+| # | Point | Decision |
+|---|---|---|
+| 1 | Label power | 0.5 mW, the same as the supports |
+| 2 | Anchoring depth | 1 µm in all three tests |
+| 3 | Header | 3 bits field number + 1 bit sub-field a/b |
+| 4 | Quick PT walls | two groups of three walls per power |
+| 5 | Full PT-01 F1 / F6 | F1: 2 x- + 2 y-lines of 7 µm, 2.5 µm apart, passes 1–4; F6: star and grid 6 µm, grid pitch 2.5 µm |
+| 6 | Voxel PT-01 | one power per experiment (10 experiments × 11 gaps) |
+| 7 | Input | one material start file per material |
+
+Remaining proposal: grouping of the 11 gap cells of a Voxel PT-01 experiment into 6 sub-fields of two cells (§6).
