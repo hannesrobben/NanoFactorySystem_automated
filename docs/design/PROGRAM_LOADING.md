@@ -1,7 +1,8 @@
 # Program loading through the A3200 library within a memory budget (T129) — work order
 
 Status: draft of 2026-11-24, updated the same day with the results of lab session 1 (section 6), the
-revised plan (section 7) and the health check and recovery (section 8). The requirements below come
+revised plan (section 7) and the health check and recovery (section 8). Updated on 2026-11-25 with the
+results of lab session 2 (section 6.2) and the plan after it (section 7.2). The requirements below come
 from the maintainer. The lab tests are in `docs/guides/PROGRAM_LOADING_LAB_TESTS.md`.
 
 Related todos:
@@ -129,6 +130,50 @@ Further observations of the session:
 | `A3200CallbackService.exe` (32 bit) held 1.87 GB in this session, constant. In the morning it held 10 MB (same PID). | It grew between the two sessions (library load of the whole layer or Motion Composer?). A 32-bit process near 2 GB can run out of address space. Monitor it; it is part of the health check (section 8). |
 | A program loaded by Motion Composer stays added after Motion Composer is closed (count 2 until the end of the session). | Before a print, the added programs must be listed and cleaned up (health check). |
 
+### 6.2 Lab session 2 (2026-11-25, T134)
+
+Session folder `mains/lab_checks/program_loading_lab_20261125` (`log.txt`, `results.jsonl`,
+`watch_094421.csv`, `api/`, `INtime.txt`, `NOTES_READ_ME.txt`), 09:42–11:54. Motion Composer
+6.04.005.005, `A3200.dll` 6.4.5.5. The session folder is not versioned.
+
+**Preconditions.** The A3200 processes were started on 2026-11-24 at 15:52 (the restart at the end of
+session 1), not right before session 2; the `system` step warned. The ASCII LOAD probe worked and 2
+programs were added. The library results are not affected. The A3200 software was restarted by hand at
+11:19, between the second and the third `sticky` run, so the third run is the clean repeat that session 1
+could not deliver.
+
+| Question | Lab step | Result |
+|---|---|---|
+| Does our own `.OGM` load fast under a new name, and does a renamed copy? | `ogm-clean` | **Yes, both.** 400k lines of layer 68: compile through the library 38.9 s, 7.51 GB, 19.63 kB per line. Loading the resulting `.OGM` under a never-used name: **15.1 s, 0.61 GB (1.55 kB per line)**; the renamed copy: 15.3 s, the same memory. The `.OGM` is about **2.6× faster** to load (38 µs instead of 97 µs per line) and needs **1/13 of the memory**. |
+| Full layers from `.ogm` (clean repeat of session 1) | `hold` | Layer 68 (1 253 745 lines): **47.5 s, 1.88 GB**; layer 69 (809 415 lines): 30.7 s, 1.22 GB, both 1.55 kB and 38 µs per line. The 5.9 s of session 1 is corrected: Motion Composer had loaded that layer just before. Both full layers stayed loaded on tasks 1 and 2 at the same time (4 added programs, both `program_ready`). |
+| Under which name is an `.ogm` added? | `ogm-clean`, `hold` | Under **`<stem>.pgm`**: `A3200ProgramRemove("<stem>.ogm")` returns success but the added-program count does not change; `"<stem>.pgm"` removes it. A removal under a wrong name is silently ignored, so R7 (verify with the count) is required. |
+| `A3200ProgramAdd` + `A3200ProgramAssociate` | `add-associate` | **Works.** 200k lines: add 19.3 s and 3.71 GB (19.33 kB per line, the same as a load), the task stays `idle`; associate to task 2 takes < 0.05 s and the task becomes `program_ready`. The compile can run ahead without a free task. |
+| Is task 2 slower only with the bare header? | `taskspeed` | **No.** 100k galvo lines: task 1 1.399 ms per line, task 2 2.502 ms per line, **ratio 1.79 with the bare and with the real layer header** (identical times). |
+| Which task parameters differ? (checklist item 2, Configuration Manager) | parameter files in `api/config` | Read from the `.prma` files instead of the Configuration Manager. In **every** parameter file of the controller (2021–2025, all objectives) task 1 is tuned and task 2 has the defaults: `MaxLookaheadMoves` 10000 / **100**, `ExecuteNumLines` 100 / **1**, `MotionUpdateRate` 48 / **1**, `DefaultCoordinatedSpeed` 12.5 / 50, `DefaultCoordinatedRampRate` 2000 / 500, `DefaultCoordinatedRampTime` 0.1 / 0.5 (task 1 / task 2; the Nikon 40x files differ slightly). `EnabledTasks` = 3, i.e. tasks 0–2: this is why task 3 is `inactive`. |
+| Does the package loader (`ProgramRunner`) run every part? (P5, first half) | `runner` | **Yes.** 4 parts × 200k lines on tasks 1/2/1/2: every part ended at its last line, load 19.1 s per part, gaps **0.31–0.33 s**, the first part waited 20.5 s for its load, PC at 8.4 GB. Parts on task 2 ran 500.7 s, parts on task 1 279.6 s. |
+| Is only the failed name blocked after a refused ASCII LOAD? | `sticky` (3 runs, the third after a restart) | **Yes, only the name.** In all three runs: the invalid program is refused ("Compiler Error: The program failed to compile."); a valid program of another name loads; **valid content under the failed name is refused again**; the first program loads again; the library loads. The probe at the start of the next run passed, so no global refusal remains. |
+| Memory of the PC | `watch` | PC at most 13.8 GB (during the 400k compile, worker at most 7.3 GB). `A3200CallbackService.exe` at most 0.035 GB, `A3200AsciiInterface.exe` at most 0.053 GB: the 1.87 GB of session 1 did not recur. |
+| INtime memory with two loaded full layers | `hold` | **Not answered.** The prompt took one line, so the pasted multi-line block of the INtime Explorer went into the next prompts. The copied block (`INtime.txt`, RT handle 0258, pool 512 MB, 122 MB used) is identical before and after; it is not the memory that holds the programs, or it was not refreshed. Practical result only: 2.06 M lines from `.ogm` loaded at the same time without an error. |
+| .NET compile path of Motion Composer | `api` | **Found, not run.** `Aerotech.A3200.dll` 6.4.5.5 has `Aerotech.AeroBasic.Builder.Build(fileName[, BuildSettings])` and `BuildSource(...)`, returning `BuildResults` with `CompilerErrors`. The step's filter missed it (it only printed names containing "Compile"). `Controller.Reset()` and `Controller.LoadedPrograms` exist as well. |
+| Library functions | `api` | `A3200Reset` is exported with the expected prototype; `A3200ProgramGetAddedPrograms` returns `A3200AddedProgram {name[128], associatedTasks}` (names and task association for R0); `A3200ProgramInitializeQueue` (queue mode, T126); `A3200ConfigurationCompilerOutputDirectoryGet/Set`. |
+
+Recovery levels (T133):
+
+| Level | Lab step | Result |
+|---|---|---|
+| R1: terminate `A3200AsciiInterface.exe` | `recover-ascii` | **Works and changes nothing else.** The CommService starts it again after 0.3 s, ASCII answers after 1.0 s, the LOAD probe passes. Tasks, added programs (2) and axes (enabled, homed, same position) are unchanged. Not tested: whether R1 clears a blocked name (there was no blocked state left to clear, see `sticky`). |
+| R2: `~RESETCONTROLLER` | `reset` | **Works, but resets the machine state.** 7.9 s; ASCII and library usable right after. **All axes disabled and not homed**; the unpowered galvo drifted (A 0.043 mm, B 0.009 mm); the added programs went 2 → 0. Only between experiments, followed by enable, home and the setup initialisation (IFOV). |
+| R3: `Restart-Service A3200CommService` | `restart-service` | **Not measured.** Refused: "Cannot open A3200CommService service on computer '.'" (PowerShell without administrator rights, or the service does not allow it). The manual restart of the A3200 software at 11:19 worked as usual. |
+
+Further observations:
+
+| Observation | Meaning |
+|---|---|
+| Session 1 wrote "every print so far ran on task 2". Wrong: `Experiment` loads every layer program on **task 1** (`run_program_as_task(part, task_id=1)`), the DOE log shows `PROGRAM 1 LOAD`. | The automated prints ran on the tuned task. The library loader is the first path that puts every second part on task 2. |
+| The ASCII path loads every layer program under the **fixed name** `python_aerobasic_program.pgm` (T127). | Together with `sticky` this explains 2026-11-21: after the out-of-memory failure of one layer, every later layer was refused because it had the same name. The global refusal of 2026-11-24 ("Could not open AerParam.pgm" after an `.ogm` sent over ASCII) is a different state and was not reproduced. |
+| 2 programs stayed added the whole day (also right after the restart at 11:19 and after many probe and `sticky` loads that were removed); after R2 the count was 0, after the next probe 1. | Probably the last program of each task stays added while it is associated with the task, even after `REMOVEPROGRAM`. Open: list the names (`A3200ProgramGetAddedPrograms`) in lab session 3. |
+| The layer header (`LOOKAHEAD FAST`, `CRITICAL START`, …) does not change the task speed. | The limit is the task configuration (lookahead 100 moves, 1 line per execution cycle), not the program. The velocity profile at corners, and with it the dose, may differ between the tasks as well. |
+
 ## 7 Plan after lab session 1
 
 What the cycle proved is already enough to print large layers safely:
@@ -184,12 +229,33 @@ The `.ogm` and Motion Composer findings make it faster and lighter. Work package
 
 T126 (queue mode) stays in the backlog: loading with prefetch already gives gaps of 0.15 s.
 
+### 7.2 Plan after lab session 2 (2026-11-25)
+
+What session 2 decides (the table "What session 2 decides" of the lab guide, applied):
+
+| Result | Consequence |
+|---|---|
+| `sticky`: only the failed name is blocked | **T152 (new, first):** the ASCII path loads every program under a fresh name (as the library loader already does) and removes it under that name; the health check and R0 recognise the name pattern. This removes the cascade of 2026-11-21 (one failed layer → every later layer refused). |
+| Task 2 is slower with both headers; task 1 is tuned, task 2 has defaults | **T132, decision (maintainer):** (a) align the task parameters of task 2 with task 1 in the active parameter file (Configuration Manager, backup first), or (b) **recommended:** print on task 1 only and compile ahead without a task (`A3200ProgramAdd`), then associate the next part to task 1 when the current one has completed (associate < 0.05 s, expected gap about 0.4 s). (b) needs no controller change, keeps one velocity profile for the whole structure and leaves task 2 free (z-line, T135). Until decided, the library loader is not used for real prints with alternation. |
+| Add + Associate works and is fast | Enables (b) above: a `ProgramRunner` mode "single task, add ahead" (T129). |
+| `.ogm` loads 2.6× faster with 1/13 of the memory; added as `<stem>.pgm` | **T131:** keep the `.OGM` the library writes anyway, load it for restarts and reprints; remove under `<stem>.pgm`. A whole-layer `.ogm` cannot be compiled through the C library within the budget (24.6 GB for layer 68). Whole layers without a split need the .NET path (below). |
+| The .NET API has `Aerotech.AeroBasic.Builder.Build(fileName)` | **Lab session 3 (T153):** compile layer 68 with `Builder.Build` in a 64-bit process, record time and peak memory, and load the result through the library. At about 5.6 kB per line (Motion Composer) a full layer compiles in about 7 GB: then compile whole layers to `.ogm` ahead (build step) and load them in 48 s with 1.9 GB, without a split. |
+| INtime memory not readable | Lab session 3, low priority: two full layers already fit. |
+| R1 works without side effects | **T133:** R1 as an operator-confirmed level: terminate the ASCII interface, wait until it answers again (≤ 5 s), probe. |
+| R2 disables and unhomes the axes | **T133:** R2 only between experiments, followed by enable, home and the setup initialisation; never during a print. |
+| R3 not measured | Lab session 3 in an administrator PowerShell; until then the manual restart of the A3200 software. |
+
+Order: T152 → T132 decision → T129 "single task, add ahead" (if (b)) and P5 with one real layer, laser
+off, then with laser → default switch (R9) → T131 → T133 R1/R2 → lab session 3 (T153).
+
 ## 8 Controller health check and recovery (maintainer idea 2026-11-24, T133)
 
 Goal: our software detects a controller in a bad state before and during a print, and brings it back
 in defined steps. Today the operator has to recognise this and restart the A3200 software by hand.
 
-Implemented on 2026-11-24 (T133, partial): the health check and R0 in `nanofactorysystem/devices/aerotech/health.py`, called by `print_structure()` before every structure and after a failed layer, stored in `/logs/health`; `mains/controller_health.py`. R1–R3 follow after lab session 2.
+Implemented on 2026-11-24 (T133, partial): the health check and R0 in `nanofactorysystem/devices/aerotech/health.py`, called by `print_structure()` before every structure and after a failed layer, stored in `/logs/health`; `mains/controller_health.py`. R1–R3 follow after lab session 2. Lab session 2 (section 6.2): R1 works
+without side effects; R2 works but disables and unhomes every axis; R3 was refused for lack of
+administrator rights.
 
 **Health check** (no side effects, before every experiment and after every failure):
 - ASCII reachable (`~VERSION`);
