@@ -42,7 +42,7 @@ with an evaluation after every layer capture; a camera live feed; a core that a 
 | 8 | Operating modes and calibration | T88, T89, T90, T91, T92, T104, T107 | T90 needs MIRA MI-53 for the real evaluator; T104 needs MIRA MI-41 for the fit; T107 needs OffAxisHolo K10 for the sweep |
 | 9 | Camera live feed | T102, T93, T94, T95 | T102 before T93 (hard prerequisite, `CAMERA_LIVE.md`) |
 | 10 | Core ready for a GUI | T96, T97 | – |
-| 11 | Standard test prints (PTD-01), **priority** (decision D7 of `TEST_PRINT_PTD01.md`) | T136–T147, T150, T151 (done), T148, T149, T154, T155 | T148 before T149; T154 before the stage-B print |
+| 11 | Standard test prints (PTD-01), **priority** (decision D7 of `TEST_PRINT_PTD01.md`) | T136–T147, T150, T151 (done), T148, T149, T155, T156 | T148 before T149; T155 before the stage-B print |
 | B | Backlog (from T19 `todo_notes.md`, lab checks, follow-ups) | T67, T69, T109, T111, T112, T114 | – |
 
 Phases 6, 9 and 10 are independent of each other. Phase 7 can start with T82, T83 and T85 before
@@ -87,8 +87,8 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
 | – | Final defaults for positions / frames / offset of the plan generator | after the speckle / position study (M4) | final values in T85 (start values exist) |
 | – | Final default z per objective | focus study OffAxisHolo K10 | fallback value of T107 |
 | PTD-01 D9 | Does `SET_POWER` inside a running program wait for the attenuator? (`docs/design/TEST_PRINT_PTD01.md` §12.1) | lab check T148 before stage A | `dwell_after_power_s` value; T149 |
-| PTD-01 D17 | Scales of the `threshold_ln` fit (n_eff identifiability) | T155 | evaluation of stage A |
-| PTD-01 D18 | Layer count of F4 / F5 / F7 (Δz per row vs. per column) | T154 | time budget of T149 |
+| PTD-01 D17 | Scales of the `threshold_ln` fit (n_eff identifiability) | T156 | evaluation of stage A |
+| PTD-01 D18 | Layer count of F4 / F5 / F7 (Δz per row vs. per column) | T155 | time budget of T149 |
 
 ## Decided
 
@@ -567,7 +567,7 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
 
 
 
-- [ ] T154: Decision: layer count of the PTD-01 volume fields F4, F5, F7 (found during T142) [phase: 11]
+- [ ] T155: Decision: layer count of the PTD-01 volume fields F4, F5, F7 (found during T142) [phase: 11]
   - Priority: high
   - Size: S
   - Depends on: –
@@ -579,7 +579,7 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
   - Done when: D18 decided and, if needed, `ptd01.py` / tests changed; layer counts and the chain time estimate
     recorded in WORKLOG.md.
 
-- [ ] T155: Decision: scales of the `threshold_ln` fit (found during T151) [phase: 11]
+- [ ] T156: Decision: scales of the `threshold_ln` fit (found during T151) [phase: 11]
   - Priority: medium
   - Size: S
   - Depends on: –
@@ -860,13 +860,13 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
 - [x] T140: `ProcessCalibration` and `StageAAxes` with their JSON files — 2026-11-25 — `calibration.py`: conversions with the voxel size at the cell power, schemas `nanofactory.process_calibration/1` and `nanofactory.ptd_stage_a/1`, `MissingPropertyError` / `SpecSerialisationError`, example sources refused for real prints. — commits: `a36a19b`
 - [x] T139: `ParameterField`: layout, header, merge by z, ordering, validation, cell table — 2026-11-25 — `field.py` and `ordering.py`: header (L mark, 3-bit id, REF pad), merge by z, named in-layer ordering (`row_by_row`, D16), validation of every problem, cell table / CSV, plot. — commits: `da90ec9`
 - [x] T141: PTD-01 field builders F0–F2 — 2026-11-25 — `ptd01.py` F0 (80 cells, 8 layers, 81 blocks), F1, F2 (pedestals 2 × 3 × 3 µm, 2 µm gap, bridge inside the pedestal top). — commits: `c662a1b`, `61eaa91`
-- [x] T142: PTD-01 field builders F3–F5 — 2026-11-25 — F3 (s = s_rel·w(P)), F4 (3 layers, ramp, `linear_x`), F5 (wedges and caps); fields needing w/l at the cell power start at p_rel 1.25; golden program `test/golden/ptd01_f3.txt` (D6). F5 has 229 layers with the example calibration (T154). — commits: `c662a1b`, `7b2d8fe`
-- [x] T143: PTD-01 field builders F6–F7 — 2026-11-25 — F6 (star, grid, woodpile) and F7 (pillars 2–10 µm on 6 × 6 × 1.4 µm bases, D10); F7 has 127 layers with the example calibration (T154). — commits: `c662a1b`
+- [x] T142: PTD-01 field builders F3–F5 — 2026-11-25 — F3 (s = s_rel·w(P)), F4 (3 layers, ramp, `linear_x`), F5 (wedges and caps); fields needing w/l at the cell power start at p_rel 1.25; golden program `test/golden/ptd01_f3.txt` (D6). F5 has 229 layers with the example calibration (T155). — commits: `c662a1b`, `7b2d8fe`
+- [x] T143: PTD-01 field builders F6–F7 — 2026-11-25 — F6 (star, grid, woodpile) and F7 (pillars 2–10 µm on 6 × 6 × 1.4 µm bases, D10); F7 has 127 layers with the example calibration (T155). — commits: `c662a1b`
 - [x] T144: Named factories `ptd01.f0` … `ptd01.f7` — 2026-11-25 — `factories.py`: JSON arguments only, power check only with a known attenuator range, objective from the context; spec round trip gives identical programs. — commits: `7334c06`
 - [x] T145: One experiment script per field in `mains/Experiments/ptd01/` — 2026-11-25 — `common.py`, `f0_interface.py` … `f7_pillars.py`, stage-A start values and example calibration files, README; dry run of every field on the dummy backend. — commits: `7c97bce`
 - [x] T146: Chain `chain_ptd01.py` with stages A/B — 2026-11-25 — Stages A / B / all, `--only`, `--replicates`, `--layout`, `--dry-run`; stage B refuses missing, mismatching or example calibrations; calibration copied into stage-B folders; time summary. — commits: `0c8ae6f`
 - [x] T147: Cell table from the experiment file and measurement import — 2026-11-25 — `analysis/experiment_analysis/ptd.py`: cell table from `/spec` (incl. REPEAT copies, stage positions), CSV template, voxel import of F0–F2, result via `ExperimentFile` (`/analysis/experiment/ptd01_cell_table`); fixed cell parameters that clashed with measurement columns. — commits: `7b2d8fe`, `3e6b81a`
-- [x] T151: Fit procedure for the voxel model from PTD measurements — 2026-11-25 — `analysis/experiment_analysis/voxel_fit.py`: weighted least squares of all kinds, standard errors, AIC, plot, calibration file, storage via `ExperimentFile`; n_eff only identifiable with fixed scales (T155). — commits: `dc42135`
+- [x] T151: Fit procedure for the voxel model from PTD measurements — 2026-11-25 — `analysis/experiment_analysis/voxel_fit.py`: weighted least squares of all kinds, standard errors, AIC, plot, calibration file, storage via `ExperimentFile`; n_eff only identifiable with fixed scales (T156). — commits: `dc42135`
 - [x] T136: Design of the standard parameter test print PTD-01 (maintainer request 2026-11-25) — 2026-11-25 — `docs/design/TEST_PRINT_PTD01.md` approved with the decisions D1–D8, D10–D16 (D9 by the lab check T148); phase 11 todos T137–T151 scheduled with priority, improvement ideas F18–F37 in `future_todo.md`. — commits: `5881afa`, `0d4bb72`, this decision commit
 - [x] T152: The ASCII path loads every layer program under one fixed name, so one refused compile blocks every later layer (found during T134) — 2026-11-25 — `run_program_as_task` loads every program under a fresh name `nfs_<session>_<counter>_<stem>.pgm`, removes it under that name and deletes the copy; R0 in `Experiment` removes the names still listed; the dummy controller blocks a name after a failed LOAD like the real one, and a test shows that the following layers still print. Golden command logs re-recorded (name lines only). — commits: `5b856bb`
 - [x] T127: `REMOVEPROGRAM` names the layer file instead of the loaded program (found during T125) — 2026-11-24 — Programs are removed under the loaded name `python_aerobasic_program.pgm` (`Task.finish()`/`abort()`, failures logged); the dummy controller records loaded programs and unknown removals; golden command logs updated deliberately. — commits: `79a789d`
