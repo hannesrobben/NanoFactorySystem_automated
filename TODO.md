@@ -42,7 +42,7 @@ with an evaluation after every layer capture; a camera live feed; a core that a 
 | 8 | Operating modes and calibration | T88, T89, T90, T91, T92, T104, T107 | T90 needs MIRA MI-53 for the real evaluator; T104 needs MIRA MI-41 for the fit; T107 needs OffAxisHolo K10 for the sweep |
 | 9 | Camera live feed | T102, T93, T94, T95 | T102 before T93 (hard prerequisite, `CAMERA_LIVE.md`) |
 | 10 | Core ready for a GUI | T96, T97 | – |
-| 11 | Standard test prints (PTD-01), **priority** (decision D7 of `TEST_PRINT_PTD01.md`) | T136–T147, T150, T151, T155, T156 (done), T157 (design v2), T158–T163, T148, T149 | T157 approved 2026-11-25; T148 before T149 |
+| 11 | Standard test prints (PTD-01), **priority** (decision D7 of `TEST_PRINT_PTD01.md`) | T136–T161, T163 (done; T148/T149 open), T162 (in progress, T164), T164 | T148 before T149 |
 | B | Backlog (from T19 `todo_notes.md`, lab checks, follow-ups) | T67, T69, T109, T111, T112, T114 | – |
 
 Phases 6, 9 and 10 are independent of each other. Phase 7 can start with T82, T83 and T85 before
@@ -585,59 +585,24 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
 
 
 
-- [ ] T158: Absolute axes and a/b sub-fields in the test-print library (design `PARAMETER_TESTS.md` §3, §7) [phase: 11]
-  - Priority: high
-  - Size: M
-  - Depends on: T157
-  - Done when: field builders take absolute axis values from a material start file (JSON, schema versioned;
-    replaces `stage_a_<material>.json`) and need no `ProcessCalibration` or fit model to print; `ParameterField`
-    supports 60 µm fields with sub-field a (0.1–0.5 mW) / b (0.6–1.0 mW), a sub-field bit in the header and a
-    `half` column in the cell table; label and support power are arguments; tests updated; existing code outside
-    `testprint/` unchanged.
 
-- [ ] T159: Quick PT: walls and pads (design `PARAMETER_TESTS.md` §4) [phase: 11]
-  - Priority: high
-  - Size: M
-  - Depends on: T158
-  - Done when: builders for Q1 (three 8 µm walls 1.5 µm apart per power, z −1 … +1 µm in 0.25 µm layers) and Q2
-    (5 × 5 µm pads, z −1 … +1 µm, hatch 0.1 / 0.2 / 0.4 / 0.6 µm) as sub-fields a/b; one experiment script with
-    `--layout` / `--dry-run`; dry run on the dummy backend; cell counts, layer counts and program lines tested.
 
-- [ ] T160: Full PT-01: fields F1–F7 on absolute axes (design `PARAMETER_TESTS.md` §5) [phase: 11]
-  - Priority: high
-  - Size: M
-  - Depends on: T158
-  - Done when: the builders of `ptd01.py` use the absolute values of §5 (decided values; proposals as confirmed
-    in the review of T157) with sub-fields a/b in 60 µm fields; every sub-field passes the validation; layer count
-    and time estimate per field logged; the F3 golden program re-recorded deliberately; scripts per field updated.
 
-- [ ] T161: Voxel PT-01: gap test for the voxel height (design `PARAMETER_TESTS.md` §6) [phase: 11]
-  - Priority: high
-  - Size: M
-  - Depends on: T158
-  - Done when: builder of a gap-test cell (20 × 20 µm base to 2 µm at the support power, gap 0 … 2.0 µm in 0.2 µm,
-    lid of 4 layers of 0.25 µm at the tested power) and the sub-field layout of §6; experiment script with
-    `--layout` / `--dry-run`; dry run; tests of the z levels (gap 0 = top layer exposed twice) and of the cell table.
 
-- [ ] T162: Scripts and chain of the three parameter tests (design `PARAMETER_TESTS.md` §2, §7) [phase: 11]
+
+- [ ] T164: Decision: move the two-stage PTD-01 version 1 to the attic (found during T162) [phase: 11]
   - Priority: medium
   - Size: S
-  - Depends on: T159, T160, T161
-  - Done when: `mains/Experiments/parameter_tests/` (provisional name) holds Quick PT, Full PT-01 (per field) and
-    Voxel PT-01 plus a chain over `run_substrate` (`--test quick|full|voxel`, `--only`, `--layout`, `--dry-run`);
-    the stage-A/B scripts of version 1 (`mains/Experiments/ptd01/`) are removed or moved to the attic after
-    approval (X-B); the layout of all tests on the T113 resin drop is checked; README updated;
-  - every parameter-test spec uses `margin_um = 90 µm`, and a check (with a test over all specs) refuses a layout in which
-    the QR code (140 µm, centred on the upper rectangle edge) or a corner marker comes closer than 20 µm to the grid area
-    (maintainer requirement 2026-11-25: the QR code must not reach into the experiments; `Experiment` unchanged).
-
-- [ ] T163: Evaluation of the parameter tests on absolute axes (design `PARAMETER_TESTS.md` §7) [phase: 11]
-  - Priority: medium
-  - Size: S
-  - Depends on: T158
-  - Done when: the cell table regenerated from `/spec` holds the absolute values and the sub-field; a function adds
-    P/P_th, h/w and Δz/l once P_th, w(P) and l(P) are known (from Quick PT / Voxel PT-01 results); the voxel fit
-    (T151) takes its points from Quick PT walls and the Voxel PT-01 gap limits; n_eff = 1 as placeholder.
+  - Depends on: –
+  - Background: version 2 (`mains/parametertest/`, `testprint/parameter_tests.py`, `pt_factories.py`, `inputs.py`)
+    replaces the two-stage PTD-01: `mains/Experiments/ptd01/`, `testprint/ptd01.py`, `testprint/factories.py`,
+    `StageAAxes` in `testprint/calibration.py`, their tests (`test_testprint_ptd01.py`, `test_testprint_factories.py`,
+    `integration/test_ptd01_fields.py`, `test_ptd01_chain.py`) and the golden file `ptd01_f3.txt`. Kept and still used:
+    `structure`, `cells`, `field`, `ordering`, `voxel_fit`, `ProcessCalibration` (evaluation result).
+  - Decision: move these files to the attic (procedure X-B, `docs/ATTIC_INDEX.md`) or keep them as a documented
+    alternative.
+  - Done when: the maintainer decided; if moved: files in `attic/`, listed in `docs/ATTIC_INDEX.md`, tests and
+    `test/README.md` updated, `python -m pytest` passes.
 
 - [ ] T148: Lab check: does `SET_POWER` inside a running program wait for the attenuator? (decision D9) [phase: 11]
   - Priority: high
@@ -741,6 +706,22 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
 
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
+
+- [ ] T162: Scripts and chain of the three parameter tests (design `PARAMETER_TESTS.md` §2, §7) [phase: 11]
+  - Priority: medium
+  - Size: S
+  - Depends on: T159, T160, T161
+  - Done when: `mains/Experiments/parameter_tests/` (provisional name) holds Quick PT, Full PT-01 (per field) and
+    Voxel PT-01 plus a chain over `run_substrate` (`--test quick|full|voxel`, `--only`, `--layout`, `--dry-run`);
+    the stage-A/B scripts of version 1 (`mains/Experiments/ptd01/`) are removed or moved to the attic after
+    approval (X-B); the layout of all tests on the T113 resin drop is checked; README updated;
+  - every parameter-test spec uses `margin_um = 90 µm`, and a check (with a test over all specs) refuses a layout in which
+    the QR code (140 µm, centred on the upper rectangle edge) or a corner marker comes closer than 20 µm to the grid area
+    (maintainer requirement 2026-11-25: the QR code must not reach into the experiments; `Experiment` unchanged).
+
+  - Status 2026-11-26: done except the removal of version 1: `mains/parametertest/` with Quick PT, Full PT-01,
+    Voxel PT-01, chain, README per test, margin 90 µm and `check_marker_clearance` (commit `7d472f1`). Open: moving
+    `mains/Experiments/ptd01/` and the version-1 modules to the attic needs the maintainer's approval (T164).
 
 - [ ] T132: Task 2 runs the same program 1.8× slower than task 1 (found during T129) [phase: B]
   - Priority: high
@@ -912,6 +893,11 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T158: Absolute axes and a/b sub-fields in the test-print library — 2026-11-26 — `testprint/inputs.py` (`ParameterTestInputs`, the material start file), sub-field bit in the header and `half` column in the cell table; builders need no calibration or fit model to print. — commits: `63e32d2`
+- [x] T159: Quick PT: walls and pads — 2026-11-26 — Builders `quick_pt.walls` (two groups of three 8 µm walls 1.5 µm apart, z −1 … +1 µm) and `quick_pt.pads` (5 × 5 µm, hatch 0.1/0.2/0.4/0.6 µm) as sub-fields a/b; script `mains/parametertest/quick_pt.py`, dry run. — commits: `89b7232`, `7d472f1`
+- [x] T160: Full PT-01: fields F1–F7 on absolute axes — 2026-11-26 — Builders `full_pt01.f1` … `f7` with the decided absolute values in 60 µm sub-fields a/b, all valid; layer programs about 25 min for F1–F7; script `mains/parametertest/full_pt01.py`. The F3 golden program of version 1 stays (version-1 builder unchanged); a golden file for version 2 was not requested. — commits: `89b7232`, `7d472f1`
+- [x] T161: Voxel PT-01: gap test for the voxel height — 2026-11-26 — Builder `voxel_pt01.gap` (20 × 20 µm base to 2 µm at 0.5 mW, gap 0 … 2.0 µm, lid of four 0.25 µm layers at the tested power, gap 0 = double exposure); one experiment per power, cells 100 µm apart in a 3 × 4 grid; script `mains/parametertest/voxel_pt01.py`. — commits: `89b7232`, `7d472f1`
+- [x] T163: Evaluation of the parameter tests on absolute axes — 2026-11-26 — `ptd.cell_table` for all test prints, `add_relative_columns` (P/P_th, h/w, s/w, Δz/l after the measurement), `voxel_lengths_from_gaps` (l from the gap test), `voxel_fit.points_from_parameter_tests`. — commits: `62c252b`
 - [x] T157: Design version 2 of the parameter tests: Quick PT, Full PT-01, Voxel PT-01 (maintainer review 2026-11-25) — 2026-11-25 — `docs/design/PARAMETER_TESTS.md` approved: single-stage tests on absolute axes, power 0.1–1.0 mW linear, 60 µm fields with sub-fields a/b, Voxel PT-01 with one power per experiment and gap cells 100 µm apart in a 3 × 4 grid; T158–T163 may start. — commits: `e992b6e`, `cf2a3ab`, this docs commit
 - [x] T155: Decision: layer count of the PTD-01 volume fields F4, F5, F7 (found during T142) — 2026-11-25 — Obsolete: version 2 of the parameter tests (T157) uses absolute slice distances, so the rows of a field share their layers. — commits: this docs(todo) commit
 - [x] T156: Decision: scales of the `threshold_ln` fit (found during T151) — 2026-11-25 — Decided by the maintainer: n_eff = 1 as placeholder in the parameter tests; n_eff is determined in a later dose-matrix test with several velocities (F31). — commits: this docs(todo) commit

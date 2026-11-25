@@ -1,4 +1,9 @@
-# PTD-01 standard parameter test print
+# PTD-01 standard parameter test print (version 1, superseded)
+
+> **Do not print these scripts.** They implement the two-stage plan (F0 first, then F1–F7 normalised with its
+> results), which the maintainer replaced on 2026-11-25 by single-stage tests on absolute axes:
+> `mains/parametertest/` (Quick PT, Full PT-01, Voxel PT-01; design `docs/design/PARAMETER_TESTS.md`). This folder
+> stays until its removal is approved (attic procedure X-B, todo T164).
 
 Scripts of the test print PTD-01 "voxel and line interaction" (phase 11, design
 `docs/design/TEST_PRINT_PTD01.md`). Every field F0–F7 is its own experiment with its own

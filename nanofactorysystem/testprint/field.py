@@ -124,12 +124,13 @@ def packed_centers(widths: Sequence[float], gap_um: float) -> list[float]:
 
 def build_header(field_id: int, *, label_power_mw: float, size_um: float = 50.0, header_um: float = 5.0,
                  z_um: float = 0.0, ref_pad: Optional[list[ElementGroup]] = None, mark_um: float = 3.0,
-                 dot_pitch_um: float = 1.5) -> tuple[ElementGroup, ...]:
+                 dot_pitch_um: float = 1.5, half: str = "") -> tuple[ElementGroup, ...]:
     """ Header of a field in field coordinates: L mark, 3-bit field id and optional REF pad.
 
     The L mark (one polyline, legs of ``mark_um``) sits at the left of the header strip. The field id
     is written most significant bit first as dots to the right of it: a dot for a 1, nothing for a 0
-    (field 0 has no dot). The REF pad (cell-local groups, e.g. a sliced 4 × 4 × 1 µm pad at P_ref)
+    (field 0 has no dot). With ``half`` (parameter tests, version 2) a fourth bit follows: 0 for
+    sub-field ``"a"``, 1 for ``"b"``. The REF pad (cell-local groups, e.g. a sliced 4 × 4 × 1 µm pad at P_ref)
     is centred at the right end of the strip.
 
     Parameters
@@ -146,6 +147,8 @@ def build_header(field_id: int, *, label_power_mw: float, size_um: float = 50.0,
         REF pad in cell-local coordinates (stage B).
     mark_um, dot_pitch_um : float
         Leg length of the L mark and dot distance.
+    half : {"", "a", "b"}
+        Sub-field; empty: no fourth bit.
 
     Returns
     -------
@@ -160,6 +163,8 @@ def build_header(field_id: int, *, label_power_mw: float, size_um: float = 50.0,
 
     if not 0 <= int(field_id) <= 7:
         raise ValueError(f"field_id must be 0 ... 7 (3 bits), got {field_id}")
+    if half not in ("", "a", "b"):
+        raise ValueError(f"half must be '', 'a' or 'b', got {half!r}")
     x0 = -size_um / 2 + 1.0
     y0 = size_um / 2 - header_um + 1.0
     groups = _cells.polyline(HEADER_CELL, points=[(x0, y0 + mark_um), (x0, y0), (x0 + mark_um, y0)],
@@ -168,6 +173,9 @@ def build_header(field_id: int, *, label_power_mw: float, size_um: float = 50.0,
         if (int(field_id) >> (2 - i)) & 1:
             groups += _cells.dot(HEADER_CELL, x_um=x0 + mark_um + dot_pitch_um * (i + 1), y_um=y0 + mark_um / 2,
                                  power_mw=label_power_mw, z_um=z_um, part=f"id_bit{2 - i}")
+    if half == "b":
+        groups += _cells.dot(HEADER_CELL, x_um=x0 + mark_um + dot_pitch_um * 4, y_um=y0 + mark_um / 2,
+                             power_mw=label_power_mw, z_um=z_um, part="half_bit")
     if ref_pad:
         pad_x0, _, pad_x1, _ = _cells.groups_bounds(ref_pad)
         groups += _cells.translate_groups(ref_pad, size_um / 2 - 1.0 - pad_x1, size_um / 2 - header_um / 2)
@@ -208,6 +216,8 @@ class ParameterField:
         Validity range of the voxel model; every cell power must lie inside (stage B).
     meta : dict
         Axis levels and other field information (JSON values).
+    half : {"", "a", "b"}
+        Sub-field of the parameter tests (version 2); column ``half`` of the cell table.
     """
 
     field_id: int
@@ -224,6 +234,7 @@ class ParameterField:
     z_max_um: float = 30.0
     power_range_mw: Optional[tuple] = None
     meta: dict = field(default_factory=dict)
+    half: str = ""
 
     # ------------------------------------------------------------------------------------------
     # Validation
@@ -359,7 +370,8 @@ class ParameterField:
         rows = []
         for cell in sorted(self.cells, key=lambda c: (c.row, c.col)):
             x0, y0, x1, y1 = cell.bounds_um() if cell.groups else (None,) * 4
-            row = {"field_id": self.field_id, "field": self.name, "cell_id": cell.cell_id, "row": cell.row,
+            row = {"field_id": self.field_id, "field": self.name, "half": self.half, "cell_id": cell.cell_id,
+                   "row": cell.row,
                    "col": cell.col, "x_um": round(float(cell.center_um[0]), 4),
                    "y_um": round(float(cell.center_um[1]), 4), "primitive": cell.primitive, "kind": cell.kind,
                    "anchor_depth_um": cell.anchor_depth_um,
