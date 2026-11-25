@@ -25,7 +25,8 @@ from scidatacontainer import Container
 from nanofactorysystem import System, ImageContainer, mkdir, getLogger
 from nanofactorysystem.aerobasic import SingleAxis, AxisStatusDataItem
 from nanofactorysystem.aerobasic.ascii import AerotechError
-from nanofactorysystem.devices.aerotech.health import HealthReport, controller_health, recover_r0
+from nanofactorysystem.devices.aerotech.health import (EXEC_PROGRAM_NAMES, HealthReport, controller_health,
+                                                       recover_r0)
 from nanofactorysystem.devices.aerotech.loader import DEFAULT_KB_PER_LINE, MemoryBudget, ProgramRunner, max_part_lines
 from nanofactorysystem.aerobasic.programs import AeroBasicProgram
 from nanofactorysystem.aerobasic.programs.drawings import DrawableObject, DrawableAeroBasicProgram
@@ -1838,7 +1839,9 @@ class Experiment(object):
         tasks = (1, 2) if self.program_loader == "library" else (1,)
         lines = [f"[{utc_timestamp()}] {context}"]
         if recover:
-            lines += [f"  R0: {step}" for step in recover_r0(api, tasks=tasks)]
+            names = EXEC_PROGRAM_NAMES + tuple(self.a3200.exec_programs)  # T152: one name per load
+            lines += [f"  R0: {step}" for step in recover_r0(api, tasks=tasks, program_names=names,
+                                                             on_removed=self.a3200.program_removed)]
         report = controller_health(api, tasks=tasks, check_processes=self.system.backend.name == "real")
         lines.append(report.text())
         text = "\n".join(lines)

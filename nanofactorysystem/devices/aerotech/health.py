@@ -13,7 +13,7 @@ import io
 import subprocess
 import sys
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Callable, Optional
 
 from nanofactorysystem.aerobasic import SingleAxis, TaskStatusDataItem
 from nanofactorysystem.aerobasic.ascii import AerotechError
@@ -24,6 +24,7 @@ from nanofactorysystem.devices.aerotech.library import used_memory_gb
 AXES = (SingleAxis.X, SingleAxis.Y, SingleAxis.Z, SingleAxis.A, SingleAxis.B)
 #: Programs this package loads under fixed names (run_program_as_task; the z-line program is kept on purpose)
 EXEC_PROGRAM_NAMES = ("python_aerobasic_program.pgm",)
+"""Fixed execution name used before T152; R0 still removes it (left over by an older version)."""
 #: A 32-bit A3200 process above this working set is close to its 2 GB address space (lab 2026-11-24: 1.87 GB)
 PROCESS_WARNING_GB = 1.5
 
@@ -145,10 +146,25 @@ def controller_health(api, *, tasks: tuple[int, ...] = (1, 2), check_processes: 
     return report
 
 
-def recover_r0(api, *, tasks: tuple[int, ...] = (1, 2), program_names: tuple[str, ...] = EXEC_PROGRAM_NAMES) -> list[str]:
+def recover_r0(api, *, tasks: tuple[int, ...] = (1, 2), program_names: tuple[str, ...] = EXEC_PROGRAM_NAMES,
+               on_removed: Optional[Callable[[str], None]] = None) -> list[str]:
     """ Recovery level R0: stop the printing tasks, remove the package's programs, acknowledge faults.
 
     Nothing moves. Every step is attempted even if an earlier one fails.
+
+    Parameters
+    ----------
+    api : AerotechAsciiInterface
+    tasks : tuple of int
+        Tasks to stop.
+    program_names : tuple of str
+        Programs to remove. Since T152 every load has its own name: pass the
+        names the controller object still lists (``A3200.exec_programs``)
+        plus :data:`EXEC_PROGRAM_NAMES`. Names loaded by another process are
+        not known here; they block nothing and disappear with a restart of
+        the A3200 software.
+    on_removed : callable, optional
+        Called with every name whose ``REMOVEPROGRAM`` succeeded.
 
     Returns
     -------
@@ -167,6 +183,8 @@ def recover_r0(api, *, tasks: tuple[int, ...] = (1, 2), program_names: tuple[str
         try:
             api.REMOVE_PROGRAM(name)
             done.append(f"{name} removed")
+            if on_removed is not None:
+                on_removed(name)
         except AerotechError as error:
             done.append(f"{name} not removed: {error}")
     try:

@@ -25,7 +25,9 @@ def test_a3200_runs_program_tasks(dummy_system, dummy_backend):
     task.wait_to_finish()
 
     assert dummy_system.controller.xyz.X == pytest.approx(1.0)
-    assert (dummy_backend.workdir / "python_aerobasic_program.pgm").is_file()
+    # T152: loaded under a fresh name; the copy stays until the program is removed
+    (name, copy), = dummy_system.controller.exec_programs.items()
+    assert name.startswith("nfs_") and copy == dummy_backend.workdir / name and copy.is_file()
 
 
 def test_z_limit_guards_immediate_api_moves(dummy_system, dummy_backend):

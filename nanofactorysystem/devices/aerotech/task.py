@@ -1,6 +1,6 @@
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from tqdm import tqdm
 
@@ -22,7 +22,7 @@ LayerFactory -> Iterator[AerobasicProgram]
 
 class Task:
     def __init__(self, api: AerotechAsciiInterface, task_id: int, *, file_path: Optional[Path | str] = None,
-                 program_name: Optional[str] = None):
+                 program_name: Optional[str] = None, on_removed: Optional[Callable[[str], None]] = None):
         """ Handle of a controller task running a program.
 
         Parameters
@@ -36,12 +36,16 @@ class Task:
             file name given to ``PROGRAM LOAD``, without path).
             :meth:`finish` and :meth:`abort` remove the program under this
             name (T127); without it, the name of ``file_path`` is used.
+        on_removed : callable, optional
+            Called with the program name after a successful ``REMOVEPROGRAM``
+            (the controller deletes its execution copy, T152).
         """
         self.api = api
         self.task_id = task_id
 
         self.file_path = Path(file_path) if file_path is not None else None
         self.program_name = program_name
+        self.on_removed = on_removed
 
         self._task_status0 = None
         self._task_status1 = None
@@ -257,10 +261,12 @@ class Task:
             return False
         try:
             self.api.REMOVE_PROGRAM(name)
-            return True
         except AerotechError as error:
             self.api.logger.warning(f"Could not remove program '{name}' after task {self.task_id}: {error}")
             return False
+        if self.on_removed is not None:
+            self.on_removed(name)
+        return True
 
     def abort(self, *, timeout: float = 10.0, update_interval: float = 0.1) -> None:
         """ Clean up after a failed program: stop the task, wait for idle, remove the program.

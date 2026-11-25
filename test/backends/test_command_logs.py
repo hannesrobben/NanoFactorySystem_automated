@@ -4,6 +4,8 @@ Recorded with the dummy backend before the controller merge (T20), so that
 refactorings of the controller classes can be checked for identical
 behaviour on the machine. Regenerate deliberately with --update-golden.
 """
+import re
+
 import pytest
 
 from nanofactorysystem import System
@@ -11,11 +13,13 @@ from nanofactorysystem.backends import DummyBackend
 
 
 def command_log(backend, tmp_path) -> str:
-    """ Controller commands in order, with temporary paths replaced by <tmp>. """
+    """ Controller commands in order, with temporary paths replaced by <tmp> and the session token of the
+    execution names (T152, random per controller object) by <session>. """
 
     text = "\n".join(backend.calllog.commands()) + "\n"
     for path in sorted({str(tmp_path), str(tmp_path.resolve())}, key=len, reverse=True):
         text = text.replace(path, "<tmp>")
+    text = re.sub(r"nfs_[0-9a-f]{6}_", "nfs_<session>_", text)
     return text.replace(chr(92), "/")  # platform-independent path separators
 
 

@@ -1,7 +1,9 @@
 import datetime
 import hashlib
 import random
+import re
 import time
+import uuid
 import shutil
 from functools import cached_property
 from os import PathLike
@@ -15,6 +17,38 @@ from nanofactorysystem.aerobasic.constants.tasks import ProgrammingMode, TaskSta
 from nanofactorysystem.aerobasic.programs import AeroBasicProgram
 from nanofactorysystem.devices.aerotech.task import Task
 from nanofactorysystem.devices.coordinate_system import Point3D
+
+
+EXEC_PROGRAM_PREFIX = "nfs_"
+"""Prefix of the execution copies loaded by :meth:`AerotechController.run_program_as_task` (T152)."""
+
+
+def exec_program_name(session: str, counter: int, stem: str) -> str:
+    """ Name under which a program is loaded over ASCII: ``nfs_<session>_<counter>_<stem>.pgm`` (T152).
+
+    A refused ``PROGRAM LOAD`` blocks its program name on the controller until
+    the A3200 software is restarted, even for valid content (lab session 2,
+    2026-11-25). A fresh name per load keeps one failure from blocking every
+    later program.
+
+    Parameters
+    ----------
+    session : str
+        Token of the controller object, unique per process.
+    counter : int
+        Number of the load within the session.
+    stem : str
+        Stem of the program file; characters other than letters, digits,
+        ``_``, ``-`` and ``.`` become ``_``, and it is cut to 60 characters.
+
+    Returns
+    -------
+    str
+        File name with the extension ``.pgm`` (at most 80 characters for a
+        session token of 6 characters).
+    """
+    clean = re.sub(r"[^A-Za-z0-9_.-]", "_", stem)[:60]
+    return f"{EXEC_PROGRAM_PREFIX}{session}_{counter:04d}_{clean}.pgm"
 
 
 class AerotechController:
@@ -35,11 +69,16 @@ class AerotechController:
         api : AerotechAsciiInterface
             ASCII command interface (connected or not).
         program_dir : str or Path, optional
-            Directory for temporary program files and the uniform execution
-            copy, see :meth:`run_program_as_task`.
+            Directory for temporary program files and the execution copies,
+            see :meth:`run_program_as_task`.
         """
         self.api = api
         self.program_dir = Path(program_dir) if program_dir is not None else None
+
+        # One fresh program name per ASCII load (T152); names loaded and not yet removed, with their copy
+        self.exec_session = uuid.uuid4().hex[:6]
+        self._exec_counter = 0
+        self.exec_programs: dict[str, Path] = {}
 
         # Own state
         self.programming_mode: Optional[ProgrammingMode] = None
@@ -172,9 +211,12 @@ class AerotechController:
     ) -> Task:
         """ Load a program on a task over ASCII, start it and return the running task.
 
-        The program is copied to ``python_aerobasic_program.pgm`` (one name
-        on the controller for every program) and loaded under that name; the
-        returned :class:`Task` removes it under that name (T127).
+        The program is copied to a fresh name
+        (:func:`exec_program_name`, T152) and loaded under that name, so that
+        a refused load does not block the next program. The returned
+        :class:`Task` removes it under that name (T127); after a removal the
+        copy is deleted. Names not removed yet are listed in
+        :attr:`exec_programs` (for recovery level R0).
 
         Parameters
         ----------
@@ -216,15 +258,14 @@ class AerotechController:
         else:
             path = Path(program)
 
-        # Copy program to uniform name for execution to avoid loading too many programs on controller.
-        exec_dir = self.program_dir if self.program_dir is not None else Path.home()
-        exec_path = exec_dir / "python_aerobasic_program.pgm"
-        exec_path.write_bytes(path.read_bytes())
+        # Copy the program to a fresh name: a refused load blocks only that name (T152)
+        exec_path = self._exec_copy(path)
 
         # Load program; the program is removed under the name it was loaded with (T127)
         if task_id is None:
             task_id = 2
-        task = Task(self.api, task_id, file_path=path, program_name=exec_path.name)
+        task = Task(self.api, task_id, file_path=path, program_name=exec_path.name,
+                    on_removed=self.program_removed)
         load_start = time.time()
         try:
             self.api.PROGRAM_LOAD(task_id, exec_path)
@@ -275,6 +316,33 @@ class AerotechController:
                                   f"(task state {state})")
 
         return task
+
+    def _exec_copy(self, path: Path) -> Path:
+        """ Copy a program file to the next fresh execution name and register it (T152). """
+
+        exec_dir = self.program_dir if self.program_dir is not None else Path.home()
+        exec_dir.mkdir(parents=True, exist_ok=True)
+        self._exec_counter += 1
+        exec_path = exec_dir / exec_program_name(self.exec_session, self._exec_counter, path.stem)
+        exec_path.write_bytes(path.read_bytes())
+        self.exec_programs[exec_path.name] = exec_path
+        return exec_path
+
+    def program_removed(self, name: str) -> None:
+        """ Forget a removed execution copy and delete its file; unknown names are ignored.
+
+        Parameters
+        ----------
+        name : str
+            Program name passed to ``REMOVEPROGRAM``.
+        """
+        exec_path = self.exec_programs.pop(name, None)
+        if exec_path is None:
+            return
+        try:
+            exec_path.unlink(missing_ok=True)
+        except OSError as error:
+            self.api.logger.warning(f"Could not delete the execution copy {exec_path}: {error}")
 
     def run_program_synchron(self, program: AeroBasicProgram):
         for line in program:
