@@ -248,6 +248,15 @@ What session 2 decides (the table "What session 2 decides" of the lab guide, app
 Order: T152 → T132 decision → T129 "single task, add ahead" (if (b)) and P5 with one real layer, laser
 off, then with laser → default switch (R9) → T131 → T133 R1/R2 → lab session 3 (T153).
 
+Status 2026-11-25: T152 done; T132 decided as (b) and implemented. `ProgramRunner` runs every part on
+task 1: a worker compiles the next part with `A3200ProgramAdd` (no task) while the current part runs;
+when the current part has completed, the task is stopped, the part removed, and the next part
+associated (`A3200ProgramAssociate`) and started. At most two programs are added at a time. Execution
+names use the T152 scheme with a session token, so a restart in a new process never reuses a name.
+Expected gap per part: stop + remove + associate + start (lab session 2: associate < 0.05 s); to be
+measured in lab session 3 (`runner` step). Lab session 3 is the next lab date (maintainer, option 2 of
+2026-11-25): T152 on the real controller, the add-ahead runner, then P5.
+
 ## 8 Controller health check and recovery (maintainer idea 2026-11-24, T133)
 
 Goal: our software detects a controller in a bad state before and during a print, and brings it back

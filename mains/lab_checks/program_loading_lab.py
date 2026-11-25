@@ -5,8 +5,8 @@ Procedure and background: ``docs/guides/PROGRAM_LOADING_LAB_TESTS.md``; work ord
 Known from ``library_load_check.py`` (2026-11-24): the ASCII interface (``A3200AsciiInterface.exe``, 32 bit)
 cannot compile large programs; ``A3200ProgramLoad`` from 64-bit Python loads the full DOE layer 68
 (1.25 M lines) in 129 s with a 19.3 GB peak in the loading process. The planned loader compiles in a
-short-lived worker process, alternates tasks 1 and 2 (load the next part while the current one runs),
-and keeps the PC below a memory budget (32 GB RAM, at most 20-25 GB used). These steps measure what
+short-lived worker process, runs every part on task 1 and compiles the next part without a task while
+the current one runs (add-ahead, T132; lab sessions 1 and 2 alternated tasks 1 and 2), and keeps the PC below a memory budget (32 GB RAM, at most 20-25 GB used). These steps measure what
 that design needs:
 
 ``system``     RAM, A3200 processes (bitness, memory, command line, parent), services, task states, added programs.
@@ -35,7 +35,7 @@ Added for lab session 2 (T134, ``docs/guides/PROGRAM_LOADING_LAB_TESTS.md`` sect
 ``taskspeed``       dry run: the same synthetic program on task 1 and task 2, with the bare header and with the
                     header of a real layer (T132).
 ``runner``          dry run of the package's library loader (T129: ``LibraryLoader`` + ``ProgramRunner``) with
-                    synthetic galvo parts alternating on tasks 1/2, like ``cycle``.
+                    synthetic galvo parts; since T132 on task 1 with add-ahead (lab session 2 ran it alternating).
 ``recover-ascii``   recovery level R1: terminate ``A3200AsciiInterface.exe``; is it started again, and does LOAD
                     over ASCII work afterwards?
 ``reset``           recovery level R2: ``~RESETCONTROLLER`` over ASCII (or ``A3200Reset``; confirmation); which states
@@ -1179,7 +1179,7 @@ def step_taskspeed(session: Session, args) -> None:
 
 
 def step_runner(session: Session, args) -> None:
-    """ Dry: the package's LibraryLoader + ProgramRunner (T129) with synthetic galvo parts on tasks 1/2. """
+    """ Dry: the package's LibraryLoader + ProgramRunner (T129) with synthetic galvo parts on task 1 (add-ahead, T132). """
 
     if not args.axes_safe:
         session.log("runner moves the galvo axes A/B (laser gate forced off). Close the shutter, make sure the galvo "

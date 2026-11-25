@@ -275,9 +275,9 @@ class Experiment(object):
             compiled through the A3200 C library in a worker process within
             the memory budget of the config section ``controller``
             (``memoryBudgetGb``, ``memoryReserveGb``, ``compileKbPerLine``,
-            ``libraryDll``), run alternately on tasks 1 and 2 while the next
-            part is loaded (T129, ``devices/aerotech/loader.py``). Opt-in until
-            the lab validation.
+            ``libraryDll``), run on task 1 while the next part is compiled
+            without a task (add-ahead, T129/T132, ``devices/aerotech/loader.py``).
+            Opt-in until the lab validation.
 
         Raises
         ------
@@ -1884,7 +1884,7 @@ class Experiment(object):
 
     def _print_layers_with_library(self, files: list[Path], layer_parts: dict[Path, list[Path]], name: str,
                                    center_mm: dict, dhm_image_count: int) -> bool:
-        """ Print layers (in the given order) through the library loader on tasks 1/2 with prefetch (T129).
+        """ Print layers (in the given order) through the library loader on task 1 with add-ahead (T129, T132).
 
         Returns
         -------
@@ -2098,7 +2098,7 @@ class Experiment(object):
         t1 = time.time()
         layer_indices = list(range(len(pgm_files_list)))[::order]
         if self.program_loader == "library":
-            # Tasks 1/2 alternate, the next part is loaded while the current one runs (T129)
+            # Task 1 only; the next part is compiled while the current one runs (T129, T132 add-ahead)
             failed = self._print_layers_with_library([Path(pgm_files_list[i]) for i in layer_indices], layer_parts,
                                                      name, structure_center_absolute_mm, dhm_image_count)
             layer_indices = []
