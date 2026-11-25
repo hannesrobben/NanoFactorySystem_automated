@@ -510,6 +510,8 @@ repository. All except D9 were decided by the maintainer in the decision session
 | ID | Question | Proposal | Blocks |
 |---|---|---|---|
 | D9 | Does a `SET_POWER` inside a running program wait until the attenuator has settled? | Lab check T148 before stage A; until then `dwell_after_power_s = 0`; if the attenuator does not settle, set the dwell found by T148. | T149 |
+| D17 | Scales of `threshold_ln` for the fit (found during T151): `d = d_scale · sqrt(n_eff · ln(P/P_th))` depends only on `d_scale² · n_eff`, so n_eff is only identifiable with fixed `w_scale_um` / `l_scale_um`. | Fix the scales from the optics of the 63x (or from a reference measurement) and fit P_th and n_eff; until decided the fit uses free scales with n_eff = 1 (P_th is unaffected). | T151 result interpretation, F33 |
+| D18 | Layer count of F4, F5, F7 (found during T142): Δz = dz_rel · l(P_cell) differs per row, so rows share no layers. Example calibration: F4 29, F5 229, F7 127 layer programs; F1–F7 ≈ 37 min of layer programs instead of ≈ 10 min. | Option a: keep (normalisation exact per cell). Option b: Δz per column from l(P_ref) (F5 ≈ 4 grids, about 60 layers), the cell table keeps the true dz_rel at the cell power. Option c: fewer dz_rel levels in F5. | T149 time budget |
 
 ### 12.2 Decided (2026-11-25)
 
@@ -530,3 +532,26 @@ repository. All except D9 were decided by the maintainer in the decision session
 | D14 | Recalibration rule (rerun F1, F3, F4 if P_th changes by more than 10 %) | Documented as a rule only; automation is F35. | T146 |
 | D15 | Substrate anchoring of volume cells | 1.5 µm below the interface; pads, wedges, caps, pedestals, bases (F2, F4, F5, F7); not F0/F1 interface lines, not F3/F6. | T138 |
 | D16 | Default in-layer ordering for PTD-01 | `row_by_row`; other strategies later as registered strategies. | T139 |
+
+## 13. Implementation notes (2026-11-25, T137–T147, T150, T151)
+
+Deviations from the text above, all within the approved decisions:
+
+- `ParameterFieldStructure` lives in `structure.py` and is built from a registered field builder
+  (name + JSON arguments); its translation keeps the element order of the job (the order is the field's
+  strategy) instead of putting contours before infill as `Model3D_Slicer` does.
+- `dot` is a short line (0.4 µm) in the layer plane, not a z line: IFOV blocks write in one plane.
+  A 0 bit of the field id has no dot (field 0 has none).
+- Fields that need w or l at the cell power (F3, F4, F5, F7) start at p_rel = 1.25 (levels F3 1.25 … 2.25,
+  F4 1.25 … 2.0, F5 1.25 / 1.5 / 1.75, F7 1.25 … 2.0): the threshold model has zero size at P_th and is only
+  valid above it. F1, F2 and F6 keep p_rel 1.0 … 2.5 / 1.0 … 2.0.
+- F1 lines are 5 µm long with a 2.5 µm pitch (the concept's ~7 µm do not fit six rows of 7.5 µm).
+- F3: s is the centre distance of neighbouring lines; the pair and the group are 1.5 µm apart.
+- Supporting volumes (F2 pedestals, F7 bases, REF pad) use hatch 0.5 · w(P_ref) and slice 0.5 · l(P_ref);
+  volume cells are packed with one pixel (0.05 µm) margin per side because sliced edges are interpolated.
+- Cell parameters must not use the names of measurement columns (`width_um`, `height_um`, …); F3 stores
+  `model_width_um`, F4 `pad_height_um`.
+- The cell table is a list of dicts (no pandas). Analysis results go through `ExperimentFile` to
+  `/analysis/experiment/ptd01_cell_table` and `/analysis/experiment/ptd01_voxel_fit` (ExperimentFile writes
+  below `/analysis/experiment/`, not `/analysis/ptd01`).
+- The voxel fit uses F0 and F2 heights as lengths; F1 heights lie on the substrate and are clipped.
