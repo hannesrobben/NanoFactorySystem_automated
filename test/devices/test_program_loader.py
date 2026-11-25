@@ -147,7 +147,8 @@ def test_task_error_stops_and_cleans_up(tmp_path, transport, api, world, low_mem
     transport.program_error_next(error_code=42, running_polls=1)
     done = []
 
-    with pytest.raises(ProgramRunError, match="ended in state error") as error:
+    # The message carries the decoded task error code (lab session 3: the cause was not visible without it)
+    with pytest.raises(ProgramRunError, match=r"ended in state error at line \d+: 42: Simulated error 42") as error:
         runner(transport, api, tmp_path).run(items, done.append)
 
     assert error.value.key == 0 and done == []
