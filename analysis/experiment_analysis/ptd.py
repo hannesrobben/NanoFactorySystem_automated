@@ -36,8 +36,8 @@ from nanofactorysystem.aerobasic.programs.drawings.lines import ifov_writing_spe
 
 from .access import ExperimentFile
 
-__all__ = ["MEASUREMENT_COLUMNS", "VOXEL_FIELDS", "ptd_structures", "cell_table", "export_cell_table",
-           "import_voxel_measurements", "save_cell_table"]
+__all__ = ["MEASUREMENT_COLUMNS", "VOXEL_FIELDS", "PREFIXES", "ptd_structures", "cell_table", "export_cell_table",
+           "import_voxel_measurements", "save_cell_table", "add_relative_columns", "voxel_lengths_from_gaps"]
 
 PathLike = Union[str, Path]
 
@@ -46,6 +46,8 @@ MEASUREMENT_COLUMNS = ("width_um", "height_um", "width_std_um", "height_std_um",
                        "collapsed", "method", "notes")
 # Fields whose measured widths / heights are voxel sizes (design §7)
 VOXEL_FIELDS = (0, 1, 2)
+# Factory name prefixes of the test prints: PTD-01 version 1 and the parameter tests of version 2
+PREFIXES = ("ptd01.", "quick_pt.", "full_pt01.", "voxel_pt01.")
 # Factory arguments that are not field arguments
 _STRUCTURE_ONLY = ("dwell_after_power_s",)
 
@@ -67,15 +69,15 @@ def _experiment(experiment: Union[PathLike, ExperimentFile]) -> ExperimentFile:
     return experiment if isinstance(experiment, ExperimentFile) else ExperimentFile(experiment)
 
 
-def ptd_structures(experiment: Union[PathLike, ExperimentFile], prefix: str = "ptd01.") -> list[dict[str, Any]]:
+def ptd_structures(experiment: Union[PathLike, ExperimentFile], prefix=PREFIXES) -> list[dict[str, Any]]:
     """ The PTD fields of an experiment: factory name, builder arguments and every printed copy.
 
     Parameters
     ----------
     experiment : path or ExperimentFile
         ``experiment.h5`` or its folder.
-    prefix : str
-        Factory name prefix of the test print.
+    prefix : str or tuple of str
+        Factory name prefix(es) of the test prints (default: PTD-01 and the parameter tests).
 
     Returns
     -------
@@ -95,7 +97,8 @@ def ptd_structures(experiment: Union[PathLike, ExperimentFile], prefix: str = "p
     found = []
     for entry in record.spec.get("structures", []):
         geometry = entry.get("geometry", {})
-        if geometry.get("kind") != "factory" or not str(geometry.get("name", "")).startswith(prefix):
+        prefixes = (prefix,) if isinstance(prefix, str) else tuple(prefix)
+        if geometry.get("kind") != "factory" or not str(geometry.get("name", "")).startswith(prefixes):
             continue
         arguments = {k: decode_json_value(v) for k, v in geometry.get("arguments", {}).items()
                      if k not in _STRUCTURE_ONLY}
@@ -105,14 +108,14 @@ def ptd_structures(experiment: Union[PathLike, ExperimentFile], prefix: str = "p
     return found
 
 
-def cell_table(experiment: Union[PathLike, ExperimentFile], prefix: str = "ptd01.") -> list[dict[str, Any]]:
+def cell_table(experiment: Union[PathLike, ExperimentFile], prefix=PREFIXES) -> list[dict[str, Any]]:
     """ The cell table of every PTD field of an experiment, regenerated from ``/spec``.
 
     Parameters
     ----------
     experiment : path or ExperimentFile
-    prefix : str
-        Factory name prefix (``"ptd01."``).
+    prefix : str or tuple of str
+        Factory name prefix(es) (default :data:`PREFIXES`).
 
     Returns
     -------
@@ -132,7 +135,9 @@ def cell_table(experiment: Union[PathLike, ExperimentFile], prefix: str = "ptd01
     rows = []
     for item in ptd_structures(exp, prefix):
         field = field_builder(item["factory"], "nanofactorysystem.testprint")(**item["arguments"])
-        material = item["arguments"].get("calibration", item["arguments"].get("stage_a", {})).get("material", "")
+        source = (item["arguments"].get("inputs") or item["arguments"].get("calibration")
+                  or item["arguments"].get("stage_a") or {})
+        material = source.get("material", "")
         for structure, (x0, y0) in item["copies"]:
             for cell in field.cell_table():
                 rows.append({"experiment_uuid": record.uuid, "experiment_label": record.label,
@@ -143,7 +148,7 @@ def cell_table(experiment: Union[PathLike, ExperimentFile], prefix: str = "ptd01
 
 
 def export_cell_table(experiment: Union[PathLike, ExperimentFile], path: PathLike,
-                      prefix: str = "ptd01.") -> Path:
+                      prefix=PREFIXES) -> Path:
     """ Write the cell table as CSV with empty measurement columns (the template for the evaluation).
 
     Returns
@@ -224,7 +229,7 @@ def import_voxel_measurements(path: PathLike, database, *, fields=VOXEL_FIELDS, 
     return imported
 
 
-def save_cell_table(experiment: Union[PathLike, ExperimentFile], prefix: str = "ptd01.", *,
+def save_cell_table(experiment: Union[PathLike, ExperimentFile], prefix=PREFIXES, *,
                     wait_s: float = 0.0) -> str:
     """ Store the cell table in the experiment file (``/analysis/experiment/ptd01_cell_table``).
 
@@ -241,5 +246,131 @@ def save_cell_table(experiment: Union[PathLike, ExperimentFile], prefix: str = "
 
     exp = _experiment(experiment)
     rows = cell_table(exp, prefix)
-    return exp.save_result("ptd01_cell_table", json.dumps(rows), attrs={"n_cells": len(rows), "prefix": prefix},
+    return exp.save_result("ptd01_cell_table", json.dumps(rows), attrs={"n_cells": len(rows), "prefix": json.dumps(prefix)},
                            wait_s=wait_s)
+
+
+# ----------------------------------------------------------------------------------------------
+# Parameter tests version 2: relative columns and voxel length from the gap test (T163)
+# ----------------------------------------------------------------------------------------------
+def add_relative_columns(rows: list[dict[str, Any]], *, p_th_mw: float, voxel_model=None) -> list[dict[str, Any]]:
+    """ Copies of the cell-table rows with the relative columns of the evaluation.
+
+    The parameter tests print on absolute axes; once the threshold and the voxel size are measured (Quick PT,
+    Voxel PT-01, fit), this adds ``p_rel = power / P_th`` and, with a voxel model whose validity range holds the
+    cell power, ``h_rel = hatch / w(P)``, ``s_rel = spacing / w(P)`` and ``dz_rel = slice / l(P)``.
+
+    Parameters
+    ----------
+    rows : list of dict
+        Cell-table rows (:func:`cell_table` or a filled CSV read as dicts).
+    p_th_mw : float
+        Measured polymerisation threshold.
+    voxel_model : VoxelFitModel, optional
+        Fitted model w(P), l(P); outside its range the columns stay empty (no extrapolation).
+
+    Returns
+    -------
+    list of dict
+
+    Raises
+    ------
+    ValueError
+        For a non-positive threshold.
+    """
+
+    if p_th_mw is None or float(p_th_mw) <= 0:
+        raise ValueError(f"p_th_mw must be > 0, got {p_th_mw}")
+    result = []
+    for row in rows:
+        new = dict(row)
+        power = _number(row.get("power_mw"))
+        if power is not None:
+            new["p_rel"] = round(power / float(p_th_mw), 6)
+            if voxel_model is not None and voxel_model.contains(power):
+                width, length = voxel_model.width_um(power), voxel_model.length_um(power)
+                for column, relative, size in (("hatch_um", "h_rel", width), ("spacing_um", "s_rel", width),
+                                               ("slice_um", "dz_rel", length)):
+                    value = _number(row.get(column))
+                    if value is not None and size > 0:
+                        new[relative] = round(value / size, 6)
+        result.append(new)
+    return result
+
+
+def _present(value) -> Optional[bool]:
+    if value is None or str(value).strip() == "":
+        return None
+    return str(value).strip().lower() in ("1", "true", "yes", "y", "x")
+
+
+def voxel_lengths_from_gaps(rows: list[dict[str, Any]], *, base_power_mw: Optional[float] = None) -> list[dict]:
+    """ Voxel length l(P) from the filled Voxel PT-01 rows (gap test).
+
+    Per lid power the largest gap with the lid still present and the smallest larger gap without lid bracket
+    the bridgeable gap ``g_max`` (midpoint, uncertainty half the step). The lid attaches while lid voxel and base
+    top overlap, ``g_max ≈ (l(P) + l_base) / 2``; the experiment whose lid power equals the base power gives
+    ``l_base = g_max``, every other power ``l(P) = 2 · g_max - l_base``.
+
+    Parameters
+    ----------
+    rows : list of dict
+        Rows with ``power_mw``, ``gap_um``, ``present`` (1/0, true/false) and ``base_power_mw``; rows without a
+        ``present`` value are ignored.
+    base_power_mw : float, optional
+        Power of the bases (default: the ``base_power_mw`` column).
+
+    Returns
+    -------
+    list of dict
+        Per power: ``power_mw``, ``g_attached_um``, ``g_missing_um``, ``g_max_um``, ``length_um``,
+        ``length_unc_um`` (None where the bracket is open).
+
+    Raises
+    ------
+    ValueError
+        Without rows with a ``present`` value, or without the experiment at the base power.
+    """
+
+    by_power: dict[float, list[tuple[float, bool]]] = {}
+    bases = set()
+    for row in rows:
+        present = _present(row.get("present"))
+        if present is None or row.get("gap_um") in (None, ""):
+            continue
+        by_power.setdefault(round(float(row["power_mw"]), 6), []).append((float(row["gap_um"]), present))
+        if row.get("base_power_mw") not in (None, ""):
+            bases.add(round(float(row["base_power_mw"]), 6))
+    if not by_power:
+        raise ValueError("No gap-test rows with a 'present' value.")
+    if base_power_mw is not None:
+        base = round(float(base_power_mw), 6)
+    else:
+        base = bases.pop() if len(bases) == 1 else None
+    brackets = {}
+    for power, cells in sorted(by_power.items()):
+        cells.sort()
+        attached = [g for g, present in cells if present]
+        g_attached = max(attached) if attached else None
+        missing = [g for g, present in cells if not present and (g_attached is None or g > g_attached)]
+        g_missing = min(missing) if missing else None
+        if g_attached is not None and g_missing is not None:
+            g_max, unc = (g_attached + g_missing) / 2, (g_missing - g_attached) / 2
+        else:
+            g_max, unc = None, None
+        brackets[power] = (g_attached, g_missing, g_max, unc)
+    if base is None or base not in brackets or brackets[base][2] is None:
+        raise ValueError(f"The experiment at the base power ({base} mW) with a closed bracket is needed for l_base.")
+    l_base, l_base_unc = brackets[base][2], brackets[base][3]
+    result = []
+    for power, (g_attached, g_missing, g_max, unc) in brackets.items():
+        if g_max is None:
+            length = length_unc = None
+        elif power == base:
+            length, length_unc = l_base, l_base_unc
+        else:
+            length, length_unc = 2 * g_max - l_base, 2 * unc + l_base_unc
+        result.append({"power_mw": power, "g_attached_um": g_attached, "g_missing_um": g_missing, "g_max_um": g_max,
+                       "length_um": None if length is None else round(length, 6),
+                       "length_unc_um": None if length_unc is None else round(length_unc, 6)})
+    return result

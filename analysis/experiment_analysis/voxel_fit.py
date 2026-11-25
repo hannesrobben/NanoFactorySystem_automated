@@ -44,7 +44,8 @@ from scipy.optimize import least_squares
 from nanofactorysystem.testprint.calibration import ProcessCalibration
 from nanofactorysystem.testprint.voxel_fit import VoxelFitModel
 
-__all__ = ["VoxelPoints", "FitResult", "points_from_rows", "points_from_csv", "fit_threshold_ln", "fit_power_law",
+__all__ = ["VoxelPoints", "FitResult", "points_from_rows", "points_from_csv", "points_from_parameter_tests",
+           "fit_threshold_ln", "fit_power_law",
            "fit_tabulated", "fit_all", "choose", "write_calibration", "plot_fit", "store_fit"]
 
 PathLike = Union[str, Path]
@@ -179,6 +180,45 @@ def points_from_csv(paths: Sequence[PathLike], **kwargs) -> VoxelPoints:
         with Path(path).open(encoding="utf-8", newline="") as handle:
             rows += list(csv.DictReader(handle))
     return points_from_rows(rows, **kwargs)
+
+
+def points_from_parameter_tests(width_rows: Sequence[dict], gap_lengths: Sequence[dict] = ()) -> VoxelPoints:
+    """ Voxel points of the parameter tests (version 2): widths and lengths at their powers.
+
+    Parameters
+    ----------
+    width_rows : sequence of dict
+        Filled cell-table rows with ``power_mw`` and ``width_um`` (e.g. Quick PT walls, Full PT-01 F1 / F2);
+        ``width_std_um`` is used as weight where given.
+    gap_lengths : sequence of dict
+        Output of :func:`experiment_analysis.ptd.voxel_lengths_from_gaps` (``power_mw``, ``length_um``,
+        ``length_unc_um``).
+
+    Returns
+    -------
+    VoxelPoints
+
+    Raises
+    ------
+    ValueError
+        Without any width or length.
+    """
+
+    data = []
+    for row in width_rows:
+        width = _value(row, "width_um")
+        if not math.isnan(width):
+            data.append((_value(row, "power_mw"), width, math.nan, _value(row, "width_std_um"), math.nan,
+                         str(row.get("cell_id", ""))))
+    for item in gap_lengths:
+        if item.get("length_um") is not None:
+            unc = item.get("length_unc_um")
+            data.append((float(item["power_mw"]), math.nan, float(item["length_um"]), math.nan,
+                         float(unc) if unc else math.nan, f"gap test {item['power_mw']} mW"))
+    if not data:
+        raise ValueError("No measured widths or lengths.")
+    columns = list(zip(*data))
+    return VoxelPoints(*(np.asarray(c, dtype=float) for c in columns[:5]), source=list(columns[5]))
 
 
 # ----------------------------------------------------------------------------------------------
