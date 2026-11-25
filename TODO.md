@@ -626,7 +626,10 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
   - Done when: `mains/Experiments/parameter_tests/` (provisional name) holds Quick PT, Full PT-01 (per field) and
     Voxel PT-01 plus a chain over `run_substrate` (`--test quick|full|voxel`, `--only`, `--layout`, `--dry-run`);
     the stage-A/B scripts of version 1 (`mains/Experiments/ptd01/`) are removed or moved to the attic after
-    approval (X-B); the layout of all tests on the T113 resin drop is checked; README updated.
+    approval (X-B); the layout of all tests on the T113 resin drop is checked; README updated;
+  - every parameter-test spec uses `margin_um = 90 µm`, and a check (with a test over all specs) refuses a layout in which
+    the QR code (140 µm, centred on the upper rectangle edge) or a corner marker comes closer than 20 µm to the grid area
+    (maintainer requirement 2026-11-25: the QR code must not reach into the experiments; `Experiment` unchanged).
 
 - [ ] T163: Evaluation of the parameter tests on absolute axes (design `PARAMETER_TESTS.md` §7) [phase: 11]
   - Priority: medium
