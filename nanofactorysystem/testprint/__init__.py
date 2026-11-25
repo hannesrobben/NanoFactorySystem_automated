@@ -12,6 +12,15 @@ parameters (power, z, hatch, slice distance). The modules are independent of
 - ``calibration``: ``ProcessCalibration``, ``StageAAxes`` (T140)
 - ``ptd01``: field builders ``ptd01.f0`` … ``ptd01.f7`` of the test print PTD-01 (T141–T143)
 - ``factories``: named structure factories ``ptd01.f0`` … ``ptd01.f7`` for experiment specs (T144)
+
+Parameter tests version 2 (design ``docs/design/PARAMETER_TESTS.md``; single stage, absolute axes):
+
+- ``inputs``: ``ParameterTestInputs``, the material start file of all three tests (T158)
+- ``parameter_tests``: field builders of Quick PT, Full PT-01 and Voxel PT-01 (T159–T161)
+- ``pt_factories``: named structure factories ``quick_pt.*``, ``full_pt01.*``, ``voxel_pt01.gap``
+
+The two-stage PTD-01 modules (``ptd01``, ``factories``, the stage-A/B use of ``calibration``) are version 1;
+they stay until the maintainer approves their removal (procedure X-B).
 """
 from .calibration import ProcessCalibration, StageAAxes
 from .field import CellSpec, FieldLayoutError, ParameterField
@@ -20,7 +29,10 @@ from .structure import ParameterFieldStructure, field_builder, field_builder_nam
 from .voxel_fit import VoxelFitModel
 from . import ptd01  # noqa: E402,F401  registers the PTD-01 field builders
 from . import factories  # noqa: E402,F401  registers the PTD-01 structure factories
+from .inputs import ParameterTestInputs  # noqa: E402
+from . import parameter_tests  # noqa: E402,F401  registers the parameter-test field builders
+from . import pt_factories  # noqa: E402,F401  registers the parameter-test structure factories
 
 __all__ = ["CellSpec", "FieldLayoutError", "ParameterField", "ParameterFieldStructure", "ProcessCalibration",
-           "StageAAxes", "VoxelFitModel", "field_builder", "field_builder_names", "ordering_names",
+           "StageAAxes", "VoxelFitModel", "ParameterTestInputs", "field_builder", "field_builder_names", "ordering_names",
            "register_field_builder", "register_ordering"]
