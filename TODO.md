@@ -146,6 +146,13 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
     above was a cache effect of Motion Composer). An `.ogm` is added under `<stem>.pgm`; a removal under the
     `.ogm` name returns success and does nothing. A whole-layer `.ogm` cannot be compiled through the C library
     within the budget (24.6 GB for layer 68); whole layers need the .NET `Builder.Build` path (T153).
+  - Lab session 3 (2026-11-25, `PROGRAM_LOADING.md` §6.3): the .NET `Builder.Build` also needs 19.9 kB per line, so
+    the cache stays per part (parts of the budget size), not per whole layer. Its `.OGM` of 400k lines loads in
+    12.0 s (30 µs per line).
+  - Maintainer 2026-11-25: keep the `.ogm` cache in view as a likely important future step, after the library loader
+    runs robustly (T153 session 3b, first real layer with the laser). Expected gains: a part loads in about 1/3 of
+    the compile time with 1/13 of the memory, so a restart (`restart_experiment`), `reprint_layers` and a repeated
+    structure skip the compile; compiling in the build step moves the 19.6 kB-per-line peak out of the print.
   - Done when: parts are compiled ahead (build step or one layer ahead, within the T129 memory budget) and loaded
     as `.ogm` during the print; the cache entry is keyed by program hash and controller software version /
     configuration and recompiled when either changes; `.ogm` files of printed layers are deleted (option);

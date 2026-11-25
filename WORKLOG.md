@@ -3008,3 +3008,11 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** system Python 3.12: `test/devices test/backends test/test_experiment.py test/lab_checks` 177 passed, 3 skipped.
 - **Commits:** `2b0fdec` fix(devices): name the task error code when a library part fails [T153]; `ad6f1f8` feat(lab): refuse motion steps without homed axes, short ascii-names path [T153]; `47f3147` docs(loading): record lab session 3 and describe session 3b [T153]; this docs(todo) commit.
 - **Follow-ups:** lab session 3b (maintainer); then one real layer with the laser through the library loader; T154; T135 before the default switch.
+
+### 2026-11-25 15:35 CET — [T131] Keep the .ogm cache in view (maintainer note)
+- **Status:** partial (note only; T131 stays open)
+- **Changes:**
+  - `TODO.md`: T131 gets the lab session 3 data (.NET compile 19.9 kB/line, so the cache is per part; `.OGM` load 30 µs/line) and the maintainer's note that the `.ogm` cache is a likely important future step after the library loader runs robustly, with the expected gains.
+- **Tests:** none (todo text only).
+- **Commits:** this docs(todo) commit.
+- **Follow-ups:** T131 after session 3b and the first laser print through the library loader.
