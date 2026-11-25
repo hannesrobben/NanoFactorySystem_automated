@@ -2981,3 +2981,15 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** system Python 3.12: `test/devices/test_program_loader.py` 11 passed; full suite 4 failed, 537 passed, 15 skipped (the 4 failures are the known T122 entry-script tests).
 - **Commits:** `4c5cf7c` feat(devices): run library-loaded parts on task 1 with add-ahead [T132]; this docs(todo) commit.
 - **Follow-ups:** lab session 3 (T153): runner gap with add-ahead, T152 on the real controller, P5.
+
+### 2026-11-25 13:24 CET — [T153] Lab session 3 tooling and guide
+- **Status:** partial (tools and guide done; blocked by the lab session on the lab PC)
+- **Changes:**
+  - `mains/lab_checks/program_loading_lab.py`: new steps `ascii-names` (T152 through the package on task 1), `recover-blocked` (R1 on a blocked name), `dotnet-build` (`Aerotech.AeroBasic.Builder.Build` in 64-bit PowerShell with a memory guard, then library load of the `.ogm`), `layer-dry` (P5: `dry_layer_lines` makes a real layer dry - gate OFF, `$AO` 0, no Z word, stage XY shifted to the current position; `dry_problems` checks it; split at the budget part size, add-ahead runner on task 1); `Library.added_program_list` (`A3200ProgramGetAddedPrograms`) in `system` and the controller snapshot; `read_block` for the INtime prompts of `hold`; `terminate_ascii_interface` shared by R1 steps; Build methods in the `api` log.
+  - `test/lab_checks/test_program_loading_lab.py`: tests of the dry copy (golden IFOV program), refused lines, split parts stay dry, `read_block`, registered steps.
+  - `docs/guides/PROGRAM_LOADING_LAB_TESTS.md`: section "Session 3" (goal, safety, preparation, 10 steps, checklist, decisions).
+  - `test/README.md`: test description.
+  - `TODO.md`: T153 to Blocked with status; note on T135 (the library loader also uses task 1).
+- **Tests:** `test/lab_checks` 21 passed (system Python 3.12); the new steps themselves need the controller (lab session 3).
+- **Commits:** `461f4f2` feat(lab): add the lab session 3 steps for names, add-ahead and P5 [T153]; `6cc29c1` docs(guide): describe lab session 3 for program loading [T153]; this docs(todo) commit.
+- **Follow-ups:** lab session 3 (maintainer); evaluation into `docs/design/PROGRAM_LOADING.md`; T135 before the library loader becomes the default.
