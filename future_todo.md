@@ -236,3 +236,183 @@ first), **Watch out for** (pitfalls and constraints), **Open questions** (for th
 - **Prerequisites:** T78, T81, F7.
 - **Watch out for:** Reproducibility: the algorithm, its version and parameters go into the metadata.
 - **Open questions:** Which algorithms first, and which quality metric decides between them?
+
+---
+
+The entries F18–F36 come from the planning of the test print PTD-01 (2026-11-20 to 2026-11-25, design
+`docs/design/TEST_PRINT_PTD01.md`). F18–F30 are improvements of **existing** code that were deliberately
+kept out of PTD-01 (maintainer decision 2026-11-25: the PTD-01 implementation must not change existing
+code); they were called improvement notes N1–N13 in the planning (renamed, because N-IDs are the code
+markers of `todo_notes.md`). F31–F36 come from the open points of the PTD-01 concept and from the import of
+the plan. **Every one of them must be discussed with the maintainer before it is scheduled.**
+
+## F18: One shared IR → IFOV translation for `Model3D_Slicer` and `ParameterFieldStructure` (formerly N1)
+- **Status:** to be discussed with the maintainer before scheduling.
+- **Goal:** The translation toolpath IR → IFOV blocks (runs of equal power → `IFOV_PolyLines`/`IFOV_Lines`)
+  exists once, used by `Model3D_Slicer.iterate_layers` (`aerobasic/programs/drawings/model3d.py`) and by
+  `ParameterFieldStructure` (T137).
+- **Context:** T137 duplicates about 40 lines on purpose. One place would hold power runs, block order and a
+  future dwell after power changes (F28).
+- **Prerequisites:** T137, T31.
+- **Watch out for:** pure refactor; the golden programs must stay byte-identical (characterization tests).
+- **Open questions:** When: right after PTD-01 or with the next slicer work (F7)?
+
+## F19: Process-window table in the voxel database (formerly N2)
+- **Status:** to be discussed with the maintainer before scheduling.
+- **Goal:** A table `process_window` in the voxel database (material, objective, setup, velocity, P_th,
+  P_dam + criterion in-situ/SEM, z0, plane-fit settings, source) and `ProcessCalibration.from_database()`,
+  so that the calibration is queried like voxel sizes and materials are comparable.
+- **Context:** PTD-01 stores the calibration as a JSON file (T140, design §7).
+- **Prerequisites:** T53, T140, results of T149.
+- **Watch out for:** schema migration (`voxel/migrations.py`); design addendum to `VOXEL_DATABASE.md`.
+- **Open questions:** Which criterion is the default P_th (in-situ or SEM)? One row per print or per fit?
+
+## F20: Store fitted voxel models in the voxel database (formerly N3)
+- **Status:** to be discussed with the maintainer before scheduling.
+- **Goal:** `VoxelFitModel`s (T150) are stored next to the raw measurements, versioned with their fit
+  inputs; the fit model becomes the queried quantity, the raw points stay for refits.
+- **Prerequisites:** T150, T151, same migration as F19.
+- **Watch out for:** `DatabaseVoxelModel` interpolates raw points today; both must stay selectable.
+- **Open questions:** Which model wins when raw points and a fit disagree?
+
+## F21: Store the `BuildContext` of a run in the experiment file (formerly N4)
+- **Status:** to be discussed with the maintainer before scheduling.
+- **Goal:** The `BuildContext` (objective, setup, accelerations, drop direction, power range) is stored, e.g.
+  under `/spec/build_context`, so that a factory can be re-evaluated offline exactly as in the lab.
+- **Context:** Today only factory name and arguments are in `/spec`; PTD-01 avoids the need with pure
+  builders (design §8).
+- **Prerequisites:** T77.
+- **Watch out for:** schema minor version of the experiment file; the power calibration object is not JSON.
+- **Open questions:** Store the attenuator calibration too, or only its range?
+
+## F22: One consistent way to pass the objective to IFOV structures (formerly N5)
+- **Status:** to be discussed with the maintainer before scheduling.
+- **Goal:** No silent 63x configuration in 20x experiments: either every IFOV structure takes `objective=`
+  in its constructor, or `Experiment.build_programs()` passes it to `iterate_layers`.
+- **Context:** `build_programs()` calls `iterate_layers(coordinate_system)` without objective
+  (`experiment.py` ~l. 1469); `Model3D_Slicer`/`HeightMap_IFOV` store it, `IFOV_Lines`/`Rectangle*_IFOV` use
+  the 63x default. Related: T114.
+- **Prerequisites:** T114.
+- **Watch out for:** touches every IFOV structure; golden files.
+- **Open questions:** Constructor argument everywhere or experiment-provided?
+
+## F23: Explicit velocity unit in `IFOV_Lines` (formerly N6)
+- **Status:** to be discussed with the maintainer before scheduling.
+- **Goal:** Replace the velocity unit guessing of `IFOV_Lines` (500–25000 → divided by 1000, "to be
+  reworked") with explicit `velocity_mm_s` / `velocity_um_s`.
+- **Prerequisites:** F13.
+- **Watch out for:** API change of a widely used class; old scripts and stored `to_json()` data.
+- **Open questions:** Deprecation period with a warning, or a hard switch?
+
+## F24: Measured layer overhead per objective and loader (formerly N7)
+- **Status:** to be discussed with the maintainer before scheduling.
+- **Goal:** `layer_overhead_s` (fixed 5 s) is measured on the lab PC (program load, task start, z settle) per
+  objective and loader and stored in the config, so that time estimates of many-layer structures are
+  realistic (PTD-01: about 160 layers).
+- **Prerequisites:** T28, T129; actual times of T149.
+- **Watch out for:** the library loader with prefetch (T129) changes the overhead.
+- **Open questions:** One value per objective, or a model (constant + per line)?
+
+## F25: Slice planes on a global aligned grid in the slicer (formerly N8)
+- **Status:** to be discussed with the maintainer before scheduling.
+- **Goal:** An option in `aerobasic/slicer/slicing.py` to put slice planes on a global grid `k · Δz` instead
+  of `z_min + z_epsilon`, so that several parts of one job share layers.
+- **Context:** PTD-01 reaches the same inside its cell primitives without a slicer change (T138).
+- **Watch out for:** the default must stay unchanged (golden files); tangential cuts at z_min.
+- **Open questions:** Grid origin: the substrate (z = 0) or the job?
+
+## F26: Process-dependent material properties (formerly N9)
+- **Status:** to be discussed with the maintainer before scheduling.
+- **Goal:** A clear boundary material ↔ process: either material properties get optional objective/setup
+  keys, or process data (thresholds) stay out of the registry explicitly (F19).
+- **Prerequisites:** T75.
+- **Open questions:** Which values are material properties and which are process properties?
+
+## F27: Print order per structure (formerly N10)
+- **Status:** to be discussed with the maintainer before scheduling.
+- **Goal:** A per-structure option for the layer order (e.g. substrate side first for the 63x), to compare
+  both orders for bridges and pillars.
+- **Context:** DOWN always prints the highest layer first (PTD-01 decision D1).
+- **Watch out for:** restart and progress logic (`print_progress`, `reprint_layers`), the split parts of T125.
+- **Open questions:** Only after the PTD-01 results of F2/F7?
+
+## F28: Dwell after power changes in IFOV blocks (formerly N11)
+- **Status:** to be discussed with the maintainer before scheduling.
+- **Goal:** If the attenuator does not settle between `SET_POWER` and the first line (T148), an optional dwell
+  after every power change in all IFOV structures, not only in the PTD-01 field structure.
+- **Prerequisites:** T148 result; F18 (one place for it).
+- **Open questions:** Fixed dwell or a dwell proportional to the power step?
+
+## F29: Structure-specific metadata in the summary (formerly N12)
+- **Status:** to be discussed with the maintainer before scheduling.
+- **Goal:** A generic hook for structure-specific metadata (e.g. a cell table) in
+  `/structures/<name>/metadata`, so that multi-parameter structures are visible in the summary.
+- **Context:** The summary lists one power/hatch per structure; PTD-01 regenerates its cell table instead (T147).
+- **Watch out for:** storage schema change.
+
+## F30: Corner markers scaled to small experiments (formerly N13)
+- **Status:** to be discussed with the maintainer before scheduling.
+- **Goal:** Scale the default `CornerSpec` with the experiment area, or document a "small experiment" preset,
+  because the default corners (300 × 50 × 7 µm) dominate the time of experiments with small structures.
+- **Context:** PTD-01 sets a reduced `CornerSpec` explicitly (decision D2).
+- **Watch out for:** a default change affects existing scripts and the corner detection.
+
+## F31: Follow-up standard test prints PTD-02 … PTD-08
+- **Status:** to be discussed with the maintainer before scheduling.
+- **Goal:** The series of the PTD-01 concept, all with the same field format (50 × 50 µm, header, REF pad,
+  metadata) and the `testprint` library: PTD-02 dose matrix P × v (P_th(v), dose exponent n); PTD-03
+  resolution (pins/holes, Siemens star); PTD-04 hatching strategies; PTD-05 slicing and adaptive layers
+  (z staircase, ramps, greyscale dose, shell + scaffold); PTD-06 mechanical limits (pillars Ø × height ×
+  pitch, bridges up to 40 µm); PTD-07 dimensional accuracy (shrinkage, contour offset); PTD-08 optics
+  validation (microlens, blazed prism, DOE grating).
+- **Prerequisites:** phase 11 done; PTD-02 needs F13 (free IFOV speed).
+- **Open questions:** Order of the follow-up prints; which ones are needed for the slicer work (F7, F17)?
+
+## F32: In-situ threshold detection from DHM phase time series
+- **Status:** to be discussed with the maintainer before scheduling.
+- **Goal:** Determine P_th (and microexplosions) in situ from the DHM phase of F0 (first row with Δφ > 0,
+  phase/amplitude spikes), taken as a time series after the exposure (monomer diffusion changes the index
+  over time). Would replace the development step between stage A and B. Not published in the literature
+  reviewed: a research result of its own.
+- **Prerequisites:** phase 7 (DHM service), T67, SEM reference data from T149.
+- **Watch out for:** the line width at the threshold is below the lateral DHM resolution (≈ 240 nm); the phase
+  of a 0.4 µm line is about 0.13 rad; calibrate against SEM.
+- **Open questions:** Time points of the series; which signal defines the threshold?
+
+## F33: PTD output for the material table
+- **Status:** to be discussed with the maintainer before scheduling.
+- **Goal:** Store the further results of the PTD-01 concept per material/objective/substrate/velocity:
+  dynamic window DFW = (P_dam − P_th)/P_th, anisotropy w_x/w_y and w(θ), merge distance s_merge(P), proximity
+  factor k_prox, hatch window (h/w)_min/max, layer window (Δz/l)_max(θ), overdose at crossings, L_max and
+  AR_max, and two named working points "Fidelity" and "Robust" per material.
+- **Prerequisites:** F19, F26, evaluation of T149.
+- **Open questions:** Where do these values live (voxel database, material registry, own table)? How does the
+  slicer use them (F7, F17)?
+
+## F34: Line ends at the galvo reversal (laser gate or lead-in)
+- **Status:** to be discussed with the maintainer before scheduling.
+- **Goal:** Lines get a uniform dose up to their ends: either a laser gate (PSO) in the AeroBasic program, or
+  lead-in/lead-out moves outside the cell with the laser off.
+- **Context:** PTD-01 measures the line middle only (decision D12); F1 compares line end and middle.
+- **Prerequisites:** F11 (A3200 manual), PTD-01 results of F1.
+- **Open questions:** Does the controller offer PSO in IFOV mode?
+
+## F35: Automatic recalibration rule
+- **Status:** to be discussed with the maintainer before scheduling.
+- **Goal:** When a new calibration changes P_th by more than a threshold (proposal 10 %), the chain proposes
+  to rerun F1, F3 and F4 (coupled parameters).
+- **Context:** PTD-01 documents the rule only (decision D14).
+- **Prerequisites:** T146, F19.
+
+## F36: Substrate anchoring by repeating the first slice, as a general slicer option
+- **Status:** to be discussed with the maintainer before scheduling.
+- **Goal:** Every sliced structure (`Model3D_Slicer`, `HeightMap_IFOV`, slicer pipeline) can repeat its first
+  slice (the one at the interface, z = 0) downwards with its layer distance until an anchor depth (typically
+  1–2 µm into the substrate) is reached, so that it bonds to the substrate.
+- **Context:** Maintainer note 2026-11-25. Today structures are shifted down as a whole (e.g. `HeightMap_IFOV`
+  `center.Z = −1 µm`), which also lowers the top. PTD-01 implements the repetition inside its cell primitive
+  (T138, decision D15).
+- **Prerequisites:** T138 (lab result of the PTD-01 anchoring), F25.
+- **Watch out for:** golden files (only as an opt-in parameter, default off); voxel-aware first slice (T54:
+  first slice half a voxel height inside the part); DOWN prints the anchor layers last.
+- **Open questions:** Default depth per objective; dose of the anchor layers (same power or higher)?
