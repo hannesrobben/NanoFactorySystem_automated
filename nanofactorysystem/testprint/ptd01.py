@@ -311,7 +311,7 @@ def field_f3(*, calibration: dict, label_power_mw: float, p_rel: Optional[list] 
             groups += cells.line_set(cid, n=5, pitch_um=s, length_um=F3_LINE_LENGTH_UM, power_mw=power,
                                      z_um=cal.z0_um, offset_um=(0.0, -total / 2 + 2 * s), part="group")
             field_cells.append(CellSpec(cid, r, c, centers[(r, c)],
-                                        {"power_mw": round(power, 6), "spacing_um": s, "width_um": round(width, 6),
+                                        {"power_mw": round(power, 6), "spacing_um": s, "model_width_um": round(width, 6),
                                          "z_um": cal.z0_um}, {"p_rel": rel, "s_rel": srel}, "line_set",
                                         groups=tuple(groups)))
     return _stage_b_field(3, cal, field_cells, label_power_mw, uses_model_at_cell_power=True, order=order,
@@ -350,7 +350,7 @@ def field_f4(*, calibration: dict, label_power_mw: float, p_rel: Optional[list] 
             field_cells.append(CellSpec(cid, r, c, (x_centers[c], y_centers[r]),
                                         {"power_mw": round(power, 6), "hatch_um": round(hatch, 6),
                                          "slice_um": round(dz, 6), "layers": F4_LAYERS,
-                                         "height_um": round(F4_LAYERS * dz, 6)},
+                                         "pad_height_um": round(F4_LAYERS * dz, 6)},
                                         {"p_rel": rel, "h_rel": hrel, "dz_rel": F4_DZ_REL}, "sliced",
                                         groups=tuple(groups), kind=VOLUME, anchor_depth_um=ANCHOR_DEPTH_UM))
     return _stage_b_field(4, cal, field_cells, label_power_mw, uses_model_at_cell_power=True, order=order,
