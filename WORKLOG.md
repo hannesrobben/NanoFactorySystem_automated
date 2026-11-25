@@ -3115,3 +3115,43 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** none (documentation only).
 - **Commits:** this docs commit on `docs/parameter-tests-qr`.
 - **Follow-ups:** T162.
+
+### 2026-11-26 00:24 CET — [T158–T163] Parameter tests version 2: library, scripts in mains/parametertest, evaluation
+- **Status:** T158, T159, T160, T161, T163 done; T162 partial (removal of version 1 needs approval → T164)
+- **Changes:**
+  - `nanofactorysystem/testprint/inputs.py` (new, T158): `ParameterTestInputs`, the material start file (schema `nanofactory.parameter_tests/1`).
+  - `nanofactorysystem/testprint/field.py` (T158): sub-field bit in the header, `half` field and cell-table column.
+  - `nanofactorysystem/testprint/parameter_tests.py` (new, T159–T161): builders of Quick PT, Full PT-01 and Voxel PT-01.
+  - `nanofactorysystem/testprint/pt_factories.py` (new): named factories `quick_pt.*`, `full_pt01.*`, `voxel_pt01.gap`.
+  - `nanofactorysystem/testprint/__init__.py`: registers them; marks the two-stage modules as version 1.
+  - `mains/parametertest/` (new, T162):
+    - `common.py`: 18 experiment positions, margin 90 µm, `check_marker_clearance`.
+    - `quick_pt.py`, `full_pt01.py`, `voxel_pt01.py`, `chain.py`.
+    - `parameter_tests_SZ2080.json`.
+    - `README.md` plus one README per test.
+  - `analysis/experiment_analysis/ptd.py` (T163): `PREFIXES`, `add_relative_columns`, `voxel_lengths_from_gaps`.
+  - `analysis/experiment_analysis/voxel_fit.py` (T163): `points_from_parameter_tests`.
+  - Tests (new): `test/testprint/test_testprint_parameter_tests.py`, `test/integration/test_parameter_tests.py`, `test/analysis/test_parameter_test_analysis.py`.
+  - `test/README.md`, `CLAUDE.md`: documentation.
+  - `mains/Experiments/ptd01/README.md`: version-1 warning ("do not print").
+  - `TODO.md`:
+    - T158–T161, T163 → Done.
+    - T162 → In Progress with status.
+    - New T164 (decision on moving version 1 to the attic).
+- **Findings:**
+  - With absolute slice distances all Quick and Full sub-fields need about 30 min of layer programs. Version 1 needed 37 min for F1–F7 alone.
+  - F1 needed a centred cell layout to fit 60 µm.
+  - Corners and QR code are printed at 0.7 mW (T113 value); the header marks at 0.5 mW, as decided.
+  - All 18 experiments fit the T113 resin drop with margin 90 µm. The QR-code clearance of 20 µm is checked for every spec.
+- **Tests:** new and affected modules pass (`test/testprint` 146, analysis, integration incl. slow dry runs). Full suite in the worktree (NFS_RUN_ENV, 19:15 min): 730 passed, 15 skipped, 4 failed. The 4 failures are the known T122 entry-script tests.
+- **Commits:**
+  - `63e32d2` [T158]
+  - `89b7232` [T159, T160, T161]
+  - `7d472f1` [T162]
+  - `62c252b` [T163]
+  - this docs commit and the docs(todo) commit.
+- **Follow-ups:**
+  - T164 (maintainer decision).
+  - T148: lab check of the attenuator settling.
+  - T149: lab print, now with the parameter tests of version 2.
+  - LAB: check `parameter_tests_SZ2080.json` and `CENTERS` / `RESIN_EDGES` in `mains/parametertest/common.py`.
