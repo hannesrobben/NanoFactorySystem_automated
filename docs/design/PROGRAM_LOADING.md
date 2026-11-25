@@ -174,6 +174,33 @@ Further observations:
 | 2 programs stayed added the whole day (also right after the restart at 11:19 and after many probe and `sticky` loads that were removed); after R2 the count was 0, after the next probe 1. | Probably the last program of each task stays added while it is associated with the task, even after `REMOVEPROGRAM`. Open: list the names (`A3200ProgramGetAddedPrograms`) in lab session 3. |
 | The layer header (`LOOKAHEAD FAST`, `CRITICAL START`, …) does not change the task speed. | The limit is the task configuration (lookahead 100 moves, 1 line per execution cycle), not the program. The velocity profile at corners, and with it the dose, may differ between the tasks as well. |
 
+### 6.3 Lab session 3 (2026-11-25, T153)
+
+Three attempts, 14:01–14:23, folders `mains/lab_checks/program_loading_lab_20261125 - …` ("labrun3 failed",
+"labrun3 again fail without system poli", "last lab run"). The maintainer restarted the PC between the
+attempts; the second attempt ran without initialising the Femtika software. The folders are not versioned.
+
+**Main finding: in every motion step the axes were disabled and not homed.** The `system` step reports
+`enabled: False, homed: False` for all axes in all three attempts: in the first one still from the R2 reset of
+session 2 (11:53, the A3200 processes were from 11:19), in the others after the PC restart. Only at 14:23, after
+Motion Composer was opened, were the axes enabled and homed; no motion step ran after that. So the motion
+results below say nothing about the loader.
+
+| Question | Step | Result |
+|---|---|---|
+| Add-ahead on task 1 (T132) | `runner` (3×) | **Not answered.** Every compile and associate worked; the first part ended in a task error at line 6, its first motion line (`RAPID A0 B0`), each time. Matches the disabled axes. The runner did not report the error code (fixed for session 3b). |
+| P5 with layer 68 | `layer-dry` (2×) | **Not answered**, same cause: task error at line 4 of the first part. The dry copy itself was as designed: layer 68 has 1 gate line, 1 `$AO` line and 2 stage lines (one start position), everything else is galvo. |
+| T152 on the controller | `ascii-names` (2×) | **Not answered.** Every load was refused with "Compiler Error: The program file could not be opened". The execution copies were at a 191-character path (`programs\ascii_names\nfs_…`); the probe and `sticky` files in the same session folder (162–166 characters) loaded. Likely a path length limit of the ASCII interface. The print path copies to the home folder (about 50 characters), where loading always worked. Session 3b uses `~/nfs_lab`. |
+| .NET compile path | `dotnet-build` (3×) | `Aerotech.AeroBasic.Builder.Build` is static and works (connected), 400k lines in 25.7 s, but **19.9 kB per line**, the same as the C library. The `.OGM` loads through the library in 12.0 s (30 µs per line) and is removed as `<stem>.pgm`. **Consequence:** no whole-layer compile within the budget; parts stay (T131 keeps the `.OGM` per part). |
+| Programs that stay added | `system` | `ImmediateProgram0`, not associated with a task: the program of the immediate (ASCII) commands. Harmless; R0 leaves it. |
+| Does R1 clear a blocked name? | `recover-blocked` | **No.** The name stays refused after the ASCII interface was restarted (back after 1.0 s). Fresh names per load (T152) are the remedy. |
+| R3 as administrator | `restart-service` (2×) | **Works:** `Restart-Service` returns after 0.7 s, ASCII after 0.5–1.0 s, the library at once, LOAD probe passes; positions unchanged (the axes were already disabled, so the effect on enable/home is still unknown). |
+| Library compile and load | all steps | **No failure** in any session: every compile through the library (C or .NET) and every `.OGM` load succeeded. |
+
+Changes for session 3b (T153): every motion step stops unless all axes are enabled and homed; the runner reports
+the decoded task error code; `ascii-names` copies to `~/nfs_lab`. The procedure is in
+`docs/guides/PROGRAM_LOADING_LAB_TESTS.md`, section "Session 3b".
+
 ## 7 Plan after lab session 1
 
 What the cycle proved is already enough to print large layers safely:
