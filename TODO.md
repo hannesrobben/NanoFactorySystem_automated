@@ -152,6 +152,16 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
     an `.ogm` is removed under `<stem>.pgm` and the removal is verified with the added-program count; dummy loader
     simulates the cache; lab check of one real layer.
 
+- [ ] T154: ASCII `PROGRAM LOAD` cannot open program files at long paths (found during T153) [phase: B]
+  - Priority: low
+  - Size: S
+  - Depends on: T153 (session 3b confirms the short path)
+  - Background: in lab session 3 every execution copy at a 191-character path was refused with "Compiler Error: The
+    program file could not be opened", while files at 162-166 characters loaded. `run_program_as_task` copies to the
+    home folder when no `program_dir` is set (the print path), so prints are not affected; a long `program_dir` is.
+  - Done when: the limit is known (lab: a few lengths between 166 and 191 characters) and `run_program_as_task`
+    refuses or relocates execution copies above it with a clear message; a unit test.
+
 - [ ] T135: The z-line program and the layer programs share task 1 (found during T129) [phase: B]
   - Priority: medium
   - Size: S
@@ -998,7 +1008,14 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
     `dotnet-build`, `layer-dry` (P5 with a dry copy of layer 68: laser gate off, `$AO` 0, no Z, stage XY around the
     current position), added-program names in `system`, INtime prompt for pasted blocks, Build methods in the
     `api` log; guide section "Session 3" in `docs/guides/PROGRAM_LOADING_LAB_TESTS.md`.
-  - Blocked by: lab session 3 on the lab PC (maintainer).
+  - Status 2026-11-25 (lab session 3, `PROGRAM_LOADING.md` §6.3): run in three attempts, all motion steps with
+    disabled, unhomed axes, so `runner`, `layer-dry` (task error at the first motion line) and `ascii-names` (copies
+    at a 191-character path not opened) answered nothing. Answered: .NET `Builder.Build` 19.9 kB per line (no
+    whole-layer compile), `ImmediateProgram0` is the program that stays added, R1 does not clear a blocked name, R3
+    works as administrator, no library compile or load failed. Session 3b prepared (commits `2b0fdec`, `ad6f1f8`,
+    `47f3147`): motion steps require homed axes, the runner names the task error code, `ascii-names` uses
+    `~/nfs_lab`; guide section "Session 3b" (about 35 minutes).
+  - Blocked by: lab session 3b on the lab PC (maintainer).
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->

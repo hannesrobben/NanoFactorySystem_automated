@@ -2993,3 +2993,18 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** `test/lab_checks` 21 passed (system Python 3.12); the new steps themselves need the controller (lab session 3).
 - **Commits:** `461f4f2` feat(lab): add the lab session 3 steps for names, add-ahead and P5 [T153]; `6cc29c1` docs(guide): describe lab session 3 for program loading [T153]; this docs(todo) commit.
 - **Follow-ups:** lab session 3 (maintainer); evaluation into `docs/design/PROGRAM_LOADING.md`; T135 before the library loader becomes the default.
+
+### 2026-11-25 15:25 CET — [T153] Evaluation of lab session 3 and preparation of session 3b
+- **Status:** partial (session 3 evaluated; the motion checks repeat in session 3b)
+- **Changes:**
+  - `nanofactorysystem/devices/aerotech/loader.py`: a failed part names the decoded task error code (session 3 showed only "ended in state error at line 6").
+  - `test/devices/test_program_loader.py`: the failure message carries the code.
+  - `mains/lab_checks/program_loading_lab.py`: `axes_not_ready` / `require_axes_ready` stop `cycle`, `taskspeed`, `runner`, `layer-dry` unless every axis is enabled and homed; `ascii-names` copies to `~/nfs_lab` and passes only with at least three loads.
+  - `test/lab_checks/test_program_loading_lab.py`: `axes_not_ready`.
+  - `test/README.md`: test descriptions.
+  - `docs/design/PROGRAM_LOADING.md`: section 6.3 with the results of lab session 3 (three attempts; axes never enabled/homed during motion steps; .NET compile 19.9 kB/line; `ImmediateProgram0`; R1 does not clear a blocked name; R3 works as administrator; no library compile or load failed).
+  - `docs/guides/PROGRAM_LOADING_LAB_TESTS.md`: section "Session 3b" (ascii-names, runner, layer-dry with homed axes, about 35 minutes).
+  - `TODO.md`: T153 status, blocked by session 3b; new T154 (ASCII LOAD at long paths).
+- **Tests:** system Python 3.12: `test/devices test/backends test/test_experiment.py test/lab_checks` 177 passed, 3 skipped.
+- **Commits:** `2b0fdec` fix(devices): name the task error code when a library part fails [T153]; `ad6f1f8` feat(lab): refuse motion steps without homed axes, short ascii-names path [T153]; `47f3147` docs(loading): record lab session 3 and describe session 3b [T153]; this docs(todo) commit.
+- **Follow-ups:** lab session 3b (maintainer); then one real layer with the laser through the library loader; T154; T135 before the default switch.
