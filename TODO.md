@@ -160,27 +160,13 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
     `DefaultCoordinatedSpeed` 12.5 / 50, `DefaultCoordinatedRampRate` 2000 / 500, `DefaultCoordinatedRampTime`
     0.1 / 0.5. Correction: the ASCII print path of `Experiment` always used task 1, so earlier prints ran on the
     tuned task; only the library loader alternates onto task 2.
-  - Decision: (a) align the task-2 parameters with task 1 in the active parameter file (Configuration Manager,
-    backup first), or (b) recommended: print on task 1 only and compile the next part ahead without a task
-    (`A3200ProgramAdd`, lab: same time and memory as a load), then associate it to task 1 when the current part
-    has completed (< 0.05 s). (b) needs no controller change and keeps one velocity profile per structure.
-  - Done when: the decision is recorded; for (a) both tasks run a real layer part within 5 % of the same time
-    (lab); for (b) the library loader prints on one task with add-ahead (`ProgramRunner` mode, dummy tests, lab
-    check of the gap) and never alternates onto an untuned task.
-
-- [ ] T152: The ASCII path loads every layer program under one fixed name, so one refused compile blocks every
-  later layer (found during T134) [phase: B]
-  - Priority: high
-  - Size: S
-  - Depends on: –
-  - Background: lab session 2 (`sticky`, three runs, one after a restart): after a refused `PROGRAM LOAD` over
-    ASCII only that program name stays refused, also with valid content; other names load. `run_program_as_task`
-    copies every program to `python_aerobasic_program.pgm` (T127), which explains the DOE print of 2026-11-21:
-    after one out-of-memory failure every later layer was refused until the restart.
-  - Done when: `run_program_as_task` (and `Aerotech3200`) load every program under a fresh name (e.g. a counter
-    and the layer stem, like `ProgramRunner._exec_copy`) and remove it under that name; `health.recover_r0` and the
-    health check recognise the name pattern; the dummy controller refuses a name after a failed compile (as the
-    real one) and a test shows that the next layer still loads; golden command logs updated deliberately.
+  - Decided 2026-11-25 (maintainer): option (b). Print on task 1 only; compile the next part ahead without a task
+    (`A3200ProgramAdd`, lab: same time and memory as a load) and associate it to task 1 when the current part has
+    completed (< 0.05 s). No change of the controller configuration; one velocity profile per structure; task 2
+    stays free (z-line, T135). Rejected: (a) aligning the task-2 parameters.
+  - Done when: the library loader prints on task 1 only with add-ahead (`ProgramRunner` mode, library wrapper for
+    `A3200ProgramAdd`/`A3200ProgramAssociate`, dummy loader and tests: order, gap, failure in the middle) and never
+    puts a print part on task 2; lab check of the gap with 4 synthetic parts (T153 runner step).
 
 - [ ] T153: Lab session 3 for program loading: .NET compile path, added-program names, R1 and R3 (follow-up of
   T134) [phase: B]
@@ -709,6 +695,8 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
     their last lines with gaps of 0.31-0.33 s (P5, first half passed). Task 2 is untuned (T132): no real print with
     alternation before the T132 decision; with option (b) the runner gets a single-task add-ahead mode. Next: T152,
     T132 decision, one real layer with laser off.
+  - Status 2026-11-25 (later): T152 done (`5b856bb`); T132 decided as option (b): task 1 only with add-ahead. Next:
+    the add-ahead mode (T132), then P5 with one real layer, laser off, on task 1.
 
 - [ ] T130: Program optimiser that shortens generated AeroBasic programs (maintainer request 2026-11-23) [phase: B]
   - Priority: high
@@ -775,6 +763,7 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T152: The ASCII path loads every layer program under one fixed name, so one refused compile blocks every later layer (found during T134) — 2026-11-25 — `run_program_as_task` loads every program under a fresh name `nfs_<session>_<counter>_<stem>.pgm`, removes it under that name and deletes the copy; R0 in `Experiment` removes the names still listed; the dummy controller blocks a name after a failed LOAD like the real one, and a test shows that the following layers still print. Golden command logs re-recorded (name lines only). — commits: `5b856bb`
 - [x] T127: `REMOVEPROGRAM` names the layer file instead of the loaded program (found during T125) — 2026-11-24 — Programs are removed under the loaded name `python_aerobasic_program.pgm` (`Task.finish()`/`abort()`, failures logged); the dummy controller records loaded programs and unknown removals; golden command logs updated deliberately. — commits: `79a789d`
 - [x] T128: Load failures: log `~LASTERROR` for `!` replies and stop instead of skipping the layer (found during T125) — 2026-11-24 — Refusals carry the `~LASTERROR` text, `PROGRAM LOAD` has a response timeout (`controller.loadTimeout`, connection reopened), task errors are decoded, an early "complete" is a failure; `Experiment(stop_on_failure=True)` (default) stops at the first failed layer with `PrintStoppedError` and `restart_experiment()` prints it again. — commits: `79a789d`, `3f773a3`
 - [x] T125: DOE print printed only 16 of 73 layers: `PROGRAM LOAD` refused every layer program above about 80 000 lines (maintainer report 2026-11-22, `surface_16bit`) — 2026-11-22 — Hotfix: `build_programs()` splits every layer program with more than `max_program_lines` (default 80 000) lines into parts (whole layer setup and footer repeated, cut with the laser off at an absolute move, power/feed replayed) and stops if one cannot be split; printing prepares all layers before the first one; interim solution `Experiment.reprint_layers()` / `mains/reprint_layers.py` prints the missing layers from the experiment file, split, in drop-direction order (DOWN: highest first). Real fix: T126; follow-ups T127, T128; lab check of the parts open. — commits: `76b8839`, `d46ad4a`, `a6db390`, `9974a31`, `2e7ad3a`

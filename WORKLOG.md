@@ -2904,3 +2904,21 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** none (documentation and evaluation of lab output; the session folder `mains/lab_checks/program_loading_lab_20261125` stays unversioned). The task-parameter comparison was done with a short script over the 30 `.prma` files in the session folder.
 - **Commits:** `d4093ae` docs(loading): record lab session 2 results and the plan after it [T134]; this docs(todo) commit.
 - **Follow-ups:** T152 (first), T132 decision (maintainer), T129 P5 with one real layer, T131, T133 R1/R2, T153. Note: work done in a separate worktree on `docs/load-lab-session2` because a parallel session (PTD-01, `docs/ptd01-planning`, new IDs up to T151) edits `TODO.md` in the main working tree.
+
+### 2026-11-25 12:40 CET — [T152] Load every ASCII program under a fresh name
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/devices/aerotech/__init__.py`: `exec_program_name()` and `EXEC_PROGRAM_PREFIX`; `run_program_as_task` copies every program to `nfs_<session>_<counter>_<stem>.pgm` (`_exec_copy`), `program_removed()` deletes the copy after a removal, `exec_programs` lists names not removed yet. Reason: a refused LOAD blocks its name on the controller (lab session 2), so the fixed name `python_aerobasic_program.pgm` blocked every later layer (2026-11-21).
+  - `nanofactorysystem/devices/aerotech/task.py`: `Task(on_removed=)` callback after a successful `REMOVEPROGRAM`.
+  - `nanofactorysystem/devices/aerotech/health.py`: `recover_r0(on_removed=)`, docstring on the names to pass.
+  - `nanofactorysystem/experiment.py`: R0 removes the controller's `exec_programs` plus the pre-T152 name.
+  - `nanofactorysystem/backends/dummy/a3200.py`: `blocked_programs`: a failed LOAD blocks its name, later loads of it get `!`.
+  - `test/backends/test_dummy_controller.py`: `test_exec_program_name`, `test_every_load_gets_a_fresh_name`, `test_refused_load_blocks_only_its_name`; existing T127 tests use the new names (same assertions on removal and cleanup, plus the deleted copy).
+  - `test/backends/test_controller_merge.py`, `test/test_experiment.py`, `test/devices/test_health.py`: new names; `test_refused_load_does_not_block_the_following_layers`; `test_recovery_level_r0_removes_the_given_names`.
+  - `test/backends/test_command_logs.py`: the session token is normalised to `<session>`.
+  - `test/golden/commands_experiment_ifov_off.txt`, `commands_experiment_ifov_on.txt`: re-recorded deliberately; only the 106 LOAD and REMOVEPROGRAM lines per file change.
+  - `CLAUDE.md`, `test/README.md`: documentation.
+  - `TODO.md`: T152 done; T132 decided as option (b) (task 1 only, add-ahead), Done-when rewritten; T129 status.
+- **Tests:** system Python 3.12 (the venv `%LOCALAPPDATA%\Temp\nfsv` is broken: editable finder missing). Targeted: `test/backends/test_dummy_controller.py test/backends/test_controller_merge.py test/devices/test_health.py test/test_experiment.py` 92 passed; golden logs re-recorded, then passed; full suite 4 failed, 535 passed, 15 skipped (the 4 failures are the known T122 entry-script tests).
+- **Commits:** `5b856bb` fix(devices): load every ASCII program under a fresh name [T152]; this docs(todo) commit.
+- **Follow-ups:** T132 add-ahead mode on task 1; T129 P5; T153 (also: list the added-program names after REMOVEPROGRAM on the real controller).
