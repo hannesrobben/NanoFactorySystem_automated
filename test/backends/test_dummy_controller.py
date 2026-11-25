@@ -1,4 +1,6 @@
 """Tests for the simulated A3200 controller (FakeA3200Transport)."""
+from pathlib import Path
+
 import pytest
 
 from nanofactorysystem.aerobasic import AxisStatusDataItem, SingleAxis
@@ -145,7 +147,8 @@ def test_program_task_runs_and_records_exposure(tmp_path, transport, world):
     assert task.task_state == TaskState.idle
     assert len(world.exposures) == 1
     assert world.exposures[0].end[2] - world.exposures[0].start[2] == pytest.approx(0.02)
-    assert (tmp_path / "python_aerobasic_program.pgm").is_file()
+    # T152: the execution copy is deleted once the program has been removed
+    assert a3200.exec_programs == {} and list(tmp_path.glob("nfs_*.pgm")) == []
     runs = world.calllog.filter(device="program")
     assert runs[0].result["not_simulated"] == 0
 
@@ -187,19 +190,20 @@ def test_program_error_before_start(tmp_path, transport, world, no_sleep):
 
 
 def test_program_is_removed_under_its_loaded_name(tmp_path, transport, world):
-    # T127: the program is loaded as python_aerobasic_program.pgm, so it must be removed under that name
+    # T127: the program is loaded under its execution name, so it must be removed under that name
     a3200 = Aerotech3200(transport_factory=lambda: transport, program_dir=tmp_path)
     a3200.connect()
     layer = tmp_path / "program_rect.000.txt"
     layer.write_text("LINEAR X1 F1\n")
 
     task = a3200.run_program_as_task(layer, task_id=1)
-    assert set(transport.loaded_programs) == {"python_aerobasic_program.pgm"}
+    name = f"nfs_{a3200.exec_session}_0001_program_rect.000.pgm"
+    assert task.program_name == name and set(transport.loaded_programs) == {name.lower()}
     task.wait_to_finish()
     task.finish()
 
     assert transport.loaded_programs == {} and transport.unknown_removals == []
-    assert 'REMOVEPROGRAM "python_aerobasic_program.pgm"' in world.calllog.commands()
+    assert f'REMOVEPROGRAM "{name}"' in world.calllog.commands()
 
 
 def test_early_complete_is_a_failure(tmp_path, transport, world, no_sleep):
@@ -237,8 +241,10 @@ def test_refused_load_reports_the_controller_reason_and_cleans_up(tmp_path, tran
     with pytest.raises(AerotechError, match=r"Could not load program .* on task 1: .*out of memory"):
         a3200.run_program_as_task(program, task_id=1)
     commands = world.calllog.commands()
-    stop, remove = commands.index("PROGRAM 1 STOP"), commands.index('REMOVEPROGRAM "python_aerobasic_program.pgm"')
+    name = Path(next(c for c in commands if c.startswith("PROGRAM 1 LOAD")).split('"')[1]).name
+    stop, remove = commands.index("PROGRAM 1 STOP"), commands.index(f'REMOVEPROGRAM "{name}"')
     assert stop < remove and "PROGRAM 1 START" not in commands
+    assert a3200.exec_programs == {} and not (tmp_path / name).exists()  # the execution copy is cleaned up
 
 
 def test_load_without_reply_times_out_and_reconnects(tmp_path, transport, world):
@@ -293,3 +299,56 @@ def test_send_one_falls_back_without_recursion(api, transport):
 
     transport.fail_next(r"^ABSOLUTE$")
     assert api.send_one("ABSOLUTE") == ""  # retried with the fallback
+
+
+def test_exec_program_name():
+    from nanofactorysystem.devices.aerotech import exec_program_name
+
+    assert exec_program_name("a1b2c3", 7, "program_surface_16bit.068") == "nfs_a1b2c3_0007_program_surface_16bit.068.pgm"
+    assert exec_program_name("a1b2c3", 1, "layer 1/ä") == "nfs_a1b2c3_0001_layer_1__.pgm"
+    assert len(exec_program_name("a1b2c3", 12345, "x" * 200)) == len("nfs_a1b2c3_12345_.pgm") + 60
+
+
+def test_every_load_gets_a_fresh_name(tmp_path, transport, world):
+    """ T152: two loads of the same file use two names; each copy is deleted after its removal. """
+
+    a3200 = Aerotech3200(transport_factory=lambda: transport, program_dir=tmp_path)
+    a3200.connect()
+    layer = tmp_path / "layer.pgm"
+    layer.write_text("LINEAR X1 F1\n")
+
+    names = []
+    for _ in range(2):
+        task = a3200.run_program_as_task(layer, task_id=1)
+        names.append(task.program_name)
+        task.wait_to_finish()
+        task.finish()
+
+    assert names[0] != names[1] and all(name.startswith(f"nfs_{a3200.exec_session}_") for name in names)
+    assert a3200.exec_programs == {} and sorted(p.name for p in tmp_path.iterdir()) == ["layer.pgm"]
+    assert Aerotech3200(transport_factory=lambda: transport).exec_session != a3200.exec_session
+
+
+def test_refused_load_blocks_only_its_name(tmp_path, transport, world):
+    """ T152: like the real controller (lab session 2), a refused LOAD blocks its name, not the next program. """
+
+    a3200 = Aerotech3200(transport_factory=lambda: transport, program_dir=tmp_path)
+    a3200.connect()
+    layer = tmp_path / "layer.pgm"
+    layer.write_text("LINEAR X1 F1\n")
+    transport.fail_next(r"PROGRAM 1 LOAD", code="INVALID", error="An out of memory error occurred.")
+
+    with pytest.raises(AerotechError, match="out of memory"):
+        a3200.run_program_as_task(layer, task_id=1)
+    blocked, = transport.blocked_programs
+
+    # The same content loads under the next name and runs
+    task = a3200.run_program_as_task(layer, task_id=1)
+    task.wait_to_finish()
+    task.finish()
+    assert task.program_name.lower() != blocked and world.stage["X"] == pytest.approx(1.0)
+
+    # The blocked name itself stays refused, also with valid content
+    (tmp_path / blocked).write_text("LINEAR X2 F1\n")
+    with pytest.raises(AerotechError, match="failed to compile"):
+        a3200.api.PROGRAM_LOAD(1, tmp_path / blocked)

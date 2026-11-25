@@ -136,27 +136,58 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
 - [ ] T131: Precompile layer parts to `.ogm` and load the compiled file while printing (follow-up of T129) [phase: B]
   - Priority: medium
   - Size: M
-  - Depends on: T129, T134 (clean `.ogm` load and the name of an added `.ogm`)
+  - Depends on: T129
   - Background (lab 2026-11-24): `A3200ProgramLoad` writes the compiled `.OGM` next to the source (142 bytes per
     line). Loading Motion Composer's `.ogm` of layer 68 (1.25 M lines) took 5.9 s with a 1.87 GB peak; the `.pgm`
     took 129 s with 19.3 GB.
+  - Lab session 2 (2026-11-25, `PROGRAM_LOADING.md` §6.2): clean repeat. Our own `.OGM` of 400k lines loads in
+    15.1 s with 0.61 GB under a new name (a renamed copy the same), the compile took 38.9 s with 7.51 GB: 2.6×
+    faster, 1/13 of the memory (38 µs and 1.55 kB per line). Full layer 68 from `.ogm`: 47.5 s, 1.88 GB (the 5.9 s
+    above was a cache effect of Motion Composer). An `.ogm` is added under `<stem>.pgm`; a removal under the
+    `.ogm` name returns success and does nothing. A whole-layer `.ogm` cannot be compiled through the C library
+    within the budget (24.6 GB for layer 68); whole layers need the .NET `Builder.Build` path (T153).
   - Done when: parts are compiled ahead (build step or one layer ahead, within the T129 memory budget) and loaded
     as `.ogm` during the print; the cache entry is keyed by program hash and controller software version /
     configuration and recompiled when either changes; `.ogm` files of printed layers are deleted (option);
-    removal uses the name listed by `A3200ProgramGetAddedPrograms`; dummy loader simulates the cache; lab check
-    of one real layer.
+    an `.ogm` is removed under `<stem>.pgm` and the removal is verified with the added-program count; dummy loader
+    simulates the cache; lab check of one real layer.
 
 - [ ] T132: Task 2 runs the same program 1.8× slower than task 1 (found during T129) [phase: B]
   - Priority: high
   - Size: S
-  - Depends on: T134 (task parameters and repeat with the real layer header)
+  - Depends on: –
   - Background: in the cycle of 2026-11-24 the same synthetic 200k-line galvo program ran 279.6 s on task 1 and
     500.5 s on task 2 (1.4 vs. 2.5 ms per line), twice each. Every automated print so far ran on task 2
     (`run_program_as_task` default). The synthetic program sets no `SECONDS`/`METRIC`/`LOOKAHEAD`/ramp, so task
     defaults may explain it.
-  - Done when: the cause is known (task parameter export of tasks 1/2 compared, repeat with the header of a real
-    layer); the generated programs set every relevant mode explicitly or the controller configuration is
-    aligned (maintainer decision); both tasks run a real layer part within 5 % of the same time.
+  - Lab session 2 (2026-11-25, `PROGRAM_LOADING.md` §6.2): cause found. Ratio 1.79 with the bare and with the real
+    layer header (1.399 vs. 2.502 ms per line). In every parameter file of the controller task 1 is tuned and task 2
+    has the defaults: `MaxLookaheadMoves` 10000 / 100, `ExecuteNumLines` 100 / 1, `MotionUpdateRate` 48 / 1,
+    `DefaultCoordinatedSpeed` 12.5 / 50, `DefaultCoordinatedRampRate` 2000 / 500, `DefaultCoordinatedRampTime`
+    0.1 / 0.5. Correction: the ASCII print path of `Experiment` always used task 1, so earlier prints ran on the
+    tuned task; only the library loader alternates onto task 2.
+  - Decided 2026-11-25 (maintainer): option (b). Print on task 1 only; compile the next part ahead without a task
+    (`A3200ProgramAdd`, lab: same time and memory as a load) and associate it to task 1 when the current part has
+    completed (< 0.05 s). No change of the controller configuration; one velocity profile per structure; task 2
+    stays free (z-line, T135). Rejected: (a) aligning the task-2 parameters.
+  - Done when: the library loader prints on task 1 only with add-ahead (`ProgramRunner` mode, library wrapper for
+    `A3200ProgramAdd`/`A3200ProgramAssociate`, dummy loader and tests: order, gap, failure in the middle) and never
+    puts a print part on task 2; lab check of the gap with 4 synthetic parts (T153 runner step).
+
+- [ ] T153: Lab session 3 for program loading: .NET compile path, added-program names, R1 and R3 (follow-up of
+  T134) [phase: B]
+  - Priority: medium
+  - Size: S
+  - Depends on: T132 decision (the runner check uses the chosen task mode)
+  - Background: the gaps of lab session 2 (`PROGRAM_LOADING.md` §6.2): the .NET `Aerotech.AeroBasic.Builder.Build`
+    was found but not run; INtime memory not readable (the prompt took one line of a pasted block); R3 refused
+    without administrator rights; 2 programs stayed added all day (names unknown); R1 not tested on a blocked name.
+  - Done when: `program_loading_lab.py` has the steps and the lab run answers: compile of layer 68 with
+    `Builder.Build` in a 64-bit process (time, peak memory, does the library load the result); the names and
+    task association of the added programs (`A3200ProgramGetAddedPrograms`) before and after `REMOVEPROGRAM`;
+    whether R1 clears a name blocked by `sticky`; R3 in an administrator PowerShell (time, axis state); the INtime
+    prompt reads a pasted multi-line block or a file; the `api` filter also lists `Build` methods; the runner
+    check in the task mode chosen in T132; results entered in `docs/design/PROGRAM_LOADING.md`.
 
 - [ ] T135: The z-line program and the layer programs share task 1 (found during T129) [phase: B]
   - Priority: medium
@@ -882,6 +913,12 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
     (`devices/aerotech/library.py`, `loader.py`: worker process, `MemoryBudget`, `ProgramRunner` on tasks 1/2 with
     prefetch; dummy loader), commit `0a4e261`. Open: lab check of the integrated path (`program_loading_lab.py
     runner`, then one real layer with laser off, P5), then switch the default (R9, maintainer decision).
+  - Status 2026-11-25 (lab session 2): the integrated `ProgramRunner` ran 4 × 200k galvo lines on tasks 1/2 to
+    their last lines with gaps of 0.31-0.33 s (P5, first half passed). Task 2 is untuned (T132): no real print with
+    alternation before the T132 decision; with option (b) the runner gets a single-task add-ahead mode. Next: T152,
+    T132 decision, one real layer with laser off.
+  - Status 2026-11-25 (later): T152 done (`5b856bb`); T132 decided as option (b): task 1 only with add-ahead. Next:
+    the add-ahead mode (T132), then P5 with one real layer, laser off, on task 1.
 
 - [ ] T130: Program optimiser that shortens generated AeroBasic programs (maintainer request 2026-11-23) [phase: B]
   - Priority: high
@@ -905,7 +942,7 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
 - [ ] T133: Controller health check and recovery levels (maintainer idea 2026-11-24) [phase: B]
   - Priority: high
   - Size: M
-  - Depends on: T129 (library wrapper), T134 (which recovery levels work and what they reset)
+  - Depends on: T129 (library wrapper)
   - Design: section 8 of `docs/design/PROGRAM_LOADING.md`.
   - Done when: `controller_health()` reports ASCII reachability, task states, added programs, axis faults, PC
     memory and the memory and start time of the A3200 processes (warning above 1.5 GB for 32-bit processes), and
@@ -919,9 +956,10 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
     after a failed layer, `/logs/health`, `mains/controller_health.py`; commit `1d969e6`). Open: R1-R3 after the lab
     results of T134 (R2 via `~RESETCONTROLLER`).
 
-
-## Blocked
-<!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
+  - Status 2026-11-25 (lab session 2): R1 (terminate `A3200AsciiInterface.exe`) works: respawned after 0.3 s, ASCII
+    after 1.0 s, LOAD works, tasks/programs/axes unchanged. R2 (`~RESETCONTROLLER`, 7.9 s) disables and unhomes
+    every axis and removes every program: only between experiments, then enable, home, setup. R3 was refused
+    without administrator rights (T153). Next: implement R1 and R2 with operator confirmation.
 
 - [ ] T134: Lab session 2 for program loading and controller recovery (follow-up of T129) [phase: B]
   - Priority: high
@@ -937,13 +975,18 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
     methods listed, one compile of layer 68 with its memory); recovery levels R1-R3 of T133 (does it work, time,
     which states survive: axis enable, home, position, galvo/IFOV settings); the `ogm` step computes kB per line
     from the source line count; the results are entered in `docs/design/PROGRAM_LOADING.md`.
-  - Blocked by: lab session 2 on the lab PC (maintainer, planned 2026-11-25). Lab tooling done: steps `api`,
-    `ogm-clean`, `add-associate`, `hold`, `taskspeed`, `runner`, `recover-ascii`, `reset`, `restart-service`, the
-    restart check in `system` (commits `b052ff3`, `2a6e48f`, `e77f48b`); guide section "Session 2".
+  - Status 2026-11-25: lab session 2 done (`mains/lab_checks/program_loading_lab_20261125`, results in
+    `docs/design/PROGRAM_LOADING.md` §6.2 and plan §7.2). Answered: `sticky` after a restart, clean `.ogm` load and
+    its name, Add + Associate, task parameters and task speed (T132), recovery R1 and R2, the runner check. Gaps
+    (follow-up T153): the .NET compile of layer 68 (method found, not run), INtime memory, R3 (no admin rights).
+
+## Blocked
+<!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
 - [x] T136: Design of the standard parameter test print PTD-01 (maintainer request 2026-11-25) — 2026-11-25 — `docs/design/TEST_PRINT_PTD01.md` approved with the decisions D1–D8, D10–D16 (D9 by the lab check T148); phase 11 todos T137–T151 scheduled with priority, improvement ideas F18–F37 in `future_todo.md`. — commits: `5881afa`, `0d4bb72`, this decision commit
+- [x] T152: The ASCII path loads every layer program under one fixed name, so one refused compile blocks every later layer (found during T134) — 2026-11-25 — `run_program_as_task` loads every program under a fresh name `nfs_<session>_<counter>_<stem>.pgm`, removes it under that name and deletes the copy; R0 in `Experiment` removes the names still listed; the dummy controller blocks a name after a failed LOAD like the real one, and a test shows that the following layers still print. Golden command logs re-recorded (name lines only). — commits: `5b856bb`
 - [x] T127: `REMOVEPROGRAM` names the layer file instead of the loaded program (found during T125) — 2026-11-24 — Programs are removed under the loaded name `python_aerobasic_program.pgm` (`Task.finish()`/`abort()`, failures logged); the dummy controller records loaded programs and unknown removals; golden command logs updated deliberately. — commits: `79a789d`
 - [x] T128: Load failures: log `~LASTERROR` for `!` replies and stop instead of skipping the layer (found during T125) — 2026-11-24 — Refusals carry the `~LASTERROR` text, `PROGRAM LOAD` has a response timeout (`controller.loadTimeout`, connection reopened), task errors are decoded, an early "complete" is a failure; `Experiment(stop_on_failure=True)` (default) stops at the first failed layer with `PrintStoppedError` and `restart_experiment()` prints it again. — commits: `79a789d`, `3f773a3`
 - [x] T125: DOE print printed only 16 of 73 layers: `PROGRAM LOAD` refused every layer program above about 80 000 lines (maintainer report 2026-11-22, `surface_16bit`) — 2026-11-22 — Hotfix: `build_programs()` splits every layer program with more than `max_program_lines` (default 80 000) lines into parts (whole layer setup and footer repeated, cut with the laser off at an absolute move, power/feed replayed) and stops if one cannot be split; printing prepares all layers before the first one; interim solution `Experiment.reprint_layers()` / `mains/reprint_layers.py` prints the missing layers from the experiment file, split, in drop-direction order (DOWN: highest first). Real fix: T126; follow-ups T127, T128; lab check of the parts open. — commits: `76b8839`, `d46ad4a`, `a6db390`, `9974a31`, `2e7ad3a`

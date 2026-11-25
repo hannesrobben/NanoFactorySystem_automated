@@ -90,3 +90,15 @@ def test_controller_health_script_dry_run(capsys):
     assert module.main(["--dry-run", "--r0"]) == 0
     out = capsys.readouterr().out
     assert "R0: faults acknowledged" in out and "Controller health: ok" in out
+
+
+def test_recovery_level_r0_removes_the_given_names(api, transport):
+    """ T152: R0 removes the execution names the controller still lists and reports each removal. """
+
+    removed = []
+
+    steps = recover_r0(api, tasks=(1,), program_names=("nfs_abc123_0001_layer.pgm",), on_removed=removed.append)
+
+    assert steps == ["task 1 stopped", "nfs_abc123_0001_layer.pgm removed", "faults acknowledged"]
+    assert removed == ["nfs_abc123_0001_layer.pgm"]
+    assert 'REMOVEPROGRAM "nfs_abc123_0001_layer.pgm"' in transport.world.calllog.commands()

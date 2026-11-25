@@ -137,8 +137,9 @@ def test_failed_layer_stops_the_structure(experiment, dummy_backend):
     assert len(dummy_backend.calllog.filter(device="program")) == 1 < len(layers)
     # The task was stopped and the program removed under the name it was loaded with (T127)
     commands = dummy_backend.calllog.commands()
-    assert "PROGRAM 1 STOP" in commands and 'REMOVEPROGRAM "python_aerobasic_program.pgm"' in commands
-    assert "python_aerobasic_program.pgm" not in dummy_backend.transport.loaded_programs
+    loaded = re.search(r'PROGRAM 1 LOAD ".*[/\\](nfs_\w+?_0001_[^"]+)"', "\n".join(commands)).group(1)
+    assert "PROGRAM 1 STOP" in commands and f'REMOVEPROGRAM "{loaded}"' in commands
+    assert loaded.lower() not in dummy_backend.transport.loaded_programs and experiment.a3200.exec_programs == {}
     # The health check after the failure ran recovery level R0 and is stored in the experiment file (T133)
     health = "".join(ExperimentStore.open(experiment.path).read_logs("health").values())
     assert "R0: task 1 stopped" in health and "before printing" in health
@@ -154,6 +155,23 @@ def test_early_end_counts_as_failure(experiment, dummy_backend):
         experiment.print_experiment()
 
     assert [layer["status"] for layer in progress(experiment, "rect")["layers"]] == ["failed"]
+
+
+def test_refused_load_does_not_block_the_following_layers(test_config, dummy_backend, no_sleep, tmp_path):
+    """ T152: the DOE print of 2026-11-21 refused every layer after one failed load (one fixed program name). """
+
+    path = tmp_path / "experiment"
+    path.mkdir()
+    with make_experiment(path, dummy_backend, stop_on_failure=False) as experiment:
+        experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+        add_rectangle(experiment)
+        experiment.build_programs()
+        n_layers = len(experiment.structure_configs[0]["layer_files"])
+        dummy_backend.transport.fail_next(r"PROGRAM 1 LOAD", code="INVALID", error="An out of memory error occurred.")
+        experiment.print_experiment()
+
+    assert len(dummy_backend.transport.blocked_programs) == 1
+    assert printed_layers(path) == list(range(1, n_layers))
 
 
 def test_restart_prints_the_failed_layer_again(test_config, dummy_backend, no_sleep, tmp_path):
@@ -234,7 +252,7 @@ def test_library_loader_prints_every_layer_on_alternating_tasks(test_config, dum
     assert set(dummy_backend.transport.loaded_programs) == {"__zline__.pgm"}
     assert dummy_backend.transport.unknown_removals == []
     assert not any((path / "exec").iterdir())
-    assert "python_aerobasic_program" not in " ".join(dummy_backend.calllog.commands())  # no ASCII load
+    assert not any(" LOAD " in c for c in dummy_backend.calllog.commands() if "__zline__" not in c)  # no ASCII load
 
 
 def test_library_loader_stops_at_the_first_failed_layer(test_config, dummy_backend, no_sleep, tmp_path, monkeypatch):

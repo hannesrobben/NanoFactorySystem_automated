@@ -42,6 +42,9 @@ class _Unhandled(Exception):
     """ Raised for commands the simulation does not know. """
 
 
+_PROGRAM_LOAD = re.compile(r'PROGRAM\s+(\d+)\s+LOAD\s+"(.*)"', re.IGNORECASE)
+
+
 class _Fault(Exception):
     """ Raised for commands that fail on the simulated controller. """
 
@@ -81,6 +84,10 @@ class FakeA3200Transport:
     unknown_removals : list of str
         ``REMOVEPROGRAM`` names that matched no loaded program. The real
         controller answers success and removes nothing (T127).
+    blocked_programs : set of str
+        Program names (lower case) whose ``PROGRAM LOAD`` failed. Like the
+        real controller (lab session 2, T152), every later load under such a
+        name is refused with ``!``, also with valid content; other names load.
     """
 
     def __init__(self, world: SimulatedWorld, *, strict: bool = False, decimal_comma: bool = False,
@@ -114,6 +121,7 @@ class FakeA3200Transport:
         self._hanging = False
         self.loaded_programs: dict[str, str] = {}
         self.unknown_removals: list[str] = []
+        self.blocked_programs: set[str] = set()
 
     # Socket interface
 
@@ -280,11 +288,18 @@ class FakeA3200Transport:
         self._outq.append(code + data + "\n")
 
     def _respond(self, line: str) -> tuple[str, str]:
+        load = _PROGRAM_LOAD.fullmatch(line.strip())
+        load_name = Path(load.group(2)).name.lower() if load else None
+        if load_name in self.blocked_programs:
+            self.last_error = "Compiler Error: The program failed to compile."
+            return INVALID, ""
         for fault in self._faults:
             pattern, frame, error, count = fault
             if count > 0 and pattern.search(line):
                 fault[3] -= 1
                 self.last_error = error
+                if load_name is not None:
+                    self.blocked_programs.add(load_name)
                 return frame, ""
         for pattern, response in self._overrides:
             match = pattern.search(line)
