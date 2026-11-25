@@ -152,28 +152,6 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
     an `.ogm` is removed under `<stem>.pgm` and the removal is verified with the added-program count; dummy loader
     simulates the cache; lab check of one real layer.
 
-- [ ] T132: Task 2 runs the same program 1.8× slower than task 1 (found during T129) [phase: B]
-  - Priority: high
-  - Size: S
-  - Depends on: –
-  - Background: in the cycle of 2026-11-24 the same synthetic 200k-line galvo program ran 279.6 s on task 1 and
-    500.5 s on task 2 (1.4 vs. 2.5 ms per line), twice each. Every automated print so far ran on task 2
-    (`run_program_as_task` default). The synthetic program sets no `SECONDS`/`METRIC`/`LOOKAHEAD`/ramp, so task
-    defaults may explain it.
-  - Lab session 2 (2026-11-25, `PROGRAM_LOADING.md` §6.2): cause found. Ratio 1.79 with the bare and with the real
-    layer header (1.399 vs. 2.502 ms per line). In every parameter file of the controller task 1 is tuned and task 2
-    has the defaults: `MaxLookaheadMoves` 10000 / 100, `ExecuteNumLines` 100 / 1, `MotionUpdateRate` 48 / 1,
-    `DefaultCoordinatedSpeed` 12.5 / 50, `DefaultCoordinatedRampRate` 2000 / 500, `DefaultCoordinatedRampTime`
-    0.1 / 0.5. Correction: the ASCII print path of `Experiment` always used task 1, so earlier prints ran on the
-    tuned task; only the library loader alternates onto task 2.
-  - Decided 2026-11-25 (maintainer): option (b). Print on task 1 only; compile the next part ahead without a task
-    (`A3200ProgramAdd`, lab: same time and memory as a load) and associate it to task 1 when the current part has
-    completed (< 0.05 s). No change of the controller configuration; one velocity profile per structure; task 2
-    stays free (z-line, T135). Rejected: (a) aligning the task-2 parameters.
-  - Done when: the library loader prints on task 1 only with add-ahead (`ProgramRunner` mode, library wrapper for
-    `A3200ProgramAdd`/`A3200ProgramAssociate`, dummy loader and tests: order, gap, failure in the middle) and never
-    puts a print part on task 2; lab check of the gap with 4 synthetic parts (T153 runner step).
-
 - [ ] T153: Lab session 3 for program loading: .NET compile path, added-program names, R1 and R3 (follow-up of
   T134) [phase: B]
   - Priority: medium
@@ -182,12 +160,16 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
   - Background: the gaps of lab session 2 (`PROGRAM_LOADING.md` §6.2): the .NET `Aerotech.AeroBasic.Builder.Build`
     was found but not run; INtime memory not readable (the prompt took one line of a pasted block); R3 refused
     without administrator rights; 2 programs stayed added all day (names unknown); R1 not tested on a blocked name.
-  - Done when: `program_loading_lab.py` has the steps and the lab run answers: compile of layer 68 with
+  - Scope extended 2026-11-25 (maintainer, option 2: one lab date for everything open): also T152 on the real
+    controller (fresh names; a refused load, then the next program loads) and the runner in the add-ahead mode of
+    T132 (gap per part), then P5 of T129 (one real layer, laser off).
+  - Done when: `program_loading_lab.py` has the steps and the lab run answers: T152 and the add-ahead gap as above;
+    compile of layer 68 with
     `Builder.Build` in a 64-bit process (time, peak memory, does the library load the result); the names and
     task association of the added programs (`A3200ProgramGetAddedPrograms`) before and after `REMOVEPROGRAM`;
     whether R1 clears a name blocked by `sticky`; R3 in an administrator PowerShell (time, axis state); the INtime
     prompt reads a pasted multi-line block or a file; the `api` filter also lists `Build` methods; the runner
-    check in the task mode chosen in T132; results entered in `docs/design/PROGRAM_LOADING.md`.
+    check in the add-ahead mode of T132; results entered in `docs/design/PROGRAM_LOADING.md`.
 
 - [ ] T135: The z-line program and the layer programs share task 1 (found during T129) [phase: B]
   - Priority: medium
@@ -875,6 +857,33 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
 
+- [ ] T132: Task 2 runs the same program 1.8× slower than task 1 (found during T129) [phase: B]
+  - Priority: high
+  - Size: S
+  - Depends on: –
+  - Background: in the cycle of 2026-11-24 the same synthetic 200k-line galvo program ran 279.6 s on task 1 and
+    500.5 s on task 2 (1.4 vs. 2.5 ms per line), twice each. Every automated print so far ran on task 2
+    (`run_program_as_task` default). The synthetic program sets no `SECONDS`/`METRIC`/`LOOKAHEAD`/ramp, so task
+    defaults may explain it.
+  - Lab session 2 (2026-11-25, `PROGRAM_LOADING.md` §6.2): cause found. Ratio 1.79 with the bare and with the real
+    layer header (1.399 vs. 2.502 ms per line). In every parameter file of the controller task 1 is tuned and task 2
+    has the defaults: `MaxLookaheadMoves` 10000 / 100, `ExecuteNumLines` 100 / 1, `MotionUpdateRate` 48 / 1,
+    `DefaultCoordinatedSpeed` 12.5 / 50, `DefaultCoordinatedRampRate` 2000 / 500, `DefaultCoordinatedRampTime`
+    0.1 / 0.5. Correction: the ASCII print path of `Experiment` always used task 1, so earlier prints ran on the
+    tuned task; only the library loader alternates onto task 2.
+  - Decided 2026-11-25 (maintainer): option (b). Print on task 1 only; compile the next part ahead without a task
+    (`A3200ProgramAdd`, lab: same time and memory as a load) and associate it to task 1 when the current part has
+    completed (< 0.05 s). No change of the controller configuration; one velocity profile per structure; task 2
+    stays free (z-line, T135). Rejected: (a) aligning the task-2 parameters.
+  - Done when: the library loader prints on task 1 only with add-ahead (`ProgramRunner` mode, library wrapper for
+    `A3200ProgramAdd`/`A3200ProgramAssociate`, dummy loader and tests: order, gap, failure in the middle) and never
+    puts a print part on task 2; lab check of the gap with 4 synthetic parts (T153 runner step).
+  - Status 2026-11-25: implemented. `ProgramRunner(task=1)` compiles the next part in a worker with `A3200ProgramAdd`
+    while the current part runs, then stops the task, removes the finished part, associates the next one
+    (`A3200ProgramAssociate`) and starts it; execution names use the T152 scheme with a session token; `LibraryLoader`
+    has `add_async`/`associate` (replacing `load_async`); the dummy loader simulates both; tests in
+    `test/devices/test_program_loader.py` and `test/test_experiment.py`. Open: the lab check of the gap (T153).
+
 - [ ] T129: Load layer programs through the A3200 C library instead of `PROGRAM LOAD` over ASCII (found during T125) [phase: B]
   - Priority: high
   - Size: M
@@ -919,6 +928,8 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
     T132 decision, one real layer with laser off.
   - Status 2026-11-25 (later): T152 done (`5b856bb`); T132 decided as option (b): task 1 only with add-ahead. Next:
     the add-ahead mode (T132), then P5 with one real layer, laser off, on task 1.
+  - Status 2026-11-25 (T132): the library loader runs every part on task 1 with add-ahead; next is lab session 3
+    (T153) with the runner check and P5.
 
 - [ ] T130: Program optimiser that shortens generated AeroBasic programs (maintainer request 2026-11-23) [phase: B]
   - Priority: high

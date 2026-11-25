@@ -2964,3 +2964,20 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** system Python 3.12 (the venv `%LOCALAPPDATA%\Temp\nfsv` is broken: editable finder missing). Targeted: `test/backends/test_dummy_controller.py test/backends/test_controller_merge.py test/devices/test_health.py test/test_experiment.py` 92 passed; golden logs re-recorded, then passed; full suite 4 failed, 535 passed, 15 skipped (the 4 failures are the known T122 entry-script tests).
 - **Commits:** `5b856bb` fix(devices): load every ASCII program under a fresh name [T152]; this docs(todo) commit.
 - **Follow-ups:** T132 add-ahead mode on task 1; T129 P5; T153 (also: list the added-program names after REMOVEPROGRAM on the real controller).
+
+### 2026-11-25 13:18 CET — [T132] Library loader on task 1 with add-ahead
+- **Status:** partial (implemented and tested on the dummy backend; the lab check of the gap is part of T153)
+- **Changes:**
+  - `nanofactorysystem/devices/aerotech/loader.py`: `ProgramRunner(task=1)` runs every part on one task; the next part is compiled without a task (`add_async`, worker with `A3200ProgramAdd`) while the current one runs, then stop, remove, `associate`, start; execution names via `exec_program_name` with a session token; `LibraryLoader.load_async` replaced by `add_async`/`associate`. Reason: maintainer decision (b) of T132 (task 2 untuned).
+  - `nanofactorysystem/devices/aerotech/library.py`: `A3200Library.add`, `associate`.
+  - `nanofactorysystem/backends/dummy/loader.py`: `add_async`, `associate` (call log `("loader", "add" / "associate")`).
+  - `nanofactorysystem/experiment.py`: docstrings of `program_loader` and `_print_layers_with_library`.
+  - `test/devices/test_program_loader.py`: alternation tests replaced by task-1 add-ahead tests (same checks on removal, cleanup and failure stops; the alternation itself is no longer wanted), new `test_associate_failure_stops_and_cleans_up`, `test_execution_names_are_unique_across_runners`.
+  - `test/test_experiment.py`: `test_library_loader_prints_every_layer_on_task_1` (renamed from `..._on_alternating_tasks`, same checks plus task 1 only).
+  - `mains/lab_checks/program_loading_lab.py`: docstrings (the `runner` step now runs add-ahead on task 1).
+  - `docs/design/PROGRAM_LOADING.md`: status in §7.2.
+  - `CLAUDE.md`, `test/README.md`: documentation.
+  - `TODO.md`: T132 to In Progress with status; T153 extended (T152 and add-ahead check, P5 on the same lab date, maintainer option 2); T129 status.
+- **Tests:** system Python 3.12: `test/devices/test_program_loader.py` 11 passed; full suite 4 failed, 537 passed, 15 skipped (the 4 failures are the known T122 entry-script tests).
+- **Commits:** `4c5cf7c` feat(devices): run library-loaded parts on task 1 with add-ahead [T132]; this docs(todo) commit.
+- **Follow-ups:** lab session 3 (T153): runner gap with add-ahead, T152 on the real controller, P5.
