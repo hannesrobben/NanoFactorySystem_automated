@@ -226,9 +226,8 @@ def test_restart_leaves_failed_layers_behind_printed_ones_to_reprint(test_config
     assert len(dummy_backend.calllog.filter(device="program")) == n_layers - 2
 
 
-def test_library_loader_prints_every_layer_on_alternating_tasks(test_config, dummy_backend, no_sleep, tmp_path,
-                                                                  monkeypatch):
-    # T129: programs are compiled through the library loader and run alternately on tasks 1 and 2
+def test_library_loader_prints_every_layer_on_task_1(test_config, dummy_backend, no_sleep, tmp_path, monkeypatch):
+    # T129/T132: programs are compiled through the library loader ahead of time and all run on task 1
     from nanofactorysystem.devices.aerotech import loader as loader_module
     monkeypatch.setattr(loader_module, "used_memory_gb", lambda: 4.0)
     path = tmp_path / "experiment"
@@ -243,10 +242,10 @@ def test_library_loader_prints_every_layer_on_alternating_tasks(test_config, dum
         n_layers = len(experiment.structure_configs[0]["layer_files"])
         experiment.print_experiment()
 
-    loads = dummy_backend.calllog.filter(device="loader")
-    tasks = [load.args[1] for load in loads]
-    assert len(loads) > n_layers and tasks == [1, 2] * (len(tasks) // 2) + [1] * (len(tasks) % 2)
-    assert len(dummy_backend.calllog.filter(device="program")) == len(loads)
+    adds = dummy_backend.calllog.filter(device="loader", call="add")
+    tasks = [c.args[0] for c in dummy_backend.calllog.filter(device="loader", call="associate")]
+    assert len(adds) > n_layers and tasks == [1] * len(adds)
+    assert len(dummy_backend.calllog.filter(device="program")) == len(adds)
     assert printed_layers(path) == list(range(n_layers))
     # Only the z-line program of the plane fit stays loaded (it is kept on purpose, init_zline)
     assert set(dummy_backend.transport.loaded_programs) == {"__zline__.pgm"}

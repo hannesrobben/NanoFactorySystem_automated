@@ -1,15 +1,16 @@
 """Simulated program loader of the dummy backend (T129, R10).
 
-It loads and starts programs on the :class:`FakeA3200Transport` the ASCII interface talks to, so that
-task states, program line numbers, injected task errors (``program_error_next``) and early ends
-(``program_incomplete_next``) behave as with ``PROGRAM LOAD``. Load time and memory per line are
-recorded in the call log, not slept.
+It adds programs (without a task), associates and starts them on the :class:`FakeA3200Transport` the
+ASCII interface talks to, so that task states, program line numbers, injected task errors
+(``program_error_next``) and early ends (``program_incomplete_next``) behave as with ``PROGRAM LOAD``.
+Compile time and memory per line are recorded in the call log, not slept.
 """
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Optional
 
+from nanofactorysystem.aerobasic.ascii import TaskFailedError
 from nanofactorysystem.aerobasic.constants.tasks import TaskState
 from nanofactorysystem.backends.dummy.a3200 import FakeA3200Transport
 from nanofactorysystem.devices.aerotech.loader import LoadResult, count_lines
@@ -47,24 +48,42 @@ class DummyLoader:
         self._load_failures: list[str] = []
 
     def fail_next_load(self, error: str = "Simulated compile error") -> None:
-        """ Let the next load fail with ``error``. """
+        """ Let the next compile (add) fail with ``error``. """
 
         self._load_failures.append(error)
 
-    def load_async(self, path: Path, task_id: int) -> _DoneLoad:
+    def add_async(self, path: Path) -> _DoneLoad:
+        """ Compile and add a program without a task (``A3200ProgramAdd``); recorded as ``("loader", "add")``. """
+
         lines = count_lines(Path(path))
         load_s = round(lines * self.seconds_per_line, 3)
         if self._load_failures:
             error = self._load_failures.pop(0)
-            self.world.calllog.record("loader", "load", (str(path), task_id), {"ok": False, "error": error},
+            self.world.calllog.record("loader", "add", (str(path),), {"ok": False, "error": error},
                                       self.world.clock.now)
             return _DoneLoad(LoadResult(False, error, load_s, None, lines))
-        self.transport._program_load(task_id, str(path), True)
+        self.transport.loaded_programs[Path(path).name.lower()] = str(path)
         peak_gb = lines * self.kb_per_line / 1024 ** 2
-        self.world.calllog.record("loader", "load", (str(path), task_id),
+        self.world.calllog.record("loader", "add", (str(path),),
                                   {"ok": True, "lines": lines, "load_s": load_s, "peak_gb": peak_gb},
                                   self.world.clock.now)
         return _DoneLoad(LoadResult(True, "", load_s, peak_gb, lines))
+
+    def associate(self, task_id: int, name: str) -> None:
+        """ Bind an added program to a task (``A3200ProgramAssociate``); recorded as ``("loader", "associate")``.
+
+        Raises
+        ------
+        TaskFailedError
+            If no program of that name is added.
+        """
+
+        path = self.transport.loaded_programs.get(Path(name).name.lower())
+        self.world.calllog.record("loader", "associate", (task_id, name), {"ok": path is not None},
+                                  self.world.clock.now)
+        if path is None:
+            raise TaskFailedError(f"A3200ProgramAssociate({task_id}, {name}) failed: program not added")
+        self.transport._program_load(task_id, path, True)
 
     def start(self, task_id: int) -> None:
         self.transport._program_start(task_id)
