@@ -10,12 +10,14 @@ parameters (power, z, hatch, slice distance). The modules are independent of
 - ``field``: ``ParameterField``, ``CellSpec``, header, validation, cell table (T139)
 - ``voxel_fit``: ``VoxelFitModel`` w(P), l(P) (T150)
 - ``calibration``: ``ProcessCalibration``, ``StageAAxes`` (T140)
+- ``ptd01``: field builders ``ptd01.f0`` … ``ptd01.f7`` of the test print PTD-01 (T141–T143)
 """
 from .calibration import ProcessCalibration, StageAAxes
 from .field import CellSpec, FieldLayoutError, ParameterField
 from .ordering import ordering_names, register_ordering
 from .structure import ParameterFieldStructure, field_builder, field_builder_names, register_field_builder
 from .voxel_fit import VoxelFitModel
+from . import ptd01  # noqa: E402,F401  registers the PTD-01 field builders
 
 __all__ = ["CellSpec", "FieldLayoutError", "ParameterField", "ParameterFieldStructure", "ProcessCalibration",
            "StageAAxes", "VoxelFitModel", "field_builder", "field_builder_names", "ordering_names",
