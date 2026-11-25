@@ -370,6 +370,7 @@ the decision session. **Every one of them must be discussed with the maintainer 
   validation (microlens, blazed prism, DOE grating).
 - **Prerequisites:** phase 11 done; PTD-02 needs F13 (free IFOV speed).
 - **Open questions:** Order of the follow-up prints; which ones are needed for the slicer work (F7, F17)?
+- **Note 2026-11-25:** the effective nonlinearity n_eff of the voxel model is determined in the dose-matrix test (threshold over velocity, P_th ∝ v^(1/n)); the parameter tests of phase 11 use n_eff = 1 as placeholder (T156).
 
 ## F32: In-situ threshold detection from DHM phase time series
 - **Status:** to be discussed with the maintainer before scheduling.
