@@ -190,3 +190,13 @@ def test_read_block_takes_a_pasted_block(lab):
 
 def test_session_3_steps_are_registered(lab):
     assert {"ascii-names", "recover-blocked", "dotnet-build", "layer-dry"} <= set(lab.STEPS)
+
+
+def test_axes_not_ready_lists_disabled_or_unhomed_axes(lab):
+    ready = {"enabled": True, "homed": True, "position": 0.0}
+    axes = {"X": ready, "Y": ready, "Z": {"enabled": False, "homed": False}, "A": ready,
+            "B": {"enabled": True, "homed": False}}
+
+    assert lab.axes_not_ready(axes) == ["Z (enabled=False, homed=False)", "B (enabled=True, homed=False)"]
+    assert lab.axes_not_ready({a: ready for a in lab.AXES}) == []
+    assert lab.axes_not_ready({}) == [f"{a} (enabled=None, homed=None)" for a in lab.AXES]
