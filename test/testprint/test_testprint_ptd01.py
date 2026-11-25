@@ -8,7 +8,7 @@ import pytest
 pytest.importorskip("trimesh")
 pytest.importorskip("shapely")
 
-from conftest import EXAMPLE_CALIBRATION, EXAMPLE_STAGE_A  # noqa: E402
+from ptd_examples import EXAMPLE_CALIBRATION, EXAMPLE_STAGE_A  # noqa: E402
 from nanofactorysystem.aerobasic.programs.split import MAX_PROGRAM_LINES  # noqa: E402
 from nanofactorysystem.devices.coordinate_system import CoordinateSystem, Unit  # noqa: E402
 from nanofactorysystem.testprint import ptd01  # noqa: E402
