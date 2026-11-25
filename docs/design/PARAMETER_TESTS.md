@@ -47,6 +47,7 @@ substrate (`run_substrate`), but no test needs the result of another one.
 | Label power | 0.5 mW (same as the supports; version 1 had 0.7 mW) | **[decided]** |
 | Substrate anchoring | the first layer is repeated 1 µm into the substrate in all three tests (version 1: 1.5 µm) | **[decided]** |
 | Cell gaps | 2 µm between line cells, 4.5 µm between volume cells (D5) | **[decided]** (D5) |
+| QR code and corner markers | must not reach into the experiment: the QR code (140 µm, centred on the upper edge of the experiment rectangle, i.e. 70 µm inside it) and the corner markers keep at least **20 µm** from the grid area. All parameter-test specs use `margin_um = 90 µm` (63x default: 50 µm, with which the QR code reaches 20 µm into the top row); a check refuses every parameter-test layout where a marker comes closer than 20 µm to the grid. No change to `Experiment` (maintainer decision 2026-11-25) | **[decided]** |
 | In-layer order | `row_by_row` (D16) | **[decided]** |
 | Print order 63x | highest layer first (D1) | **[decided]** |
 | Material start file | one JSON per material (e.g. `parameter_tests_SZ2080.json`): power ladder, the axis lists of §4–§6, label and support power, anchoring depth; all three tests read it; the values are stored in `/spec` of every experiment; replaces `stage_a_<material>.json`; no calibration file is needed for printing | **[decided]** |

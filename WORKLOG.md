@@ -3100,3 +3100,18 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** none (documentation only).
 - **Commits:** `cf2a3ab` docs(design): record the review of the parameter-test proposals [T157]; this docs(todo) commit.
 - **Follow-ups:** T158–T163 (implementation of version 2); T148 and T149 (lab).
+
+### 2026-11-25 23:37 CET — [T162] Requirement: the QR code must not reach into the experiments
+- **Status:** done (requirement recorded; implemented with T162)
+- **Background:** Maintainer note 2026-11-25. Code check:
+  - The QR code (`QR_CODE_WIDTH_UM` = 140 µm) is centred on the upper edge of the experiment rectangle (`Experiment.qrcode_location`), so it reaches 70 µm inside.
+  - With the 63x default margin of 50 µm it reaches 20 µm into the top row of the grid. It does not touch the 60 µm fields or the 20 µm gap cells (45 / 40 µm away), but it lies in the field of view and DHM image of the top row.
+  - The layout check of `substrate_plan` only treats the QR code as clearance towards other experiments.
+- **Decision:** the parameter tests use `margin_um = 90 µm` (70 µm + 20 µm minimum distance), plus a check that refuses layouts where QR code or corner markers come closer than 20 µm to the grid; no change to `Experiment`.
+- **Changes:**
+  - `docs/design/PARAMETER_TESTS.md`: rule in §3.
+  - `TODO.md`: acceptance criterion of T162.
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (documentation only).
+- **Commits:** this docs commit on `docs/parameter-tests-qr`.
+- **Follow-ups:** T162.
