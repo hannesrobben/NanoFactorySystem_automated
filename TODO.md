@@ -42,7 +42,7 @@ with an evaluation after every layer capture; a camera live feed; a core that a 
 | 8 | Operating modes and calibration | T88, T89, T90, T91, T92, T104, T107 | T90 needs MIRA MI-53 for the real evaluator; T104 needs MIRA MI-41 for the fit; T107 needs OffAxisHolo K10 for the sweep |
 | 9 | Camera live feed | T102, T93, T94, T95 | T102 before T93 (hard prerequisite, `CAMERA_LIVE.md`) |
 | 10 | Core ready for a GUI | T96, T97 | – |
-| 11 | Standard test prints (PTD-01), **priority** (decision D7 of `TEST_PRINT_PTD01.md`) | T136–T147, T150, T151 (done), T148, T149, T155, T156 | T148 before T149; T155 before the stage-B print |
+| 11 | Standard test prints (PTD-01), **priority** (decision D7 of `TEST_PRINT_PTD01.md`) | T136–T147, T150, T151, T155, T156 (done), T157 (design v2), T158–T163, T148, T149 | T157 approved before T158–T163; T148 before T149 |
 | B | Backlog (from T19 `todo_notes.md`, lab checks, follow-ups) | T67, T69, T109, T111, T112, T114 | – |
 
 Phases 6, 9 and 10 are independent of each other. Phase 7 can start with T82, T83 and T85 before
@@ -87,8 +87,7 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
 | – | Final defaults for positions / frames / offset of the plan generator | after the speckle / position study (M4) | final values in T85 (start values exist) |
 | – | Final default z per objective | focus study OffAxisHolo K10 | fallback value of T107 |
 | PTD-01 D9 | Does `SET_POWER` inside a running program wait for the attenuator? (`docs/design/TEST_PRINT_PTD01.md` §12.1) | lab check T148 before stage A | `dwell_after_power_s` value; T149 |
-| PTD-01 D17 | Scales of the `threshold_ln` fit (n_eff identifiability) | T156 | evaluation of stage A |
-| PTD-01 D18 | Layer count of F4 / F5 / F7 (Δz per row vs. per column) | T155 | time budget of T149 |
+| Parameter tests v2 | Review of the proposals in `docs/design/PARAMETER_TESTS.md` §8 (label power, anchoring depth, header bits, Quick PT wall groups, F1 / F6 values, Voxel PT-01 layout, material start file) | T157 | T158–T163 |
 
 ## Decided
 
@@ -584,27 +583,58 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
 
 
 
-- [ ] T155: Decision: layer count of the PTD-01 volume fields F4, F5, F7 (found during T142) [phase: 11]
-  - Priority: high
-  - Size: S
-  - Depends on: –
-  - Background: Δz = dz_rel · l(P_cell) differs per row, so the rows share no layer programs. With the example
-    calibration F4 has 29, F5 229 and F7 127 layer programs; F1–F7 need about 37 min of layer programs
-    (5 s overhead each) instead of the ≈ 10 min of the design. Options in design §12.1 (D18).
-  - Decision: keep, Δz per column from l(P_ref), or fewer dz_rel levels in F5 (proposal: Δz per column from
-    l(P_ref) for F5, keep F4/F7; the cell table records the true dz_rel at the cell power).
-  - Done when: D18 decided and, if needed, `ptd01.py` / tests changed; layer counts and the chain time estimate
-    recorded in WORKLOG.md.
 
-- [ ] T156: Decision: scales of the `threshold_ln` fit (found during T151) [phase: 11]
+
+- [ ] T158: Absolute axes and a/b sub-fields in the test-print library (design `PARAMETER_TESTS.md` §3, §7) [phase: 11]
+  - Priority: high
+  - Size: M
+  - Depends on: T157
+  - Done when: field builders take absolute axis values from a material start file (JSON, schema versioned;
+    replaces `stage_a_<material>.json`) and need no `ProcessCalibration` or fit model to print; `ParameterField`
+    supports 60 µm fields with sub-field a (0.1–0.5 mW) / b (0.6–1.0 mW), a sub-field bit in the header and a
+    `half` column in the cell table; label and support power are arguments; tests updated; existing code outside
+    `testprint/` unchanged.
+
+- [ ] T159: Quick PT: walls and pads (design `PARAMETER_TESTS.md` §4) [phase: 11]
+  - Priority: high
+  - Size: M
+  - Depends on: T158
+  - Done when: builders for Q1 (three 8 µm walls 1.5 µm apart per power, z −1 … +1 µm in 0.25 µm layers) and Q2
+    (5 × 5 µm pads, z −1 … +1 µm, hatch 0.1 / 0.2 / 0.4 / 0.6 µm) as sub-fields a/b; one experiment script with
+    `--layout` / `--dry-run`; dry run on the dummy backend; cell counts, layer counts and program lines tested.
+
+- [ ] T160: Full PT-01: fields F1–F7 on absolute axes (design `PARAMETER_TESTS.md` §5) [phase: 11]
+  - Priority: high
+  - Size: M
+  - Depends on: T158
+  - Done when: the builders of `ptd01.py` use the absolute values of §5 (decided values; proposals as confirmed
+    in the review of T157) with sub-fields a/b in 60 µm fields; every sub-field passes the validation; layer count
+    and time estimate per field logged; the F3 golden program re-recorded deliberately; scripts per field updated.
+
+- [ ] T161: Voxel PT-01: gap test for the voxel height (design `PARAMETER_TESTS.md` §6) [phase: 11]
+  - Priority: high
+  - Size: M
+  - Depends on: T158
+  - Done when: builder of a gap-test cell (20 × 20 µm base to 2 µm at the support power, gap 0 … 2.0 µm in 0.2 µm,
+    lid of 4 layers of 0.25 µm at the tested power) and the sub-field layout of §6; experiment script with
+    `--layout` / `--dry-run`; dry run; tests of the z levels (gap 0 = top layer exposed twice) and of the cell table.
+
+- [ ] T162: Scripts and chain of the three parameter tests (design `PARAMETER_TESTS.md` §2, §7) [phase: 11]
   - Priority: medium
   - Size: S
-  - Depends on: –
-  - Background: `d = d_scale · sqrt(n_eff · ln(P/P_th))` depends only on `d_scale² · n_eff`; n_eff is only
-    identifiable with fixed `w_scale_um` / `l_scale_um` (design §12.1, D17). The fit currently uses free scales
-    with n_eff = 1 unless scales are given; P_th is unaffected.
-  - Decision: where the scales come from (optics of the 63x, a reference measurement, or leave n_eff = 1).
-  - Done when: D17 decided and documented in `analysis/README.md` and design §12; the evaluation of stage A uses it.
+  - Depends on: T159, T160, T161
+  - Done when: `mains/Experiments/parameter_tests/` (provisional name) holds Quick PT, Full PT-01 (per field) and
+    Voxel PT-01 plus a chain over `run_substrate` (`--test quick|full|voxel`, `--only`, `--layout`, `--dry-run`);
+    the stage-A/B scripts of version 1 (`mains/Experiments/ptd01/`) are removed or moved to the attic after
+    approval (X-B); the layout of all tests on the T113 resin drop is checked; README updated.
+
+- [ ] T163: Evaluation of the parameter tests on absolute axes (design `PARAMETER_TESTS.md` §7) [phase: 11]
+  - Priority: medium
+  - Size: S
+  - Depends on: T158
+  - Done when: the cell table regenerated from `/spec` holds the absolute values and the sub-field; a function adds
+    P/P_th, h/w and Δz/l once P_th, w(P) and l(P) are known (from Quick PT / Voxel PT-01 results); the voxel fit
+    (T151) takes its points from Quick PT walls and the Voxel PT-01 gap limits; n_eff = 1 as placeholder.
 
 - [ ] T148: Lab check: does `SET_POWER` inside a running program wait for the attenuator? (decision D9) [phase: 11]
   - Priority: high
@@ -846,6 +876,15 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
 
+- [ ] T157: Design version 2 of the parameter tests: Quick PT, Full PT-01, Voxel PT-01 (maintainer review 2026-11-25) [phase: 11]
+  - Priority: high
+  - Size: S
+  - Depends on: –
+  - Done when: `docs/design/PARAMETER_TESTS.md` holds the decisions of the session of 2026-11-25 (single stage,
+    absolute axes, power 0.1–1.0 mW linear, 60 µm fields with sub-fields a/b, three tests) and the maintainer has
+    confirmed the proposals of its §8; the document contains `Status: approved <date>`.
+  - Blocked by: waiting for maintainer approval (draft written 2026-11-25, working rule 2).
+
 - [ ] T153: Lab session 3 for program loading: .NET compile path, added-program names, R1 and R3 (follow-up of
   T134) [phase: B]
   - Priority: medium
@@ -878,6 +917,8 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T155: Decision: layer count of the PTD-01 volume fields F4, F5, F7 (found during T142) — 2026-11-25 — Obsolete: version 2 of the parameter tests (T157) uses absolute slice distances, so the rows of a field share their layers. — commits: this docs(todo) commit
+- [x] T156: Decision: scales of the `threshold_ln` fit (found during T151) — 2026-11-25 — Decided by the maintainer: n_eff = 1 as placeholder in the parameter tests; n_eff is determined in a later dose-matrix test with several velocities (F31). — commits: this docs(todo) commit
 - [x] T137: `ParameterFieldStructure`: toolpath IR → IFOV programs without changing existing code — 2026-11-25 — `nanofactorysystem/testprint/structure.py`: one IFOV layer per z level, one block per run of equal power and leaf kind, element order kept, `dwell_after_power_s`, built from a registered field builder (JSON round trip); no existing file changed. — commits: `a191b60`
 - [x] T138: Cell primitives for test fields with aligned z grid and substrate anchoring — 2026-11-25 — `cells.py`: line primitives, woodpile, analytic height maps and `sliced` on the aligned grid `k·Δz` with anchoring by repeating the first slice (D15); `dot` is an in-plane short line (IFOV writes in one plane); slicing cache for identical maps. — commits: `7c2622a`, `2d66f3e`
 - [x] T150: Voxel fit models w(P), l(P) — 2026-11-25 — `voxel_fit.py`: `VoxelFitModel` with registered kinds `threshold_ln`, `power_law`, `tabulated`, no extrapolation, slicer `VoxelModel` protocol (works in `Model3D_Slicer`). — commits: `8a50a07`

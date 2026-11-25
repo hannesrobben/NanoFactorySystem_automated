@@ -3052,3 +3052,34 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** none (todo text only).
 - **Commits:** this docs(todo) commit.
 - **Follow-ups:** T131 after session 3b and the first laser print through the library loader.
+
+### 2026-11-25 18:03 CET — [T157] Parameter tests version 2: design and todos after the maintainer review
+- **Status:** partial (design draft written; T157 blocked until the maintainer approves it)
+- **Background:** In the review of the PTD-01 implementation the maintainer clarified the intent:
+  - A parameter test runs on an unknown material. P_th, w and l are measured by it and must not be needed before printing. The voxel database is never read; it was not read in version 1 either.
+  - Decisions of the session:
+    - single-stage tests on absolute axes;
+    - power 0.1–1.0 mW, linear, 0.1 mW steps;
+    - 60 × 60 µm fields (DHM field of view about 85 µm minus border and centring error);
+    - every field split into sub-fields a (0.1–0.5 mW) and b (0.6–1.0 mW).
+  - Three tests:
+    - Quick PT: walls of stacked lines, and pads over hatch × power.
+    - Full PT-01: F1–F7 with absolute values.
+    - Voxel PT-01: a gap test with a 20 × 20 µm base, a gap of 0–2 µm in 0.2 µm steps and a lid at the tested power.
+  - Absolute values decided: F3 0.2–1.2 µm; F4 hatch 0.1/0.2/0.4/0.6, Δz 0.3; F5 Δz 0.1/0.2/0.3/0.5, hatch 0.2, wedges 8 × 4 µm; F6 woodpile 1.5/0.4 µm; F7 fill 0.2/0.25 µm; F2 line 0.5 µm below the pedestal top; supports at 0.5 mW, hatch 0.2, Δz 0.25.
+  - n_eff = 1 as placeholder; it is determined in a later dose-matrix test.
+- **Changes:**
+  - `docs/design/PARAMETER_TESTS.md` (new): design version 2 (decided values marked, proposals listed in §8).
+  - `docs/design/TEST_PRINT_PTD01.md`: status says the two-stage plan is superseded by version 2.
+  - `TODO.md`:
+    - T157 is in Blocked (design v2, waiting for approval).
+    - New T158–T163: library with absolute axes and a/b, Quick PT, Full PT-01, Voxel PT-01, scripts and chain, evaluation.
+    - T155 is done as obsolete: absolute Δz values let the rows share their layers.
+    - T156 is done as decided: n_eff = 1.
+    - Phase-plan row and open-decision row updated.
+  - `future_todo.md`: F31 notes that n_eff is determined in the dose-matrix test.
+- **Tests:** none (documentation and planning only).
+- **Commits:** this docs commit on `docs/parameter-tests-v2`.
+- **Follow-ups:**
+  - Maintainer review of `PARAMETER_TESTS.md` §8, then T158–T163.
+  - The code of version 1 (`mains/Experiments/ptd01/` and the stage-B logic in `testprint/`) stays until T158/T162 replace it.
