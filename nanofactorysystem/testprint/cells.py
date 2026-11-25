@@ -419,6 +419,40 @@ def pillar_on_base_map(base_x_um: float, base_y_um: float, base_height_um: float
     return heights
 
 
+# Identical maps are sliced once per process (F2 pedestals, F7 bases): key = map bytes + parameters
+_SLICE_CACHE: dict = {}
+_SLICE_CACHE_SIZE = 64
+
+
+def _sliced_layers(heights: np.ndarray, pixel_um: float, slicing: SlicingParameters) -> list:
+    """ ``[(z, [PathElement, ...]), ...]`` of a centred height map on the aligned grid, cached.
+
+    The elements are centred (map centre = origin), have z = k·Δz (``z_epsilon`` removed, rounded to
+    1 nm) and must not be changed by the caller (copies are made with ``dataclasses.replace``).
+    """
+
+    key = (heights.shape, heights.tobytes(), pixel_um, repr(slicing))
+    if key not in _SLICE_CACHE:
+        job = slice_geometry(heights, JobParameters(slicing=slicing, laser=LaserParameters()),
+                             pixel_size=pixel_um, run_preprocess=False)
+        ny, nx = heights.shape
+        layers = []
+        for group in job.groups:
+            if not group.elements:
+                continue
+            z = _round_z(group.z_um - slicing.z_epsilon_um)
+            elements = []
+            for element in group.elements:
+                points = element.points - np.array([(nx - 1) * pixel_um / 2, (ny - 1) * pixel_um / 2, 0.0])
+                points[:, 2] = z
+                elements.append(dataclasses.replace(element, points=points, meta={}))
+            layers.append((z, elements))
+        if len(_SLICE_CACHE) >= _SLICE_CACHE_SIZE:
+            _SLICE_CACHE.pop(next(iter(_SLICE_CACHE)))
+        _SLICE_CACHE[key] = layers
+    return _SLICE_CACHE[key]
+
+
 # ----------------------------------------------------------------------------------------------
 # Sliced volume cells
 # ----------------------------------------------------------------------------------------------
@@ -470,22 +504,13 @@ def sliced(cell_id: str, *, height_map_um: np.ndarray, pixel_um: float, slicing:
              "a cell that starts above z = 0 (min_z_um) cannot be anchored")
     power = _power(cell_id, power_mw)
     slicing = dataclasses.replace(slicing, voxel_height_um=0.0)
-    params = JobParameters(slicing=slicing, laser=LaserParameters(power_mw=power))
-    job = slice_geometry(heights, params, pixel_size=float(pixel_um), run_preprocess=False)
-
-    ny, nx = heights.shape
-    shift = np.array([float(offset_um[0]) - (nx - 1) * pixel_um / 2,
-                      float(offset_um[1]) - (ny - 1) * pixel_um / 2, -slicing.z_epsilon_um])
+    shift = np.array([float(offset_um[0]), float(offset_um[1]), 0.0])
     groups = []
-    for group in job.groups:
-        z = _round_z(group.z_um - slicing.z_epsilon_um)
-        if min_z_um is not None and z < _round_z(min_z_um) or not group.elements:
+    for z, layer in _sliced_layers(heights, float(pixel_um), slicing):
+        if min_z_um is not None and z < _round_z(min_z_um):
             continue
-        elements = []
-        for element in group.elements:
-            points = element.points + shift
-            points[:, 2] = z
-            elements.append(dataclasses.replace(element, points=points, power_mw=power, meta=_meta(cell_id, part)))
+        elements = [dataclasses.replace(element, points=element.points + shift, power_mw=power,
+                                        meta=_meta(cell_id, part)) for element in layer]
         groups.append(ElementGroup(kind=KIND_LAYER, z_um=z, elements=elements))
     _require(bool(groups), cell_id, "slicing gave no layer")
 
