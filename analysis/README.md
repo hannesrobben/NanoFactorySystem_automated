@@ -95,3 +95,21 @@ row has the cell parameters (absolute and normalised), the stage position of the
 measurement columns `width_um`, `height_um`, `width_std_um`, `height_std_um`, `n_lines`, `present`,
 `merged`, `collapsed`, `method`, `notes`. Filled rows of F0, F1 and F2 (with `method`) go into the voxel
 database.
+
+`experiment_analysis.voxel_fit` (T151) fits the voxel model w(P), l(P) to the filled cell tables
+(weighted least squares; kinds `threshold_ln`, `power_law`, `tabulated`; AIC comparison; plot per fit)
+and writes the `ProcessCalibration` file of stage B:
+
+```python
+from experiment_analysis.voxel_fit import points_from_csv, fit_all, choose, plot_fit, store_fit, write_calibration
+points = points_from_csv(["F0_cells.csv"])            # F0 / F2 heights are lengths, F1 heights are clipped
+fits = fit_all(points, velocity_um_s=5000.0, w_scale_um=None, l_scale_um=None)
+best = choose(fits)
+plot_fit(best, points, "fit.png")
+write_calibration(best, "calibration_SZ2080_Zeiss63x.json", material="SZ2080", objective="Zeiss 63x",
+                  setup="IFOV_on", z0_um=0.4, provisional=True, source="HR-26-003-A F0")
+store_fit(r"D:/.../HR-26-003-A_20261201-1015", fits, points, best)   # /analysis/experiment/ptd01_voxel_fit
+```
+
+`n_eff` of `threshold_ln` is only identifiable with fixed scales `w_scale_um` / `l_scale_um`; without them
+the scales are fitted with `n_eff = 1`.

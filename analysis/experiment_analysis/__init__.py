@@ -9,6 +9,7 @@
 - :class:`ExperimentFile`: read the file at any time (also while printing) and
   store analysis results in it.
 - :mod:`.ptd`: cell tables of the PTD-01 test fields and import of measured voxel sizes (T147).
+- :mod:`.voxel_fit`: fit of the voxel model w(P), l(P) and the stage-B calibration file (T151).
 """
 
 from .access import ExperimentBusyError, ExperimentFile, lock_holder, resolve_file
