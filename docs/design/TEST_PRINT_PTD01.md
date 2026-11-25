@@ -1,6 +1,7 @@
 # Design: Standard parameter test print PTD-01 "voxel and line interaction"
 
-Status: draft (waiting for maintainer approval)
+Status: approved 2026-11-25 (decisions D1–D8, D10–D16 taken in the decision session of 2026-11-25, §12;
+D9 is answered by the lab check T148)
 
 Date: 2026-11-25. Todo: T136 (this document). Used by: T137–T151. Review of the plan:
 `docs/reviews/PTD01_PLAN_REVIEW_2026-11-25.md`. Improvement ideas for existing code found during the
@@ -198,8 +199,9 @@ cell's Δz (z = −Δz, −2Δz, …) until the anchor depth is reached (typical
 anchor layers lie on the same aligned grid. Existing structures do this differently (e.g. `HeightMap_IFOV`
 shifts the whole structure down with `center.Z = −1 µm`); PTD-01 implements the repetition inside `sliced`
 (no slicer change), the general option is future todo F36. `anchor_depth_um` is stored per cell in the cell
-table. Default and scope: decision D15 (proposal 1.5 µm; pads, wedges, caps, pedestals, bases; not the
-interface lines of F0/F1, whose z position is the measured quantity).
+table. Default and scope (decision D15): 1.5 µm below the interface; pads, wedges, caps, pedestals and
+bases (F2, F4, F5, F7); not the interface lines of F0/F1, whose z position is the measured quantity, and
+not F3/F6.
 
 Every primitive validates its inputs (positive sizes, at least one element) and raises `ValueError` with
 the cell id.
@@ -297,8 +299,11 @@ class ProcessCalibration:
   `slice_um(dz_rel, power_mw)`, `to_json()` / `from_json()` (schema `nanofactory.process_calibration/1`,
   model included), `load(path)`, `save(path)`. Missing values raise `MissingPropertyError` (G7), a wrong
   schema `SpecSerialisationError`.
-- `StageAAxes` (same module): `p_min_mw`, `p_max_mw`, `n_levels`, `z_offsets_um`, `label_power_mw`; JSON
-  schema `nanofactory.ptd_stage_a/1` (decision D8).
+- `StageAAxes` (same module): `material`, `p_min_mw`, `p_max_mw`, `n_levels`, `z_offsets_um`,
+  `label_power_mw`; JSON schema `nanofactory.ptd_stage_a/1`. One file per material
+  (`mains/Experiments/ptd01/stage_a_<material>.json`, decision D8): the maintainer enters the start values
+  of a new material there without changing code; they are checked against the attenuator range when it is
+  known and stored in `/spec` as factory arguments.
 
 ### 4.5 Factories (`factories.py`, T144)
 
@@ -328,12 +333,12 @@ converted with the calibration; F0 uses absolute values.
 |---|---|---|---|---|---|---|
 | F0 interface & threshold | 10 × 8 | P absolute, log, 10 levels between `p_min_mw` and `p_max_mw` (stage-A file) | z offset −1.0 … +2.5 µm, step 0.5 | line length 4 µm | `line` | 8 + header |
 | F1 line test | 6 × 4 | p_rel 1.0 … 2.5 | passes n = 1 … 4 | z = z0; per cell 2 x-lines + 2 y-lines, 7 µm / 6 µm | `line_set` | 1 + header |
-| F2 bridges | 6 × 4 | p_rel 6 levels | span 2 / 4 / 7 / 10 µm | pedestals 2 × 4 × 3 µm at P_ref; line z = 3 µm − l0/2 | `sliced`, `suspended_line` | ~11 + anchor |
+| F2 bridges | 6 × 4 | p_rel 6 levels | span 2 / 4 / 7 / 10 µm | pedestals 2 × 3 × 3 µm at P_ref (D11); gap 2 µm between bridge cells; line z = 3 µm − l0/2 | `sliced`, `suspended_line` | ~11 + anchor |
 | F3 line pairs | 5 × 6 | p_rel 5 levels | s_rel 0.5 … 2.0 | pair + 5-line group, 6 µm long | `line_set` | 1 + header |
 | F4 squares | 4 × 4 | p_rel 4 levels | h_rel 0.3 / 0.5 / 0.75 / 1.0 | pad 6 × 6 µm, 3 layers, dz_rel 0.5, `linear_x`, ramp 1.6 µm | `sliced` | ~5 + anchor |
 | F5 layer test | 3 × 4 wedges + 1 × 4 caps | p_rel 3 levels (+ caps at P_ref) | dz_rel 0.15 / 0.25 / 0.4 / 0.6 | wedge 20°, 8 × 6 × 3 µm; cap Ø 8 µm, 2 µm; h from F4 (`h_rel` constant) | `sliced` | union of z levels, ~35 + anchor |
 | F6 crossings | 3 × 5 | star / grid / woodpile | p_rel 5 levels | one pass; woodpile 4 layers, dz = 0.6 l0 | `polyline`, `woodpile` | ~5 |
-| F7 pillars | 4 × 5 | p_rel 4 levels | height 4 / 8 / 12 / 16 / 24 µm | Ø 1.5 µm, base 7 × 7 × 1.4 µm at P_ref (see D10) | `sliced` | ~85 + anchor |
+| F7 pillars | 4 × 5 | p_rel 4 levels | height 2 / 4 / 6 / 8 / 10 µm above the base (AR ≈ 1.3–6.7) | Ø 1.5 µm, base 6 × 6 × 1.4 µm at P_ref (D10) | `sliced` | ~40 + anchor |
 
 "+ anchor" = the anchor layers of §4.2 (anchor depth / Δz per cell, shared where the grids coincide).
 
@@ -345,11 +350,13 @@ P_ref (stage B only). Field centre = centre of the experiment's grid cell (on th
 IFOV block).
 
 Space check with the gaps of D5 (usable height 45 µm below the header, width 50 µm):
-- F7: 5 bases à 7 µm + 4 gaps à 4.5 µm = 53 µm > 50 µm → **does not fit** (decision D10). The concept
-  also warns that the pitch of 10 µm is smaller than the highest pillar (24 µm): highest pillars at the field
-  edge (T143).
-- F2: rows 6 × 4 µm + 5 × 4.5 µm = 46.5 µm > 45 µm; columns (spans + 2 pedestals à 2 µm) 6 + 8 + 11 + 14 =
-  39 µm + 3 × 4.5 µm = 52.5 µm > 50 µm → **does not fit with the volume gap** (decision D11).
+- F7: with the planned 7 µm bases, 5 × 7 µm + 4 × 4.5 µm = 53 µm > 50 µm did not fit. Decided (D10):
+  bases 6 × 6 µm → 5 × 6 µm + 4 × 4.5 µm = 48 µm; rows 4 × 6 µm + 3 × 4.5 µm = 37.5 µm. Pillar heights
+  2 / 4 / 6 / 8 / 10 µm (maintainer, 2026-11-25): all pillars are lower than the pitch of 10.5 µm, so a
+  falling pillar does not reach the next base; high aspect ratios follow in PTD-06 (F31).
+- F2: with pedestals 2 × 4 µm the rows needed 46.5 µm > 45 µm and the columns 52.5 µm > 50 µm. Decided
+  (D11): pedestals 2 × 3 × 3 µm and a 2 µm gap between bridge cells → rows 6 × 3 µm + 5 × 2 µm = 28 µm,
+  columns 39 µm + 3 × 2 µm = 45 µm.
 - F4 (4 × 7.6 µm + 3 × 4.5 µm = 43.9 µm) and F5 (4 × 8 µm + 3 × 4.5 µm = 45.5 µm; rows 3 × 6 + 8 + 3 × 4.5 =
   39.5 µm) fit.
 
@@ -432,7 +439,9 @@ them, and the anchor layers (§4.2) are written last. This is how all 63x prints
 z = 5 µm first, z = −1 µm last) and relies on the viscous resin (SZ2080). It must be checked for:
 - F2: the suspended line is written before its pedestals. The line z must lie inside the pedestal top
   (`z = 3 µm − l0/2`) so that the pedestal later polymerises into it.
-- F7: tall pillars are written top first; a pillar that never reaches its base is a result, not a bug.
+- F7: pillars are written top first; a pillar that never reaches its base is a result, not a bug.
+The descending order is a property of the resin, not only of the objective: with other materials the print
+order may also change for the 63x (maintainer note 2026-11-25, F27).
 - F0: lines far above the interface are written first and float; expected.
 Decision D1 asks whether a per-structure ascending order is wanted later (would need an `Experiment`
 change, future todo F27; not part of PTD-01).
@@ -444,7 +453,8 @@ independent of the order; for the volume fields the rule is dropped in PTD-01.
 
 ### 9.3 Program size and time
 - IFOV writes at 5 mm/s: pure writing time per field is seconds. The time is dominated by
-  `layer_overhead_s` × layers (§5: about 160 layers in F1–F7 plus anchor layers → about 14–16 min), plane
+  `layer_overhead_s` × layers (§5: about 110–120 layers in F1–F7 incl. anchor layers after D10 → about
+  10 min; the concept's 160 layers assumed pillars up to 24 µm), plane
   fit, corner markers and the overview mosaic per experiment. `build_programs()` logs the estimate; the dry
   run of the chain prints it per field (T146 acceptance). A measured `layer_overhead_s` is future todo F24.
 - Power changes start a new IFOV block (RAPID to the reference point, START IFOV). F0 has 80 blocks in
@@ -493,24 +503,30 @@ Naming: classes start with `Parameter…`, not `Test…`, because pytest tries t
 ## 12. Decisions (maintainer)
 
 D1–D9 come from the planning conversation, D10–D16 were found while importing the plan into the
-repository (2026-11-25). Each row holds the proposal until the maintainer decides; decided rows move to a
-"Decided" table below with the date.
+repository. All except D9 were decided by the maintainer in the decision session of 2026-11-25.
+
+### 12.1 Open
 
 | ID | Question | Proposal | Blocks |
 |---|---|---|---|
-| D1 | Keep the descending print order of the 63x for all fields? | Yes for PTD-01; revisit after the lab print (F2/F7 results). | T141–T143 |
-| D2 | Corner markers per field experiment: default, reduced or none? | Reduced `CornerSpec` (e.g. 150 × 20 × 4 µm) with QR code; none is not traceable. | T145 |
-| D3 | `p_ref_factor` start value | 1.5, replaced by the measured working point after PTD-01. | T140 |
+| D9 | Does a `SET_POWER` inside a running program wait until the attenuator has settled? | Lab check T148 before stage A; until then `dwell_after_power_s = 0`; if the attenuator does not settle, set the dwell found by T148. | T149 |
+
+### 12.2 Decided (2026-11-25)
+
+| ID | Question | Decision | Used in |
+|---|---|---|---|
+| D1 | Print order of the 63x (DOWN, highest layer first) for all fields? | Kept as it is. Note for the future: with other materials the print order may also change for the 63x (F27). | T141–T143 |
+| D2 | Corner markers per field experiment? | Reduced `CornerSpec` (e.g. 150 × 20 × 4 µm) with QR code. Future: one continuous corner frame around all experiments of a substrate instead of corners per experiment (F37). | T145 |
+| D3 | `p_ref_factor` start value | 1.5; replaced by the measured working point after PTD-01. | T140 |
 | D4 | Replicates per field | 1 for the first print; `--replicates 3` once the time per field is known. | T145, T146 |
-| D5 | Minimum gap between cells | 2 µm for line cells, 4.5 µm for volume cells; check with the edge-vs-inner comparison after the print. | T139, D10, D11 |
-| D6 | Golden program for one field? | Yes, F3 (small, single layer). | T142 |
-| D7 | Phase of the todos | New phase 11 "Standard test prints", independent of phases 7–10 (depends only on done phases 4 and 6). | scheduling |
-| D8 | Where do F0 axis limits for stage A come from? | `StageAAxes` JSON next to the chain script; checked against the attenuator range when it is known. | T140, T141 |
-| D9 | Does a `SET_POWER` inside a running program wait until the attenuator has settled? | Check on the lab PC before stage A (T148); if not, set `dwell_after_power_s` of the field translation. | T148 → T149 |
-| D10 | F7 does not fit: 5 bases à 7 µm + 4 gaps à 4.5 µm = 53 µm > 50 µm. | Base 6 × 6 × 1.4 µm (5 · 6 + 4 · 4.5 = 48 µm); alternatives: 4 height columns, or split the heights over two fields. | T143 |
-| D11 | F2 does not fit with the volume gap (rows 46.5 µm > 45 µm, columns 52.5 µm > 50 µm). | Gap 2 µm between bridge cells (the line is the measured feature, pedestals are small), pedestals 2 × 3 × 3 µm. | T141 |
-| D12 | Line ends at the galvo reversal (no laser gate known). | Measure the line middle only in PTD-01; keep line ends as written; lead-in / PSO gate is F34. | T138, T147 |
-| D13 | Polarisation direction relative to x/y (needed to interpret w_x/w_y of F1 and w(θ) of F6). | Measure and document on the lab PC before stage B (T149 criterion); store it in the calibration file. | T140, T149 |
-| D14 | Recalibration rule: rerun F1, F3, F4 if P_th changes by more than 10 %? | Adopt as a documented rule in §7, no automation in phase 11 (F35 for automation). | T146 |
-| D15 | Substrate anchoring of volume cells: default `anchor_depth_um` and which cells. | 1.5 µm; pads, wedges, caps, pedestals, bases (F2, F4, F5, F7); not the interface lines of F0/F1 and not F3/F6. | T138 |
-| D16 | Default in-layer ordering strategy for PTD-01. | `row_by_row`; other strategies (outline-following, cross hatch, by power) later as registered strategies. | T139 |
+| D5 | Minimum gap between cells | 2 µm for line cells, 4.5 µm for volume cells (except F2, D11); check with the edge-vs-inner comparison after the print. | T139 |
+| D6 | Golden program for one field? | Yes, F3 (`test/golden/ptd01_f3.txt`). | T142 |
+| D7 | Phase of the todos | New phase 11 "Standard test prints" **with priority** over the other open phases (lab blockers such as T134 excepted). | scheduling |
+| D8 | Where do the F0 start values of stage A come from? | One `StageAAxes` JSON file per material (`stage_a_<material>.json`), checked against the attenuator range when it is known. | T140, T141 |
+| D10 | F7 did not fit 50 µm. | Bases 6 × 6 × 1.4 µm; pillar heights 2 / 4 / 6 / 8 / 10 µm above the base (all below the pitch of 10.5 µm). | T143 |
+| D11 | F2 did not fit with the volume gap. | Pedestals 2 × 3 × 3 µm, gap 2 µm between bridge cells. | T141 |
+| D12 | Line ends at the galvo reversal | Measure the line middle only; line ends stay as written; lead-in / PSO gate is F34. | T138, T147 |
+| D13 | Polarisation direction relative to x/y | Measured and documented on the lab PC before stage B (T149); stored in the calibration file. | T140, T149 |
+| D14 | Recalibration rule (rerun F1, F3, F4 if P_th changes by more than 10 %) | Documented as a rule only; automation is F35. | T146 |
+| D15 | Substrate anchoring of volume cells | 1.5 µm below the interface; pads, wedges, caps, pedestals, bases (F2, F4, F5, F7); not F0/F1 interface lines, not F3/F6. | T138 |
+| D16 | Default in-layer ordering for PTD-01 | `row_by_row`; other strategies later as registered strategies. | T139 |

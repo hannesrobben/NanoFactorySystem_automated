@@ -42,16 +42,18 @@ with an evaluation after every layer capture; a camera live feed; a core that a 
 | 8 | Operating modes and calibration | T88, T89, T90, T91, T92, T104, T107 | T90 needs MIRA MI-53 for the real evaluator; T104 needs MIRA MI-41 for the fit; T107 needs OffAxisHolo K10 for the sweep |
 | 9 | Camera live feed | T102, T93, T94, T95 | T102 before T93 (hard prerequisite, `CAMERA_LIVE.md`) |
 | 10 | Core ready for a GUI | T96, T97 | – |
-| 11 | Standard test prints (PTD-01), proposed (decision D7 of `TEST_PRINT_PTD01.md`) | T136, T137, T138, T139, T140, T141, T142, T143, T144, T145, T146, T147, T148, T149, T150, T151 | T136 approved before T137–T147, T150, T151 start; T148 before T149 |
+| 11 | Standard test prints (PTD-01), **priority** (decision D7 of `TEST_PRINT_PTD01.md`) | T136 (done), T137, T138, T139, T140, T141, T142, T143, T144, T145, T146, T147, T148, T149, T150, T151 | T136 approved 2026-11-25; T148 before T149 |
 | B | Backlog (from T19 `todo_notes.md`, lab checks, follow-ups) | T67, T69, T109, T111, T112, T114 | – |
 
 Phases 6, 9 and 10 are independent of each other. Phase 7 can start with T82, T83 and T85 before
 `dhmconnect` exists. Phase 8 needs T83 and T85. Phase 11 is independent of phases 7–10 (it builds only on
-the done phases 4 and 6) and must not change existing code (maintainer decision 2026-11-25). Target of all phases: Release V1.0 as defined by the
+the done phases 4 and 6), has priority over the other open phases (decision D7, 2026-11-25) and must not
+change existing code (maintainer decision 2026-11-25). Target of all phases: Release V1.0 as defined by the
 decision session of 2026-11-17/18 (`docs/system/SOFTWARE_PLAN_OVERVIEW.md` v0.4).
 
 ### Working rules for Claude Code (in addition to CLAUDE.md)
-1. Pick the first open todo of the lowest unfinished phase whose dependencies are done. Phases 6, 9 and 10
+1. Phase 11 (PTD-01) goes first (decision D7 of 2026-11-25); lab blockers such as T134 stay with the
+   maintainer. Otherwise pick the first open todo of the lowest unfinished phase whose dependencies are done. Phases 6, 9 and 10
    may run in parallel once their design is approved. Take phase B todos only when nothing else is
    available or the maintainer names one; T69 (lab check) is done by the maintainer on the lab PC.
 2. Design todos end with a document in `docs/design/`. After writing it, move the todo to "Blocked" with
@@ -84,7 +86,7 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
 | – | `pose_tolerance_um` for 20x / 63x | measure (T104) | final values in T89 |
 | – | Final defaults for positions / frames / offset of the plan generator | after the speckle / position study (M4) | final values in T85 (start values exist) |
 | – | Final default z per objective | focus study OffAxisHolo K10 | fallback value of T107 |
-| PTD-01 D1–D16 | Test print PTD-01: print order DOWN (D1), corner markers (D2), `p_ref_factor` (D3), replicates (D4), cell gaps (D5), golden program F3 (D6), phase 11 (D7), stage-A axes file (D8), attenuator settling after `SET_POWER` (D9), F7 / F2 do not fit 50 µm (D10, D11), line ends (D12), polarisation direction (D13), recalibration rule (D14), substrate anchoring depth (D15), in-layer ordering (D16); questions and proposals in `docs/design/TEST_PRINT_PTD01.md` §12 | with the approval of T136; D9 by the lab check T148; D13 on the lab PC before stage B | T137–T149 (each row of §12 names what it blocks) |
+| PTD-01 D9 | Does `SET_POWER` inside a running program wait for the attenuator? (`docs/design/TEST_PRINT_PTD01.md` §12.1) | lab check T148 before stage A | `dwell_after_power_s` value; T149 |
 
 ## Decided
 
@@ -107,6 +109,7 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
 | DL-A3 a | 2026-11-18 | `config_hash` + parameter-set id in every message; the full parameter set once per hash in `experiment.h5` (T79). |
 | M4 / T85 | 2026-11-18 | One plan generator here (T85), one algorithm in MIRA; at least 9 positions per structure; jitter with stored seed; start values in T85. |
 | M6 | 2026-11-18 | This side rasterises the target at least as fine as the product (T89). |
+| PTD-01 D1–D8, D10–D16 | 2026-11-25 | `docs/design/TEST_PRINT_PTD01.md` §12.2: DOWN order kept; reduced corners with QR; `p_ref_factor` 1.5; 1 replicate (later 3); gaps 2 / 4.5 µm; golden program F3; phase 11 with priority; stage-A start values in one JSON per material; F7 bases 6 × 6 µm with pillars 2–10 µm; F2 pedestals 2 × 3 × 3 µm with 2 µm gap; line middle only; polarisation measured before stage B; recalibration rule documented only; anchoring 1.5 µm for volume cells; in-layer order `row_by_row`. |
 | X-A, X-B, X-C | 2026-11-18 | `Information_Mehrere_Experimente.txt` and `todo_claude/` moved to the local attic; `docs/ATTIC_INDEX.md`. |
 
 ## Open
@@ -546,7 +549,7 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
 
 ### Phase 11 — Standard test prints
 
-Design: `docs/design/TEST_PRINT_PTD01.md` (T136, waiting for approval; decisions D1–D16 in §12). Review:
+Design: `docs/design/TEST_PRINT_PTD01.md` (T136, approved 2026-11-25; decisions in §12, only D9 open). Review:
 `docs/reviews/PTD01_PLAN_REVIEW_2026-11-25.md`. Rule for all phase-11 todos: no file outside
 `nanofactorysystem/testprint/`, `mains/Experiments/ptd01/`, `analysis/experiment_analysis/` (new modules
 only) and the new tests is changed, apart from documentation (`test/README.md`, READMEs, CLAUDE.md);
@@ -584,7 +587,7 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
       change, z rounded to 1 nm); stacked parts (pillar on base) are one height map; helpers `pad_map`,
       `wedge_map`, `cap_map`, `pillar_on_base_map`, `pedestal_map`;
     - substrate anchoring: `sliced(…, anchor_depth_um=…)` repeats the first slice (z = 0) downwards at
-      z = −k·Δz until the anchor depth is reached (default from D15; 0 disables it); the anchor layers carry
+      z = −k·Δz until the anchor depth is reached (default 1.5 µm for volume cells, D15; 0 disables it); the anchor layers carry
       `meta["part"] = "anchor"`;
     - unit tests per primitive: element count, bounding box, z levels (aligned grid, anchor layers), every
       element has a power, invalid input raises `ValueError` naming the cell.
@@ -614,8 +617,8 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
       settings, polarisation direction (D13), `provisional`, source, date) with `power_mw`, `p_ref_mw`,
       `hatch_um(h_rel, power_mw)` and `slice_um(dz_rel, power_mw)` evaluated with the fit model at the power
       of the cell;
-    - `StageAAxes` (`p_min_mw`, `p_max_mw`, `n_levels`, `z_offsets_um`, `label_power_mw`), schema
-      `nanofactory.ptd_stage_a/1`;
+    - `StageAAxes` (`material`, `p_min_mw`, `p_max_mw`, `n_levels`, `z_offsets_um`, `label_power_mw`), schema
+      `nanofactory.ptd_stage_a/1`, one file per material (`stage_a_<material>.json`, D8);
     - `to_json`/`from_json`/`save`/`load` (schema `nanofactory.process_calibration/1`, model included); a
       missing physical value or model raises `MissingPropertyError`, a wrong schema `SpecSerialisationError`;
     - unit tests: conversions with a `threshold_ln` model, a power outside the model range raises, both
@@ -650,8 +653,8 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
       `field_f1(calibration, …)`, `field_f2(calibration, …)` with the axis levels of design §5 as module
       constants; the builders take no `BuildContext`;
     - F0: 10 power rows × 8 z offsets = 8 layers + header, 80 IFOV blocks;
-    - F2 writes the suspended line inside the pedestal top (`z = pedestal height − l0/2`, design §9.1), with
-      the geometry of D11 so that the field validation passes;
+    - F2 writes the suspended line inside the pedestal top (`z = pedestal height − l0/2`, design §9.1);
+      pedestals 2 × 3 × 3 µm and a 2 µm gap between bridge cells (D11), so that the field validation passes;
     - tests: cell counts (80 / 24 / 24), axis levels, every power inside the given range, every layer
       program below `MAX_PROGRAM_LINES`, field validation passes.
 
@@ -671,8 +674,8 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
   - Size: M
   - Depends on: T141 (decision D10)
   - Done when:
-    - `field_f6` (star 0/45/90/135°, 3 × 3 grid, 4-layer woodpile) and `field_f7` (pillars on bases, heights
-      4–24 µm, highest pillars at the field edge, base geometry of D10, design §5/§9.1) exist;
+    - `field_f6` (star 0/45/90/135°, 3 × 3 grid, 4-layer woodpile) and `field_f7` (pillars Ø 1.5 µm on bases
+      6 × 6 × 1.4 µm, heights 2 / 4 / 6 / 8 / 10 µm above the base, D10, design §5/§9.1) exist;
     - tests as in T141 (cell counts 15 / 20); F7 layer count logged and checked against an upper bound.
 
 - [ ] T144: Named factories `ptd01.f0` … `ptd01.f7` (design §4.5) [phase: 11]
@@ -920,17 +923,6 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
 
-- [ ] T136: Design of the standard parameter test print PTD-01 (maintainer request 2026-11-25) [phase: 11]
-  - Priority: high
-  - Size: S
-  - Depends on: –
-  - Done when:
-    - `docs/design/TEST_PRINT_PTD01.md` exists (goals, architecture `nanofactorysystem/testprint/`, the eight
-      fields, experiments and chain, data flow, constraints, tests, decisions);
-    - the maintainer has answered all decisions of §12 (D1–D16; D9 may stay open until T148) and the document
-      contains `Status: approved <date>`.
-  - Blocked by: waiting for maintainer approval (design written 2026-11-25, working rule 2).
-
 - [ ] T134: Lab session 2 for program loading and controller recovery (follow-up of T129) [phase: B]
   - Priority: high
   - Size: S
@@ -951,6 +943,7 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T136: Design of the standard parameter test print PTD-01 (maintainer request 2026-11-25) — 2026-11-25 — `docs/design/TEST_PRINT_PTD01.md` approved with the decisions D1–D8, D10–D16 (D9 by the lab check T148); phase 11 todos T137–T151 scheduled with priority, improvement ideas F18–F37 in `future_todo.md`. — commits: `5881afa`, `0d4bb72`, this decision commit
 - [x] T127: `REMOVEPROGRAM` names the layer file instead of the loaded program (found during T125) — 2026-11-24 — Programs are removed under the loaded name `python_aerobasic_program.pgm` (`Task.finish()`/`abort()`, failures logged); the dummy controller records loaded programs and unknown removals; golden command logs updated deliberately. — commits: `79a789d`
 - [x] T128: Load failures: log `~LASTERROR` for `!` replies and stop instead of skipping the layer (found during T125) — 2026-11-24 — Refusals carry the `~LASTERROR` text, `PROGRAM LOAD` has a response timeout (`controller.loadTimeout`, connection reopened), task errors are decoded, an early "complete" is a failure; `Experiment(stop_on_failure=True)` (default) stops at the first failed layer with `PrintStoppedError` and `restart_experiment()` prints it again. — commits: `79a789d`, `3f773a3`
 - [x] T125: DOE print printed only 16 of 73 layers: `PROGRAM LOAD` refused every layer program above about 80 000 lines (maintainer report 2026-11-22, `surface_16bit`) — 2026-11-22 — Hotfix: `build_programs()` splits every layer program with more than `max_program_lines` (default 80 000) lines into parts (whole layer setup and footer repeated, cut with the laser off at an absolute move, power/feed replayed) and stops if one cannot be split; printing prepares all layers before the first one; interim solution `Experiment.reprint_layers()` / `mains/reprint_layers.py` prints the missing layers from the experiment file, split, in drop-direction order (DOWN: highest first). Real fix: T126; follow-ups T127, T128; lab check of the parts open. — commits: `76b8839`, `d46ad4a`, `a6db390`, `9974a31`, `2e7ad3a`
