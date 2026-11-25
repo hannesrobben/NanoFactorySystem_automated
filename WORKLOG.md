@@ -2908,3 +2908,32 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** none (documentation and planning only, no code changed).
 - **Commits:** `5881afa` docs(design): add the PTD-01 test print design and plan review [T136]; docs(todo): schedule phase 11 PTD-01 and record improvement ideas [T136] (this commit).
 - **Follow-ups:** decision session D1–D16 with the maintainer, then `Status: approved` and T136 done; T148 on the lab PC before stage A.
+
+### 2026-11-25 12:38 CET — [T136] PTD-01 decision session and design approval
+- **Status:** done
+- **Decisions (maintainer, 2026-11-25):**
+  - D1: DOWN order kept; note: with other materials the order may change for the 63x too.
+  - D2: reduced corners with QR code; future: one corner frame around all experiments.
+  - D3: `p_ref_factor` 1.5.
+  - D4: 1 replicate, later 3.
+  - D5: gaps 2 µm for line cells and 4.5 µm for volume cells.
+  - D6: golden program for F3.
+  - D7: phase 11 with priority.
+  - D8: stage-A start values in one JSON per material (after an explanation of what the values are).
+  - D10: F7 bases 6 × 6 µm; pillar heights changed by the maintainer from 4/8/12/16/24 to 2/4/6/8/10 µm, all below the 10.5 µm pitch.
+  - D11: F2 pedestals 2 × 3 × 3 µm with a 2 µm gap.
+  - D12: measure the line middle only.
+  - D13: polarisation measured before stage B.
+  - D14: recalibration rule documented only.
+  - D15: anchoring 1.5 µm for volume cells (after the clarification that this is the depth written additionally below the interface).
+  - D16: `row_by_row`.
+  - D9 stays open until the lab check T148.
+  - The design was approved.
+- **Changes:**
+  - `docs/design/TEST_PRINT_PTD01.md`: `Status: approved 2026-11-25`; §12 split into open (D9) and decided; F2/F7 geometry, space check, layer estimate (F7 about 40 instead of 85 layers; F1–F7 about 110–120 layers incl. anchors, about 10 min overhead), `StageAAxes` per material, anchoring scope, print-order note.
+  - `TODO.md`: phase 11 has priority (phase-plan row, text, working rule 1); open decision row only D9; "Decided" row for PTD-01; T136 → Done; T138, T140, T141, T143 carry the decided values.
+  - `future_todo.md`: F27 gets the material-dependent print order note; new F37 (one corner frame around all experiments of a substrate); intro range F18–F37.
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (documentation only).
+- **Commits:** docs(design): record the PTD-01 decisions and approve the design [T136] (this commit).
+- **Follow-ups:** start phase 11 with T137, T138 and T150 (parallel), then T140 and T139. T148 (attenuator settling) on the lab PC before stage A.

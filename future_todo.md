@@ -239,12 +239,12 @@ first), **Watch out for** (pitfalls and constraints), **Open questions** (for th
 
 ---
 
-The entries F18–F36 come from the planning of the test print PTD-01 (2026-11-20 to 2026-11-25, design
+The entries F18–F37 come from the planning of the test print PTD-01 (2026-11-20 to 2026-11-25, design
 `docs/design/TEST_PRINT_PTD01.md`). F18–F30 are improvements of **existing** code that were deliberately
 kept out of PTD-01 (maintainer decision 2026-11-25: the PTD-01 implementation must not change existing
 code); they were called improvement notes N1–N13 in the planning (renamed, because N-IDs are the code
-markers of `todo_notes.md`). F31–F36 come from the open points of the PTD-01 concept and from the import of
-the plan. **Every one of them must be discussed with the maintainer before it is scheduled.**
+markers of `todo_notes.md`). F31–F37 come from the open points of the PTD-01 concept, the import of the plan and
+the decision session. **Every one of them must be discussed with the maintainer before it is scheduled.**
 
 ## F18: One shared IR → IFOV translation for `Model3D_Slicer` and `ParameterFieldStructure` (formerly N1)
 - **Status:** to be discussed with the maintainer before scheduling.
@@ -332,7 +332,10 @@ the plan. **Every one of them must be discussed with the maintainer before it is
 - **Status:** to be discussed with the maintainer before scheduling.
 - **Goal:** A per-structure option for the layer order (e.g. substrate side first for the 63x), to compare
   both orders for bridges and pillars.
-- **Context:** DOWN always prints the highest layer first (PTD-01 decision D1).
+- **Context:** DOWN always prints the highest layer first (PTD-01 decision D1, kept for PTD-01). Maintainer
+  note 2026-11-25: the descending order relies on the viscous SZ2080; with other materials the print order
+  may also change for the 63x, so the order may have to become a material (or structure) property, not a
+  fixed property of the objective.
 - **Watch out for:** restart and progress logic (`print_progress`, `reprint_layers`), the split parts of T125.
 - **Open questions:** Only after the PTD-01 results of F2/F7?
 
@@ -416,3 +419,16 @@ the plan. **Every one of them must be discussed with the maintainer before it is
 - **Watch out for:** golden files (only as an opt-in parameter, default off); voxel-aware first slice (T54:
   first slice half a voxel height inside the part); DOWN prints the anchor layers last.
 - **Open questions:** Default depth per objective; dose of the anchor layers (same power or higher)?
+
+## F37: One corner frame around all experiments of a substrate
+- **Status:** to be discussed with the maintainer before scheduling.
+- **Goal:** Instead of corner markers and a QR code per experiment, one continuous corner frame (rectangle)
+  is printed around all experiments of a substrate (or of a chain), as a common frame of reference.
+- **Context:** Maintainer note 2026-11-25 (PTD-01 decision D2): PTD-01 uses reduced corners with QR code per
+  field experiment for now. With eight small field experiments the corners cost much of the time.
+- **Prerequisites:** T52/T76 (`run_substrate`, substrate index), T118 (substrate layout); F30.
+- **Watch out for:** plane fit mode `CORNERS` and the overview capture use the corners of each experiment;
+  every experiment still needs its UUID traceable (QR per experiment or one index QR with positions);
+  restart of a single experiment must find the frame; the frame must stay inside the resin drop.
+- **Open questions:** One QR code for the frame plus the positions in `substrate.json`, or small QR codes per
+  experiment inside the frame? Is the frame printed before the first experiment of the chain?
