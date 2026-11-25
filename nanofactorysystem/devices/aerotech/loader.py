@@ -1,16 +1,20 @@
-"""Loading programs through the A3200 C library in worker processes, and running them on tasks 1 and 2 (T129).
+"""Loading programs through the A3200 C library in worker processes, and running them on one task (T129, T132).
 
-Work order: ``docs/design/PROGRAM_LOADING.md`` (requirements R1-R10, lab session 1 in section 6).
+Work order: ``docs/design/PROGRAM_LOADING.md`` (requirements R1-R10, lab sessions in section 6, plan
+after lab session 2 in section 7.2).
 
-- :class:`LibraryLoader` compiles and loads every program in a short-lived worker process
-  (``python -m nanofactorysystem.devices.aerotech.loader``), so that the compile memory (19.6 kB per
-  line) is returned to Windows when the worker disconnects; the loaded program stays on the
-  controller. Start, state, stop and removal go through one library connection of this process.
+- :class:`LibraryLoader` compiles and adds every program in a short-lived worker process
+  (``python -m nanofactorysystem.devices.aerotech.loader``, ``A3200ProgramAdd``, no task), so that the
+  compile memory (19.6 kB per line) is returned to Windows when the worker disconnects; the added
+  program stays on the controller. Associate, start, state, stop and removal go through one library
+  connection of this process.
 - :class:`MemoryBudget` keeps the whole PC below the budget of the maintainer (32 GB RAM, at most
   20-25 GB used, default 22 GB) and gives the largest part size that may be compiled.
-- :class:`ProgramRunner` runs the parts of the layers alternately on tasks 1 and 2: while one part
-  runs, the next one is compiled and loaded on the other task (only one compile at a time, never on
-  the running task). In lab session 1 the gap between two parts was 0.15 s.
+- :class:`ProgramRunner` runs the parts of the layers on **one task** (task 1) with add-ahead: while
+  one part runs, the next one is compiled without a task; when the current part has completed it is
+  removed and the next one is associated with the task and started (T132, maintainer decision (b) of
+  2026-11-25). Task 2 has untuned parameters on this controller (lookahead 100 instead of 10000 moves),
+  so print parts never run there.
 """
 from __future__ import annotations
 
@@ -21,6 +25,7 @@ import shutil
 import subprocess
 import sys
 import time
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Hashable, Iterable, Optional, Protocol
@@ -28,6 +33,7 @@ from typing import Callable, Hashable, Iterable, Optional, Protocol
 from nanofactorysystem.aerobasic import TaskStatusDataItem
 from nanofactorysystem.aerobasic.ascii import AerotechError, TaskFailedError
 from nanofactorysystem.aerobasic.constants.tasks import TaskState
+from nanofactorysystem.devices.aerotech import exec_program_name
 from nanofactorysystem.devices.aerotech.library import DEFAULT_DLL, A3200Library, used_memory_gb
 
 DEFAULT_KB_PER_LINE = 19.7  # lab session 1: 19.6 kB per line, linear from 50k to 400k lines
@@ -49,7 +55,7 @@ class LoadResult:
 
 
 class PendingLoad(Protocol):
-    """ A load that runs in the background. """
+    """ A compile (add) that runs in the background. """
 
     def result(self, timeout: Optional[float] = None) -> LoadResult: ...
 
@@ -59,7 +65,9 @@ class PendingLoad(Protocol):
 class ProgramLoader(Protocol):
     """ What :class:`ProgramRunner` needs from a loader (seam: :class:`LibraryLoader` or the dummy loader). """
 
-    def load_async(self, path: Path, task_id: int) -> PendingLoad: ...
+    def add_async(self, path: Path) -> PendingLoad: ...
+
+    def associate(self, task_id: int, name: str) -> None: ...
 
     def start(self, task_id: int) -> None: ...
 
@@ -181,7 +189,7 @@ class _WorkerLoad:
 
 
 class LibraryLoader:
-    """ Loads programs through the A3200 C library in worker processes (R1).
+    """ Compiles and adds programs through the A3200 C library in worker processes (R1).
 
     Parameters
     ----------
@@ -204,10 +212,25 @@ class LibraryLoader:
         self.load_timeout_s = load_timeout_s
         self.lib = A3200Library(self.dll)
 
-    def load_async(self, path: Path, task_id: int) -> PendingLoad:
-        cmd = [self.python, "-m", "nanofactorysystem.devices.aerotech.loader", str(path), str(task_id), self.dll]
+    def add_async(self, path: Path) -> PendingLoad:
+        """ Compile and add a program without a task in a worker process (``A3200ProgramAdd``). """
+
+        cmd = [self.python, "-m", "nanofactorysystem.devices.aerotech.loader", str(path), self.dll]
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         return _WorkerLoad(process, Path(path), count_lines(Path(path)))
+
+    def associate(self, task_id: int, name: str) -> None:
+        """ Bind an added program (by its file name) to a task.
+
+        Raises
+        ------
+        TaskFailedError
+            If ``A3200ProgramAssociate`` fails.
+        """
+
+        ok, error = self.lib.associate(task_id, name)
+        if not ok:
+            raise TaskFailedError(f"A3200ProgramAssociate({task_id}, {name}) failed: {error}")
 
     def start(self, task_id: int) -> None:
         ok, error = self.lib.start(task_id)
@@ -233,21 +256,23 @@ class LibraryLoader:
 
 
 def _worker(argv: list[str]) -> None:
-    """ Worker process: load one program, report the result as JSON, disconnect (the program stays loaded). """
+    """ Worker process: compile and add one program without a task, report the result as JSON, disconnect.
+
+    The added program stays on the controller after the worker has exited (lab session 1); the
+    compile memory is returned to Windows at the disconnect.
+    """
 
     from nanofactorysystem.devices.aerotech.library import peak_private_gb
 
-    path, task_id, dll = Path(argv[0]), int(argv[1]), argv[2]
+    path, dll = Path(argv[0]), argv[1]
     start = time.time()
     try:
         with A3200Library(dll) as lib:
-            ok, error = lib.load(task_id, path)
-            state = lib.state(task_id).name if ok else ""
+            ok, error = lib.add(path)
     except Exception as exc:  # report every failure to the parent
-        ok, error, state = False, f"{type(exc).__name__}: {exc}", ""
-    print(json.dumps({"ok": ok and state in ("program_ready", "program_complete"),
-                      "error": error or ("" if state in ("program_ready", "program_complete") else f"task {state}"),
-                      "load_s": round(time.time() - start, 2), "peak_gb": peak_private_gb()}))
+        ok, error = False, f"{type(exc).__name__}: {exc}"
+    print(json.dumps({"ok": ok, "error": error, "load_s": round(time.time() - start, 2),
+                      "peak_gb": peak_private_gb()}))
 
 
 # ------------------------------------------------------------------------------------------- runner
@@ -278,7 +303,12 @@ class ProgramRunError(AerotechError):
 
 @dataclass
 class ProgramRunner:
-    """ Runs program parts alternately on tasks 1 and 2 with prefetch (R4-R8).
+    """ Runs program parts on one task with add-ahead (R4-R8, T132).
+
+    While a part runs, the next part is compiled and added without a task (``A3200ProgramAdd`` in a
+    worker process). When the current part has completed, the task is stopped, the part is removed,
+    and the next part is associated with the task (``A3200ProgramAssociate``) and started. At most two
+    programs are added at a time: the running one and the next one.
 
     Parameters
     ----------
@@ -288,10 +318,12 @@ class ProgramRunner:
         For the program line number of a running task (stall and early-end detection).
     budget : MemoryBudget
     exec_dir : Path
-        Folder for the execution copies (one unique ``.pgm`` name per part; the compiled ``.OGM`` of the
+        Folder for the execution copies (one unique ``.pgm`` name per part, see
+        :func:`~nanofactorysystem.devices.aerotech.exec_program_name`; the compiled ``.OGM`` of the
         library lands next to it). Both are deleted after the part has run.
-    tasks : tuple of int
-        The two tasks that alternate.
+    task : int
+        The task every part runs on (default 1, the task with the tuned parameters; decision (b) of
+        T132: print parts never run on task 2).
     poll_s, stall_timeout_s : float
         Status polling interval, and the time without progress after which a running part fails.
     logger : logging.Logger, optional
@@ -301,7 +333,7 @@ class ProgramRunner:
     api: object
     budget: MemoryBudget
     exec_dir: Path
-    tasks: tuple[int, int] = (1, 2)
+    task: int = 1
     poll_s: float = 0.5
     stall_timeout_s: float = 600.0
     logger: Optional[logging.Logger] = None
@@ -310,14 +342,14 @@ class ProgramRunner:
     def __post_init__(self):
         self.exec_dir = Path(self.exec_dir)
         self.log = self.logger or logging.getLogger(__name__)
+        self._session = uuid.uuid4().hex[:6]
         self._counter = 0
 
-    def _exec_copy(self, part: Path, task_id: int) -> Path:
-        """ Copy a part to a unique ``.pgm`` name (the library compiles ``.pgm``; two tasks never share a name). """
+    def _exec_copy(self, part: Path) -> Path:
+        """ Copy a part to a fresh ``.pgm`` name, unique across processes (the library compiles ``.pgm``). """
 
         self._counter += 1
-        stem = re.sub(r"[^A-Za-z0-9_.-]", "_", Path(part).stem)
-        path = self.exec_dir / f"nfs_t{task_id}_{self._counter:05d}_{stem}.pgm"
+        path = self.exec_dir / exec_program_name(self._session, self._counter, Path(part).stem)
         self.exec_dir.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(part, path)
         return path
@@ -333,56 +365,62 @@ class ProgramRunner:
         except (AerotechError, ValueError):
             return None
 
-    def _discard(self, task_id: int, exec_path: Optional[Path]) -> None:
-        """ Stop a task and remove its program; never raises. """
-
-        try:
-            self.loader.stop(task_id)
-        except Exception as error:  # cleanup after a failure must not hide the failure
-            self.log.error(f"Could not stop task {task_id}: {error}")
-        if exec_path is not None:
-            try:
-                self.loader.remove(exec_path.name)
-            except Exception as error:
-                self.log.error(f"Could not remove {exec_path.name}: {error}")
-            self._cleanup(exec_path)
-
     def run(self, items: Iterable[tuple[Hashable, list[Path]]],
             on_item_done: Optional[Callable[[Hashable], None]] = None) -> list[PartRecord]:
         """ Run the parts of every item (layer) in order; call ``on_item_done(key)`` after its last part.
 
-        The next part is loaded on the other task while the current part runs, if the memory budget
-        allows it; otherwise it is loaded after the current part has ended. ``on_item_done`` runs while
-        the next part is loading (captures between layers do not add to the printing time).
+        The next part is compiled while the current part runs, if the memory budget allows it;
+        otherwise it is compiled after the current part has ended. ``on_item_done`` runs while the
+        next part is compiling (captures between layers do not add to the printing time).
 
         Raises
         ------
         ProgramRunError
-            On the first part that cannot be loaded, does not start, ends in an error or before its last
-            line, or stalls. Both tasks are stopped and their programs removed first; ``key`` names the item.
+            On the first part that cannot be compiled, associated or started, ends in an error or
+            before its last line, or stalls. The task is stopped and every added program removed
+            first; ``key`` names the item.
         """
 
         queue = [(key, Path(part), k == len(parts) - 1) for key, parts in items for k, part in enumerate(parts)]
         if not queue:
             return self.records
-        loaded: dict[int, Path] = {}
-        pending, pending_index = None, None
+        task_id = self.task
+        added: dict[str, Path] = {}  # programs added on the controller and not removed yet
+        pending: Optional[PendingLoad] = None
+        upcoming: Optional[Path] = None
         last_end: Optional[float] = None
 
-        def begin_load(index: int) -> None:
-            nonlocal pending, pending_index
-            key, part, _ = queue[index]
-            task_id = self.tasks[index % 2]
-            exec_path = self._exec_copy(part, task_id)
-            loaded[task_id] = exec_path
-            pending, pending_index = self.loader.load_async(exec_path, task_id), index
+        def begin_add(index: int) -> None:
+            nonlocal pending, upcoming
+            upcoming = self._exec_copy(queue[index][1])
+            added[upcoming.name] = upcoming
+            pending = self.loader.add_async(upcoming)
 
-        def fail(message: str, key: Hashable) -> ProgramRunError:
+        def release(name: str) -> bool:
+            """ Remove one added program and its files; never raises. """
+
+            removed = False
+            try:
+                removed = self.loader.remove(name)
+            except Exception as error:  # cleanup must not hide the original failure
+                self.log.error(f"Could not remove {name}: {error}")
+            self._cleanup(added.pop(name))
+            return removed
+
+        def discard_all() -> None:
+            """ Cancel the compile, stop the task and remove every added program; never raises. """
+
             if pending is not None:
                 pending.cancel()
-            for task_id, exec_path in list(loaded.items()):
-                self._discard(task_id, exec_path)
-            loaded.clear()
+            try:
+                self.loader.stop(task_id)
+            except Exception as error:
+                self.log.error(f"Could not stop task {task_id}: {error}")
+            for name in list(added):
+                release(name)
+
+        def fail(message: str, key: Hashable) -> ProgramRunError:
+            discard_all()
             self.log.error(message)
             return ProgramRunError(message, key)
 
@@ -390,17 +428,20 @@ class ProgramRunner:
         if not self.budget.fits(lines):
             raise ProgramLoadError(f"{queue[0][1].name} ({lines} lines, about {self.budget.peak_gb(lines):.1f} GB to "
                                    f"compile) does not fit into the memory budget of {self.budget.budget_gb} GB")
-        begin_load(0)
+        begin_add(0)
         for index, (key, part, item_done) in enumerate(queue):
-            task_id = self.tasks[index % 2]
-            exec_path = loaded[task_id]
+            exec_path = upcoming
             record = PartRecord(key, part.name, task_id, count_lines(part))
             wait_start = time.time()
             result = pending.result(timeout=getattr(self.loader, "load_timeout_s", None))
             pending = None
             record.waited_for_load_s, record.load_s = round(time.time() - wait_start, 2), result.load_s
             if not result.ok:
-                raise fail(f"Could not load {part.name} on task {task_id}: {result.error}", key)
+                raise fail(f"Could not compile {part.name}: {result.error}", key)
+            try:
+                self.loader.associate(task_id, exec_path.name)
+            except AerotechError as error:
+                raise fail(f"Could not associate {part.name} with task {task_id}: {error}", key) from error
             if self.loader.state(task_id) != TaskState.program_ready:
                 raise fail(f"{part.name} is not ready on task {task_id} ({self.loader.state(task_id).name})", key)
             try:
@@ -411,16 +452,16 @@ class ProgramRunner:
             record.gap_s = round(started - last_end, 2) if last_end is not None else None
             record.used_gb = used_memory_gb()
 
-            # Prefetch: compile the next part on the other task while this one runs, if the budget allows
+            # Add-ahead: compile the next part without a task while this one runs, if the budget allows
             prefetch_after = False
             if index + 1 < len(queue):
                 next_lines = count_lines(queue[index + 1][1])
                 if self.budget.fits(next_lines):
-                    begin_load(index + 1)
+                    begin_add(index + 1)
                 else:
                     prefetch_after = True
-                    self.log.warning(f"Not enough memory to load {queue[index + 1][1].name} while {part.name} runs; "
-                                     f"it is loaded afterwards")
+                    self.log.warning(f"Not enough memory to compile {queue[index + 1][1].name} while {part.name} "
+                                     f"runs; it is compiled afterwards")
 
             # Wait for the end; a part without progress for stall_timeout_s fails
             last_line, last_change = None, time.time()
@@ -444,12 +485,10 @@ class ProgramRunner:
                 raise fail(f"Program ended early: {part.name} on task {task_id} reported complete at line "
                            f"{record.last_line} of {expected}", key)
             self.loader.stop(task_id)
-            if not self.loader.remove(exec_path.name):
+            if not release(exec_path.name):
                 self.log.warning(f"Removing {exec_path.name} did not lower the added-program count")
-            self._cleanup(exec_path)
-            loaded.pop(task_id, None)
             self.records.append(record)
-            self.log.info(f"Part {part.name} on task {task_id}: {record.lines} lines, load {record.load_s} s "
+            self.log.info(f"Part {part.name} on task {task_id}: {record.lines} lines, compile {record.load_s} s "
                           f"(waited {record.waited_for_load_s} s), run {record.run_s} s, gap {record.gap_s} s, "
                           f"PC memory {record.used_gb if record.used_gb is None else round(record.used_gb, 1)} GB")
             if prefetch_after:
@@ -457,16 +496,13 @@ class ProgramRunner:
                 if not self.budget.fits(next_lines):
                     raise fail(f"{queue[index + 1][1].name} ({next_lines} lines) does not fit into the memory budget",
                                queue[index + 1][0])
-                begin_load(index + 1)
+                begin_add(index + 1)
             if item_done and on_item_done is not None:
                 try:
                     on_item_done(key)
                 except BaseException:
-                    # Do not leave the prefetched part loaded on the other task
-                    if pending is not None:
-                        pending.cancel()
-                    for other, other_path in list(loaded.items()):
-                        self._discard(other, other_path)
+                    # Do not leave the next part added on the controller
+                    discard_all()
                     raise
         return self.records
 

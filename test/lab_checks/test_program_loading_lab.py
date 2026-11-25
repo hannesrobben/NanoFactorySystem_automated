@@ -140,3 +140,53 @@ def test_reset_prototype_is_recognised(lab):
     assert re.search(lab.RESET_SIGNATURE, header)
     assert lab.prototype(header, "A3200Reset") == "BOOL DLLENTRYDECLARATION A3200Reset(A3200Handle handle);"
     assert lab.prototype(header, "A3200Missing") is None
+
+
+# ------------------------------------------------------------------------------------- lab session 3 (T153)
+
+GOLDEN_IFOV = Path(__file__).resolve().parents[1] / "golden" / "binary_grating_ifov_63x.txt"
+
+
+def test_dry_layer_switches_the_laser_off_and_never_moves_z(lab):
+    original = GOLDEN_IFOV.read_text().splitlines()
+    assert lab.dry_problems(original)  # the generated program opens the gate, sets the power and moves Z
+
+    dry, info = lab.dry_layer_lines(original, 10.0, -5.0)
+
+    assert lab.dry_problems(dry) == []
+    assert info["laser_gate_lines"] > 0 and info["analog_out_lines"] > 0 and info["z_words_removed"] > 0
+    assert all(line.endswith("OFF") for line in dry if "LASEROVERRIDE" in line)
+    assert all(line == "$AO[0].A=0" for line in dry if line.startswith("$AO"))
+    # The stage pattern is kept and starts at the current position; the galvo lines are unchanged
+    stage = [line for line in dry if line.startswith("RAPID X")]
+    assert stage[0] == "RAPID X10.000000 Y-5.000000" and stage[1] == "RAPID X10.000000 Y-5.004000"
+    galvo = [line for line in original if re.match(r"(RAPID|LINEAR) A", line)]
+    assert galvo == [line for line in dry if re.match(r"(RAPID|LINEAR) A", line)]
+
+
+@pytest.mark.parametrize("line", ["INCREMENTAL", "G91", "PSOCONTROL X ON", "LINEAR Z $dz F 0.1", "LINEAR X 1.0"])
+def test_dry_layer_refuses_what_cannot_be_made_safe(lab, line):
+    with pytest.raises(ValueError):
+        lab.dry_layer_lines(["ABSOLUTE", line, "END PROGRAM"], 0.0, 0.0)
+
+
+def test_dry_layer_parts_stay_dry(lab):
+    from nanofactorysystem.aerobasic.programs.split import split_lines
+
+    text = GOLDEN_IFOV.read_text()
+    layer = text[text.index("' ==== layer 0 ===="):text.index("' ==== layer 1 ====")].splitlines()
+    dry, _ = lab.dry_layer_lines(layer, 1.0, 2.0)
+
+    parts = split_lines(dry, 70, source="layer0")  # header 45 + footer 6 lines
+
+    assert len(parts) > 1 and all(lab.dry_problems(part) == [] for part in parts)
+
+
+def test_read_block_takes_a_pasted_block(lab):
+    answers = iter(["", "Pool min 530156K", "Used 124976K", "", "ignored"])
+
+    assert lab.read_block("INtime", reader=lambda _: next(answers)) == "Pool min 530156K\nUsed 124976K"
+
+
+def test_session_3_steps_are_registered(lab):
+    assert {"ascii-names", "recover-blocked", "dotnet-build", "layer-dry"} <= set(lab.STEPS)

@@ -52,6 +52,7 @@ class A3200Library:
         signatures = {
             "A3200Connect": [ctypes.POINTER(ctypes.c_void_p)], "A3200Disconnect": [handle],
             "A3200ProgramLoad": [handle, task, text], "A3200ProgramStart": [handle, task],
+            "A3200ProgramAdd": [handle, text], "A3200ProgramAssociate": [handle, task, text],
             "A3200ProgramStop": [handle, task], "A3200ProgramStopAndWait": [handle, task, dword],
             "A3200ProgramRemove": [handle, text],
             "A3200ProgramGetTaskState": [handle, task, ctypes.POINTER(ctypes.c_int)],
@@ -82,6 +83,22 @@ class A3200Library:
         """ Compile and load a program file on a task (``A3200ProgramLoad``); returns (ok, error text). """
 
         ok = self.lib.A3200ProgramLoad(self.handle, task_id, str(Path(path).resolve()).encode("mbcs"))
+        return bool(ok), "" if ok else self.error()
+
+    def add(self, path: Path) -> tuple[bool, str]:
+        """ Compile and add a program without a task (``A3200ProgramAdd``); returns (ok, error text).
+
+        Lab session 2: the same time and memory as a load (19.3 kB per line); the program is added
+        under its file name and the tasks stay as they are.
+        """
+
+        ok = self.lib.A3200ProgramAdd(self.handle, str(Path(path).resolve()).encode("mbcs"))
+        return bool(ok), "" if ok else self.error()
+
+    def associate(self, task_id: int, name: str) -> tuple[bool, str]:
+        """ Bind an added program to a task (``A3200ProgramAssociate``, < 0.05 s); returns (ok, error text). """
+
+        ok = self.lib.A3200ProgramAssociate(self.handle, task_id, name.encode("mbcs"))
         return bool(ok), "" if ok else self.error()
 
     def start(self, task_id: int) -> tuple[bool, str]:
