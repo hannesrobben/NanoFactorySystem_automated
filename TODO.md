@@ -37,13 +37,13 @@ with an evaluation after every layer capture; a camera live feed; a core that a 
 | 3 | Experiment scripts and substrate main | T51, T52 (done) | – |
 | 4 | Voxel database and voxel-aware slicing | T53, T54, T31 (done) | T53 design approved by the maintainer |
 | 5 | Concept for phases 6–10 | T70, T71, T72, T73, T74, T100 (done; all approved 2026-11-18) | – |
-| 6 | Information model | T75, T76, T77 (done), T78, T79, T80, T81, T101, T103, T108 | – |
+| 6 | Information model | T75, T76, T77 (done), T78, T79, T80, T81, T101, T108 (T103 → F39) | – |
 | 7 | DHM service integration | T82, T83, T84, T85, T86, T87, T105, T106 | T84 needs DHMConnect DL-C1, DL-C2; T87 needs DL-H2 and K14 |
 | 8 | Operating modes and calibration | T88, T89, T90, T91, T92, T104, T107 | T90 needs MIRA MI-53 for the real evaluator; T104 needs MIRA MI-41 for the fit; T107 needs OffAxisHolo K10 for the sweep |
 | 9 | Camera live feed | T102, T93, T94, T95 | T102 before T93 (hard prerequisite, `CAMERA_LIVE.md`) |
 | 10 | Core ready for a GUI | T96, T97 | – |
 | 11 | Standard test prints (PTD-01), **priority** (decision D7 of `TEST_PRINT_PTD01.md`) | T136–T161, T163 (done; T148/T149 open), T162 (in progress, T164), T164 | T148 before T149 |
-| B | Backlog (from T19 `todo_notes.md`, lab checks, follow-ups) | T67, T69, T109, T111, T112, T114 | – |
+| B | Backlog (from T19 `todo_notes.md`, lab checks, follow-ups) | T67, T69, T109, T111, T112, T114, T165, T166, T167 | – |
 
 Phases 6, 9 and 10 are independent of each other. Phase 7 can start with T82, T83 and T85 before
 `dhmconnect` exists. Phase 8 needs T83 and T85. Phase 11 is independent of phases 7–10 (it builds only on
@@ -86,7 +86,7 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
 | – | `pose_tolerance_um` for 20x / 63x | measure (T104) | final values in T89 |
 | – | Final defaults for positions / frames / offset of the plan generator | after the speckle / position study (M4) | final values in T85 (start values exist) |
 | – | Final default z per objective | focus study OffAxisHolo K10 | fallback value of T107 |
-| PTD-01 D9 | Does `SET_POWER` inside a running program wait for the attenuator? (`docs/design/TEST_PRINT_PTD01.md` §12.1) | lab check T148 before stage A | `dwell_after_power_s` value; T149 |
+| PTD-01 D9 | Does `SET_POWER` inside a running program wait for the attenuator? (`docs/design/TEST_PRINT_PTD01.md` §12.1) | lab check T148 (lines only, several dwell levels) before the parameter tests | `dwell_after_power_s` value; T149 |
 
 ## Decided
 
@@ -111,28 +111,10 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
 | M6 | 2026-11-18 | This side rasterises the target at least as fine as the product (T89). |
 | Parameter tests v2 | 2026-11-25 | `docs/design/PARAMETER_TESTS.md` §3–§8: single stage, absolute axes, 0.1–1.0 mW linear, 60 µm fields a/b, label and support power 0.5 mW, anchoring 1 µm, header 3 + 1 bits, Quick PT walls and pads, Full PT-01 values, Voxel PT-01 one power per experiment (gap cells 100 µm apart, 3 × 4), one material start file. |
 | PTD-01 D1–D8, D10–D16 | 2026-11-25 | `docs/design/TEST_PRINT_PTD01.md` §12.2: DOWN order kept; reduced corners with QR; `p_ref_factor` 1.5; 1 replicate (later 3); gaps 2 / 4.5 µm; golden program F3; phase 11 with priority; stage-A start values in one JSON per material; F7 bases 6 × 6 µm with pillars 2–10 µm; F2 pedestals 2 × 3 × 3 µm with 2 µm gap; line middle only; polarisation measured before stage B; recalibration rule documented only; anchoring 1.5 µm for volume cells; in-layer order `row_by_row`. |
+| Todo review | 2026-11-26 | Review with the maintainer of every todo of this repository outside the DHM / MIRA / real-time scope (phases 7–9 except T102 and T79 not reviewed): decisions recorded in T69, T81, T96, T97, T101, T102, T109, T111, T112, T114, T122, T124, T129, T130, T133, T135, T148, T149, T153, T154, T164; new T165–T167; T126 → F38, T103 → F39; T134 done. |
 | X-A, X-B, X-C | 2026-11-18 | `Information_Mehrere_Experimente.txt` and `todo_claude/` moved to the local attic; `docs/ATTIC_INDEX.md`. |
 
 ## Open
-
-- [ ] T126: Run layer programs in queue mode (`PROGRAM 1 BUFFEREDRUN`) instead of `PROGRAM LOAD` (follow-up of T125) [phase: B]
-  - Priority: high
-  - Size: M
-  - Depends on: –
-  - Background (maintainer research 2026-11-22, A3200 help 6.04 / library 6.4.5.5): `PROGRAM LOAD` compiles the
-    whole file and keeps it resident; the knowledge base names 60 000–80 000 lines as the usual limit; "An out of
-    memory error occurred." is ErrorCode 88 OutOfMemory (CoreLibrary, Windows side). Queue mode
-    (`PROGRAM <task> BUFFEREDRUN <file>` sent from task 0, task state 9 while running, `QueueBufferSize` per task,
-    `QueueStatus` bits 0x01 active / 0x02 empty / 0x04 full / 0x10 paused) runs programs of any size. Starvation
-    stops LINEAR moves in VELOCITY ON (dose peaks). `LOOKAHEAD FAST` has no function since 6.01; a `CRITICAL`
-    section over the whole layer may starve the Windows side that refills the queue. Open: whether IFOV commands,
-    `CRITICAL` and `$AO[...]` are allowed in queue mode (lab test first).
-  - Done when: layer programs run with `BUFFEREDRUN` (queue pre-filled, e.g. `PROGRAM PAUSE` as first line and
-    `PROGRAM 1 START` once `QueueLineCount` ≥ 90 % of `QueueLineCapacity`; progress and end markers via `$global`;
-    queue-empty events logged with time and line); generated programs without `LOOKAHEAD FAST` and without a
-    whole-layer `CRITICAL START/END` (golden files updated deliberately); the dummy backend simulates
-    `BUFFEREDRUN` and the queue status; the T125 split is kept only for the LOAD path or removed; lab check with the
-    largest DOE layer (2.2 M lines, 78 MB) without load error and without queue-empty events.
 
 - [ ] T131: Precompile layer parts to `.ogm` and load the compiled file while printing (follow-up of T129) [phase: B]
   - Priority: medium
@@ -167,6 +149,7 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
   - Background: in lab session 3 every execution copy at a 191-character path was refused with "Compiler Error: The
     program file could not be opened", while files at 162-166 characters loaded. `run_program_as_task` copies to the
     home folder when no `program_dir` is set (the print path), so prints are not affected; a long `program_dir` is.
+  - Maintainer 2026-11-26: approved as written.
   - Done when: the limit is known (lab: a few lengths between 166 and 191 characters) and `run_program_as_task`
     refuses or relocates execution copies above it with a clear message; a unit test.
 
@@ -180,22 +163,28 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
     layer program again. Plane fits run before printing, so it has not happened in a print so far.
   - Note 2026-11-25 (found during T132): the library loader now also runs every part on task 1, so after a library
     print the z-line program is no longer associated with task 1 either.
-  - Done when: `zline()` checks that its own program is associated with its task before START (or loads it again),
-    or the z-line uses a task that layer programs never use; a dummy test runs a z-line after a printed layer.
+  - Note: the z-line is the interface scan (`Plane` → `Layer` → `Focus.run` → `System.zline`).
+  - Decided 2026-11-26 (maintainer): as interim protection the z-line stays on task 1 and `zline()` checks the
+    association before START; moving the base programs (z-line, corners, QR code) to a tuned task 2 is T165.
+  - Done when: `zline()` checks that its own program is associated with its task before START and loads it again
+    otherwise; a dummy test runs a z-line after a printed layer (ASCII and library loader).
 
 - [ ] T124: Whole-structure program duplicated uncompressed in `experiment.h5` (found during T123) [phase: B]
   - Priority: medium
   - Size: S
   - Depends on: –
-  - Done when: `Experiment` no longer stores `structures/<name>/program` as a second uncompressed copy
-    of the layer programs (e.g. stored compressed, or only a reference/hash when it is the concatenation
-    of the layers); a 48-million-line structure (main_PNG print 2026-11-21, > 2 GB text) is stored
+  - Decided 2026-11-26 (maintainer): store the copy compressed by default; an option stores only a reference
+    (SHA-256 + layer programs), because a later queue mode (F38) may run the whole program.
+  - Done when: `Experiment` stores `structures/<name>/program` compressed (chunked, no single scalar string)
+    by default, and an option (e.g. `Experiment(structure_program="compressed" | "reference")`) stores only
+    the hash and a reference to the layer programs; a 48-million-line structure (main_PNG print 2026-11-21, > 2 GB text) is stored
     and read back by `ExperimentStore` and `ExperimentFile` without a 2 GB scalar string; old files still read.
 
 - [ ] T122: Entry-script tests depend on the lab settings in `main.py` / `main_PNG.py` (found during T121) [phase: B]
   - Priority: medium
   - Size: S
   - Depends on: –
+  - Maintainer 2026-11-26: approved as written.
   - Done when: `test_main_entry.py::test_main_substrate_layout_is_valid`, `::test_main_layout_and_materials_dry_run`
     and `test_main_png.py::test_spec_is_one_ifov_structure_in_the_drop_center` pass whatever lab values
     (`RESIN_EDGES`, `CENTER`) are set in the SETTINGS blocks (tests patch the settings they rely on);
@@ -247,12 +236,15 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
   - Depends on: T78
   - Done when:
     - a structure names a strategy and its parameters, the name and parameters are stored in the
-      metadata, and an unknown strategy is refused; no new strategy is implemented (F7, F12, F17).
+      metadata, and an unknown strategy is refused; no new strategy is implemented (F7, F12, F17);
+    - (maintainer 2026-11-26) strategies are registered by name through one interface (geometry + voxel
+      model + laser parameters → toolpath IR, F7), so further strategies are added without changing the core.
 
 - [ ] T101: Find out which controller states persist between programs and experiments (found during T70) [phase: 6]
   - Priority: medium
   - Size: S
   - Depends on: – (lab PC; A3200 manual, F11)
+  - Decided 2026-11-26 (maintainer): the lab check runs as a step without laser in lab session 3b (T153).
   - Done when:
     - it is known from the A3200 manual and a check on the lab PC whether `GALVO ROTATION A -0.6`
       (`SetupIFOV`), `GALVO LASEROVERRIDE A AUTO`, `RAMP MODE RATE` / `RAMP RATE 0`, `LOOKAHEAD FAST` and
@@ -262,16 +254,6 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
       commands that `DefaultSetup` and `SetupIFOV` each need to reach a defined state regardless of what
       ran before are listed for T78 (the setup is sent before every structure, decision M2);
     - if a state leaks into `IFOV_off` experiments today, a `fix:` todo exists.
-
-- [ ] T103: Rebuild a spec from an experiment file without `/spec` (follow-up of T77) [phase: 6]
-  - Priority: low
-  - Size: S
-  - Depends on: T77
-  - Done when:
-    - `ExperimentSpec.from_record(record)` rebuilds a spec from `/metadata/experiment` and the structure
-      `config`s of an experiment file 1.0 (or 1.1 without `/spec`), marked `reconstructed: true`; factories
-      become `drawing` geometries (INFORMATION_MODEL.md §6.4);
-    - a test rebuilds the spec of a dry-run file whose `/spec` was removed and compares the built structures.
 
 ### Phase 7 — DHM service integration
 
@@ -500,6 +482,8 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
   - Priority: high
   - Size: S
   - Depends on: – (verification on the lab PC)
+  - Decided 2026-11-26 (maintainer): implement the bounded timeout now; the unit of `ExposureTime` is confirmed
+    in lab session 3b (T153).
   - Done when:
     - `CameraDevice.getimage()` waits at most a bounded time derived from the exposure in ms (e.g. twice the
       exposure plus a transfer margin, at least 50 ms) instead of `2000 × ExposureTime[µs]` ms (≈ 11 h at
@@ -541,7 +525,9 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
 ### Phase 10 — Core ready for a GUI
 
 - [ ] T96: Remove blocking user interaction from the run path [phase: 10]
-  - Priority: medium
+  - Priority: high
+  - Decided 2026-11-26 (maintainer): soon, together with T133: the injectable confirmation callback (default a
+    Tk pop-up) also asks for the recovery levels R2 and R3.
   - Size: S
   - Depends on: T74
   - Done when:
@@ -550,7 +536,8 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
       the entry scripts show it.
 
 - [ ] T97: Run control and progress events [phase: 10]
-  - Priority: medium
+  - Priority: low
+  - Decided 2026-11-26 (maintainer): later, with the GUI (F15).
   - Size: M
   - Depends on: T74, T96
   - Done when:
@@ -570,26 +557,6 @@ only) and the new tests is changed, apart from documentation (`test/README.md`, 
 golden files stay untouched (except a new F3 golden file if D6 is accepted). Improvements of existing code
 found on the way are future todos (F18–F30, F36), not part of these todos.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 - [ ] T164: Decision: move the two-stage PTD-01 version 1 to the attic (found during T162) [phase: 11]
   - Priority: medium
   - Size: S
@@ -599,39 +566,51 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
     `StageAAxes` in `testprint/calibration.py`, their tests (`test_testprint_ptd01.py`, `test_testprint_factories.py`,
     `integration/test_ptd01_fields.py`, `test_ptd01_chain.py`) and the golden file `ptd01_f3.txt`. Kept and still used:
     `structure`, `cells`, `field`, `ordering`, `voxel_fit`, `ProcessCalibration` (evaluation result).
-  - Decision: move these files to the attic (procedure X-B, `docs/ATTIC_INDEX.md`) or keep them as a documented
-    alternative.
-  - Done when: the maintainer decided; if moved: files in `attic/`, listed in `docs/ATTIC_INDEX.md`, tests and
-    `test/README.md` updated, `python -m pytest` passes.
+  - Decided 2026-11-26 (maintainer): move these files to the attic (procedure X-B, `docs/ATTIC_INDEX.md`).
+  - Done when: files in `attic/`, listed in `docs/ATTIC_INDEX.md`, tests and `test/README.md` updated,
+    `python -m pytest` passes.
 
 - [ ] T148: Lab check: does `SET_POWER` inside a running program wait for the attenuator? (decision D9) [phase: 11]
   - Priority: high
   - Size: S
   - Depends on: T137 (a field with power steps can be built), lab PC (maintainer)
+  - Decided 2026-11-26 (maintainer): lines only, no test blocks. Line pairs alternating 0.25 ↔ 0.75 mW: one
+    line switches the power without dwell, the line next to it (2 µm apart) is written the same way with a dwell
+    after the switch; several dwell levels (e.g. 0 / 10 / 50 / 200 ms); 10 repetitions. The attenuator type
+    (motorised wave plate or AOM / Pockels cell) is unknown; the test is to show its settling time.
+    `SET_POWER` writes `$AO[0].A` and the controller does not wait for the attenuator.
   - Done when:
-    - a short lab program (pattern of `mains/lab_checks/`: work order, guide, script) writes line pairs with a
-      power step between them inside one IFOV program, with and without a dwell after `SET_POWER`;
+    - first, the A3200 help is researched for how `$AO`, `DWELL`, `VELOCITY ON` and the lookahead interact, so
+      that the dwell is executed and the moves around a power change are not blended (the maintainer has seen
+      blended motion before); the findings are in the work order and the generated program follows them;
+    - a short lab program (pattern of `mains/lab_checks/`: work order, guide, script) writes the line pairs
+      above inside one IFOV program;
     - the width at the line start vs. the line middle (SEM or camera) shows whether the attenuator settles in
       time; the result and, if needed, the value of `dwell_after_power_s` are recorded in WORKLOG.md and in
       design §12 (D9);
-    - runs before stage A (T149).
+    - runs before the lab print of the parameter tests (T149).
 
-- [ ] T149: Lab print of PTD-01, stage A then stage B (maintainer) [phase: 11]
+- [ ] T149: Lab print of the parameter tests version 2: Quick PT, Full PT-01, Voxel PT-01 (maintainer) [phase: 11]
   - Priority: high
   - Size: M
-  - Depends on: T146, T148, T151 (provisional fit for stage B)
+  - Depends on: T148, T162
+  - Rewritten 2026-11-26 (maintainer): formerly the two-stage PTD-01 print (stages A/B), superseded by version 2
+    (`docs/design/PARAMETER_TESTS.md`).
   - Done when:
-    - stage A printed and evaluated, `calibration_<material>_<objective>.json` written;
-    - polarisation direction relative to x/y documented before stage B (D13);
-    - stage B printed; actual vs. estimated time per field recorded in WORKLOG.md;
-    - every problem found on the lab PC is a new todo `(found during T149)`; D1, D4, D5 and D15 are revisited.
+    - Quick PT printed and evaluated (`mains/parametertest/quick_pt.py`), the material start file updated;
+    - Full PT-01 (F1–F7) and Voxel PT-01 printed and evaluated with `analysis/experiment_analysis/ptd.py` and
+      `voxel_fit.py`;
+    - polarisation direction relative to x/y documented (D13);
+    - actual vs. estimated time per experiment recorded in WORKLOG.md;
+    - every problem found on the lab PC is a new todo `(found during T149)`.
 
 ### Phase B — Backlog (from T19 `todo_notes.md`, lab checks, follow-ups)
 
 - [ ] T69: Run the lab check of the new features on the lab PC (follow-up of T68) [phase: B]
-  - Priority: high
+  - Priority: low
   - Size: S
-  - Depends on: T68
+  - Depends on: T68, T167
+  - Decided 2026-11-26 (maintainer): second priority; runs on the prepared lab day T167.
   - Done when:
     - `mains/lab_checks/new_features_check.py` has run on the lab PC and every point of its checklist is
       recorded in WORKLOG.md as working or as a new todo;
@@ -655,6 +634,7 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
   - Priority: low
   - Size: S
   - Depends on: –
+  - Maintainer 2026-11-26: approved as written.
   - Done when:
     - the v6 client in `nanofactorysystem/dhm/` raises `AttributeError(...)` instead of
       `raise(AttributeError, "…")` (a `TypeError` in Python 3), with a unit test; golden command logs
@@ -667,6 +647,7 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
   - A `user:<name>` section without `email`, `organization` or `orcid` makes every `System`/`Experiment`
     fail inside `scidatacontainer.load_config` with `AttributeError: 'NoneType' object has no attribute
     'strip'` (`nanofactorysystem/parameter.py`, `Parameter.__init__`), which does not name the missing key.
+  - Maintainer 2026-11-26: approved as written.
   - Done when:
     - `Parameter.__init__` (or `Config.user`) raises an error naming the user and the missing keys, with a
       unit test; complete user sections behave as before.
@@ -680,12 +661,11 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
     `mains/lab_checks/new_features_check.py` (`rect`, `ramp`) gives a run-up of 2·v²/(2a) = 2 mm before
     every 50/30 µm hatch line (`_Lines.iterate_layers`, a in µm/s²); the time estimate says about 49 min
     for one 50×50×3 µm block. The dry runs do not show it (simulated motion time).
-  - Decision: use the controller acceleration through a named factory (as `default_experiment.rectangle`,
-    T110) or a fixed realistic value? Proposal: the factory, because the controller value is the one the
-    stages really use.
+  - Decided 2026-11-26 (maintainer): the controller acceleration through a named factory (as
+    `default_experiment.rectangle`, T110).
   - Done when:
     - both scripts use the chosen acceleration and the expected printing time of these structures is in the
-      range of minutes; T69 (lab check) is run with the corrected values.
+      range of minutes; T69 (lab check, on the lab day T167) is run with the corrected values.
 
 - [ ] T114: `Rectangle3D_IFOV`: objective of the IFOV configuration and stateless alternating hatch (found during T113) [phase: B]
   - Priority: medium
@@ -699,10 +679,56 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
     every layer. With an odd number of layers (e.g. 6 µm / 0.25 µm → 25 layers) a second iteration (time
     estimate, plot, rebuild) starts with the other direction, and `to_json()` may store the flipped start
     direction.
+  - Maintainer 2026-11-26: approved as written. The fix keeps the intended alternation (direction from the layer
+    index); hatching patterns as a research topic belong to the strategy extension point T81 / F7.
   - Done when:
     - both classes take `objective=` (default `"Zeiss 63x"`, stored in `to_json()`) and pass it on;
     - the alternating direction is computed from the layer index without changing the object; iterating twice
       gives identical programs (unit test); golden files unchanged.
+
+- [ ] T165: Align the task-2 parameters with task 1 and run the base programs of an experiment on task 2 (maintainer request 2026-11-26) [phase: B]
+  - Priority: medium
+  - Size: M
+  - Depends on: T135 (interim protection), lab PC
+  - Background: the base programs of an experiment (interface scan z-line `Plane` → `Layer` → `Focus` →
+    `System.zline`, corner markers, QR code) share task 1 with the layer programs. The maintainer wants them on
+    task 2. Task 2 has the default parameters of the controller (T132: `MaxLookaheadMoves` 100, `ExecuteNumLines`
+    1, `MotionUpdateRate` 1, ramp defaults), so the same program runs 1.8× slower; corners and QR code are galvo /
+    IFOV programs and need the tuned values. This reconsiders T132 option (a) for the base programs only; print
+    parts stay on task 1.
+  - Done when:
+    - the controller parameter file is backed up before the change; the task-2 parameters equal those of task 1,
+      and the changed parameters are listed in `docs/design/PROGRAM_LOADING.md`;
+    - lab: the same program runs on task 1 and task 2 with a time ratio of 1.0 (± 2 %);
+    - z-line, corner markers and QR code run on task 2 and never on the task of a print part; dummy tests; golden
+      command logs re-recorded with the reason.
+
+- [ ] T166: Port `mains/main_3D_model.py` to the experiment environment (maintainer request 2026-11-26) [phase: B]
+  - Priority: medium
+  - Size: S
+  - Depends on: –
+  - Background: the script still calls `print_2pp` of `mains/Experiments/old_experiment/historical/Model_3D_experiment.py`
+    with absolute lab paths and a free substrate dict with German keys.
+  - Done when:
+    - the 3D-model print is an `ExperimentSpec` with `ProgramSource.SLICER` (STL as slicer input in `inputs/`
+      with SHA-256, optional voxel model), run with `run_experiment()` (substrate, data root, material registry);
+    - settings at the top in English, `--dry-run` on the dummy backend; a dry-run test; `mains/` README and
+      CLAUDE.md updated.
+
+- [ ] T167: Prepare and run an intensive lab day: new features and program types / commands (maintainer request 2026-11-26) [phase: B]
+  - Priority: low (second priority until the parameter tests and program loading are done)
+  - Size: L
+  - Depends on: T112, T148
+  - Background: the maintainer postponed T69 and wants one well-prepared lab day that tests the new features and
+    the different program types and commands.
+  - Done when:
+    - a work order (`docs/design/…`), a lab guide (`docs/guides/…`) and lab scripts (`mains/lab_checks/…`) cover
+      (1) the new features of T69 (overview in focus, camera captures, power per layer, repetition, restart after
+      Ctrl+C) and (2) program types and commands: CW / CCW arcs, the effect of the velocity on small fine
+      structures (steep edges, small pixels where the laser on/off timing matters) and further commands named by
+      the maintainer;
+    - the maintainer ran it; every checklist point is recorded in WORKLOG.md as working or as a new todo
+      `(found during T167)`; T69 is closed with it.
 
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
@@ -722,6 +748,7 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
   - Status 2026-11-26: done except the removal of version 1: `mains/parametertest/` with Quick PT, Full PT-01,
     Voxel PT-01, chain, README per test, margin 90 µm and `check_marker_clearance` (commit `7d472f1`). Open: moving
     `mains/Experiments/ptd01/` and the version-1 modules to the attic needs the maintainer's approval (T164).
+  - Status 2026-11-26: the maintainer approved the move (T164); T162 is done when T164 is implemented.
 
 - [ ] T132: Task 2 runs the same program 1.8× slower than task 1 (found during T129) [phase: B]
   - Priority: high
@@ -796,6 +823,9 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
     the add-ahead mode (T132), then P5 with one real layer, laser off, on task 1.
   - Status 2026-11-25 (T132): the library loader runs every part on task 1 with add-ahead; next is lab session 3
     (T153) with the runner check and P5.
+  - Decided 2026-11-26 (maintainer): the library loader may become the default later, but the current ASCII path
+    stays and remains selectable. No default switch and no change of the add-ahead behaviour before the lab test
+    (T153 session 3b) has shown that add-ahead works.
 
 - [ ] T130: Program optimiser that shortens generated AeroBasic programs (maintainer request 2026-11-23) [phase: B]
   - Priority: high
@@ -815,6 +845,8 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
   - Status 2026-11-24: optimiser done (`aerobasic/programs/optimize.py`, commit `b063502`; golden programs 37-53 %
     fewer bytes, same exposed path within 10 nm). Open: the build-step option (e.g. `Experiment(optimize_programs=)`)
     and the maintainer decision whether it becomes a default (golden files).
+  - Decided 2026-11-26 (maintainer): opt-in build option (e.g. `Experiment(optimize_programs=False)`); golden
+    files unchanged; a default switch only after a lab print with optimised programs.
 
 - [ ] T133: Controller health check and recovery levels (maintainer idea 2026-11-24) [phase: B]
   - Priority: high
@@ -837,25 +869,11 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
     after 1.0 s, LOAD works, tasks/programs/axes unchanged. R2 (`~RESETCONTROLLER`, 7.9 s) disables and unhomes
     every axis and removes every program: only between experiments, then enable, home, setup. R3 was refused
     without administrator rights (T153). Next: implement R1 and R2 with operator confirmation.
-
-- [ ] T134: Lab session 2 for program loading and controller recovery (follow-up of T129) [phase: B]
-  - Priority: high
-  - Size: S
-  - Depends on: –
-  - Done when: `program_loading_lab.py` is extended and run on the lab PC after a verified restart (the `system`
-    step reports the start time of the A3200 processes and warns if they are older than the last boot of the
-    software); answered: `sticky` after a clean restart (with a 60 s reply timeout instead of 600 s); clean
-    `.ogm` load of a part compiled by our own load (no program of that name added before) and the name it is added
-    under; `A3200ProgramAdd` + `A3200ProgramAssociate` timing and memory; task parameters of tasks 1/2 and the
-    cycle with the real layer header on each task (T132); memory of the INtime side with two loaded full-layer
-    `.ogm`; whether the .NET assemblies in `A3200\DotNet` offer the compile path of Motion Composer (types and
-    methods listed, one compile of layer 68 with its memory); recovery levels R1-R3 of T133 (does it work, time,
-    which states survive: axis enable, home, position, galvo/IFOV settings); the `ogm` step computes kB per line
-    from the source line count; the results are entered in `docs/design/PROGRAM_LOADING.md`.
-  - Status 2026-11-25: lab session 2 done (`mains/lab_checks/program_loading_lab_20261125`, results in
-    `docs/design/PROGRAM_LOADING.md` §6.2 and plan §7.2). Answered: `sticky` after a restart, clean `.ogm` load and
-    its name, Add + Associate, task parameters and task speed (T132), recovery R1 and R2, the runner check. Gaps
-    (follow-up T153): the .NET compile of layer 68 (method found, not run), INtime memory, R3 (no admin rights).
+  - Decided 2026-11-26 (maintainer): R1 runs automatically, only after a detected error (failed load, ASCII not
+    answering), with a limit per structure (proposal: 2) so that a persistent error never ends in a reset loop;
+    beyond the limit the print stops (resumable with `restart_experiment`). R2 and R3 run only after the
+    operator agreed in a pop-up window, not only a console message: injectable confirmation callback (T96),
+    default a Tk dialog; never with a running task or the laser on.
 
 ## Blocked
 <!-- Format: todo as above, plus the line "Blocked by: <reason or T<n>>". -->
@@ -889,10 +907,13 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
     works as administrator, no library compile or load failed. Session 3b prepared (commits `2b0fdec`, `ad6f1f8`,
     `47f3147`): motion steps require homed axes, the runner names the task error code, `ascii-names` uses
     `~/nfs_lab`; guide section "Session 3b" (about 35 minutes).
+  - Scope extended 2026-11-26 (todo review): session 3b also runs the controller-state check of T101 (no laser)
+    and confirms the unit of the camera `ExposureTime` (T102).
   - Blocked by: lab session 3b on the lab PC (maintainer).
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T134: Lab session 2 for program loading and controller recovery — 2026-11-26 — Lab session 2 evaluated in `docs/design/PROGRAM_LOADING.md` §6.2 (`sticky`, `.ogm` load and name, Add + Associate, untuned task 2, R1/R2, runner check); the gaps (.NET compile, INtime memory, R3) went to T153. Closed in the todo review 2026-11-26. — commits: `d4093ae`
 - [x] T158: Absolute axes and a/b sub-fields in the test-print library — 2026-11-26 — `testprint/inputs.py` (`ParameterTestInputs`, the material start file), sub-field bit in the header and `half` column in the cell table; builders need no calibration or fit model to print. — commits: `63e32d2`
 - [x] T159: Quick PT: walls and pads — 2026-11-26 — Builders `quick_pt.walls` (two groups of three 8 µm walls 1.5 µm apart, z −1 … +1 µm) and `quick_pt.pads` (5 × 5 µm, hatch 0.1/0.2/0.4/0.6 µm) as sub-fields a/b; script `mains/parametertest/quick_pt.py`, dry run. — commits: `89b7232`, `7d472f1`
 - [x] T160: Full PT-01: fields F1–F7 on absolute axes — 2026-11-26 — Builders `full_pt01.f1` … `f7` with the decided absolute values in 60 µm sub-fields a/b, all valid; layer programs about 25 min for F1–F7; script `mains/parametertest/full_pt01.py`. The F3 golden program of version 1 stays (version-1 builder unchanged); a golden file for version 2 was not requested. — commits: `89b7232`, `7d472f1`
