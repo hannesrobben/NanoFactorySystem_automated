@@ -57,6 +57,15 @@ Added for lab session 3 (T153, ``docs/guides/PROGRAM_LOADING_LAB_TESTS.md`` sect
                     current position), split at the budget part size and run through the package's
                     ``ProgramRunner`` on task 1 with add-ahead (T132): gaps, last lines, memory.
 
+Added for lab session 3b (todo review 2026-11-26):
+
+``states``          T101: task modes, ramp settings and the galvo rotation (A-only probe move of 0.05 mm) before and
+                    after the mode lines of an IFOV layer program, after a program that sets nothing (task 1 and 2)
+                    and after DefaultSetup: which states persist into the next program? Laser gate off.
+``camera``          T102: grab time and mean grey value at several ``ExposureTime`` values: is the unit µs?
+``path-limit``      T154: the tiny program loaded over ASCII at path lengths of 160 to 259 characters: where is
+                    the limit of ``PROGRAM LOAD``? No motion.
+
 Since lab session 3 the ``system`` step lists the names of the added programs, and the INtime prompts of
 ``hold`` take a pasted block (end with an empty line).
 
@@ -73,6 +82,7 @@ import csv
 import ctypes
 import datetime
 import json
+import math
 import os
 import re
 import shutil
@@ -1888,12 +1898,290 @@ def step_layer_dry(session: Session, args) -> None:
         shutil.rmtree(folder, ignore_errors=True)
 
 
+# ============================================================================================ states (T101)
+
+# Bits of the task status items (A3200CommonStructures.h, TASKMODE_* and TASKSTATUS2BITS_*)
+TASK_MODE_BITS = {"secondary_units": 0, "absolute": 1, "accel_type_linear": 2, "ramp_mode_rate": 3,
+                  "velocity_on": 5, "accel_type_scurve": 10, "minutes": 28, "wait_auto": 30}
+TASK_STATUS2_BITS = {"rotation_active": 0, "scaling_active": 3, "motion_continuous_active": 9}
+STATE_TASK_ITEMS = ("TaskMode", "TaskStatus2", "CoordinatedAccelerationRate")
+STATE_AXIS_ITEMS = ("AccelerationRate", "AccelerationMode", "AccelerationType")
+STATE_AXES = ("A", "B", "X", "Y", "Z")
+# The mode lines of a generated IFOV layer program and of SetupIFOV (test/golden/binary_grating_ifov_63x.txt,
+# setup_ifov_63x.txt) without motion; the laser gate is written OFF instead of AUTO (gate closed).
+STATE_SETTER = ["' T101 setter: modes of an IFOV layer program and of SetupIFOV, no motion, laser gate off",
+                "LOOKAHEAD FAST", "METRIC", "SECONDS", "ABSOLUTE", "VELOCITY ON", "WAIT MODE AUTO",
+                "GALVO LASEROVERRIDE A OFF", "RAMP MODE RATE", "RAMP RATE 0", "RAMP RATE A 0", "RAMP RATE B 0",
+                "GALVO ROTATION A -0.6", "DWELL 0.1", "END PROGRAM"]
+STATE_NEUTRAL = ["' T101 neutral program: sets no mode", "DWELL 0.1", "END PROGRAM"]
+# DefaultSetup (test/golden/setup_default.txt)
+STATE_DEFAULT_SETUP = ["' T101 DefaultSetup", "PRIMARY", "SECONDS", "ABSOLUTE", "VELOCITY ON", "IFOV OFF", "END PROGRAM"]
+
+
+def decode_bits(raw: str, bits: dict[str, int]) -> dict[str, bool]:
+    """ Named flags of an integer status value (``raw`` as the ASCII interface returns it, e.g. ``"1073741866"``). """
+
+    value = int(float(raw))
+    return {name: bool(value >> bit & 1) for name, bit in bits.items()}
+
+
+def state_entry(item: str, raw: str) -> dict:
+    """ One status value as stored by the ``states`` step: bit fields decoded, other items as float. """
+
+    if item == "TaskMode":
+        return {"TaskMode": int(float(raw)), "mode": decode_bits(raw, TASK_MODE_BITS)}
+    if item == "TaskStatus2":
+        return {"TaskStatus2": int(float(raw)), "status2": decode_bits(raw, TASK_STATUS2_BITS)}
+    return {item: float(raw)}
+
+
+def rotation_angle_deg(delta_a_mm: float, delta_b_mm: float) -> Optional[float]:
+    """ Angle of the commanded galvo motion against the A axis for an A-only move (None without motion). """
+
+    if abs(delta_a_mm) < 1e-9 and abs(delta_b_mm) < 1e-9:
+        return None
+    return round(math.degrees(math.atan2(delta_b_mm, delta_a_mm)), 4)
+
+
+def controller_states(client: Ascii, tasks: tuple[int, ...] = (1, 2)) -> dict:
+    """ Modes of the tasks and ramp settings of the axes, one ASCII query per item (an unknown item stays local). """
+
+    result: dict = {}
+    queries = [(t, f"task{t}", item) for t in tasks for item in STATE_TASK_ITEMS]
+    queries += [(a, a, item) for a in STATE_AXES for item in STATE_AXIS_ITEMS]
+    for owner, key, item in queries:
+        code, data, _ = client.send(f"~STATUS ({owner}, {item})")
+        entry = result.setdefault(key, {})
+        if code == "%" and data:
+            try:
+                entry.update(state_entry(item, data.split()[0]))
+                continue
+            except ValueError:
+                pass
+        entry[item] = f"error {code}{data}"
+    return result
+
+
+def galvo_position(client: Ascii) -> dict:
+    code, data, _ = client.send("~STATUS (A, PositionCommand) (B, PositionCommand) (A, PositionFeedback) "
+                                "(B, PositionFeedback)")
+    if code != "%":
+        return {"error": f"{code}{data}"}
+    a_cmd, b_cmd, a_fb, b_fb = (float(v) for v in data.split()[:4])
+    return {"A_cmd": a_cmd, "B_cmd": b_cmd, "A_fb": a_fb, "B_fb": b_fb}
+
+
+def rotation_probe(client: Ascii, distance_mm: float = 0.05, speed: float = 1.0) -> dict:
+    """ Move the galvo A axis by ``distance_mm`` (immediate ``MOVEINC``, independent of the task modes) and back:
+    does the B command change, i.e. is ``GALVO ROTATION`` applied? Laser gate stays as it is (OFF by the setter). """
+
+    before = galvo_position(client)
+    replies = [client.send(f"MOVEINC A {distance_mm:g} {speed:g}")[:2]]
+    time.sleep(distance_mm / speed + 0.5)
+    after = galvo_position(client)
+    replies.append(client.send(f"MOVEINC A {-distance_mm:g} {speed:g}")[:2])
+    time.sleep(distance_mm / speed + 0.5)
+    back = galvo_position(client)
+    result = {"before": before, "after": after, "back": back, "replies": ["".join(r) for r in replies]}
+    if "error" not in before and "error" not in after:
+        d_a, d_b = after["A_cmd"] - before["A_cmd"], after["B_cmd"] - before["B_cmd"]
+        result.update(dA_mm=round(d_a, 7), dB_mm=round(d_b, 7), angle_deg=rotation_angle_deg(d_a, d_b))
+    return result
+
+
+def step_states(session: Session, args) -> None:
+    """ T101: which controller states persist after a program ends, into the next program and on the other task?
+
+    Phases: ``before`` (as found), ``after_setter`` (task 1 ran the mode lines of an IFOV layer program and of
+    SetupIFOV), ``after_neutral_task1`` / ``after_neutral_task2`` (a program that sets nothing ran on task 1 / 2),
+    ``after_default_setup`` (DefaultSetup ran on task 1). Every phase reads the task modes (TaskMode, TaskStatus2,
+    coordinated ramp rate) of tasks 1 and 2 and the ramp settings of the axes, and probes the galvo rotation with an
+    A-only move of 0.05 mm. Moves only the galvo A axis; the laser gate is set OFF, no laser command.
+    ``LOOKAHEAD FAST`` and ``GALVO LASEROVERRIDE`` cannot be read back (no status item); they are answered from the
+    manual (``LOOKAHEAD FAST`` has no function since A3200 6.01).
+    """
+
+    if not args.axes_safe:
+        session.log("states moves the galvo axis A by 0.05 mm (laser gate off). Close the shutter, make sure the galvo "
+                    "may move, then repeat with --axes-safe.")
+        sys.exit(1)
+    require_axes_ready(session, args, ("A", "B"))
+    lib = Library(args.dll)
+    for task_id in (1, 2):
+        require_idle(lib, task_id, session)
+    client = try_ascii(args.reply_timeout)
+    if client is None:
+        session.log("ASCII interface not reachable. Stopped.")
+        sys.exit(1)
+    programs = {"setter": STATE_SETTER, "neutral": STATE_NEUTRAL, "default_setup": STATE_DEFAULT_SETUP}
+    paths = {name: write_program(session.programs / f"states_{name}.pgm", lines) for name, lines in programs.items()}
+    plan = [("before", None, None), ("after_setter", "setter", 1), ("after_neutral_task1", "neutral", 1),
+            ("after_neutral_task2", "neutral", 2), ("after_default_setup", "default_setup", 1)]
+    phases = {}
+    try:
+        for phase, program, task_id in plan:
+            run = {}
+            if program:
+                loaded = load_part(session, args, paths[program], task_id)
+                if not loaded.get("ok"):
+                    session.log(f"{phase}: load of {program} on task {task_id} failed; the step stops.")
+                    break
+                state, last_line, run_s = run_and_wait(lib, client, task_id)
+                run = {"program": program, "task": task_id, "state": state, "last_line": last_line, "run_s": run_s}
+                run.update(unload_part(session, lib, paths[program], task_id))
+            states = controller_states(client)
+            probe = rotation_probe(client)
+            phases[phase] = {"run": run, "states": states, "rotation": probe}
+            session.record("states", {"phase": phase, **phases[phase]})
+            t1, t2 = states.get("task1", {}), states.get("task2", {})
+            session.log(f"{phase:<22} task1 mode {t1.get('mode')} | task2 mode {t2.get('mode')}")
+            session.log(f"{'':<22} A ramp rate {states.get('A', {}).get('AccelerationRate')}, X ramp rate "
+                        f"{states.get('X', {}).get('AccelerationRate')}, task1 coord. ramp "
+                        f"{t1.get('CoordinatedAccelerationRate')}, rotation probe {probe.get('angle_deg')} deg "
+                        f"(dB {probe.get('dB_mm')} mm)")
+    finally:
+        client.close()
+        lib.close()
+    session.log("Compare the phases: a value set by the setter that is still there after 'after_neutral_task1' "
+                "persists into the next program; one that also shows on task 2 is not task-local; "
+                "'after_default_setup' shows what DefaultSetup resets. Restart the A3200 software after the session.")
+
+
+# ============================================================================================ camera (T102)
+
+def step_camera(session: Session, args) -> None:
+    """ T102: unit of the camera ``ExposureTime``: grab time and mean grey value at several exposure values.
+
+    If ``ExposureTime`` is in µs, the grab time grows by about ``ExposureTime / 1e6`` s and the mean grey value in
+    proportion to it. Uses the package's ``CameraDevice`` (mvIMPACT); no motion, no laser. Close the Femtika
+    software's camera view first.
+    """
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from nanofactorysystem.camera.camera import CameraDevice
+
+    try:
+        device = CameraDevice()
+    except Exception as exc:  # mvIMPACT missing or no camera
+        session.log(f"Camera not usable ({type(exc).__name__}: {exc}). Stopped.")
+        sys.exit(1)
+    if not device.opened:
+        session.log("Camera could not be opened (in use by another program?). Stopped.")
+        sys.exit(1)
+    prop = device.property("ExposureTime")
+    info = {"ExposureTime_initial": device["ExposureTime"], "min": prop.minValue, "max": prop.maxValue}
+    session.log(f"ExposureTime {info['ExposureTime_initial']} (range {info['min']} ... {info['max']})")
+    device["ExposureMode"] = "Timed"
+    device["ExposureAuto"] = 0
+    rows = []
+    try:
+        for value in args.exposures:
+            device["ExposureTime"] = value
+            device.getimage()  # first frame after a change may still use the old value
+            start = time.perf_counter()
+            image = device.getimage()
+            grab_s = time.perf_counter() - start
+            row = {"set": value, "read_back": device["ExposureTime"], "grab_s": round(grab_s, 4),
+                   "mean": round(float(image.mean()), 2), "max_value": int(image.max())}
+            rows.append(row)
+            session.log(f"  ExposureTime {value:>8}: grab {row['grab_s']:.4f} s, mean {row['mean']}")
+    finally:
+        device["ExposureTime"] = info["ExposureTime_initial"]
+        device.close()
+    if len(rows) >= 2:
+        first, last = rows[0], rows[-1]
+        slope = (last["grab_s"] - first["grab_s"]) / (last["set"] - first["set"])
+        info["grab_s_per_unit"] = slope
+        info["unit_guess"] = "us" if 0.5e-6 < slope < 2e-6 else ("ms" if 0.5e-3 < slope < 2e-3 else "unclear")
+        session.log(f"grab time per ExposureTime unit {slope:.3g} s -> unit {info['unit_guess']}")
+    session.record("camera", {**info, "rows": rows})
+
+
+# ============================================================================================ path-limit (T154)
+
+PATH_LIMIT_LENGTHS = (160, 166, 170, 175, 180, 185, 191, 200, 220, 259)
+
+
+def padded_program_path(root: Path, length: int, stem: str = "plim") -> Path:
+    """ A program path of exactly ``length`` characters below ``root`` (folders of at most 40 characters).
+
+    Raises
+    ------
+    ValueError
+        If ``root`` is already too long for ``length``.
+    """
+
+    name = f"{stem}_{length}.pgm"
+    base = len(str(root)) + 1 + len(name)
+    if base > length:
+        raise ValueError(f"{root} is too long for a path of {length} characters")
+    folders, remaining = [], length - base
+    while remaining > 0:
+        size = min(40, remaining - 1) if remaining > 1 else 0
+        if size <= 0:                                        # one character left: lengthen a folder or the name
+            if folders:
+                folders[-1] += "x"
+            else:
+                name = f"{stem}x_{length}.pgm"
+            remaining -= 1
+            continue
+        folders.append("p" * size)
+        remaining -= size + 1
+    path = root.joinpath(*folders, name)
+    assert len(str(path)) == length, (len(str(path)), length)
+    return path
+
+
+def step_path_limit(session: Session, args) -> None:
+    """ T154: up to which path length does ``PROGRAM LOAD`` over ASCII open a program file?
+
+    Loads the tiny valid program at the lengths ``PATH_LIMIT_LENGTHS`` (each under its own name, below
+    ``~/nfs_lab``) on an idle task, then stops the task and removes the program. In lab session 3 a copy at 191
+    characters was refused ("The program file could not be opened"), copies at 162-166 loaded. No motion.
+    """
+
+    root = Path.home() / "nfs_lab"
+    client = try_ascii(args.reply_timeout)
+    if client is None:
+        session.log("ASCII interface not reachable. Stopped.")
+        sys.exit(1)
+    rows = []
+    try:
+        state = ascii_task_state(client, args.task)
+        if state != "idle":
+            session.log(f"Task {args.task} is {state}; path-limit needs an idle task. Stopped.")
+            sys.exit(1)
+        for length in PATH_LIMIT_LENGTHS:
+            try:
+                path = write_program(padded_program_path(root, length), TINY_PROGRAM)
+            except (ValueError, OSError) as error:                 # Windows MAX_PATH or a long home folder
+                rows.append({"length": length, "ok": None, "error": f"not written: {error}"})
+                session.log(f"  {length:>3} characters: not written ({error})")
+                continue
+            code, data, seconds = client.send(f'PROGRAM {args.task} LOAD "{path}"')
+            error = client.last_error() if code != "%" else ""
+            client.send(f"PROGRAM {args.task} STOP")
+            client.send(f'REMOVEPROGRAM "{path.name}"')
+            rows.append({"length": length, "ok": code == "%", "reply": code + data, "seconds": round(seconds, 2),
+                         "error": error})
+            session.log(f"  {length:>3} characters: {'loaded' if code == '%' else 'REFUSED'} {error}")
+    finally:
+        client.close()
+        shutil.rmtree(root / ("p" * 40), ignore_errors=True)
+    loaded = [r["length"] for r in rows if r["ok"]]
+    refused = [r["length"] for r in rows if r["ok"] is False]
+    session.record("path_limit", {"rows": rows, "longest_loaded": max(loaded, default=None),
+                                  "shortest_refused": min(refused, default=None)})
+    session.log(f"path-limit: longest loaded {max(loaded, default=None)}, shortest refused {min(refused, default=None)}")
+
+
 STEPS = {"system": step_system, "ladder": step_ladder, "precision": step_precision, "ogm": step_ogm,
          "cycle": step_cycle, "sticky": step_sticky, "watch": step_watch,
          "api": step_api, "ogm-clean": step_ogm_clean, "add-associate": step_add_associate, "hold": step_hold,
          "taskspeed": step_taskspeed, "runner": step_runner, "recover-ascii": step_recover_ascii, "reset": step_reset,
          "restart-service": step_restart_service, "ascii-names": step_ascii_names,
-         "recover-blocked": step_recover_blocked, "dotnet-build": step_dotnet_build, "layer-dry": step_layer_dry}
+         "recover-blocked": step_recover_blocked, "dotnet-build": step_dotnet_build, "layer-dry": step_layer_dry,
+         "states": step_states, "camera": step_camera, "path-limit": step_path_limit}
 
 
 def main(argv: Optional[list[str]] = None) -> None:
@@ -1920,11 +2208,13 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--segment-um", type=float, default=2.0, help="galvo step of the synthetic programs")
     parser.add_argument("--budget-gb", type=float, default=22.0, help="memory budget of the whole PC")
     parser.add_argument("--axes-safe", action="store_true",
-                        help="confirm that the galvo (cycle, taskspeed, runner) or the stage XY (layer-dry) may move")
+                        help="confirm that the galvo (cycle, taskspeed, runner, states) or the stage XY (layer-dry) may move")
     parser.add_argument("--part-lines", type=int, default=None,
                         help="layer-dry: lines per part (default: from the memory budget)")
     parser.add_argument("--max-parts", type=int, default=None, help="layer-dry: run only the first N parts")
     parser.add_argument("--interval", type=float, default=5.0, help="seconds between samples (watch)")
+    parser.add_argument("--exposures", type=lambda s: [float(x) for x in s.split(",")],
+                        default=[10_000.0, 50_000.0, 200_000.0], help="camera: ExposureTime values to test")
     parser.add_argument("--dll", default=DLL_DEFAULT)
     parser.add_argument("--keep", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--session", type=Path, default=None, help="session folder (default: one per day)")

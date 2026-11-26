@@ -254,6 +254,8 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
       commands that `DefaultSetup` and `SetupIFOV` each need to reach a defined state regardless of what
       ran before are listed for T78 (the setup is sent before every structure, decision M2);
     - if a state leaks into `IFOV_off` experiments today, a `fix:` todo exists.
+  - Status 2026-11-26: lab step `states` written (session 3b, commit `1c8d3d1`); open: the lab run and the evaluation
+    into `INFORMATION_MODEL.md` §7.
 
 ### Phase 7 — DHM service integration
 
@@ -477,19 +479,6 @@ distance comes from the experiment focus (T107) or the parameter set and is stor
     - per-capture autofocus values are only reported in `quality`; a dummy test with a synthetic stack.
 
 ### Phase 9 — Camera live feed
-
-- [ ] T102: Camera image timeout uses the exposure in µs as if it were ms (found during T73) [phase: 9]
-  - Priority: high
-  - Size: S
-  - Depends on: – (verification on the lab PC)
-  - Decided 2026-11-26 (maintainer): implement the bounded timeout now; the unit of `ExposureTime` is confirmed
-    in lab session 3b (T153).
-  - Done when:
-    - `CameraDevice.getimage()` waits at most a bounded time derived from the exposure in ms (e.g. twice the
-      exposure plus a transfer margin, at least 50 ms) instead of `2000 × ExposureTime[µs]` ms (≈ 11 h at
-      20 ms); the unit of `ExposureTime` returned by mvIMPACT is confirmed on the lab PC;
-    - a missed frame raises a clear error instead of blocking; a unit test with the dummy driver checks
-      the computed timeout; the camera service (T93) relies on it for its stop bound.
 
 - [ ] T93: Camera service with one owner [phase: 9]
   - Priority: medium
@@ -733,6 +722,21 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
 ## In Progress
 <!-- Claude Code moves a todo here when starting work. -->
 
+- [ ] T102: Camera image timeout uses the exposure in µs as if it were ms (found during T73) [phase: 9]
+  - Priority: high
+  - Size: S
+  - Depends on: – (verification on the lab PC)
+  - Decided 2026-11-26 (maintainer): implement the bounded timeout now; the unit of `ExposureTime` is confirmed
+    in lab session 3b (T153).
+  - Done when:
+    - `CameraDevice.getimage()` waits at most a bounded time derived from the exposure in ms (e.g. twice the
+      exposure plus a transfer margin, at least 50 ms) instead of `2000 × ExposureTime[µs]` ms (≈ 11 h at
+      20 ms); the unit of `ExposureTime` returned by mvIMPACT is confirmed on the lab PC;
+    - a missed frame raises a clear error instead of blocking; a unit test with the dummy driver checks
+      the computed timeout; the camera service (T93) relies on it for its stop bound.
+  - Status 2026-11-26: bounded timeout implemented (`image_timeout_ms`, `TimeoutError` on a missed frame, tests;
+    commit `46994e1`). Open: the unit check on the lab PC (session 3b step `camera`, T153).
+
 - [ ] T162: Scripts and chain of the three parameter tests (design `PARAMETER_TESTS.md` §2, §7) [phase: 11]
   - Priority: medium
   - Size: S
@@ -910,6 +914,8 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
   - Scope extended 2026-11-26 (todo review): session 3b also runs the controller-state check of T101 (no laser)
     and confirms the unit of the camera `ExposureTime` (T102).
   - Blocked by: lab session 3b on the lab PC (maintainer).
+  - Status 2026-11-26: steps `states` (T101) and `camera` (T102) added, guide section "Session 3b" updated (about
+    45 minutes; commit `1c8d3d1`).
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->

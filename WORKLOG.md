@@ -3165,3 +3165,17 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** none (todo bookkeeping only).
 - **Commits:** this docs(todo) commit.
 - **Follow-ups:** implementable without the lab: T164, T102 (fix), T122, T111, T109, T114, T124, T130 (option), T133 + T96 (R1 limit, pop-up), T135 (interim), T112, T166, T81/T78/T80; lab: T153 session 3b (incl. T101, T102), T148, then T149; later T165, T167.
+
+### 2026-11-26 11:02 CET — [T153, T101, T102] Session 3b extended; bounded camera timeout
+- **Status:** partial (lab tooling and the T102 fix done; the lab run of session 3b is open)
+- **Changes:**
+  - `mains/lab_checks/program_loading_lab.py`: step `states` (T101: task modes, ramp settings, galvo rotation probe by an immediate 0.05 mm `MOVEINC` of A, phases before / after the IFOV mode lines / after a neutral program on tasks 1 and 2 / after DefaultSetup) and step `camera` (T102: grab time per `ExposureTime` unit), option `--exposures`.
+  - `test/lab_checks/test_program_loading_lab.py`: tests of the new helpers and of the state programs.
+  - `docs/guides/PROGRAM_LOADING_LAB_TESTS.md`: session 3b with the steps 5 (`states`) and 7 (`camera`), safety notes, decisions; add-ahead decides before the default switch (T129).
+  - `nanofactorysystem/camera/camera.py`: `image_timeout_ms()` (2 × exposure in ms + 500 ms, at least 50 ms) instead of `2000 × ExposureTime` ms; `TimeoutError` on a missed frame.
+  - `test/devices/test_camera_timeout.py` (new): timeout values and `getimage()` with a fake function interface.
+  - `test/README.md`: new tests listed.
+  - `TODO.md`: T102 to In Progress with status; status lines in T101 and T153.
+- **Tests:** `python -m pytest test/lab_checks/test_program_loading_lab.py test/devices/test_camera_timeout.py test/devices/test_camera.py`: 30 passed, 1 skipped.
+- **Commits:** `46994e1` fix(camera): bound the wait for an image by the exposure in ms [T102]; `1c8d3d1` feat(lab): add the controller-state and camera steps to session 3b [T153]; this docs(todo) commit.
+- **Follow-ups:** lab session 3b (maintainer; restart the A3200 software after it, because `states` leaves the IFOV modes set).

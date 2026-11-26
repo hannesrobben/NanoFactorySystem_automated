@@ -1,6 +1,7 @@
 """Tests for the hardware-free helpers of mains/lab_checks/program_loading_lab.py (T129)."""
 import importlib.util
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -200,3 +201,47 @@ def test_axes_not_ready_lists_disabled_or_unhomed_axes(lab):
     assert lab.axes_not_ready(axes) == ["Z (enabled=False, homed=False)", "B (enabled=True, homed=False)"]
     assert lab.axes_not_ready({a: ready for a in lab.AXES}) == []
     assert lab.axes_not_ready({}) == [f"{a} (enabled=None, homed=None)" for a in lab.AXES]
+
+
+def test_decode_bits_names_the_task_mode_flags(lab):
+    # absolute (bit 1), ramp mode rate (bit 3), velocity on (bit 5), wait auto (bit 30)
+    value = (1 << 1) | (1 << 3) | (1 << 5) | (1 << 30)
+
+    flags = lab.decode_bits(f"{value}", lab.TASK_MODE_BITS)
+
+    assert flags["absolute"] and flags["ramp_mode_rate"] and flags["velocity_on"] and flags["wait_auto"]
+    assert not flags["secondary_units"] and not flags["minutes"]
+    assert lab.state_entry("TaskMode", f"{value}.0")["TaskMode"] == value
+    assert lab.state_entry("TaskStatus2", "1")["status2"]["rotation_active"]
+    assert lab.state_entry("AccelerationRate", "2000") == {"AccelerationRate": 2000.0}
+
+
+def test_rotation_angle_of_an_a_only_move(lab):
+    assert lab.rotation_angle_deg(0.05, 0.0) == 0.0
+    assert lab.rotation_angle_deg(0.05, 0.05 * math.tan(math.radians(-0.6))) == pytest.approx(-0.6, abs=1e-3)
+    assert lab.rotation_angle_deg(0.0, 0.0) is None
+
+
+def test_state_programs_never_open_the_laser_gate_and_move_nothing(lab):
+    golden = (Path(__file__).resolve().parents[1] / "golden" / "binary_grating_ifov_63x.txt").read_text().splitlines()
+    for lines in (lab.STATE_SETTER, lab.STATE_NEUTRAL, lab.STATE_DEFAULT_SETUP):
+        assert lines[-1] == "END PROGRAM"
+        assert not [line for line in lines if re.match(r"(RAPID|LINEAR|MOVE|\$AO)", line)]
+        assert all(line.endswith("OFF") for line in lines if "LASEROVERRIDE" in line)
+    # every mode line of the setter appears in a generated IFOV layer program (gate AUTO written as OFF)
+    for line in lab.STATE_SETTER[1:-2]:
+        if "LASEROVERRIDE" not in line:
+            assert any(g.strip().startswith(line.split(" -")[0]) for g in golden), line
+
+
+@pytest.mark.parametrize("root", [r"C:\Users\Nanofactory\nfs_lab", r"C:\a", r"C:\Users\someone_with_a_long_name\nfs_lab"])
+def test_padded_program_paths_have_the_requested_length(lab, root):
+    for length in lab.PATH_LIMIT_LENGTHS:
+        path = lab.padded_program_path(Path(root), length)
+        assert len(str(path)) == length and path.suffix == ".pgm"
+        assert all(len(part) <= 41 for part in path.parts)
+    base = len(root) + 1 + len("plim_0.pgm")
+    for length in range(base + 4, base + 90):                 # every remainder, incl. the one-character case
+        assert len(str(lab.padded_program_path(Path(root), length))) == length
+    with pytest.raises(ValueError):
+        lab.padded_program_path(Path(root), 10)

@@ -29,6 +29,7 @@
 ##########################################################################
 
 import ctypes
+import math
 
 import numpy as np
 
@@ -159,6 +160,30 @@ class PropertySelect(Property):
 
 
 ##########################################################################
+#: Time for the transfer of one frame after the exposure, in ms (USB3, full sensor, with margin)
+TRANSFER_MARGIN_MS = 500
+#: Shortest wait for an image, in ms
+MIN_TIMEOUT_MS = 50
+
+
+def image_timeout_ms(exposure_us: float) -> int:
+    """ Bounded wait for one image in ms.
+
+    Parameters
+    ----------
+    exposure_us : float
+        ``ExposureTime`` of the camera in µs (GenICam unit; confirmed on the lab PC in lab session 3b, T102).
+
+    Returns
+    -------
+    int
+        Twice the exposure time in ms plus :data:`TRANSFER_MARGIN_MS`, at least :data:`MIN_TIMEOUT_MS`. Until T102
+        the wait was ``2000 * ExposureTime`` ms (about 11 h at 20 ms), so a missed frame blocked the caller.
+    """
+
+    return max(MIN_TIMEOUT_MS, int(math.ceil(2.0 * float(exposure_us) / 1000.0)) + TRANSFER_MARGIN_MS)
+
+
 class CameraDevice(object):
     """ MatrixVision camera device class. This is a convenience wrapper to the
     MatrixVision library. """
@@ -283,51 +308,61 @@ class CameraDevice(object):
 
     def getimage(self) -> np.ndarray:
 
-        """ Grab and return a camera image. """
+        """ Grab and return a camera image.
+
+        Returns
+        -------
+        numpy.ndarray
+            Grey-value image (uint8 or uint16).
+
+        Raises
+        ------
+        TimeoutError
+            If no image arrives within :func:`image_timeout_ms` of the exposure time.
+        RuntimeError
+            If the image request failed.
+        """
 
         img = None
 
         # Place an image request in the request queue
         self.fi.imageRequestSingle()
 
-        # Get result number from the result queue
-        timeout = max(50, round(2000 * self["ExposureTime"]))
-        if np.log(timeout) / np.log(2) >= 32.0:
-            raise RuntimeError("Timeout must be a 32 bit integer!")
+        # Get result number from the result queue (bounded wait, T102)
+        timeout = image_timeout_ms(self["ExposureTime"])
         reqno = self.fi.imageRequestWaitFor(timeout)
-        if self.fi.isRequestNrValid(reqno):
+        if not self.fi.isRequestNrValid(reqno):
+            raise TimeoutError(f"No camera image within {timeout} ms (ExposureTime {self['ExposureTime']} µs)!")
 
-            # Get result from the result queue
-            req = self.fi.getRequest(reqno)
-            # if req.imagePixelFormat.read() == 28:
-            #     print("Pixel Format is mvIMPACT.acquire.ibpfMono12Packed_V1.")  # https://assets.balluff.com/documents/DRF_957356_AA_000/classmvIMPACT_1_1acquire_1_1Request.html#a491bca5fe5a03e9523a411a90d8b29cd
-            if req.isOK:
+        # Get result from the result queue
+        req = self.fi.getRequest(reqno)
+        if req.isOK:
 
-                # Get image meta data
-                addr = int(req.imageData.read())
-                size = req.imageSize.read()
-                width = req.imageWidth.read()
-                height = req.imageHeight.read()
-                depth = req.imageChannelBitDepth.read()
-                channels = req.imageChannelCount.read()
-                if channels != 1:
-                    raise RuntimeError("Gray scale camera required!")
+            # Get image meta data
+            addr = int(req.imageData.read())
+            size = req.imageSize.read()
+            width = req.imageWidth.read()
+            height = req.imageHeight.read()
+            depth = req.imageChannelBitDepth.read()
+            channels = req.imageChannelCount.read()
+            if channels != 1:
+                raise RuntimeError("Gray scale camera required!")
 
-                # Copy image data to numpy array
-                cbuf = (ctypes.c_char * size).from_address(addr)
-                # note: if depth is not 16 the dtype is not correctly chosen and one need to change the PixelFormat
-                dtype = np.uint16 if depth > 8 else np.uint8
-                img = np.copy(np.frombuffer(cbuf, dtype=dtype))
+            # Copy image data to numpy array
+            cbuf = (ctypes.c_char * size).from_address(addr)
+            # note: if depth is not 16 the dtype is not correctly chosen and one need to change the PixelFormat
+            dtype = np.uint16 if depth > 8 else np.uint8
+            img = np.copy(np.frombuffer(cbuf, dtype=dtype))
 
-                # print(f"size={size}, width={width}, height={height}, depth={depth}")
-                # print(f"Array length: {len(img)}, Expected: {height * width}")
+            # print(f"size={size}, width={width}, height={height}, depth={depth}")
+            # print(f"Array length: {len(img)}, Expected: {height * width}")
 
 
-                img = img.reshape((height, width))
+            img = img.reshape((height, width))
 
-            # Unlock the request object
-            req.unlock()
-            req = None
+        # Unlock the request object
+        req.unlock()
+        req = None
 
         if img is None:
             raise RuntimeError("Image grabbing failed!")
