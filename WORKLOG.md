@@ -3233,3 +3233,13 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** see the T83 entry (same branch and runs).
 - **Commits:** `5674b82` feat(storage): record the DHM configuration per session [T79]; the docs(todo) commit of T83.
 - **Follow-ups:** the adapters (T82 legacy, T84 service) call `write_dhm_session` once per session and `write_parameter_set` per new hash (AP5). The print camera stays in `/metadata/system/devices_json`.
+
+### 2026-11-26 14:25 CET — [T83] Example file: tiles on their GroupSpec positions (follow-up)
+- **Status:** done
+- **Changes:**
+  - `test/storage/dhm_example.py`: capture positions and footprint of both ProductSets on the GroupSpec positions; border band and minimum overlap of the GroupSpec scaled to the 16 px example tiles, so MIRA MI-62 can rerun the stitching of the example group offline.
+  - `test/storage/data/dhm_example/experiment.h5`: regenerated (headers still valid for the DHMConnect schemas).
+  - `WORKLOG.md`: this entry.
+- **Tests:** `test/storage/test_dhm_storage.py` 18 passed; MIRA `tests/test_experiment_file.py` passed with the new file.
+- **Commits:** `12686ef` test(storage): place the example tiles on their GroupSpec positions [T83]; this docs(todo) commit.
+- **Follow-ups:** the vendored copies in DHMConnect and OffAxisHolo are the earlier `c4f768d` version (their tests do not use the group); refresh them with the next layout change.
