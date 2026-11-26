@@ -3155,3 +3155,13 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
   - T148: lab check of the attenuator settling.
   - T149: lab print, now with the parameter tests of version 2.
   - LAB: check `parameter_tests_SZ2080.json` and `CENTERS` / `RESIN_EDGES` in `mains/parametertest/common.py`.
+
+### 2026-11-26 10:53 CET — [Todo review] Review of the open todos with the maintainer
+- **Status:** done
+- **Changes:**
+  - `TODO.md`: maintainer decisions recorded for every todo of this repository outside the DHM / MIRA / real-time scope (phases 7, 8 and the camera live feed T93–T95 and T79 were not reviewed): T148 (lines only, several dwell levels, A3200 lookahead/`DWELL`/`$AO` research first), T149 rewritten to the lab print of parameter tests version 2, T164 (move version 1 to the attic), T129 (library loader selectable, ASCII kept, no default switch before the add-ahead lab test), T130 (opt-in build option), T133 (R1 automatic after a detected error with a limit per structure, R2/R3 only after a pop-up confirmation), T135 (interim association check), T101 and T102 lab checks in session 3b (T153 scope), T124 (compressed copy by default, reference option), T112 (controller acceleration via factory), T114, T122, T109, T111, T154 (approved as written), T81 (extensible strategy registry), T96 (soon, with T133), T97 (later), T69 (postponed to the lab day); new T165 (tuned task 2 for the base programs z-line / corners / QR), T166 (port `mains/main_3D_model.py` to `ExperimentSpec`), T167 (intensive lab day: new features and program types / commands); T126 and T103 removed (→ F38, F39); T134 moved to Done; "Decided" table row "Todo review"; phase plan rows 6 and B.
+  - `future_todo.md`: new F38 (queue mode, formerly T126) and F39 (spec from an old experiment file, formerly T103), with the former todo text.
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (todo bookkeeping only).
+- **Commits:** this docs(todo) commit.
+- **Follow-ups:** implementable without the lab: T164, T102 (fix), T122, T111, T109, T114, T124, T130 (option), T133 + T96 (R1 limit, pop-up), T135 (interim), T112, T166, T81/T78/T80; lab: T153 session 3b (incl. T101, T102), T148, then T149; later T165, T167.

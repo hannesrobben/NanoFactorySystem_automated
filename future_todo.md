@@ -433,3 +433,55 @@ the decision session. **Every one of them must be discussed with the maintainer 
   restart of a single experiment must find the frame; the frame must stay inside the resin drop.
 - **Open questions:** One QR code for the frame plus the positions in `substrate.json`, or small QR codes per
   experiment inside the frame? Is the frame printed before the first experiment of the chain?
+
+## F38: Layer programs in queue mode (`PROGRAM <task> BUFFEREDRUN`) (formerly T126)
+- **Status:** parked 2026-11-26 in the todo review (maintainer): the library loader (T129) loads layers of any
+  size in parts, so queue mode is not needed now. Reconsider if the library path reaches its limits (compile time,
+  memory, gaps between parts).
+- **Goal:** Layer programs run in queue mode instead of being compiled as a whole, so programs of any size run
+  without a load limit.
+- **Context:** the former T126 (follow-up of T125), kept verbatim below. T124 keeps an option that stores the
+  whole-structure program only as a reference, for this mode.
+- **Prerequisites:** T125, T129.
+- **Watch out for:** queue starvation stops LINEAR moves in VELOCITY ON (dose peaks); no whole-layer `CRITICAL`;
+  lab test first whether IFOV commands, `CRITICAL` and `$AO[...]` are allowed in queue mode.
+- **Open questions:** Is queue mode needed at all once `.ogm` parts (T131) run robustly?
+- **Former todo text:**
+
+  - [ ] T126: Run layer programs in queue mode (`PROGRAM 1 BUFFEREDRUN`) instead of `PROGRAM LOAD` (follow-up of T125) [phase: B]
+    - Priority: high
+    - Size: M
+    - Depends on: –
+    - Background (maintainer research 2026-11-22, A3200 help 6.04 / library 6.4.5.5): `PROGRAM LOAD` compiles the
+      whole file and keeps it resident; the knowledge base names 60 000–80 000 lines as the usual limit; "An out of
+      memory error occurred." is ErrorCode 88 OutOfMemory (CoreLibrary, Windows side). Queue mode
+      (`PROGRAM <task> BUFFEREDRUN <file>` sent from task 0, task state 9 while running, `QueueBufferSize` per task,
+      `QueueStatus` bits 0x01 active / 0x02 empty / 0x04 full / 0x10 paused) runs programs of any size. Starvation
+      stops LINEAR moves in VELOCITY ON (dose peaks). `LOOKAHEAD FAST` has no function since 6.01; a `CRITICAL`
+      section over the whole layer may starve the Windows side that refills the queue. Open: whether IFOV commands,
+      `CRITICAL` and `$AO[...]` are allowed in queue mode (lab test first).
+    - Done when: layer programs run with `BUFFEREDRUN` (queue pre-filled, e.g. `PROGRAM PAUSE` as first line and
+      `PROGRAM 1 START` once `QueueLineCount` ≥ 90 % of `QueueLineCapacity`; progress and end markers via `$global`;
+      queue-empty events logged with time and line); generated programs without `LOOKAHEAD FAST` and without a
+      whole-layer `CRITICAL START/END` (golden files updated deliberately); the dummy backend simulates
+      `BUFFEREDRUN` and the queue status; the T125 split is kept only for the LOAD path or removed; lab check with the
+      largest DOE layer (2.2 M lines, 78 MB) without load error and without queue-empty events.
+
+## F39: Rebuild a spec from an experiment file without `/spec` (formerly T103)
+- **Status:** parked 2026-11-26 in the todo review (maintainer).
+- **Goal:** `ExperimentSpec.from_record(record)` rebuilds a spec from the metadata of an old experiment file.
+- **Context:** the former T103 (follow-up of T77), kept verbatim below.
+- **Prerequisites:** T77.
+- **Watch out for:** factories become `drawing` geometries; the result is marked `reconstructed: true`.
+- **Open questions:** Is it needed for old experiments at all?
+- **Former todo text:**
+
+  - [ ] T103: Rebuild a spec from an experiment file without `/spec` (follow-up of T77) [phase: 6]
+    - Priority: low
+    - Size: S
+    - Depends on: T77
+    - Done when:
+      - `ExperimentSpec.from_record(record)` rebuilds a spec from `/metadata/experiment` and the structure
+        `config`s of an experiment file 1.0 (or 1.1 without `/spec`), marked `reconstructed: true`; factories
+        become `drawing` geometries (INFORMATION_MODEL.md §6.4);
+      - a test rebuilds the spec of a dry-run file whose `/spec` was removed and compares the built structures.
