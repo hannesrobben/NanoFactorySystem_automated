@@ -264,6 +264,7 @@ class AerotechController:
         # Load program; the program is removed under the name it was loaded with (T127)
         if task_id is None:
             task_id = 2
+        self.note_task_load(task_id)
         task = Task(self.api, task_id, file_path=path, program_name=exec_path.name,
                     on_removed=self.program_removed)
         load_start = time.time()
@@ -316,6 +317,27 @@ class AerotechController:
                                   f"(task state {state})")
 
         return task
+
+    def note_task_load(self, task_id: int) -> None:
+        """ Count a program loaded or associated on ``task_id`` (T135).
+
+        A program kept on a task (the z-line program) checks this count before
+        it starts again: another program on its task replaced it. Loaders that
+        bypass :meth:`run_program_as_task` (the library loader) call it too.
+
+        Parameters
+        ----------
+        task_id : int
+            Controller task.
+        """
+
+        loads = self.__dict__.setdefault("_task_loads", {})
+        loads[int(task_id)] = loads.get(int(task_id), 0) + 1
+
+    def task_load_count(self, task_id: int) -> int:
+        """ Number of programs loaded on ``task_id`` through :meth:`note_task_load` (T135). """
+
+        return self.__dict__.get("_task_loads", {}).get(int(task_id), 0)
 
     def _exec_copy(self, path: Path) -> Path:
         """ Copy a program file to the next fresh execution name and register it (T152). """

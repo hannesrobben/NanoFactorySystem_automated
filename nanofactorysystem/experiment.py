@@ -1924,6 +1924,7 @@ class Experiment(object):
 
         remaining = [(self._layer_id(f), Path(f)) for f in files]
         failed = False
+        self.a3200.note_task_load(1)  # the parts replace a program kept on task 1 (the z-line program, T135)
         while remaining:
             paths = dict(remaining)
             done: list[int] = []
