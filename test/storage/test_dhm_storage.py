@@ -59,7 +59,8 @@ def test_layer_product_uses_the_mira_layout(example):
     assert example.dhm_groups() == ["grp-0001"]
     header, buffers, info = example.read_layer_product("grp-0001")
     assert info["kind"] == "layer" and info["layer_id"] == 4 and info["members"] == ["0000", "0001"]
-    assert info["group_spec"]["seed"] == 7 and info["recovered"] is False
+    assert info["group_spec"]["message_type"] == "GroupSpec" and len(info["group_spec"]["positions"]) == 2
+    assert info["recovered"] is False
     assert header["message_type"] == "LayerProduct" and len(header["tiles"]) == 2
     assert buffers["field"].dtype == np.complex64
     # Plain h5py reader: header_json + one dataset per buffer descriptor (MIRA LayerProduct.from_h5)

@@ -128,6 +128,18 @@ def layer_product_header(group_id: str, job_id: str, member_ids: list, buffers: 
     return header
 
 
+def group_spec() -> dict:
+    """ The ``GroupSpec`` 1.0 of the example layer (contract example with the two member positions). """
+
+    spec = copy.deepcopy(_example("GroupSpec"))
+    spec["structure"].update({"structure_id": "pillar_03",
+                              "occupied_um": [[[999.0, 999.5], [999.0, 1002.5], [1001.0, 1002.5], [1001.0, 999.5]]]})
+    spec["layer_index"] = 4
+    spec["positions"] = [{"tile_index": i, "planned_um": {"x": 1000.0 + 2.0 * i, "y": 1000.0, "z": 20000.0},
+                          "role": "ring", "n_frames": 2} for i in range(2)]
+    return spec
+
+
 def write_dhm_example(folder) -> Path:
     """ Write the example experiment into ``folder`` (created) and return the path of ``experiment.h5``. """
 
@@ -162,9 +174,7 @@ def write_dhm_example(folder) -> Path:
         header = layer_product_header("grp-0001", "job-110", [f"ps-{m}" for m in members], buffers)
         store.add_layer_product("grp-0001", header, buffers, kind="layer", structure="pillar_03", phase="layer",
                                 layer_id=4, members=members, job_id="job-110", job_state="acknowledged",
-                                group_spec={"group_kind": "layer", "seed": 7, "positions_um": [[1000, 1000],
-                                                                                              [1002, 1000]]},
-                                recipe=recipe)
+                                group_spec=group_spec(), recipe=recipe)
         # A capture still waiting for its result and a failed one
         store.reserve_capture(_capture(5, 0), recipe=recipe, context=context, config_hash=CONFIG_HASH,
                               parameter_set_id=PARAMETER_SET_ID)

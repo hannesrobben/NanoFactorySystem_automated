@@ -3,9 +3,11 @@
   "dhmconnect_commit": "b04fe69",
   "schema_versions": {
     "ProductSet": "1.0",
-    "LayerProduct": "1.0"
+    "LayerProduct": "1.0",
+    "GroupSpec": "1.0"
   },
   "files": {
+    "GroupSpec.example.json": "ee065746b8f4996089d2dfe2e9df2fcc18da30f30150c9f6d298f13304b4d627",
     "LayerProduct.example.json": "fb140451f128506c6525d1edb2035c2d1dcc93fc1a477ed5618448cda2ab3af9",
     "ProductSet.example.json": "eb362f08916e0392dbdfd6e99acbf12c6563db1ce1e271a6a4821734f33b653a"
   }
