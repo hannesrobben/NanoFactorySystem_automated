@@ -7,8 +7,9 @@
 
 FILE_TYPE = "nanofactory.experiment"
 # 1.0: T47; 1.1: /metadata/materials (material snapshots, T75); 1.2: whole-structure program compressed or as
-# reference (T124). Readers accept every 1.x file.
-SCHEMA_VERSION = "1.2"
+# reference (T124); 1.3: DHM service results (T83, docs/design/EXPERIMENT_STORAGE.md §15). Readers accept every
+# 1.x file.
+SCHEMA_VERSION = "1.3"
 FILE_NAME = "experiment.h5"
 LOCK_NAME = "experiment.lock"
 
@@ -19,6 +20,12 @@ STATUS_PRINTING = "printing"
 STATUS_FINISHED = "finished"
 STATUS_ABORTED = "aborted"
 STATUS_FAILED = "failed"
+
+# DHM service results (§15): states of a capture's or a group's job, adapters, group kinds
+DHM_JOB_STATES = ("reserved", "sent", "acquired", "stored", "acknowledged", "failed", "missing")
+DHM_ADAPTERS = ("legacy", "service", "fake")
+DHM_GROUP_KINDS = ("layer", "speckle", "background")
+DHM_CALIBRATION_KINDS = ("exposure", "opl_scan", "background")
 
 # Experiment constructor parameters: (constructor argument, key in experiment_dictionary.json,
 # attribute in /metadata/experiment, kind). Kinds: "float", "int", "bool", "str",
