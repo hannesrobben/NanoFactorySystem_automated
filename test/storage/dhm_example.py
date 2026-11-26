@@ -96,7 +96,10 @@ def product_set_header(capture_id: str, job_id: str, buffers: list, tile_index: 
                              "background_created_utc": "2026-11-26T11:55:00Z", "background_age_s": 300.0})
     header["capture"].update({"experiment_uuid": EXPERIMENT_UUID, "structure_id": "pillar_03", "layer_index": 4,
                               "capture_id": capture_id, "image_index": tile_index, "group_id": "grp-0001",
-                              "tile_index": tile_index})
+                              "tile_index": tile_index,
+                              "position_commanded_um": {"x": 1000.0 + 2.0 * tile_index, "y": 1000.0, "z": 20000.0},
+                              "position_actual_um": {"x": 1000.0 + 2.0 * tile_index, "y": 1000.0, "z": 20000.0},
+                              "occupied_um": [[[999.0, 999.5], [999.0, 1002.5], [1001.0, 1002.5], [1001.0, 999.5]]]})
     header.update({"product_id": f"ps-{capture_id}", "context_id": "ctx-example", "job_id": job_id,
                    "background_id": "bg-0001", "parameter_set_id": PARAMETER_SET_ID, "config_hash": CONFIG_HASH,
                    "raw_ref": {"host": "dhm-pc",
@@ -135,6 +138,8 @@ def group_spec() -> dict:
     spec["structure"].update({"structure_id": "pillar_03",
                               "occupied_um": [[[999.0, 999.5], [999.0, 1002.5], [1001.0, 1002.5], [1001.0, 999.5]]]})
     spec["layer_index"] = 4
+    # tiles of 16 x 16 px (2.8 µm): border band and overlap scaled down from the contract example
+    spec["stitching"].update({"border_band_um": 0.3, "min_overlap_um": 0.5})
     spec["positions"] = [{"tile_index": i, "planned_um": {"x": 1000.0 + 2.0 * i, "y": 1000.0, "z": 20000.0},
                           "role": "ring", "n_frames": 2} for i in range(2)]
     return spec
