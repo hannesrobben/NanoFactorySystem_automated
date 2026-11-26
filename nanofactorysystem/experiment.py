@@ -57,6 +57,7 @@ from nanofactorysystem.storage.substrate_store import (SubstrateRecord, Substrat
                                                        default_root, layout_area_um)
 from nanofactorysystem.storage import schema
 from nanofactorysystem.voxel.materials import MaterialRegistry, material_names, unregistered_snapshot
+from nanofactorysystem.storage.experiment_store import STRUCTURE_PROGRAM_MODES
 from nanofactorysystem.dhm.optimage import optImageMedian
 from nanofactorysystem.utils.visualization import read_file, plot_movements
 
@@ -173,7 +174,8 @@ class Experiment(object):
                  plan_id: Optional[str] = None,
                  max_program_lines: Optional[int] | str = "auto",
                  stop_on_failure: bool = True,
-                 program_loader: str = "ascii"):
+                 program_loader: str = "ascii",
+                 structure_program: str = "compressed"):
         """ Experiment on one substrate.
 
         Only the newer parameters are documented here; see the class
@@ -279,6 +281,11 @@ class Experiment(object):
             without a task (add-ahead, T129/T132, ``devices/aerotech/loader.py``).
             Opt-in until the lab validation.
 
+        structure_program : {"compressed", "reference"}
+            How the whole-structure program is stored in the experiment file
+            (T124): ``"compressed"`` (default) as gzip-compressed UTF-8 bytes,
+            ``"reference"`` only its SHA-256, line count and file (the layer
+            programs are stored anyway).
         Raises
         ------
         FileExistsError
@@ -298,6 +305,9 @@ class Experiment(object):
         if self.program_loader not in ("ascii", "library"):
             raise ValueError(f"program_loader must be 'ascii' or 'library', not {program_loader!r}")
         self._loader = None
+        self.structure_program_mode = str(structure_program).lower()
+        if self.structure_program_mode not in STRUCTURE_PROGRAM_MODES:
+            raise ValueError(f"structure_program must be one of {STRUCTURE_PROGRAM_MODES}, not {structure_program!r}")
         self._health_log: list[str] = []
 
         # Substrate record and experiment folder
@@ -1981,7 +1991,9 @@ class Experiment(object):
         for file in config["layer_files"]:
             self.store.write_layer_program(name, self._layer_id(file), Path(file).read_text(),
                                            self._relative(file))
-        self.store.write_structure_program(name, Path(config["program_file"]).read_text())
+        self.store.write_structure_program(name, Path(config["program_file"]).read_text(),
+                                           mode=self.structure_program_mode,
+                                           file=self._relative(config["program_file"]))
 
     @staticmethod
     def _layer_power(layer_power, layer_id: int) -> float:

@@ -136,7 +136,7 @@ Attributes of `/`:
 | Attribute | Content |
 |---|---|
 | `file_type` | `"nanofactory.experiment"` |
-| `schema_version` | `"1.0"`; `"1.1"` since T75 (`/metadata/materials`; `/spec` and `/inputs` from T77 belong to the same minor version) (§9) |
+| `schema_version` | `"1.0"`; `"1.1"` since T75 (`/metadata/materials`; `/spec` and `/inputs` from T77 belong to the same minor version); `"1.2"` since T124 (compressed or referenced whole-structure program) (§9) |
 | `experiment_uuid`, `experiment_label` | §4 |
 | `substrate_uuid`, `substrate_label` | §4 (empty strings if no substrate is given) |
 | `created` | first write |
@@ -213,7 +213,7 @@ Children:
 | Path | Content |
 |---|---|
 | `programs/layer_<iii>` | layer program text (variable-length UTF-8 string); attributes `layer_id`, `file` (relative path of the file copy), `sha256` |
-| `program` | whole-structure program text |
+| `program` | whole-structure program (the concatenation of the layer programs). Since 1.2 (T124): gzip-compressed UTF-8 bytes (uint8, chunked) with attributes `storage = "compressed"`, `format = "txt"` (the unpack tool writes `program.txt`), `encoding`, `sha256`, `n_lines`, `n_bytes`, `file`; with `Experiment(structure_program="reference")` an empty dataset with `storage = "reference"` and the same attributes (only hash and file). Before 1.2: a variable-length UTF-8 string. `ExperimentStore.read_structure_program()` reads every form (None for a reference) |
 | `progress` | compound table, one row per layer event: `layer_id`, `session`, `started`, `ended`, `status` (`ok`/`failed`), `error` |
 | `slicer` | slicer output if the program source is the slicer (§5.7) |
 | `captures/<nnnn>` | §5.6 |
@@ -476,7 +476,8 @@ class ExperimentStore:
 
     def add_structure(self, structure: StructureRecord) -> None: ...
     def write_layer_program(self, structure: str, layer_id: int, text: str, file: Path) -> None: ...
-    def write_structure_program(self, structure: str, text: str) -> None: ...
+    def write_structure_program(self, structure: str, text: str, *, mode: str = "compressed", file: str = "") -> None: ...
+    def read_structure_program(self, structure: str) -> Optional[str]: ...
     def write_slicer_job(self, structure: str, job: "ToolpathJob") -> None: ...
 
     def add_capture(self, capture: CaptureRecord, data: np.ndarray) -> str: ...   # returns capture id

@@ -1174,3 +1174,23 @@ def test_reprint_prints_the_highest_missing_layer_first_and_splits(test_config, 
     assert all(e["status"] == "ok" for e in events if e["session"] == "001")
     assert len(dummy_backend.calllog.filter(device="program")) > len(failed)  # printed in parts
     assert not any(split_dir.iterdir())  # parts removed after printing
+
+
+def test_structure_program_is_stored_compressed_or_as_reference(test_config, dummy_backend, no_sleep, tmp_path):
+    # T124
+    texts = {}
+    for mode in ("compressed", "reference"):
+        path = tmp_path / mode
+        path.mkdir()
+        with make_experiment(path, dummy_backend, structure_program=mode) as experiment:
+            experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+            add_rectangle(experiment)
+            experiment.build_programs()
+            built = Path(experiment.structure_configs[0]["program_file"]).read_text()
+        texts[mode] = ExperimentStore.open(path).read_structure_program("rect")
+        if mode == "compressed":
+            assert texts[mode] == built
+    assert texts["reference"] is None
+    (tmp_path / "bad").mkdir()
+    with pytest.raises(ValueError, match="structure_program"):
+        make_experiment(tmp_path / "bad", dummy_backend, structure_program="zip")

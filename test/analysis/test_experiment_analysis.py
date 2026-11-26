@@ -284,3 +284,20 @@ def test_text_datasets_are_written_without_numpy_conversion(tmp_path):
         write_dataset(f["names"], out)
     assert (out / "program.txt").read_text(encoding="utf-8") == text
     assert (out / "names.txt").read_text(encoding="utf-8") == "a\nb"
+
+
+def test_compressed_structure_program_is_unpacked_as_text(tmp_path):
+    """T124: the compressed whole-structure program becomes program.txt again."""
+    import h5py
+    import numpy as np
+
+    from experiment_analysis.convert import write_dataset
+
+    text = "LINEAR X1 Y2\nLINEAR X3 Y4 ; µm\n"
+    with h5py.File(tmp_path / "t.h5", "w") as f:
+        dataset = f.create_dataset("program", data=np.frombuffer(text.encode(), dtype=np.uint8), compression="gzip")
+        dataset.attrs["format"] = "txt"
+        out = tmp_path / "out"
+        out.mkdir()
+        write_dataset(f["program"], out)
+    assert (out / "program.txt").read_text(encoding="utf-8") == text
