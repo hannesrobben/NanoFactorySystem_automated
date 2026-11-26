@@ -4,6 +4,8 @@ Converted from a script that only logged the stage position of the real
 controller: the dummy tests check the generated commands and the parsing of
 the responses; the hardware test checks the real controller.
 """
+from pathlib import Path
+
 import pytest
 
 from nanofactorysystem import A3200
@@ -128,3 +130,29 @@ def test_zline_before_absolute_z_move(test_config, dummy_backend):
     a3200.zline(1.0, 100.0, 10.0, 10.0)
 
     assert len(dummy_backend.world.exposures) == 1
+
+
+def test_long_execution_paths_go_to_the_short_folder_or_are_refused(test_config, dummy_backend, tmp_path):
+    # T154: PROGRAM LOAD over ASCII cannot open program files at long paths
+    from nanofactorysystem.aerobasic.ascii import AerotechError
+    from nanofactorysystem.aerobasic.programs import AeroBasicProgram
+
+    deep = tmp_path / ("p" * 60) / ("q" * 60)
+    a3200 = A3200("Test", transport=dummy_backend.transport, program_dir=deep,
+                  controller=dict(CONTROLLER_ARGS), attenuator=dummy_backend.attenuator_args())
+    assert len(str(deep)) > 150
+    a3200.max_load_path_chars = len(str(tmp_path)) + 80
+    a3200.short_exec_dir = tmp_path / "short"
+    program = AeroBasicProgram()
+    program.send("DWELL 0.01")
+
+    task = a3200.run_program_as_task(program, task_id=1)
+    task.wait_to_finish(update_interval=0.01)
+    task.finish()
+
+    runs = dummy_backend.world.calllog.filter(device="program")
+    assert runs and Path(runs[-1].call).parent == tmp_path / "short"
+
+    a3200.short_exec_dir = deep
+    with pytest.raises(AerotechError, match="T154"):
+        a3200.run_program_as_task(program, task_id=1)

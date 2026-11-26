@@ -23,6 +23,13 @@ EXEC_PROGRAM_PREFIX = "nfs_"
 """Prefix of the execution copies loaded by :meth:`AerotechController.run_program_as_task` (T152)."""
 
 
+#: Longest program path known to load with ``PROGRAM LOAD`` over ASCII (lab session 3: 162-166 characters loaded,
+#: 191 were refused with "The program file could not be opened"). Raised once lab session 3b measures it (T154).
+MAX_LOAD_PATH_CHARS = 166
+#: Short folder for execution copies whose path in ``program_dir`` would be too long (T154)
+SHORT_EXEC_DIR = Path.home() / "nfs_exec"
+
+
 def exec_program_name(session: str, counter: int, stem: str) -> str:
     """ Name under which a program is loaded over ASCII: ``nfs_<session>_<counter>_<stem>.pgm`` (T152).
 
@@ -340,12 +347,35 @@ class AerotechController:
         return self.__dict__.get("_task_loads", {}).get(int(task_id), 0)
 
     def _exec_copy(self, path: Path) -> Path:
-        """ Copy a program file to the next fresh execution name and register it (T152). """
+        """ Copy a program file to the next fresh execution name and register it (T152).
+
+        On the real controller a copy whose path would be longer than
+        :data:`MAX_LOAD_PATH_CHARS` goes to :data:`SHORT_EXEC_DIR` instead (T154:
+        ``PROGRAM LOAD`` cannot open long paths). The attributes
+        ``max_load_path_chars`` (None: no limit) and ``short_exec_dir`` override both.
+
+        Raises
+        ------
+        AerotechError
+            If even the path in the short folder is too long.
+        """
 
         exec_dir = self.program_dir if self.program_dir is not None else Path.home()
-        exec_dir.mkdir(parents=True, exist_ok=True)
         self._exec_counter += 1
-        exec_path = exec_dir / exec_program_name(self.exec_session, self._exec_counter, path.stem)
+        name = exec_program_name(self.exec_session, self._exec_counter, path.stem)
+        exec_path = Path(exec_dir) / name
+        # The real controller only: the fake controller of the dummy backend has no path limit
+        limit = getattr(self, "max_load_path_chars",
+                        MAX_LOAD_PATH_CHARS if getattr(self.api, "transport_factory", None) is None else None)
+        if limit is not None and len(str(exec_path.resolve())) > limit:
+            short_dir = Path(getattr(self, "short_exec_dir", SHORT_EXEC_DIR))
+            exec_path = short_dir / name
+            if len(str(exec_path.resolve())) > limit:
+                raise AerotechError(f"The execution copy {exec_path} has more than {limit} characters; "
+                                    f"PROGRAM LOAD cannot open such paths (T154). Use a shorter program name.")
+            self.api.logger.info(f"Execution copy in {short_dir}: the path in {exec_dir} is longer than "
+                                 f"{limit} characters (T154)")
+        exec_path.parent.mkdir(parents=True, exist_ok=True)
         exec_path.write_bytes(path.read_bytes())
         self.exec_programs[exec_path.name] = exec_path
         return exec_path
