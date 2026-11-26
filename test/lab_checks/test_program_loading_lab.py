@@ -232,3 +232,16 @@ def test_state_programs_never_open_the_laser_gate_and_move_nothing(lab):
     for line in lab.STATE_SETTER[1:-2]:
         if "LASEROVERRIDE" not in line:
             assert any(g.strip().startswith(line.split(" -")[0]) for g in golden), line
+
+
+@pytest.mark.parametrize("root", [r"C:\Users\Nanofactory\nfs_lab", r"C:\a", r"C:\Users\someone_with_a_long_name\nfs_lab"])
+def test_padded_program_paths_have_the_requested_length(lab, root):
+    for length in lab.PATH_LIMIT_LENGTHS:
+        path = lab.padded_program_path(Path(root), length)
+        assert len(str(path)) == length and path.suffix == ".pgm"
+        assert all(len(part) <= 41 for part in path.parts)
+    base = len(root) + 1 + len("plim_0.pgm")
+    for length in range(base + 4, base + 90):                 # every remainder, incl. the one-character case
+        assert len(str(lab.padded_program_path(Path(root), length))) == length
+    with pytest.raises(ValueError):
+        lab.padded_program_path(Path(root), 10)
