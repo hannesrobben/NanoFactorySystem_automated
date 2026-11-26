@@ -3252,3 +3252,15 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** `test/storage/test_dhm_storage.py` 18 passed; MIRA `tests/test_experiment_file.py` passed with the new file.
 - **Commits:** `12686ef` test(storage): place the example tiles on their GroupSpec positions [T83]; this docs(todo) commit.
 - **Follow-ups:** the vendored copies in DHMConnect and OffAxisHolo are the earlier `c4f768d` version (their tests do not use the group); refresh them with the next layout change.
+
+### 2026-11-26 18:53 CET — [T168] Layer scanner kept the immersion oil for a drop facing down
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/tools/detector.py`: `Scanner.register` keeps the focus range with the highest z for both drop directions and raises `zmin` past the other one (before: DOWN kept the lowest range, i.e. the immersion oil, because T43 read "above" as "higher z" while positive z points downwards); docstring and log text
+  - `nanofactorysystem/devices/coordinate_system.py`: `DropDirection` docstring
+  - `test/test_drop_direction.py`: DOWN now expects the highest-z range; new regression test with the lab case of 2026-11-26 (hit 25327, miss 25293, oil 25260)
+  - `test/README.md`: description of `test_drop_direction.py`
+  - `TODO.md`: T168 added to Done
+- **Tests:** `python -m pytest test/test_drop_direction.py` failed before the fix (2 tests) and passes after it; full `python -m pytest`: 744 passed, 15 skipped
+- **Commits:** `7e9acdd` fix(tools): keep the highest-z focus range for a drop facing down [T168]
+- **Follow-ups:** UP keeps the highest-z range as before (maintainer decision); the lab must pull the fix before restarting the aborted parameter test. The aborted experiment is restarted by running the remaining experiments into the same substrate (index entry set to `planned`).
