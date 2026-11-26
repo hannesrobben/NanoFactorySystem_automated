@@ -1,6 +1,6 @@
 # Design: Experiment storage and substrate model
 
-Status: approved 2026-09-29
+Status: approved 2026-09-29; §15 (DHM service results) approved with T71 on 2026-11-18 and fixed by T83 on 2026-11-26
 
 Approved by the maintainer on 2026-09-29 in the Claude Code session, with every proposal in §12
 accepted as written.
@@ -136,7 +136,7 @@ Attributes of `/`:
 | Attribute | Content |
 |---|---|
 | `file_type` | `"nanofactory.experiment"` |
-| `schema_version` | `"1.0"`; `"1.1"` since T75 (`/metadata/materials`; `/spec` and `/inputs` from T77 belong to the same minor version); `"1.2"` since T124 (compressed or referenced whole-structure program) (§9) |
+| `schema_version` | `"1.0"`; `"1.1"` since T75 (`/metadata/materials`; `/spec` and `/inputs` from T77 belong to the same minor version); `"1.2"` since T124 (compressed or referenced whole-structure program); `"1.3"` since T83 (DHM service results, §15) (§9) |
 | `experiment_uuid`, `experiment_label` | §4 |
 | `substrate_uuid`, `substrate_label` | §4 (empty strings if no substrate is given) |
 | `created` | first write |
@@ -573,70 +573,112 @@ proposal are answered by the proposal itself (D1: hard error; D2: `nnn` restarts
 Approved by the maintainer on 2026-09-29 (all proposals in §12 accepted); recorded in the status line
 at the top.
 
-## 15. Proposed amendment: DHM service results (T71, not yet approved)
+## 15. DHM service results (T71, approved 2026-11-18; layout fixed by T83, schema 1.3)
 
-Proposed with `docs/design/DHM_SERVICE_INTEGRATION.md` (T71); implemented in T83 once both are approved.
-Minor schema addition: legacy captures and every existing group stay unchanged, readers of 1.0 files keep
-working. The version number is set when T83 is implemented (1.1, or the next minor if the information
-model additions of `INFORMATION_MODEL.md` §10 come first). OffAxisHolo K12 reads the file by this
-document, so this section is binding for it once approved.
+Designed with `docs/design/DHM_SERVICE_INTEGRATION.md` (T71, approved 2026-11-18 with §10.1 there) and
+fixed when T83 was implemented (2026-11-26). Minor schema addition (1.2 → 1.3): legacy captures and every
+existing group stay unchanged, readers of 1.x files keep working. **This section is binding** for the
+readers outside this repository: OffAxisHolo K12 (replay), MIRA MI-62 (offline fusion, stitching,
+comparison) and the DHMConnect tools. They read with `h5py` only and with HDF5 file locking off
+(`HDF5_USE_FILE_LOCKING=FALSE` or `h5py.File(..., locking=False)`), never import nanofactorysystem, and
+must not write the file (§6.3). Writing goes through `ExperimentStore` only. An example file built by
+`test/storage/dhm_example.py` (`write_dhm_example(path)`) is the fixture the other repositories vendor.
+
+**Product layout (one rule for every contract product).** A contract product (`ProductSet` 1.0 of one
+capture, `LayerProduct` 1.0 of a group) is stored as one HDF5 group with the attribute `header_json` (the
+contract header exactly as delivered: every field of the message except the buffer bytes, incl. its
+`buffers` descriptors) and one dataset per buffer under its contract name (`phase_rad`, `intensity_rel`,
+`valid` as uint8, optional `field` as complex64), chunked with `gzip` 4 and `shuffle`. This is the layout of
+MIRA `LayerProduct.to_h5` / `from_h5` (MI-10), so a reader rebuilds the product with
+`from_message(json.loads(group.attrs["header_json"]), [(name, group[name][()]) ...])`. Products are stored
+as delivered: aligned, not levelled (levelling is MIRA's, G10 SA5).
 
 ### 15.1 DHM capture (`/structures/<name>/captures/<nnnn>`, `kind = "dhm"`)
 
-New attributes:
+`ExperimentStore.reserve_capture(record, ...)` creates the group before the acquisition (DHM service
+design §7). Captures written with `add_capture` (legacy mode) and captures of files before 1.3 carry none
+of the attributes below; a reader treats a missing `job_state` as `stored` and a missing `adapter` as
+`legacy`.
+
+New attributes (all strings unless noted; empty string = not set):
 
 | Attribute | Content |
 |---|---|
+| `adapter` | `legacy`, `service` or `fake` |
 | `job_id` | job id of the DHM service (empty in legacy mode) |
 | `job_state` | `reserved`, `sent`, `acquired`, `stored`, `acknowledged`, `failed`, `missing` (legacy: `stored`) |
-| `error` | reason of a failed job, else empty |
+| `error` | reason of a failed job |
+| `group_id` | group the capture belongs to (§15.3), else empty |
+| `config_hash`, `parameter_set_id` | parameter set of the reconstruction (DL-A3 a); the set itself is under `/metadata/dhm/parameter_sets` (§15.4) |
 | `recipe_json` | effective recipe of this capture (incl. unknown keys passed to the service) |
-| `context_json` | `CaptureContext` as sent (incl. material snapshot reference and `z_hint_um`) |
-| `raw_ref_json` | raw frames that stayed on the DHM-PC: `host`, `path`, `sha256`, `n_frames`, `keep_raw`; empty if the frames are stored here |
+| `context_json` | `CaptureContext` as sent (incl. material snapshot reference, `z_hint_um`, `occupied_um`, `pose_tolerance_um`) |
+| `raw_ref_json` | raw frames that stayed on the DHM-PC: `host`, `path` (DHMConnect raw archive, `<root>/<experiment_uuid>/captures/<capture_id>_<job_id>.h5`, `docs/RAW_ARCHIVE.md` there), `sha256`, `n_frames`, `keep_raw`; `{}` if the frames are stored here or none were kept |
+| `recovered` (bool), `recovered_json` | set when the result was fetched after a restart (SI4): `reason`, `original_session`, `time` |
 
 Datasets:
-- `holograms`, `capture_times_s`: as today, only when the raw frames are transferred (`legacy_raw`,
-  `products_and_raw`). A capture may have products and no `holograms` (as already allowed in §5.6).
-- `frames`: compound table, one row per frame: `index` (int), `used` (bool), `reject_reason` (str), one
-  float column per metric (`saturated_count`, `black_count`, `intensity_q01`, `intensity_q50`,
-  `intensity_q99`, `sideband_fraction`, `sideband_peak_x`, `sideband_peak_y`, `piston_rad`,
-  `phase_noise_rad`, …; unknown metrics become extra columns, a missing one NaN); attribute
-  `acquisition_json` (per-frame acquisition data passed through unchanged).
+- `holograms`, `capture_times_s`: as in §5.6, only when the raw frames are stored here (legacy mode,
+  `products_and_raw`, `publication` transfer T105). A capture may have products and no `holograms`.
+- `frames`: compound table, one row per frame of the job (contract `FrameRecord` 1.0): `index` (int32),
+  `used` (bool), `reject_reason` (str, empty for `null`), then one float64 column per metric, named
+  `metric_<key>` (`metric_saturated_count`, `metric_sideband_fraction`, `metric_piston_rad`, …; the union of
+  the keys of all frames, sorted; a missing or `null` metric is NaN). Attribute `acquisition_json`: the list
+  of the per-frame `acquisition` objects, unchanged. Readers that need the exact records can rebuild them
+  from these two parts.
 
-### 15.2 Products (`…/captures/<nnnn>/products/<name>`)
+### 15.2 Products of a capture (`…/captures/<nnnn>/products`)
 
-`<name>` is `phase_rad`, `intensity`, `field` (complex64) or a further product. Existing attributes stay
-(`source`, `created`, `parameters_json`, `unit`); new attributes:
+- Service result (`ProductSet` 1.0): the group `products` follows the product layout above. Its attribute
+  `header_json` is the `ProductSet` header (incl. the nested `ReconstructionResult` without buffer bytes);
+  the datasets are the buffers. In addition `products` carries the attributes `message_type`
+  (`"ProductSet"`), `schema_version`, `product_id`, `job_id`.
+- Every product dataset has the attribute `created`; legacy products (`add_dhm_product`) also have
+  `metadata_json` (source, unit, reconstruction parameters as given). Service products get these flat
+  copies of the header instead, so that a reader without JSON parsing can trace them:
 
 | Attribute | Content |
 |---|---|
-| `schema_version` | version of the `ReconstructionResult` / `ProductSet` contract |
-| `config_hash`, `config_json` | parameter set of the reconstruction |
-| `background_id`, `background_created`, `background_age_s` | background used |
-| `pixel_pitch_um` | after the sideband crop (not the camera pitch) |
-| `z_um`, `wavelength_um`, `n_medium` | propagation distance, wavelength, medium index used |
-| `quality_json` | `n_obj`, `n_effective`, `n_bg`, `piston_std_rad`, selection summary |
-| `timings_json`, `versions_json`, `warnings_json` | stage timings, software versions, warnings |
-| `job_id` | redundant back-reference |
+| `schema_version` | version of the `ReconstructionResult` contract |
+| `config_hash`, `parameter_set_id` | parameter set of the reconstruction |
+| `background_id`, `background_created`, `background_age_s` | background used (from `quality`) |
+| `pixel_um` | float64 (2,), (y, x) after the sideband crop (not the camera pitch) |
+| `z_um`, `propagation_index`, `wavelength_um` | propagation distance with its index (G4) and wavelength |
+| `quality_json`, `timings_json`, `versions_json`, `warnings_json` | as delivered |
 
-Products are stored as delivered (aligned, not levelled; levelling belongs to MIRA if G10 / SA5 is
-decided as proposed).
+- Legacy products (`phase`, `amplitude`, `height`, … from offline reconstruction, F4) stay as in §5.6 and
+  have no `header_json` on `products`. A capture holds either one service `ProductSet` or legacy products.
 
-### 15.3 Groups, calibration, orphans
+### 15.3 Groups (`/dhm_groups/<group_id>`)
+
+One group per `open_group(GroupSpec)` of the service (N2): a stitched layer raster, a speckle set, or a
+background raster at the object positions (SI3).
+
+| Item | Content |
+|---|---|
+| attributes | `kind` (`layer`, `speckle`, `background`), `structure`, `phase`, `layer_id` (int), `job_id`, `job_state` (as §15.1), `group_spec_json` (the `GroupSpec` as sent, incl. seed, T85), `recipe_json`, `recovered` (bool), `recovered_json` |
+| dataset `members` | capture ids of the member captures (variable-length strings, in position order) |
+| group `product` | the `LayerProduct` 1.0 (N1) in the product layout above: `header_json` + `phase_rad`, `intensity_rel`, `valid`, optional `field`. Member `ProductSet`s stay on the DHM-PC and are referenced by `header_json["tiles"][i]["product_id"]` / `member_ids` |
+
+A `LayerProduct` that is recovered after a restart (SI4) is stored the same way with `recovered = true`.
+
+### 15.4 Session metadata and parameter sets (T79)
 
 | Path | Content |
 |---|---|
-| `/dhm_groups/<group_id>` | attributes `kind` (`speckle`, `stitching`), `structure`, `phase`, `layer_id`, `recipe_json`, `job_id`, `job_state`; dataset `members` (capture ids); group `products/<name>` like §15.2; dataset `member_transforms` (one row per member, as delivered by MIRA) |
-| `/calibration/dhm/<kind>/<id>` | `kind` = `exposure`, `opl_scan`, `background`: attributes `parameters_json`, `result_json`, `time`, `session`, `job_id`; backgrounds only metadata (frames stay on the DHM-PC unless `keep_raw` asks otherwise). `/opl_scan` (§5.3) keeps the latest OPL result. |
-| `/metadata/dhm` | once per session (T79): service and software versions, parameter-set name and hash, camera, pixel size and its source, adapter (`legacy`, `service`, `fake`) |
-| `/dhm_orphans/<job_id>` | results that arrived for an unknown capture (restart after a crash), stored like a capture's products with the context they carried |
+| `/metadata/dhm/sessions/<n>` | once per session that used the DHM (`n` = row of `/metadata/sessions`): attributes `adapter`, `service_version`, `protocol_version`, `software_versions_json`, `parameter_set_id`, `config_hash`, `camera_json`, `pixel_um` (2, (y, x)), `pixel_source` (`parameter_set`, `calibration`, `nominal`; never Koala), `objective` |
+| `/metadata/dhm/parameter_sets/<config_hash>` | the full parameter set **once per hash** (DL-A3 a): attributes `parameter_set_id`, `parameter_set_json`, `first_used` |
 
-### 15.4 JSON copies and unpack tool
+### 15.5 Calibration and orphans
+
+| Path | Content |
+|---|---|
+| `/calibration/dhm/<kind>/<id>` | `kind` = `exposure`, `opl_scan`, `background`: attributes `parameters_json`, `result_json`, `time`, `session`, `job_id`; backgrounds as metadata only (frames stay on the DHM-PC unless `keep_raw` asks otherwise). `/opl_scan` (§5.3) keeps the latest OPL result. |
+| `/dhm_orphans/<job_id>` | **references only** (SI4): attributes `result_id`, `message_type`, `structure`, `layer_id`, `time`, `host`, `path`, `sha256`, `size_bytes`, `reason`. A `LayerProduct` among the orphans is fetched and stored in full under `/dhm_groups` instead (`recovered = true`). |
+
+### 15.6 JSON copies and unpack tool
 
 The JSON copies (`experiment_dictionary.json`, `structures.json`, `print_progress.json`) list no captures
-and stay unchanged. `analysis/experiment_analysis` unpacks `frames` as CSV and the new attributes as JSON
-without code change (generic mirroring); its `tables/captures.csv` gets the columns `job_id`, `job_state`
-and `products`; a test with a fake-service experiment checks it (T83).
+and stay unchanged. `analysis/experiment_analysis` mirrors the new groups generically (attributes as JSON,
+the `frames` table as CSV); `tables/captures.csv` gets the columns `job_id`, `job_state` and `products`.
 
 ## 16. Proposed amendment: feedback results (T72, not yet approved)
 
