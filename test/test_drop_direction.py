@@ -17,21 +17,31 @@ def scanner(drop_direction):
     return Scanner(100.0, 10.0, 0.0, 200.0, drop_direction, Interface.BOTH, 1.5, 0.3, 0.5)
 
 
-@pytest.mark.parametrize("drop_direction, kept, limit", [
-    (DropDirection.DOWN, (45.0, 55.0), ("zmax", 145.0)),  # e.g. the oil interface above is ignored
-    (DropDirection.UP, (145.0, 155.0), ("zmin", 55.0)),  # the interface with the higher z is decisive
+@pytest.mark.parametrize("drop_direction", [
+    DropDirection.DOWN,  # z grows downwards: the oil interface above the substrate has the smaller z (T168)
+    DropDirection.UP,  # the interface with the higher z is decisive
 ])
-def test_scanner_keeps_the_resin_layer(drop_direction, kept, limit):
+def test_scanner_keeps_the_resin_layer(drop_direction):
     s = scanner(drop_direction)
     s.register(50.0, 10.0, Result.HIT)
     s.register(150.0, 10.0, Result.HIT)
 
-    assert (s.hit.lowest.low, s.hit.lowest.high) == kept
-    assert getattr(s, limit[0]) == limit[1]
+    assert (s.hit.range.low, s.hit.range.high) == (145.0, 155.0)
+    assert s.zmin == 55.0 and s.zmax == 200.0
+
+
+def test_scanner_down_ignores_the_oil_found_after_the_resin_interface():
+    # Lab case 2026-11-26 (63x, DOWN): focus at 25327, none at 25293, then the immersion oil at 25260
+    s = Scanner(25327.0, 50.0, 25000.0, 25600.0, DropDirection.DOWN, Interface.LOW, 1.5, 0.3, 0.5)
+    for z, result in [(25327.0, Result.HIT), (25293.0, Result.MISS), (25260.0, Result.HIT)]:
+        s.register(z, 50.0, result)
+
+    assert (s.hit.range.low, s.hit.range.high) == (25302.0, 25352.0)
+    assert s.zmin == 25285.0
 
 
 def test_layer_default_keeps_the_former_behaviour():
-    # Before T43 the scanner always kept the lowest range, which is the rule for DOWN
+    # Before T43 the scanner always kept the lowest range; since T168 both directions keep the highest
     assert Layer._defaults["dropDirection"] == "DOWN"
 
 

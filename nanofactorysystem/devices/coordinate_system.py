@@ -92,9 +92,10 @@ class DropDirection(Enum):
     - ``Experiment.plane_fit``: the plane is fitted through the "high"
       interface points for UP and through the "low" ones for DOWN.
     - ``tools.detector.Scanner`` / ``tools.layer.Layer``: if two focus ranges
-      are found, DOWN keeps the lowest one (a range above is e.g. the
-      substrate/immersion-oil interface), UP keeps the highest one; the drop
-      direction reaches the tools as ``sys_args["layer"]["dropDirection"]``.
+      are found, both directions keep the one with the highest z (positive z
+      points downwards; for DOWN the range with the smaller z is e.g. the
+      substrate/immersion-oil interface above, T168); the drop direction
+      reaches the tools as ``sys_args["layer"]["dropDirection"]``.
     - ``QRCode.pixel_program``: the vertical pixel lines are drawn in negative
       z direction for UP and in positive z direction for DOWN.
     - ``storage.legacy.read_legacy``: the layer order of old progress files.

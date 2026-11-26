@@ -30,11 +30,11 @@ class Scanner:
 
         """ Initialize a Scanner object.
 
-        ``drop_direction`` decides which of two focus ranges is the resin layer
-        (see :class:`DropDirection`): for DOWN the lowest range is kept and a
-        second range above it (e.g. the interface to the immersion oil) is
-        ignored; for UP the highest range is kept and a second range below it
-        is ignored.
+        If two focus ranges are found, the one with the highest z is kept for
+        both drop directions and the other one is ignored (positive z points
+        downwards; for DOWN the range with the smaller z is e.g. the interface
+        to the immersion oil above the substrate, T168). ``drop_direction`` is
+        reported in :meth:`result`.
         """
 
         # Store logger
@@ -161,19 +161,15 @@ class Scanner:
         else:
             return
 
-        # Skip a second layer by adjusting zmin and zmax. Drop facing down: the resin layer is the
-        # lowest range, a range above it is e.g. the substrate/immersion-oil interface. Drop facing
-        # up: the interface with the higher z is decisive, so a range below is removed.
+        # Skip a second layer by raising zmin. Positive z points downwards. Drop facing down: the
+        # range with the smaller z lies physically above the resin layer, e.g. the substrate/
+        # immersion-oil interface (T168). Drop facing up: the interface with the higher z is
+        # decisive. Both directions therefore keep the range with the highest z.
         if len(self.hit) > 1:
             assert (len(self.hit) == 2)
-            if self.drop_direction == DropDirection.DOWN:
-                self.zmax = self.hit.highest.low
-                self.hit = RangeSet(self.hit.lowest)
-                self.log.info(f"Remove second layer above {self.zmax}")
-            else:
-                self.zmin = self.hit.lowest.high
-                self.hit = RangeSet(self.hit.highest)
-                self.log.info(f"Remove second layer below {self.zmin}")
+            self.zmin = self.hit.lowest.high
+            self.hit = RangeSet(self.hit.highest)
+            self.log.info(f"Remove second layer at smaller z (physically above) up to {self.zmin}")
             assert (self.zmax > self.zmin)
 
         # Runtime sanity checks
