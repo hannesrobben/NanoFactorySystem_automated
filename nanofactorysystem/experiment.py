@@ -57,6 +57,7 @@ from nanofactorysystem.time_estimate import (DEFAULT_LAYER_OVERHEAD_S, TimeEstim
 from nanofactorysystem.storage.substrate_store import (SubstrateRecord, SubstrateStore, check_not_synced,
                                                        default_root, layout_area_um)
 from nanofactorysystem.storage import schema
+from nanofactorysystem.layout import draw_layout, experiment_layout
 from nanofactorysystem.storage.experiment_store import STRUCTURE_PROGRAM_MODES
 from nanofactorysystem.voxel.materials import MaterialRegistry, material_names, unregistered_snapshot
 from nanofactorysystem.dhm.optimage import optImageMedian
@@ -1007,50 +1008,10 @@ class Experiment(object):
                           facecolor='none', lw=2, label="Resin Drop")
         ax.add_patch(ellipse)
 
-        # Draw the outer rectangle
-        outer_rectangle = Rectangle(self.rectangle_tl, self.grid_width, self.grid_height, edgecolor='blue',
-                                    facecolor='none', lw=2, label="Experiment Field")
-        ax.add_patch(outer_rectangle)
-
-        # Draw the grid of rectangles
-        center_xs = []
-        center_ys = []
-        for i, (x, y) in enumerate(self.iter_experiment_locations()):
-            x_tl = x - self.structure_size / 2
-            y_tl = y - self.structure_size / 2
-            rect = Rectangle(
-                (x_tl, y_tl),
-                width=self.structure_size,
-                height=self.structure_size,
-                edgecolor='green',
-                facecolor='none',
-                lw=1
-            )
-            ax.text(x_tl, y_tl, f"{i}", color="green")
-            ax.add_patch(rect)
-            center_xs.append(x)
-            center_ys.append(y)
-
-        ax.scatter(center_xs, center_ys, s=3, marker="x", color="green", label="Structures")
-
-        plane_fit_points = self.sample_points_for_plane_fitting()
-        ax.scatter(*zip(*plane_fit_points), s=3, marker=".", color="red", label="Plane Fitting Probe Points")
-
-        # Corners (the double corner marks the orientation) and QR code
+        # Experiment rectangle, grid cells, plane-fit points, corners and QR code from the layout data (T80)
+        draw_layout(ax, experiment_layout(self))
         layout = self._layout()
-        corners = [c for c in layout.corners if not c.double]
-        if corners:
-            ax.scatter([c.center_um[0] for c in corners], [c.center_um[1] for c in corners], s=12, marker="s",
-                       color="orange", label="Corners")
-        double = layout.double_corner
-        if double is not None:
-            ax.scatter([double.center_um[0]], [double.center_um[1]], s=30, marker="D", color="darkred",
-                       label="Double corner (orientation)")
-        for corner in layout.corners:
-            ax.annotate(corner.position, corner.center_um, fontsize=6, color="darkorange")
-        if layout.qrcode_um is not None:
-            ax.scatter([layout.qrcode_um[0]], [layout.qrcode_um[1]], s=20, marker="s", color="black",
-                       label="QR code")
+
         label = f"{self.experiment_label} " if self.experiment_label else ""
         ax.set_title(f"Experiment {label}{self.qr_text}", fontsize=8)
 
