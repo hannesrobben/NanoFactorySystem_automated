@@ -9,7 +9,7 @@ Goal: the three open checks of session 3, this time **with enabled and homed axe
 step ran with disabled axes and ended in a task error at its first motion line; the loading itself worked.
 After session 3b the library loader can print a real layer with the laser. Added in the todo review of
 2026-11-26: which controller states persist between programs (T101, step `states`) and the unit of the camera
-exposure time (T102, step `camera`).
+exposure time (T102, step `camera`) and the path-length limit of `PROGRAM LOAD` (T154, step `path-limit`).
 
 The add-ahead mode (task 1 only, the next part compiled while the current one runs) is decided by `runner` and
 `layer-dry` here: the maintainer switches the default loader only after these pass (T129).
@@ -49,6 +49,7 @@ Plan about 45 minutes. No step switches the laser on.
 |---|---|---|---|
 | 1 | `python program_loading_lab.py system` | 1 min | **Check: every axis `enabled: True, homed: True`.** If not, enable and home them and repeat. (The motion steps refuse to start otherwise.) |
 | 2 | `python program_loading_lab.py ascii-names` | 1 min | T152: must end with `PASSED` (copies under `~\nfs_lab`). |
+| 2b | `python program_loading_lab.py path-limit` | 1 min | T154: the log names the longest path that loaded and the shortest that was refused (160–259 characters). Nothing to judge on site. |
 | 3 | `python program_loading_lab.py runner --axes-safe --lines 100000` | 12 min | T132: 4 parts on task 1 with add-ahead; every part to its last line, gaps < 1 s. |
 | 4 | objective at a safe Z, shutter closed: `python program_loading_lab.py layer-dry --file $layer --axes-safe --part-lines 200000 --max-parts 3` (type `DRY`) | 15 min | P5: 3 parts of the real layer 68, dry, on task 1; every part to its last line, gaps < 1 s, PC within the budget. |
 | 5 | shutter closed: `python program_loading_lab.py states --axes-safe` | 3 min | T101: per phase the task modes (absolute, ramp mode rate, velocity on, wait auto, …), ramp rates and the measured galvo rotation; nothing to judge on site. |
@@ -67,6 +68,7 @@ Send back the session folder `program_loading_lab_<date>` and the console output
 | `ascii-names` fails again at the short path | The ASCII fallback needs another look (T152); the library loader is not affected |
 | `runner` or `layer-dry` fail with an error code | Evaluate the code; the loader code is changed only if the cause is in it |
 | `states` | T101: the reset commands that `DefaultSetup` and `SetupIFOV` need (T78) are listed in `INFORMATION_MODEL.md` §7; a mode that leaks into `IFOV_off` experiments gets a `fix:` todo |
+| `path-limit` | T154: the limit is entered in `devices/aerotech` (`MAX_LOAD_PATH_CHARS`); until then 166 characters, the longest path known to load |
 | `camera` says `unit us` | T102 is done (the bounded timeout assumes µs); otherwise the timeout is changed to the measured unit |
 
 

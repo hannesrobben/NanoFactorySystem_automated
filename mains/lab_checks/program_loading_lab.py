@@ -63,6 +63,8 @@ Added for lab session 3b (todo review 2026-11-26):
                     after the mode lines of an IFOV layer program, after a program that sets nothing (task 1 and 2)
                     and after DefaultSetup: which states persist into the next program? Laser gate off.
 ``camera``          T102: grab time and mean grey value at several ``ExposureTime`` values: is the unit µs?
+``path-limit``      T154: the tiny program loaded over ASCII at path lengths of 160 to 259 characters: where is
+                    the limit of ``PROGRAM LOAD``? No motion.
 
 Since lab session 3 the ``system`` step lists the names of the added programs, and the INtime prompts of
 ``hold`` take a pasted block (end with an empty line).
@@ -2095,13 +2097,91 @@ def step_camera(session: Session, args) -> None:
     session.record("camera", {**info, "rows": rows})
 
 
+# ============================================================================================ path-limit (T154)
+
+PATH_LIMIT_LENGTHS = (160, 166, 170, 175, 180, 185, 191, 200, 220, 259)
+
+
+def padded_program_path(root: Path, length: int, stem: str = "plim") -> Path:
+    """ A program path of exactly ``length`` characters below ``root`` (folders of at most 40 characters).
+
+    Raises
+    ------
+    ValueError
+        If ``root`` is already too long for ``length``.
+    """
+
+    name = f"{stem}_{length}.pgm"
+    base = len(str(root)) + 1 + len(name)
+    if base > length:
+        raise ValueError(f"{root} is too long for a path of {length} characters")
+    folders, remaining = [], length - base
+    while remaining > 0:
+        size = min(40, remaining - 1) if remaining > 1 else 0
+        if size <= 0:                                        # one character left: lengthen a folder or the name
+            if folders:
+                folders[-1] += "x"
+            else:
+                name = f"{stem}x_{length}.pgm"
+            remaining -= 1
+            continue
+        folders.append("p" * size)
+        remaining -= size + 1
+    path = root.joinpath(*folders, name)
+    assert len(str(path)) == length, (len(str(path)), length)
+    return path
+
+
+def step_path_limit(session: Session, args) -> None:
+    """ T154: up to which path length does ``PROGRAM LOAD`` over ASCII open a program file?
+
+    Loads the tiny valid program at the lengths ``PATH_LIMIT_LENGTHS`` (each under its own name, below
+    ``~/nfs_lab``) on an idle task, then stops the task and removes the program. In lab session 3 a copy at 191
+    characters was refused ("The program file could not be opened"), copies at 162-166 loaded. No motion.
+    """
+
+    root = Path.home() / "nfs_lab"
+    client = try_ascii(args.reply_timeout)
+    if client is None:
+        session.log("ASCII interface not reachable. Stopped.")
+        sys.exit(1)
+    rows = []
+    try:
+        state = ascii_task_state(client, args.task)
+        if state != "idle":
+            session.log(f"Task {args.task} is {state}; path-limit needs an idle task. Stopped.")
+            sys.exit(1)
+        for length in PATH_LIMIT_LENGTHS:
+            try:
+                path = write_program(padded_program_path(root, length), TINY_PROGRAM)
+            except (ValueError, OSError) as error:                 # Windows MAX_PATH or a long home folder
+                rows.append({"length": length, "ok": None, "error": f"not written: {error}"})
+                session.log(f"  {length:>3} characters: not written ({error})")
+                continue
+            code, data, seconds = client.send(f'PROGRAM {args.task} LOAD "{path}"')
+            error = client.last_error() if code != "%" else ""
+            client.send(f"PROGRAM {args.task} STOP")
+            client.send(f'REMOVEPROGRAM "{path.name}"')
+            rows.append({"length": length, "ok": code == "%", "reply": code + data, "seconds": round(seconds, 2),
+                         "error": error})
+            session.log(f"  {length:>3} characters: {'loaded' if code == '%' else 'REFUSED'} {error}")
+    finally:
+        client.close()
+        shutil.rmtree(root / ("p" * 40), ignore_errors=True)
+    loaded = [r["length"] for r in rows if r["ok"]]
+    refused = [r["length"] for r in rows if r["ok"] is False]
+    session.record("path_limit", {"rows": rows, "longest_loaded": max(loaded, default=None),
+                                  "shortest_refused": min(refused, default=None)})
+    session.log(f"path-limit: longest loaded {max(loaded, default=None)}, shortest refused {min(refused, default=None)}")
+
+
 STEPS = {"system": step_system, "ladder": step_ladder, "precision": step_precision, "ogm": step_ogm,
          "cycle": step_cycle, "sticky": step_sticky, "watch": step_watch,
          "api": step_api, "ogm-clean": step_ogm_clean, "add-associate": step_add_associate, "hold": step_hold,
          "taskspeed": step_taskspeed, "runner": step_runner, "recover-ascii": step_recover_ascii, "reset": step_reset,
          "restart-service": step_restart_service, "ascii-names": step_ascii_names,
          "recover-blocked": step_recover_blocked, "dotnet-build": step_dotnet_build, "layer-dry": step_layer_dry,
-         "states": step_states, "camera": step_camera}
+         "states": step_states, "camera": step_camera, "path-limit": step_path_limit}
 
 
 def main(argv: Optional[list[str]] = None) -> None:
