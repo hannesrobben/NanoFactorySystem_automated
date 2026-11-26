@@ -1,8 +1,7 @@
-"""Cell tables of PTD fields from the experiment file and import of measured voxel sizes (T147)."""
+"""Cell tables of test fields from the experiment file and import of measured voxel sizes (T147, T164)."""
 import csv
 import importlib
 import json
-import sys
 from pathlib import Path
 
 import pytest
@@ -13,17 +12,17 @@ pytest.importorskip("shapely")
 from experiment_analysis import ExperimentFile  # noqa: E402
 from experiment_analysis.ptd import (MEASUREMENT_COLUMNS, cell_table, export_cell_table,  # noqa: E402
                                      import_voxel_measurements, save_cell_table)
-from nanofactorysystem.testprint import ptd01  # noqa: E402
+from nanofactorysystem.testprint import ParameterTestInputs  # noqa: E402
+from nanofactorysystem.testprint import parameter_tests  # noqa: E402
 from nanofactorysystem.testprint.field import write_rows  # noqa: E402
 from nanofactorysystem.voxel.database import VoxelDatabase  # noqa: E402
 
 MAINS = Path(__file__).parents[2] / "mains"
-sys.path.insert(0, str(Path(__file__).parents[1] / "testprint"))
-from ptd_examples import EXAMPLE_CALIBRATION  # noqa: E402
+INPUTS = ParameterTestInputs("SZ2080", source="tests").to_json()
 
 
 def filled_rows():
-    field = ptd01.field_f1(calibration=EXAMPLE_CALIBRATION.to_json(), label_power_mw=0.7)
+    field = parameter_tests.full_f1(inputs=INPUTS, half="a")
     rows = []
     for row in field.cell_table()[:3]:
         rows.append({"experiment_uuid": "uuid-1", "material": "SZ2080", "objective": "Zeiss 63x",
@@ -34,16 +33,17 @@ def filled_rows():
 
 
 def test_import_voxel_measurements(tmp_path):
-    path = write_rows(tmp_path / "f1.csv", filled_rows(), MEASUREMENT_COLUMNS)
+    rows = filled_rows()
+    path = write_rows(tmp_path / "f1.csv", rows, MEASUREMENT_COLUMNS)
     database = VoxelDatabase(tmp_path / "voxels.sqlite")
     assert import_voxel_measurements(path, database) == 2
     stored = database.measurements(material="SZ2080")
     assert len(stored) == 2
     first = next(m for m in stored if m["method"] == "SEM")
     assert first["width_um"] == 0.31 and first["n_lines"] == 4 and first["experiment_uuid"] == "uuid-1"
-    assert first["power_mW"] == pytest.approx(EXAMPLE_CALIBRATION.power_mw(ptd01.F1_P_REL[0]))
+    assert first["power_mW"] == pytest.approx(rows[0]["power_mw"])
     assert first["setup"] == "IFOV_on" and first["velocity_um_s"] == 5000.0
-    assert "F1-r0c1" in next(m for m in stored if m["method"] == "DHM")["notes"]
+    assert rows[1]["cell_id"] in next(m for m in stored if m["method"] == "DHM")["notes"]
 
 
 def test_import_refuses_a_row_without_method(tmp_path):
@@ -67,26 +67,23 @@ def test_cell_table_from_the_dry_run_experiment(monkeypatch, test_config, dummy_
     import matplotlib
     matplotlib.use("Agg")
     monkeypatch.syspath_prepend(str(MAINS))
-    common = importlib.import_module("Experiments.ptd01.common")
+    common = importlib.import_module("parametertest.common")
     monkeypatch.setattr(common, "USER", "Test")
-    [folder] = common.run_fields([3], calibration_path=common.EXAMPLE_CALIBRATION_FILE, replicates=2,
-                                 backend=dummy_backend, plane=dummy_backend.world.sample.plane(),
-                                 data_root=tmp_path / "data", allow_example=True)
+    [folder] = common.run(["full"], only=["F1"], backend=dummy_backend, plane=dummy_backend.world.sample.plane(),
+                          data_root=tmp_path / "data")
 
     rows = cell_table(folder)
-    expected = ptd01.field_f3(calibration=EXAMPLE_CALIBRATION.to_json(), label_power_mw=common.LABEL_POWER_MW)
-    table = expected.cell_table()
-    assert len(rows) == 2 * len(table)                               # the field and its REPEAT copy
-    structures = sorted({r["structure"] for r in rows})
-    assert len(structures) == 2 and "F3_line_pairs" in structures
+    inputs = common.load_inputs().to_json()
+    expected = {half: parameter_tests.full_f1(inputs=inputs, half=half).cell_table() for half in "ab"}
+    assert len(rows) == sum(len(table) for table in expected.values())
     record = ExperimentFile(folder).record(include_captures=False)
     centers = {s.name: s.center_um for s in record.structures}
     for row in rows:
-        reference = next(c for c in table if c["cell_id"] == row["cell_id"])
+        reference = next(c for c in expected[row["half"]] if c["cell_id"] == row["cell_id"])
         for key, value in reference.items():
             assert row[key] == value, key
-        assert row["experiment_uuid"] == record.uuid and row["material"] == "SZ2080"
-        assert row["velocity_um_s"] == 5000.0 and row["setup"] == "IFOV_on"
+        assert row["experiment_uuid"] == record.uuid and row["material"] == common.RESIN
+        assert row["setup"] == "IFOV_on" and row["velocity_um_s"] > 0
         assert row["stage_x_um"] == pytest.approx(centers[row["structure"]][0] + row["x_um"], abs=1e-3)
         assert row["stage_y_um"] == pytest.approx(centers[row["structure"]][1] + row["y_um"], abs=1e-3)
 

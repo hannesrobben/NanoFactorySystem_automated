@@ -78,15 +78,15 @@ Rules (they keep the printing process safe):
 
 ## Test prints (PTD-01)
 
-`experiment_analysis.ptd` (T147) supports the evaluation of the standard test print PTD-01
-(`mains/Experiments/ptd01/`, design `docs/design/TEST_PRINT_PTD01.md` §8):
+`experiment_analysis.ptd` (T147) supports the evaluation of the parameter tests (`mains/parametertest/`, design
+`docs/design/PARAMETER_TESTS.md`; the cell-table format is that of `docs/design/TEST_PRINT_PTD01.md` §8):
 
 ```python
 from experiment_analysis.ptd import export_cell_table, import_voxel_measurements, save_cell_table
 from nanofactorysystem.voxel import VoxelDatabase
 
 export_cell_table(r"D:/.../HR-26-003-B_20261201-1015", "F1_cells.csv")   # template, fill it during SEM / DHM
-import_voxel_measurements("F1_cells.csv", VoxelDatabase(r"D:/.../voxels.sqlite"))   # F0, F1, F2 rows
+import_voxel_measurements("F1_cells.csv", VoxelDatabase(r"D:/.../voxels.sqlite"))   # rows of fields 0, 1, 2
 save_cell_table(r"D:/.../HR-26-003-B_20261201-1015")                    # /analysis/experiment/ptd01_cell_table
 ```
 

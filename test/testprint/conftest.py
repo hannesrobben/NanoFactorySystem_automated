@@ -1,17 +1,12 @@
 """Shared fixtures of the test-print tests (phase 11)."""
 import pytest
 
-from ptd_examples import EXAMPLE_CALIBRATION, EXAMPLE_STAGE_A
+from ptd_examples import EXAMPLE_CALIBRATION
 
 
 @pytest.fixture
 def example_calibration():
     return EXAMPLE_CALIBRATION
-
-
-@pytest.fixture
-def example_stage_a():
-    return EXAMPLE_STAGE_A
 
 
 @pytest.fixture
