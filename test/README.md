@@ -109,6 +109,7 @@ level, so the exact command strings are checked.
 | `devices/test_camera.py` | Exposure optimisation, image container | Unusable camera images | – (plus 1 hardware test) |
 | `devices/test_camera_timeout.py` | T102: the wait for a camera image is twice the exposure (µs → ms) plus a transfer margin; a missed frame raises `TimeoutError` instead of blocking, a failed request `RuntimeError` (fake function interface, no mvIMPACT) | A camera call that blocks for hours on a missed frame | – |
 | `dhm/test_dhm.py` | DHM client: objective selection, shutter, motor, hologram | DHM communication errors | – (plus 1 hardware test) |
+| `dhm/test_dhmclient_errors.py` | T109 (finding B19): the v6 `DhmClient` raises `AttributeError` for writing a read-only and reading a write-only attribute (before: `raise (AttributeError, ...)`, a `TypeError` in Python 3) | A misleading error from the DHM client | – |
 | `dhm/test_motorscan.py` | OPL motor scan: the bracket is widened step by step, stays inside the motor range, and a missing maximum raises `MotorScanError` | An OPL scan that drives the motor out of range or gives up too early | – |
 | `dhm/test_manual_helper.py` | `reset()` of the interactive DHM helper `test/manual/dhm/DHMUserBackend.py`, run on the dummy DHM | A helper that keeps an old connection or old state after a reset | – |
 | `test_femtika/test_device_no_laser.py` | `Aerotech3200` status, positions, tasks, homing on the simulated controller | Parsing errors in the status answers of the controller | – (the same tests also run as hardware tests) |

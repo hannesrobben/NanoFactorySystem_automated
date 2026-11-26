@@ -222,7 +222,7 @@ class DhmClient(object):
         if name in self._commands:
             cmd, _, infmt = self._commands[name]
             if cmd is None:
-                raise (AttributeError, f"Attribute '{name}' is not writeable!")
+                raise AttributeError(f"Attribute '{name}' is not writeable!")
 
             if isinstance(value, tuple):
                 self.remoteCmd(cmd, "", infmt, *value)
@@ -237,7 +237,7 @@ class DhmClient(object):
         if name in self._commands:
             _, cmd, outfmt = self._commands[name]
             if cmd is None:
-                raise (AttributeError, f"Attribute '{name}' is not readable!")
+                raise AttributeError(f"Attribute '{name}' is not readable!")
             return self.remoteCmd(cmd, outfmt, "")
 
         elif name in self._functions:
