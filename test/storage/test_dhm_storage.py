@@ -168,3 +168,53 @@ def test_vendored_example_matches_the_generator(tmp_path):
     committed = Path(__file__).parent / "data" / "dhm_example" / "experiment.h5"
     generated = write_dhm_example(tmp_path / "exp")
     assert _tree(committed) == _tree(generated), "regenerate: python test/storage/dhm_example.py <folder>"
+
+
+def test_dhm_session_and_parameter_set_record(example):
+    """ T79: DHM configuration once per session, the parameter set once per hash, shown in the summary. """
+
+    from nanofactorysystem.storage.summary import format_table, summary
+
+    meta = example.read_dhm_metadata()
+    session = meta["sessions"]["000"]
+    assert session["adapter"] == "service" and session["pixel_source"] == "parameter_set"
+    assert list(session["pixel_um"]) == pytest.approx([0.1738, 0.1738])
+    assert session["software_versions"]["offaxisholo"] == "0.4.0"
+    stored = meta["parameter_sets"][CONFIG_HASH]
+    assert stored["parameter_set_id"] == "zeiss63x-insitu-v1" and stored["parameter_set"]["wavelength_um"] == 0.674994
+    record = example.read()
+    data = summary(record)
+    assert data["dhm_config"]["config_hash"] == CONFIG_HASH
+    assert "DHM service zeiss63x-insitu-v1 (af2c68e6), pixel 0.1738x0.1738 um (parameter_set)" in format_table(data)
+
+
+def test_parameter_set_is_stored_once_per_hash(tmp_path):
+    path = write_dhm_example(tmp_path / "exp")
+    store = ExperimentStore.open(path.parent)
+    same = {"parameter_set_id": "zeiss63x-insitu-v1", "wavelength_um": 0.674994,
+            "objective": {"magnification": 63.0, "pixel_um": [0.1738, 0.1738]}}
+    assert store.write_parameter_set(CONFIG_HASH, "zeiss63x-insitu-v1", same) is False
+    with pytest.raises(ValueError, match="different content"):
+        store.write_parameter_set(CONFIG_HASH, "zeiss63x-insitu-v1", {**same, "wavelength_um": 0.6})
+
+
+def test_dhm_session_validation(tmp_path):
+    path = write_dhm_example(tmp_path / "exp")
+    store = ExperimentStore.open(path.parent)
+    with pytest.raises(RuntimeError, match="session"):
+        store.write_dhm_session({"adapter": "service", "pixel_source": "nominal"})
+    store.begin_session("restart")
+    try:
+        with pytest.raises(ValueError, match="never Koala"):
+            store.write_dhm_session({"adapter": "service", "pixel_source": "koala"})
+    finally:
+        store.end_session("finished")
+
+
+def test_summary_without_dhm_record(tmp_path):
+    from nanofactorysystem.storage.summary import summary
+
+    from test_experiment_store import record
+
+    store = ExperimentStore.create(tmp_path / "exp", record())
+    assert "dhm_config" not in summary(store.read())

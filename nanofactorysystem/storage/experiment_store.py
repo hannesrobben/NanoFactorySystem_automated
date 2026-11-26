@@ -1209,6 +1209,93 @@ class ExperimentStore:
             group.attrs["parameters_json"] = _json(parameters)
             group.attrs["result_json"] = _json(result)
 
+    def write_dhm_session(self, info: dict) -> None:
+        """ Store the DHM configuration of the current session (``/metadata/dhm/sessions/<n>``, T79, §15.4).
+
+        Parameters
+        ----------
+        info : dict
+            ``adapter`` (``legacy``, ``service``, ``fake``), ``pixel_source``
+            (``parameter_set``, ``calibration``, ``nominal``), ``pixel_um``
+            ((y, x)), ``service_version``, ``protocol_version``,
+            ``software_versions``, ``parameter_set_id``, ``config_hash``,
+            ``camera``, ``objective``; further keys are stored as given.
+
+        Raises
+        ------
+        RuntimeError
+            Outside a session (``begin_session``).
+        ValueError
+            For an unknown adapter or pixel source.
+        """
+
+        if self._session is None:
+            raise RuntimeError("write_dhm_session() needs an open session (begin_session)")
+        if info.get("adapter") not in schema.DHM_ADAPTERS:
+            raise ValueError(f"Unknown DHM adapter {info.get('adapter')!r}; expected one of {schema.DHM_ADAPTERS}")
+        if info.get("pixel_source") not in schema.DHM_PIXEL_SOURCES:
+            raise ValueError(f"Unknown pixel source {info.get('pixel_source')!r}; expected one of "
+                             f"{schema.DHM_PIXEL_SOURCES} (never Koala)")
+        values = dict(info)
+        if "pixel_um" in values:
+            values["pixel_um"] = np.asarray(values["pixel_um"], dtype=float)
+        with self._write() as f:
+            parent = _group(f, "metadata/dhm/sessions")
+            if self._session in parent:
+                del parent[self._session]
+            group = parent.create_group(self._session)
+            _set_attrs(group, {k: ("" if v is None else v) for k, v in values.items()})
+            group.attrs["written"] = utc_timestamp()
+
+    def write_parameter_set(self, config_hash: str, parameter_set_id: str, parameter_set: dict) -> bool:
+        """ Store a reconstruction parameter set once per hash (``/metadata/dhm/parameter_sets``, DL-A3 a).
+
+        Parameters
+        ----------
+        config_hash : str
+            Hash of the parameter set as sent by the service.
+        parameter_set_id : str
+        parameter_set : dict
+            The full parameter set (contract ``ParameterSet``).
+
+        Returns
+        -------
+        bool
+            True if written, False if this hash is stored already with the same content.
+
+        Raises
+        ------
+        ValueError
+            If the hash is stored already with a different parameter set.
+        """
+
+        text = json.dumps(parameter_set, sort_keys=True, default=_json_default)
+        with self._write() as f:
+            parent = _group(f, "metadata/dhm/parameter_sets")
+            if config_hash in parent:
+                stored = _attr(parent[config_hash], "parameter_set_json")
+                if json.loads(stored) != json.loads(text):
+                    raise ValueError(f"Parameter set {config_hash} is stored already with different content")
+                return False
+            group = parent.create_group(config_hash)
+            _set_attrs(group, {"parameter_set_id": parameter_set_id, "first_used": utc_timestamp()})
+            group.attrs["parameter_set_json"] = text
+        return True
+
+    def read_dhm_metadata(self) -> dict:
+        """ Return the DHM configuration record (``sessions``, ``parameter_sets``), see ``ExperimentRecord.dhm``. """
+
+        with self._read() as f:
+            return self._read_dhm_metadata(f)
+
+    @staticmethod
+    def _read_dhm_metadata(f: h5py.File) -> dict:
+        if "metadata/dhm" not in f:
+            return {}
+        group = f["metadata/dhm"]
+        return {"sessions": {n: _get_json_attrs(g) for n, g in sorted(group.get("sessions", {}).items())},
+                "parameter_sets": {h: _get_json_attrs(g) for h, g in sorted(group.get("parameter_sets", {}).items())}}
+
     def read_dhm_calibrations(self, kind: str) -> dict[str, dict]:
         """ Return the stored calibrations of one kind by id. """
 
@@ -1293,6 +1380,7 @@ class ExperimentStore:
             if "time_estimate" in f:
                 record.time_estimate = _get_json_attrs(f["time_estimate"])
             record.materials = self._read_materials(f)
+            record.dhm = self._read_dhm_metadata(f)
             if "spec/spec_json" in f:
                 record.spec = json.loads(_text(f["spec/spec_json"][()]))
             for name, group in f.get("structures", {}).items():

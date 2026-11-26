@@ -121,6 +121,20 @@ def _printing_duration(record: ExperimentRecord) -> Optional[float]:
     return _seconds_between(min(started), max(ended))
 
 
+def _dhm_config(record: ExperimentRecord) -> Optional[dict]:
+    """ DHM configuration of the latest session that recorded one (T79), or None. """
+
+    sessions = (record.dhm or {}).get("sessions") or {}
+    if not sessions:
+        return None
+    latest = sessions[sorted(sessions)[-1]]
+    pixel = latest.get("pixel_um")
+    return {"adapter": latest.get("adapter", ""), "parameter_set_id": latest.get("parameter_set_id", ""),
+            "config_hash": latest.get("config_hash", ""),
+            "pixel_um": [float(v) for v in pixel] if pixel is not None else None,
+            "pixel_source": latest.get("pixel_source", ""), "service_version": latest.get("service_version", "")}
+
+
 def summary(record: ExperimentRecord) -> dict[str, Any]:
     """ Return the summary of an experiment.
 
@@ -135,7 +149,10 @@ def summary(record: ExperimentRecord) -> dict[str, Any]:
         ``substrate_label``, ``objective``, ``setup``, ``drop_direction``,
         ``plane_fit_mode``, ``program_source``, ``dhm_usage``, ``camera_capture``, ``started``,
         ``status``, ``estimated_s`` and ``duration_s``: expected and actual
-        printing time, T28) and ``structures``, one row per user structure (corners
+        printing time, T28), ``dhm_config`` (DHM configuration of the latest
+        session, T79: ``adapter``, ``parameter_set_id``, ``config_hash``,
+        ``pixel_um``, ``pixel_source``, ``service_version``; only present when
+        the file has a DHM record) and ``structures``, one row per user structure (corners
         and QR code excluded) with the keys in :data:`COLUMNS`.
     """
 
@@ -163,7 +180,7 @@ def summary(record: ExperimentRecord) -> dict[str, Any]:
             "printed_layers": printed,
             "status": structure.status,
         })
-    return {
+    data = {
         "experiment_uuid": record.uuid,
         "experiment_label": record.label,
         "substrate_label": record.substrate_label,
@@ -180,6 +197,10 @@ def summary(record: ExperimentRecord) -> dict[str, Any]:
         "duration_s": _printing_duration(record),
         "structures": [{column: row[column] for column in COLUMNS} for row in rows],
     }
+    dhm_config = _dhm_config(record)
+    if dhm_config:  # only with a DHM record, so the stored summary of older experiments stays the same
+        data["dhm_config"] = dhm_config
+    return data
 
 
 def format_table(data: dict[str, Any]) -> str:
@@ -210,6 +231,11 @@ def format_table(data: dict[str, Any]) -> str:
     if data.get("estimated_s") is not None:
         header += (f"; printing time expected {format_duration(data['estimated_s'])}, actual "
                    f"{format_duration(data.get('duration_s'))}")
+    dhm = data.get("dhm_config")
+    if dhm:
+        pixel = "x".join(f"{v:g}" for v in dhm["pixel_um"]) if dhm.get("pixel_um") else "-"
+        header += (f"; DHM {dhm['adapter']} {dhm['parameter_set_id'] or '-'} "
+                   f"({(dhm['config_hash'] or '-')[:8]}), pixel {pixel} um ({dhm['pixel_source']})")
     rows = [[text(row[column]) for column in COLUMNS] for row in data["structures"]]
     widths = [max([len(column)] + [len(row[i]) for row in rows]) for i, column in enumerate(COLUMNS)]
     lines = [header, "  ".join(column.ljust(w) for column, w in zip(COLUMNS, widths))]

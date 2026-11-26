@@ -26,6 +26,8 @@ DHM_JOB_STATES = ("reserved", "sent", "acquired", "stored", "acknowledged", "fai
 DHM_ADAPTERS = ("legacy", "service", "fake")
 DHM_GROUP_KINDS = ("layer", "speckle", "background")
 DHM_CALIBRATION_KINDS = ("exposure", "opl_scan", "background")
+# Source of the DHM pixel size (§15.4); it never comes from Koala (B17)
+DHM_PIXEL_SOURCES = ("parameter_set", "calibration", "nominal")
 
 # Experiment constructor parameters: (constructor argument, key in experiment_dictionary.json,
 # attribute in /metadata/experiment, kind). Kinds: "float", "int", "bool", "str",

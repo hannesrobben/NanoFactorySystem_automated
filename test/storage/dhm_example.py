@@ -1,7 +1,8 @@
 """Example experiment file with DHM service results (docs/design/EXPERIMENT_STORAGE.md §15, schema 1.3).
 
 ``write_dhm_example(folder)`` builds a small ``experiment.h5`` with every item of §15: a reserved and a
-stored service capture (``ProductSet`` with frame records and raw reference), a stitched ``LayerProduct``
+stored service capture (``ProductSet`` with frame records and raw reference), the DHM session record and
+parameter set (T79), a stitched ``LayerProduct``
 group of two member captures, a failed capture, an orphan reference, a background calibration and a legacy
 capture. The values are synthetic. The file is the fixture that OffAxisHolo (K12), MIRA (MI-62) and
 DHMConnect vendor; regenerate it with::
@@ -132,6 +133,15 @@ def write_dhm_example(folder) -> Path:
     store.begin_session("new")
     try:
         store.add_structure(_structure())
+        # DHM configuration of the session and the parameter set once per hash (T79, section 15.4)
+        store.write_dhm_session({"adapter": "service", "service_version": "0.1.0", "protocol_version": "1.0",
+                                 "software_versions": {"dhmconnect": "0.1.0", "offaxisholo": "0.4.0"},
+                                 "parameter_set_id": PARAMETER_SET_ID, "config_hash": CONFIG_HASH,
+                                 "pixel_um": PIXEL_UM, "pixel_source": "parameter_set",
+                                 "camera": {"model": "Basler acA1300", "bit_depth": 8}, "objective": "Zeiss 63x"})
+        store.write_parameter_set(CONFIG_HASH, PARAMETER_SET_ID,
+                                  {"parameter_set_id": PARAMETER_SET_ID, "wavelength_um": 0.674994,
+                                   "objective": {"magnification": 63.0, "pixel_um": PIXEL_UM}})
         recipe = {"mode": "products", "frames": 2, "selection_policy": "all", "keep_raw": "all"}
         context = {"experiment_uuid": EXPERIMENT_UUID, "structure": "pillar_03", "layer": 4, "z_hint_um": -2.4}
         # A stitched layer: two member captures of one group (N1, N2)
