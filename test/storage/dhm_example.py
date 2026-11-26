@@ -4,11 +4,15 @@
 stored service capture (``ProductSet`` with frame records and raw reference), the DHM session record and
 parameter set (T79), a stitched ``LayerProduct``
 group of two member captures, a failed capture, an orphan reference, a background calibration and a legacy
-capture. The values are synthetic. The file is the fixture that OffAxisHolo (K12), MIRA (MI-62) and
-DHMConnect vendor; regenerate it with::
+capture. The values are synthetic; the product headers start from the contract examples of DHMConnect
+(vendored in ``data/contracts``, see its ``MANIFEST.json``), so they are valid ``ProductSet`` 1.0 and
+``LayerProduct`` 1.0 messages. The file is the fixture that OffAxisHolo (K12), MIRA (MI-62) and DHMConnect
+vendor; regenerate it with::
 
     python test/storage/dhm_example.py <target folder>
 """
+import copy
+import json
 import sys
 from pathlib import Path
 
@@ -21,6 +25,11 @@ CONFIG_HASH = "af2c68e689d640b9bbfd8f9e0cdaa6923aab578f591682466bbd4bdf5ec8a38f"
 PARAMETER_SET_ID = "zeiss63x-insitu-v1"
 SHAPE = (16, 16)
 PIXEL_UM = [0.1738, 0.1738]
+CONTRACTS = Path(__file__).parent / "data" / "contracts"
+
+
+def _example(name: str) -> dict:
+    return json.loads((CONTRACTS / f"{name}.example.json").read_text(encoding="utf-8"))
 
 
 def _record() -> ExperimentRecord:
@@ -65,9 +74,10 @@ def _descriptors(buffers: list) -> list:
             for name, data in buffers]
 
 
-def product_set_header(capture_id: str, job_id: str, buffers: list) -> dict:
-    """ A ``ProductSet`` 1.0 header with one used and one rejected frame. """
+def product_set_header(capture_id: str, job_id: str, buffers: list, tile_index: int = 0) -> dict:
+    """ A ``ProductSet`` 1.0 header (contract example with this capture's ids) with one used and one rejected frame. """
 
+    header = copy.deepcopy(_example("ProductSet"))
     frames = [
         {"index": 0, "used": True, "reject_reason": None,
          "metrics": {"saturated_count": 0, "sideband_fraction": 0.081, "piston_rad": 0.12, "phase_noise_rad": None},
@@ -78,52 +88,44 @@ def product_set_header(capture_id: str, job_id: str, buffers: list) -> dict:
          "acquisition": {"frame_id": 1202, "exposure_us": 16800, "camera_time_s": 1021.367,
                          "host_utc": "2026-11-26T12:00:00.234Z"}},
     ]
-    return {
-        "message_type": "ProductSet", "schema_version": "1.0", "product_id": f"ps-{capture_id}",
-        "context_id": "ctx-example", "job_id": job_id,
-        "reconstruction": {
-            "message_type": "ReconstructionResult", "schema_version": "1.0",
-            "created_utc": "2026-11-26T12:00:01.000Z", "pixel_um": PIXEL_UM, "z_um": -2.4,
-            "propagation_index": 1.508, "wavelength_um": 0.674994, "parameter_set_id": PARAMETER_SET_ID,
-            "config_hash": CONFIG_HASH, "frames": frames,
-            "quality": {"n_obj": 1, "n_effective": 1.0, "n_bg": 10, "selection_policy": "all",
-                        "reference_source": "mask_a_priori", "reference_fraction": 0.71, "phase_noise_rad": 0.042,
-                        "background_id": "bg-0001", "background_created_utc": "2026-11-26T11:55:00Z",
-                        "background_age_s": 300.0},
-            "timings_s": {"total": 0.012, "grab": 0.27}, "timings_profiled": False,
-            "versions": {"offaxisholo": "0.4.0", "numpy": "2.3.0"}, "warnings": [],
-            "buffers": _descriptors(buffers)},
-        "raw_ref": {"host": "dhm-pc", "path": f"D:/raw/{EXPERIMENT_UUID}/captures/{capture_id}_{job_id}.h5",
-                    "sha256": "0" * 64, "n_frames": 2, "keep_raw": "all"},
-        "parameter_set_id": PARAMETER_SET_ID, "config_hash": CONFIG_HASH, "background_id": "bg-0001",
-        "created_utc": "2026-11-26T12:00:01.000Z",
-    }
+    recon = header["reconstruction"]
+    recon.update({"created_utc": "2026-11-26T12:00:01.000Z", "pixel_um": PIXEL_UM, "z_um": -2.4,
+                  "propagation_index": 1.508, "wavelength_um": 0.674994, "parameter_set_id": PARAMETER_SET_ID,
+                  "config_hash": CONFIG_HASH, "frames": frames, "buffers": _descriptors(buffers)})
+    recon["quality"].update({"n_frames_total": 2, "n_frames_used": 1, "background_id": "bg-0001",
+                             "background_created_utc": "2026-11-26T11:55:00Z", "background_age_s": 300.0})
+    header["capture"].update({"experiment_uuid": EXPERIMENT_UUID, "structure_id": "pillar_03", "layer_index": 4,
+                              "capture_id": capture_id, "image_index": tile_index, "group_id": "grp-0001",
+                              "tile_index": tile_index})
+    header.update({"product_id": f"ps-{capture_id}", "context_id": "ctx-example", "job_id": job_id,
+                   "background_id": "bg-0001", "parameter_set_id": PARAMETER_SET_ID, "config_hash": CONFIG_HASH,
+                   "raw_ref": {"host": "dhm-pc",
+                               "path": f"D:/raw/{EXPERIMENT_UUID}/captures/{capture_id}_{job_id}.h5",
+                               "sha256": "0" * 64, "n_frames": 2, "keep_raw": "all"},
+                   "created_utc": "2026-11-26T12:00:01.000Z"})
+    return header
 
 
 def layer_product_header(group_id: str, job_id: str, member_ids: list, buffers: list) -> dict:
-    """ A ``LayerProduct`` 1.0 header of two tiles. """
+    """ A ``LayerProduct`` 1.0 header (contract example with this group's ids), one tile per member. """
 
-    tiles = [{"product_id": pid, "tile_index": i, "planned_um": {"x": 1000.0 + 2.0 * i, "y": 1000.0, "z": 20000.0},
-              "actual_um": {"x": 1000.0 + 2.0 * i, "y": 1000.0, "z": 20000.0},
-              "registration": {"shift_um": [0.0, 0.0], "method": "stage_prior+phase_correlation",
-                               "residual_um": 0.01},
-              "piston_rad": 0.0, "tilt_rad_per_um": [0.0, 0.0], "anchor": "ring_substrate", "residual_rad": 0.02,
-              "border_band_um": 1.0, "reference_source": "mask_a_priori", "reference_fraction": 0.7,
-              "unwrap": {"method": "fast2d", "k_offset": 0, "consistent": True, "residues": 0}, "flagged": False}
-             for i, pid in enumerate(member_ids)]
-    return {
-        "message_type": "LayerProduct", "schema_version": "1.0", "product_id": f"lp-{group_id}",
-        "context_id": "ctx-example", "job_id": job_id, "group_id": group_id, "group_kind": "layer",
-        "experiment_uuid": EXPERIMENT_UUID, "structure_id": "pillar_03", "layer_index": 4,
-        "grid": {"origin_um": [998.6, 998.6], "pixel_um": PIXEL_UM, "shape": list(SHAPE)},
-        "tiles": tiles, "member_ids": member_ids,
-        "quality": {"n_tiles": len(tiles), "n_flagged": 0, "phase_noise_rad": 0.03, "unwrap_method": "fast2d",
-                    "coverage_min": 1, "recovered": False},
-        "z_um": -2.4, "propagation_index": 1.508, "n_surround": 1.508, "wavelength_um": 0.674994,
-        "background_ids": ["bg-0001"], "parameter_set_id": PARAMETER_SET_ID, "config_hash": CONFIG_HASH,
-        "versions": {"mira": "0.2.0"}, "timings_s": {"total": 0.4}, "warnings": [],
-        "buffers": _descriptors(buffers), "created_utc": "2026-11-26T12:00:05.000Z",
-    }
+    header = copy.deepcopy(_example("LayerProduct"))
+    template = header["tiles"][0]
+    tiles = []
+    for i, pid in enumerate(member_ids):
+        tile = copy.deepcopy(template)
+        tile.update({"product_id": pid, "tile_index": i,
+                     "planned_um": {"x": 1000.0 + 2.0 * i, "y": 1000.0, "z": 20000.0},
+                     "actual_um": {"x": 1000.0 + 2.0 * i, "y": 1000.0, "z": 20000.0}})
+        tiles.append(tile)
+    header.update({"product_id": f"lp-{group_id}", "context_id": "ctx-example", "job_id": job_id,
+                   "group_id": group_id, "experiment_uuid": EXPERIMENT_UUID, "structure_id": "pillar_03",
+                   "layer_index": 4, "tiles": tiles, "member_ids": member_ids,
+                   "parameter_set_id": PARAMETER_SET_ID, "config_hash": CONFIG_HASH, "background_ids": ["bg-0001"],
+                   "buffers": _descriptors(buffers), "created_utc": "2026-11-26T12:00:05.000Z"})
+    header["grid"].update({"origin_um": [998.6, 998.6], "pixel_um": PIXEL_UM, "shape": list(SHAPE)})
+    header["quality"].update({"n_tiles": len(tiles), "n_flagged": 0})
+    return header
 
 
 def write_dhm_example(folder) -> Path:
@@ -153,7 +155,7 @@ def write_dhm_example(folder) -> Path:
             job_id = f"job-{100 + i}"
             store.update_capture_job(capture_id, job_state="sent", job_id=job_id)
             buffers = _buffers(i)
-            store.add_dhm_result(capture_id, product_set_header(capture_id, job_id, buffers), buffers)
+            store.add_dhm_result(capture_id, product_set_header(capture_id, job_id, buffers, i), buffers)
             store.update_capture_job(capture_id, job_state="acknowledged")
             members.append(capture_id)
         buffers = _buffers(10, field=True)

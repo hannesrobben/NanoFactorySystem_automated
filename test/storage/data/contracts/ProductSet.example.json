@@ -1,0 +1,182 @@
+{
+  "message_type": "ProductSet",
+  "schema_version": "1.0",
+  "product_id": "ps-000231",
+  "context_id": "ctx-3f2a",
+  "job_id": "job-000231",
+  "reconstruction": {
+    "message_type": "ReconstructionResult",
+    "schema_version": "1.0",
+    "created_utc": "2026-11-18T09:12:03.950Z",
+    "pixel_um": [
+      0.1738,
+      0.1738
+    ],
+    "z_um": -2.4,
+    "propagation_index": 1.508,
+    "wavelength_um": 0.674994,
+    "parameter_set_id": "zeiss63x-insitu-v1",
+    "config_hash": "af2c68e689d640b9bbfd8f9e0cdaa6923aab578f591682466bbd4bdf5ec8a38f",
+    "frames": [
+      {
+        "index": 0,
+        "used": true,
+        "reject_reason": null,
+        "metrics": {
+          "saturated_count": 0,
+          "black_count": 12,
+          "sideband_fraction": 0.081,
+          "piston_rad": 0.12,
+          "phase_noise_rad": null
+        },
+        "acquisition": {
+          "frame_id": 1201,
+          "exposure_us": 16800,
+          "camera_time_s": 1021.334,
+          "host_utc": "2026-11-18T09:12:03.201Z"
+        }
+      }
+    ],
+    "quality": {
+      "n_obj": 1,
+      "n_effective": 1.0,
+      "n_bg": 10,
+      "piston_std_rad": 0.0,
+      "selection_policy": "all",
+      "n_frames_total": 1,
+      "n_frames_used": 1,
+      "selection_min_frames": 1,
+      "selection_min_frames_enforced": false,
+      "reference_source": "mask_a_priori",
+      "reference_fraction": 0.71,
+      "phase_noise_rad": 0.042,
+      "background_id": "bg-0008",
+      "background_created_utc": "2026-11-18T09:05:00Z",
+      "background_age_s": 423.9
+    },
+    "timings_s": {
+      "upload": 0.001,
+      "demodulation": 0.004,
+      "total": 0.012,
+      "grab": 0.27
+    },
+    "timings_profiled": false,
+    "versions": {
+      "offaxisholo": "0.4.0",
+      "numpy": "2.3.0",
+      "cupy": null
+    },
+    "warnings": [],
+    "buffers": [
+      {
+        "name": "phase_rad",
+        "dtype": "float32",
+        "shape": [
+          512,
+          512
+        ],
+        "byte_order": "little"
+      },
+      {
+        "name": "intensity_rel",
+        "dtype": "float32",
+        "shape": [
+          512,
+          512
+        ],
+        "byte_order": "little"
+      }
+    ]
+  },
+  "capture": {
+    "message_type": "CaptureContext",
+    "schema_version": "1.0",
+    "experiment_uuid": "6b1f3c1e-2d4a-4f7e-9c0a-1b2c3d4e5f60",
+    "experiment_label": "pillars_63x_2026-11-18",
+    "substrate_id": "S-0042",
+    "session_id": "1",
+    "structure_id": "pillar_03",
+    "phase": "in_situ",
+    "layer_index": 4,
+    "capture_id": "L004-C012",
+    "image_index": 12,
+    "group_id": "grp-0007",
+    "tile_index": 3,
+    "position_commanded_um": {
+      "x": 1200.0,
+      "y": 850.0,
+      "z": 32.5
+    },
+    "position_actual_um": {
+      "x": 1200.02,
+      "y": 849.98,
+      "z": 32.5
+    },
+    "occupied_um": [
+      [
+        [
+          840.0,
+          1190.0
+        ],
+        [
+          840.0,
+          1210.0
+        ],
+        [
+          860.0,
+          1210.0
+        ],
+        [
+          860.0,
+          1190.0
+        ]
+      ]
+    ],
+    "occupied_raster": null,
+    "pose_tolerance_um": 1.5,
+    "material": {
+      "material_id": "sz2080",
+      "name": "SZ2080",
+      "registry_version": "1",
+      "wavelength_nm": 674.994,
+      "states": {
+        "uncured": {
+          "n": 1.508,
+          "source": "maintainer measurement 2026"
+        },
+        "cured_in_resin": {
+          "n": 1.52,
+          "source": "maintainer measurement 2026"
+        },
+        "cured_developed": {
+          "n": 1.52,
+          "source": "maintainer measurement 2026, checked against air"
+        }
+      }
+    },
+    "n_structure": 1.52,
+    "n_surround": 1.508,
+    "propagation_index": 1.508,
+    "z_hint": {
+      "kind": "experiment_focus",
+      "z_um": -2.4
+    },
+    "created_utc": "2026-11-18T09:12:03.100Z"
+  },
+  "recipe_hash": "9a8b7c6d5e4f30211203f4e5d6c7b8a99a8b7c6d5e4f30211203f4e5d6c7b8a9",
+  "background_id": "bg-0008",
+  "raw_ref": {
+    "host": "DHM-PC",
+    "path": "D:/dhm_archive/6b1f3c1e-2d4a-4f7e-9c0a-1b2c3d4e5f60/captures/L004-C012_job-000231.h5",
+    "sha256": "9a8b7c6d5e4f30211203f4e5d6c7b8a99a8b7c6d5e4f30211203f4e5d6c7b8a9",
+    "n_frames": 10
+  },
+  "parameter_set_id": "zeiss63x-insitu-v1",
+  "config_hash": "af2c68e689d640b9bbfd8f9e0cdaa6923aab578f591682466bbd4bdf5ec8a38f",
+  "service_versions": {
+    "dhmconnect": "0.1.0",
+    "offaxisholo": "0.4.0",
+    "mira": "0.3.0"
+  },
+  "created_utc": "2026-11-18T09:12:04.000Z"
+}
