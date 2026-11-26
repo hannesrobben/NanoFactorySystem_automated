@@ -1176,6 +1176,26 @@ def test_reprint_prints_the_highest_missing_layer_first_and_splits(test_config, 
     assert not any(split_dir.iterdir())  # parts removed after printing
 
 
+def test_optimised_programs_print_the_same_path(test_config, dummy_backend, no_sleep, tmp_path):
+    # T130: opt-in build option; the exposed path stays within 10 nm
+    exposures, sizes = {}, {}
+    for optimize in (False, True):
+        path = tmp_path / f"opt_{optimize}"
+        path.mkdir()
+        start = len(dummy_backend.world.exposures)
+        with make_experiment(path, dummy_backend, optimize_programs=optimize) as experiment:
+            experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+            add_rectangle(experiment)
+            experiment.build_programs()
+            sizes[optimize] = sum(Path(f).stat().st_size for f in experiment.structure_configs[0]["layer_files"])
+            experiment.print_experiment()
+        exposures[optimize] = dummy_backend.world.exposures[start:]
+    assert sizes[True] < sizes[False]
+    assert len(exposures[True]) == len(exposures[False]) > 0
+    for plain, short in zip(exposures[False], exposures[True]):
+        assert np.allclose(plain.start, short.start, atol=1e-5) and np.allclose(plain.end, short.end, atol=1e-5)
+
+
 def test_structure_program_is_stored_compressed_or_as_reference(test_config, dummy_backend, no_sleep, tmp_path):
     # T124
     texts = {}

@@ -33,6 +33,7 @@ from nanofactorysystem.aerobasic.programs.drawings import DrawableObject, Drawab
 from nanofactorysystem.aerobasic.programs.drawings.lines import Corner
 from nanofactorysystem.aerobasic.programs.drawings.qr_code import QRCode, QrErrorCorrection
 from nanofactorysystem.aerobasic.programs.setups import DefaultSetup, SetupIFOV
+from nanofactorysystem.aerobasic.programs.optimize import optimize_file
 from nanofactorysystem.aerobasic.programs.split import (MAX_PROGRAM_LINES, ProgramSplitError, count_lines,
                                                         existing_parts, remove_parts, split_program_file)
 from nanofactorysystem.backends import BackendLike
@@ -56,8 +57,8 @@ from nanofactorysystem.time_estimate import (DEFAULT_LAYER_OVERHEAD_S, TimeEstim
 from nanofactorysystem.storage.substrate_store import (SubstrateRecord, SubstrateStore, check_not_synced,
                                                        default_root, layout_area_um)
 from nanofactorysystem.storage import schema
-from nanofactorysystem.voxel.materials import MaterialRegistry, material_names, unregistered_snapshot
 from nanofactorysystem.storage.experiment_store import STRUCTURE_PROGRAM_MODES
+from nanofactorysystem.voxel.materials import MaterialRegistry, material_names, unregistered_snapshot
 from nanofactorysystem.dhm.optimage import optImageMedian
 from nanofactorysystem.utils.visualization import read_file, plot_movements
 
@@ -175,6 +176,7 @@ class Experiment(object):
                  max_program_lines: Optional[int] | str = "auto",
                  stop_on_failure: bool = True,
                  program_loader: str = "ascii",
+                 optimize_programs: bool = False,
                  structure_program: str = "compressed"):
         """ Experiment on one substrate.
 
@@ -280,12 +282,19 @@ class Experiment(object):
             ``libraryDll``), run on task 1 while the next part is compiled
             without a task (add-ahead, T129/T132, ``devices/aerotech/loader.py``).
             Opt-in until the lab validation.
-
+        optimize_programs : bool
+            Shorten every layer program while building with
+            ``aerobasic.programs.optimize`` (trailing zeros, modal feed rates
+            and axis words, collinear moves merged; the exposed path changes
+            by at most 10 nm). Default False (T130, maintainer decision: opt-in
+            until a lab print with optimised programs). The reduction is logged
+            per structure.
         structure_program : {"compressed", "reference"}
             How the whole-structure program is stored in the experiment file
             (T124): ``"compressed"`` (default) as gzip-compressed UTF-8 bytes,
             ``"reference"`` only its SHA-256, line count and file (the layer
             programs are stored anyway).
+
         Raises
         ------
         FileExistsError
@@ -304,10 +313,11 @@ class Experiment(object):
         self.program_loader = str(program_loader).lower()
         if self.program_loader not in ("ascii", "library"):
             raise ValueError(f"program_loader must be 'ascii' or 'library', not {program_loader!r}")
-        self._loader = None
+        self.optimize_programs = bool(optimize_programs)
         self.structure_program_mode = str(structure_program).lower()
         if self.structure_program_mode not in STRUCTURE_PROGRAM_MODES:
             raise ValueError(f"structure_program must be one of {STRUCTURE_PROGRAM_MODES}, not {structure_program!r}")
+        self._loader = None
         self._health_log: list[str] = []
 
         # Substrate record and experiment folder
@@ -1458,6 +1468,7 @@ class Experiment(object):
         structure_pgm = DrawableAeroBasicProgram(coordinate_system)
         layer_pgm_paths = []
         layer_powers = []
+        optimized = []
         # NOTE What to do with tiles
         x_structure_center = structure_center_absolute_mm["X"]
         y_structure_center = structure_center_absolute_mm["Y"]
@@ -1499,6 +1510,8 @@ class Experiment(object):
             # Store layer program file
             layer_pgm_path = pgm_path / f"program_{name}.{layer_id:03d}.txt"
             layer_pgm.write(layer_pgm_path)
+            if self.optimize_programs:
+                optimized.append(optimize_file(layer_pgm_path, layer_pgm_path))  # in place (T130)
             layer_pgm_paths.append(str(layer_pgm_path))
 
             # Add layer program to structure program
@@ -1510,6 +1523,13 @@ class Experiment(object):
         # Store structure program file
         structure_pgm_path = path / f"program_{name}.txt"
         structure_pgm.write(structure_pgm_path)
+        if self.optimize_programs:
+            optimize_file(structure_pgm_path, structure_pgm_path)
+            before = sum(s.bytes_before for s in optimized)
+            after = sum(s.bytes_after for s in optimized)
+            self.log.info(f"{name}: layer programs optimised from {sum(s.lines_before for s in optimized)} to "
+                          f"{sum(s.lines_after for s in optimized)} lines, {before} to {after} bytes "
+                          f"({100 * (1 - after / max(before, 1)):.0f} % smaller, T130)")
 
         # Structure configuration
         structure_config = {
