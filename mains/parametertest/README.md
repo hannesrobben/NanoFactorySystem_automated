@@ -69,5 +69,5 @@ columns once P_th, w and l are known. `analysis/experiment_analysis/voxel_fit.py
 
 ## Version 1
 
-`mains/Experiments/ptd01/` holds the superseded two-stage PTD-01 scripts (F0 first, then F1–F7 normalised with
-its results). Do not print them; they stay until their removal is approved (attic procedure X-B).
+The superseded two-stage PTD-01 scripts (F0 first, then F1–F7 normalised with its results) were moved to the local
+attic on 2026-11-26 (T164); `docs/ATTIC_INDEX.md` lists them with the commit to restore them from.

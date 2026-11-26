@@ -263,8 +263,21 @@ def check_layout(substrate: SubstrateSpec, experiments: list[SubstrateExperiment
 
 
 def plot_substrate(substrate: SubstrateSpec, areas: list[Area], existing: Optional[list[Area]] = None,
-                   show: bool = False):
+                   show: bool = False, layouts: Optional[list] = None):
     """ Plot the resin drop, the planned experiment areas and those already on the substrate.
+
+    Parameters
+    ----------
+    substrate : SubstrateSpec
+    areas : list of Area
+        Planned experiment areas.
+    existing : list of Area, optional
+        Areas of the experiments already on the substrate.
+    show : bool
+        Show the window (blocks); otherwise the figure never opens one.
+    layouts : list of ExperimentLayout, optional
+        Layouts of the planned experiments (:func:`nanofactorysystem.layout.spec_layout`, T80): their cells,
+        corners and QR codes are drawn into the areas.
 
     Returns
     -------
@@ -288,6 +301,10 @@ def plot_substrate(substrate: SubstrateSpec, areas: list[Area], existing: Option
         size = np.subtract(area.upper, area.lower)
         ax.add_patch(Rectangle(area.lower, *size, alpha=0.3, color=color))
         ax.annotate(area.name, np.add(area.lower, size / 2), ha="center", va="center", fontsize=8)
+    if layouts:
+        from .layout import draw_layout
+        for index, layout in enumerate(layouts):
+            draw_layout(ax, layout, label_cells=False, legend=index == 0)
     ax.set_xlim(lower[0], upper[0])
     ax.set_ylim(lower[1], upper[1])
     ax.set_aspect("equal")
@@ -373,7 +390,8 @@ def run_substrate(substrate: SubstrateSpec, experiments: list[SubstrateExperimen
     existing = existing_areas(store.root, substrate.label, logger) if known else []
     areas = check_layout(substrate, experiments, existing)
     if show_plot:
-        plot_substrate(substrate, areas, existing, show=True)
+        from .layout import spec_layout
+        plot_substrate(substrate, areas, existing, show=True, layouts=[spec_layout(e.spec) for e in experiments])
 
     record = open_substrate(substrate, store)
     logger.info(f"Substrate {record.label}: {len(experiments)} experiments, {len(existing)} already on it")

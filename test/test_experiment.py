@@ -1174,3 +1174,73 @@ def test_reprint_prints_the_highest_missing_layer_first_and_splits(test_config, 
     assert all(e["status"] == "ok" for e in events if e["session"] == "001")
     assert len(dummy_backend.calllog.filter(device="program")) > len(failed)  # printed in parts
     assert not any(split_dir.iterdir())  # parts removed after printing
+
+
+def test_optimised_programs_print_the_same_path(test_config, dummy_backend, no_sleep, tmp_path):
+    # T130: opt-in build option; the exposed path stays within 10 nm
+    exposures, sizes = {}, {}
+    for optimize in (False, True):
+        path = tmp_path / f"opt_{optimize}"
+        path.mkdir()
+        start = len(dummy_backend.world.exposures)
+        with make_experiment(path, dummy_backend, optimize_programs=optimize) as experiment:
+            experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+            add_rectangle(experiment)
+            experiment.build_programs()
+            sizes[optimize] = sum(Path(f).stat().st_size for f in experiment.structure_configs[0]["layer_files"])
+            experiment.print_experiment()
+        exposures[optimize] = dummy_backend.world.exposures[start:]
+    assert sizes[True] < sizes[False]
+    assert len(exposures[True]) == len(exposures[False]) > 0
+    for plain, short in zip(exposures[False], exposures[True]):
+        assert np.allclose(plain.start, short.start, atol=1e-5) and np.allclose(plain.end, short.end, atol=1e-5)
+
+
+def test_structure_program_is_stored_compressed_or_as_reference(test_config, dummy_backend, no_sleep, tmp_path):
+    # T124
+    texts = {}
+    for mode in ("compressed", "reference"):
+        path = tmp_path / mode
+        path.mkdir()
+        with make_experiment(path, dummy_backend, structure_program=mode) as experiment:
+            experiment.plane_fit(plane=dummy_backend.world.sample.plane())
+            add_rectangle(experiment)
+            experiment.build_programs()
+            built = Path(experiment.structure_configs[0]["program_file"]).read_text()
+        texts[mode] = ExperimentStore.open(path).read_structure_program("rect")
+        if mode == "compressed":
+            assert texts[mode] == built
+    assert texts["reference"] is None
+    (tmp_path / "bad").mkdir()
+    with pytest.raises(ValueError, match="structure_program"):
+        make_experiment(tmp_path / "bad", dummy_backend, structure_program="zip")
+
+
+def test_r1_runs_at_most_the_limit_per_structure_and_r2_only_after_consent(experiment, dummy_backend):
+    # T133 (maintainer decision 2026-11-26): R1 automatically after a detected error, limited per structure;
+    # R2 only after the operator agreed and only before anything of the experiment was printed
+    from nanofactorysystem.aerobasic.ascii import AerotechError
+    add_rectangle(experiment)
+    experiment.build_programs()
+    original = dummy_backend.transport._axis_item
+    dummy_backend.transport._axis_item = lambda axis, item: (
+        "4" if (axis, item) == ("Z", "AxisFault") else original(axis, item))
+    questions = []
+    experiment._confirm_recovery = lambda question: questions.append(question) or False
+    experiment.max_r1_per_structure = 1
+
+    for _ in range(2):
+        with pytest.raises(AerotechError, match="not ready to print"):
+            experiment.print_experiment()
+
+    restarts = [c for c in dummy_backend.calllog.filter(device="controller") if c.call == "restart_ascii_interface"]
+    assert len(restarts) == 1                                     # the limit of 1 per structure
+    health = "".join(ExperimentStore.open(experiment.path).read_logs("health").values())
+    assert "R1 (1 of 1)" in health and "R1 not run: the limit of 1" in health
+    assert len(questions) == 2 and "R2 resets the controller" in questions[0]
+    assert "~RESETCONTROLLER" not in dummy_backend.calllog.commands()   # declined
+
+    experiment._confirm_recovery = lambda question: True
+    with pytest.raises(AerotechError, match="controller was reset"):
+        experiment.print_experiment()
+    assert "~RESETCONTROLLER" in dummy_backend.calllog.commands()

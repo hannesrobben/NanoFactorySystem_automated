@@ -293,6 +293,16 @@ Implemented on 2026-11-24 (T133, partial): the health check and R0 in `nanofacto
 without side effects; R2 works but disables and unhomes every axis; R3 was refused for lack of
 administrator rights.
 
+Implemented on 2026-11-26 (T133, maintainer decision of the todo review): R1 runs **automatically** when the
+controller is still not healthy after R0, only after a detected error and at most `Experiment(max_r1_per_structure=2)`
+times per structure, so that a persistent error never ends in a loop of restarts; beyond the limit printing stops.
+R2 and R3 run only after the operator agreed in a **message box** (a console message is too easy to miss):
+`Experiment(confirm_recovery=...)` (default: a Tk message box on the lab hardware, never on the dummy backend)
+offers R2 before a structure only while nothing of the experiment was printed (between experiments) and stops
+afterwards (axes must be enabled and homed by hand); R3 is offered by `mains/controller_health.py --r3`.
+Functions: `recover_r1`, `reset_controller`, `restart_a3200_service`, `terminate_ascii_interface` in `health.py`;
+backend seam `restart_ascii_interface()`.
+
 **Health check** (no side effects, before every experiment and after every failure):
 - ASCII reachable (`~VERSION`);
 - tasks 1/2 idle;
@@ -310,9 +320,9 @@ with the laser on: the laser is set to 0 and the gate closed first.
 | Level | Action | Side effects | Who triggers it |
 |---|---|---|---|
 | R0 | Stop tasks 1/2, remove every added program (by listed name), `ACKNOWLEDGEALL` | none on axes or positions | automatic before a print and after a failure |
-| R1 | Restart only the ASCII interface (terminate `A3200AsciiInterface.exe`, if the CommService starts it again; lab session 2) | ASCII connection lost, reconnect | software after operator confirmation |
-| R2 | Controller reset with the documented ASCII command `~RESETCONTROLLER` (the "Reset Controller" button of Motion Composer; `A3200Reset` of the library as alternative) | Axes disabled, home and IFOV/galvo settings possibly lost → enable axes, possibly home, re-initialise the setup | operator confirms on the console; homing only with the objective at a safe Z |
-| R3 | Restart the A3200 software (`Restart-Service A3200CommService`, admin rights) | as R2, plus all connections | operator confirms; only if R1/R2 do not help |
+| R1 | Restart only the ASCII interface (terminate `A3200AsciiInterface.exe`, if the CommService starts it again; lab session 2) | ASCII connection lost, reconnect | automatic after a detected error, at most `max_r1_per_structure` (2) per structure (2026-11-26) |
+| R2 | Controller reset with the documented ASCII command `~RESETCONTROLLER` (the "Reset Controller" button of Motion Composer; `A3200Reset` of the library as alternative) | Axes disabled, home and IFOV/galvo settings possibly lost → enable axes, possibly home, re-initialise the setup | operator confirms in a message box, only between experiments; enabling and homing by hand (2026-11-26) |
+| R3 | Restart the A3200 software (`Restart-Service A3200CommService`, admin rights) | as R2, plus all connections | operator confirms in a message box (`controller_health.py --r3`); only if R1/R2 do not help |
 
 Each level is followed by the health check again. The experiment continues only if it passes. The
 print resumes with `restart_experiment()` from the recorded progress; double exposure of the

@@ -103,6 +103,12 @@ class DummyBackend:
 
         return self.workdir
 
+    def restart_ascii_interface(self) -> str:
+        """ Simulate recovery level R1 (T133): recorded in the call log, the simulated controller stays as it is. """
+
+        self.world.calllog.record("controller", "restart_ascii_interface", (), {}, self.world.clock.now)
+        return "simulated"
+
     def program_loader(self, dll: Optional[str] = None):
         """ Return a :class:`DummyLoader` on the simulated controller (T129); ``dll`` is ignored. """
 

@@ -1,4 +1,4 @@
-"""Process calibration and stage-A axes of the test print PTD-01 (T140, design §4.4, §7).
+"""Process calibration of the test prints (T140, design TEST_PRINT_PTD01.md §4.4, §7).
 
 - :class:`ProcessCalibration` holds the stage-A results of one material / objective / setup /
   velocity (P_th, P_dam, interface working point z0, the voxel fit model) and converts the
@@ -6,9 +6,9 @@
   ``h = h_rel · w(P)``, ``Δz = dz_rel · l(P)`` with the voxel size **at the power of the cell**.
   JSON schema ``nanofactory.process_calibration/1``; the file is written after the evaluation of
   stage A (``provisional=True``) and refined after stage B (T151).
-- :class:`StageAAxes` holds the start values of stage A (field F0) for one material: the power
-  range of the logarithmic power ladder, the z offsets and the label power. One file per material
-  (``stage_a_<material>.json``, decision D8), schema ``nanofactory.ptd_stage_a/1``.
+
+The stage-A start values of the two-stage PTD-01 (``StageAAxes``) were moved to the attic with version 1
+(T164, ``docs/ATTIC_INDEX.md``); the parameter tests of version 2 use ``inputs.ParameterTestInputs``.
 
 Missing physical values raise ``MissingPropertyError`` (no silent default, G7); a wrong schema
 raises ``SpecSerialisationError``.
@@ -20,20 +20,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
-import numpy as np
-
 from nanofactorysystem.experiment_spec import SpecSerialisationError
 from nanofactorysystem.voxel.materials import MissingPropertyError
 
 from .voxel_fit import VELOCITY_TOLERANCE, VoxelFitModel
 
-__all__ = ["ProcessCalibration", "StageAAxes", "as_calibration", "as_stage_a", "CALIBRATION_SCHEMA",
-           "STAGE_A_SCHEMA", "DEFAULT_Z_OFFSETS_UM"]
+__all__ = ["ProcessCalibration", "as_calibration", "CALIBRATION_SCHEMA"]
 
 CALIBRATION_SCHEMA = "nanofactory.process_calibration/1"
-STAGE_A_SCHEMA = "nanofactory.ptd_stage_a/1"
-# z offsets of F0 relative to the fitted plane: -1.0 ... +2.5 µm in steps of 0.5 µm (design §5)
-DEFAULT_Z_OFFSETS_UM = (-1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5)
 
 
 def _check_schema(data: Any, schema: str) -> None:
@@ -221,122 +215,7 @@ class ProcessCalibration:
         return cls.from_json(json.loads(Path(path).read_text(encoding="utf-8")))
 
 
-@dataclass(frozen=True)
-class StageAAxes:
-    """ Start values of stage A (field F0) for one material (decision D8).
-
-    Parameters
-    ----------
-    material : str
-        Registry name of the resin.
-    p_min_mw, p_max_mw : float
-        Range of the logarithmic power ladder (about one decade around the expected threshold).
-    label_power_mw : float
-        Fixed power of the header elements (L mark, id dots), safely above the threshold.
-    n_levels : int
-        Number of power levels (rows of F0).
-    z_offsets_um : sequence of float
-        z offsets relative to the fitted plane (columns of F0), ascending.
-    label_z_um : float
-        z of the header elements in stage A (z0 is not known yet).
-    source : str
-        Where the start values come from.
-
-    Raises
-    ------
-    MissingPropertyError
-        For a missing value.
-    ValueError
-        For an empty range, fewer than 2 levels or unsorted z offsets.
-    """
-
-    material: str
-    p_min_mw: float
-    p_max_mw: float
-    label_power_mw: float
-    n_levels: int = 10
-    z_offsets_um: tuple = DEFAULT_Z_OFFSETS_UM
-    label_z_um: float = 0.0
-    source: str = ""
-
-    def __post_init__(self):
-        _require({"material": self.material, "p_min_mw": self.p_min_mw, "p_max_mw": self.p_max_mw,
-                  "label_power_mw": self.label_power_mw}, "Stage-A axes")
-        if not 0 < self.p_min_mw < self.p_max_mw:
-            raise ValueError(f"Stage-A power range must be 0 < p_min < p_max, got {self.p_min_mw}, {self.p_max_mw}")
-        if self.label_power_mw <= 0:
-            raise ValueError("label_power_mw must be > 0")
-        if int(self.n_levels) < 2:
-            raise ValueError("n_levels must be >= 2")
-        offsets = tuple(float(z) for z in self.z_offsets_um)
-        if not offsets or list(offsets) != sorted(set(offsets)):
-            raise ValueError("z_offsets_um must be non-empty, ascending and without duplicates")
-        object.__setattr__(self, "z_offsets_um", offsets)
-        object.__setattr__(self, "n_levels", int(self.n_levels))
-
-    def levels_mw(self) -> list[float]:
-        """ The power levels, logarithmically spaced from ``p_min_mw`` to ``p_max_mw`` (rounded to 1 µW). """
-
-        return [round(float(p), 4) for p in np.geomspace(self.p_min_mw, self.p_max_mw, self.n_levels)]
-
-    def check_range(self, power_min_mw: Optional[float], power_max_mw: Optional[float]) -> None:
-        """ Raise ``ValueError`` if a power lies outside the attenuator range (skipped while it is unknown). """
-
-        if power_min_mw is None or power_max_mw is None:
-            return
-        powers = self.levels_mw() + [self.label_power_mw]
-        outside = [p for p in powers if not power_min_mw <= p <= power_max_mw]
-        if outside:
-            raise ValueError(f"Stage-A powers {outside} mW lie outside the attenuator calibration range "
-                             f"({power_min_mw:.4f} - {power_max_mw:.4f} mW).")
-
-    def to_json(self) -> dict[str, Any]:
-        """ JSON form with schema ``nanofactory.ptd_stage_a/1``. """
-
-        return {"schema": STAGE_A_SCHEMA, "material": self.material, "p_min_mw": self.p_min_mw,
-                "p_max_mw": self.p_max_mw, "n_levels": self.n_levels, "z_offsets_um": list(self.z_offsets_um),
-                "label_power_mw": self.label_power_mw, "label_z_um": self.label_z_um, "source": self.source}
-
-    @classmethod
-    def from_json(cls, data: dict) -> "StageAAxes":
-        """ Rebuild the axes from :meth:`to_json`.
-
-        Raises
-        ------
-        SpecSerialisationError
-            For another schema or unknown keys.
-        """
-
-        _check_schema(data, STAGE_A_SCHEMA)
-        unknown = sorted(set(data) - set(cls.__dataclass_fields__) - {"schema"})
-        if unknown:
-            raise SpecSerialisationError(f"Unknown keys {unknown} in the stage-A axes.")
-        arguments = {k: v for k, v in data.items() if k != "schema"}
-        if "z_offsets_um" in arguments:
-            arguments["z_offsets_um"] = tuple(arguments["z_offsets_um"])
-        return cls(**arguments)
-
-    def save(self, path) -> Path:
-        """ Write the JSON form to ``path``. """
-
-        path = Path(path)
-        path.write_text(json.dumps(self.to_json(), indent=2), encoding="utf-8")
-        return path
-
-    @classmethod
-    def load(cls, path) -> "StageAAxes":
-        """ Read a stage-A file written by :meth:`save`. """
-
-        return cls.from_json(json.loads(Path(path).read_text(encoding="utf-8")))
-
-
 def as_calibration(value) -> ProcessCalibration:
     """ A ``ProcessCalibration`` from itself or its JSON dict (factory arguments are dicts). """
 
     return value if isinstance(value, ProcessCalibration) else ProcessCalibration.from_json(value)
-
-
-def as_stage_a(value) -> StageAAxes:
-    """ A ``StageAAxes`` from itself or its JSON dict. """
-
-    return value if isinstance(value, StageAAxes) else StageAAxes.from_json(value)

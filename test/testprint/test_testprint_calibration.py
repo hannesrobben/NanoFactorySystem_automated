@@ -1,12 +1,11 @@
-"""ProcessCalibration and StageAAxes with their JSON files (T140)."""
-import dataclasses
+"""ProcessCalibration with its JSON file (T140)."""
 import json
 import math
 
 import pytest
 
 from nanofactorysystem.experiment_spec import SpecSerialisationError
-from nanofactorysystem.testprint.calibration import ProcessCalibration, StageAAxes, as_calibration
+from nanofactorysystem.testprint.calibration import ProcessCalibration, as_calibration
 from nanofactorysystem.testprint.voxel_fit import VoxelFitModel
 from nanofactorysystem.voxel.materials import MissingPropertyError
 
@@ -72,30 +71,3 @@ def test_inconsistent_values():
         calibration(p_dam_mw=0.2)
     assert calibration(source="example values for dry runs").is_example
     assert not calibration().is_example
-
-
-def test_stage_a_axes(tmp_path):
-    axes = StageAAxes("SZ2080", p_min_mw=0.1, p_max_mw=1.0, label_power_mw=0.7)
-    levels = axes.levels_mw()
-    assert len(levels) == 10 and levels[0] == 0.1 and levels[-1] == 1.0
-    assert levels[1] / levels[0] == pytest.approx(10 ** (1 / 9), rel=1e-3)   # logarithmic ladder
-    assert axes.z_offsets_um == (-1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5)
-    assert StageAAxes.load(axes.save(tmp_path / "stage_a_SZ2080.json")) == axes
-    axes.check_range(None, None)                                               # unknown range: no check
-    axes.check_range(0.05, 2.0)
-    with pytest.raises(ValueError, match="outside the attenuator"):
-        axes.check_range(0.2, 2.0)
-
-
-def test_stage_a_invalid():
-    with pytest.raises(ValueError, match="p_min < p_max"):
-        StageAAxes("SZ2080", p_min_mw=1.0, p_max_mw=0.1, label_power_mw=0.7)
-    with pytest.raises(ValueError, match="ascending"):
-        StageAAxes("SZ2080", p_min_mw=0.1, p_max_mw=1.0, label_power_mw=0.7, z_offsets_um=(0.5, 0.0))
-    with pytest.raises(MissingPropertyError, match="label_power_mw"):
-        StageAAxes("SZ2080", p_min_mw=0.1, p_max_mw=1.0, label_power_mw=None)
-    with pytest.raises(SpecSerialisationError):
-        StageAAxes.from_json({"schema": "nanofactory.ptd_stage_a/2"})
-    data = dataclasses.asdict(StageAAxes("SZ2080", p_min_mw=0.1, p_max_mw=1.0, label_power_mw=0.7))
-    with pytest.raises(SpecSerialisationError):
-        StageAAxes.from_json(data)                                             # no schema key

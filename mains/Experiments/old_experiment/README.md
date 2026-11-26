@@ -1,8 +1,8 @@
 # Older experiment scripts
 
 Moved here in T113 so that `mains/Experiments/` holds only the documented default experiment
-(`default_experiment.py`) and the experiments built on it (e.g. `chain_rectangle_doe_lens.py` and the
-standard test print PTD-01 in `../ptd01/`, see its README).
+(`default_experiment.py`) and the experiments built on it (e.g. `chain_rectangle_doe_lens.py`). The parameter
+tests are in `mains/parametertest/`.
 
 | Folder / file | Content | Tested |
 |---|---|---|

@@ -17,6 +17,9 @@ from scidatacontainer import load_config
 
 from .config import sysConfig
 
+#: Keys every ``user:<name>`` section needs (author identity of the data containers)
+USER_KEYS = ("name", "email", "organization", "orcid")
+
 
 class Interface(Flag):
     LOW = auto()
@@ -53,6 +56,11 @@ class Parameter(abc.ABC):
 
         # Store user data dictionary
         self.user = sysConfig.user(user)
+        missing = [key for key in USER_KEYS if self.user.get(key) is None]
+        if missing:
+            # scidatacontainer.load_config fails with an AttributeError on a missing value (T111)
+            raise KeyError(f"The user section 'user:{user}' of the configuration misses the keys "
+                           f"{', '.join(missing)} (required: {', '.join(USER_KEYS)}).")
         self.config = load_config(
             author=self.user.get("name", None),
             email=self.user.get("email", None),

@@ -197,6 +197,12 @@ class StructureSpec:
     structure_type : StructureType, optional
         Default: ``NORMAL`` for DRAWING, ``IFOV`` for SLICER; ``DUMMY`` leaves
         the grid cell empty (see :meth:`empty`).
+    strategy : str, optional
+        Print strategy for dynamic slicing and hatching (program source SLICER,
+        :mod:`nanofactorysystem.print_strategies`, T81); None or ``"static"``:
+        the slicer arguments as given. An unknown name is refused.
+    strategy_params : dict
+        Parameters of the strategy (stored with the spec).
     """
 
     name: str
@@ -209,6 +215,26 @@ class StructureSpec:
     structure_type: Optional[StructureType] = None
     factory: Union[FactoryCall, Callable[[Experiment], DrawableObject], None] = None
     layer_power: Any = None
+    strategy: Optional[str] = None
+    strategy_params: dict = field(default_factory=dict)
+
+    def print_strategy(self, source: ProgramSource):
+        """ The print strategy of the structure (T81).
+
+        Raises
+        ------
+        UnknownStrategyError
+            For a name that is not registered.
+        ValueError
+            For a strategy other than ``"static"`` on a structure that is not sliced.
+        """
+
+        from .print_strategies import DEFAULT_STRATEGY, get_print_strategy
+        name = self.strategy or DEFAULT_STRATEGY
+        strategy = get_print_strategy(name)
+        if name != DEFAULT_STRATEGY and source != ProgramSource.SLICER:
+            raise ValueError(f"Structure {self.name!r}: the print strategy {name!r} needs program source SLICER.")
+        return strategy
 
     @classmethod
     def empty(cls) -> "StructureSpec":
@@ -255,7 +281,7 @@ class StructureSpec:
             if voxel_model is not None:
                 power = self.power_mw if self.power_mw is not None else default_power_mw
                 arguments |= {"voxel_model": voxel_model, "power": power}
-            arguments |= self.slicer
+            arguments |= self.print_strategy(source).apply(self.slicer, self.strategy_params)
             return Model3D_Slicer(source=self.height_data, **arguments)
         raise ValueError(f"Unknown program source {source}")
 
@@ -297,6 +323,12 @@ class StructureSpec:
             raise fail("layer_power", "a function cannot be stored; give the powers per layer as a list.")
         layer_power = None if self.layer_power is None else [float(p) for p in self.layer_power]
         data["settings"] = {"axes": self.axes, "power_mw": self.power_mw, "layer_power": layer_power}
+        if self.strategy is not None or self.strategy_params:
+            try:
+                parameters = {k: encode_json_value(v) for k, v in self.strategy_params.items()}
+            except TypeError as error:
+                raise fail("strategy_params", str(error)) from None
+            data["settings"] |= {"strategy": self.strategy, "strategy_params": parameters}
         return data
 
     def _geometry_json(self, folder: Optional[Path], fail) -> dict:
@@ -379,12 +411,15 @@ class StructureSpec:
         name = data.get("name", "?")
         _check_keys(data, {"name", "repeat", "structure_type", "geometry", "settings"}, f"structure {name!r}")
         settings = dict(data.get("settings") or {})
-        _check_keys(settings, {"axes", "power_mw", "layer_power"}, f"structure {name!r}, settings")
+        _check_keys(settings, {"axes", "power_mw", "layer_power", "strategy", "strategy_params"},
+                    f"structure {name!r}, settings")
         structure_type = data.get("structure_type")
         arguments = dict(name=data["name"], repeat=int(data.get("repeat", 0)),
                          structure_type=StructureType[structure_type] if structure_type else None,
                          axes=settings.get("axes", "ABZ"), power_mw=settings.get("power_mw"),
-                         layer_power=settings.get("layer_power"))
+                         layer_power=settings.get("layer_power"), strategy=settings.get("strategy"),
+                         strategy_params={k: decode_json_value(v)
+                                          for k, v in (settings.get("strategy_params") or {}).items()})
         geometry = data.get("geometry") or {"kind": "empty"}
         kind = geometry.get("kind")
         if kind == "empty":
@@ -644,7 +679,8 @@ class ExperimentSpec:
         ------
         ValueError
             For an unknown objective, a SLICER experiment without IFOV setup,
-            or more structures than grid cells.
+            more structures than grid cells, or an unknown print strategy
+            (``UnknownStrategyError``, T81).
         """
 
         if self.objective not in OBJECTIVE_DEFAULTS:
@@ -655,6 +691,9 @@ class ExperimentSpec:
         cells = sum(1 + s.repeat for s in self.structures)
         if cells > self.grid[0] * self.grid[1]:
             raise ValueError(f"{cells} structures (with repetitions) do not fit into a {self.grid} grid.")
+        for structure in self.structures:
+            if structure.strategy is not None or structure.strategy_params:
+                structure.print_strategy(source)  # an unknown strategy is refused here (T81)
         defaults = OBJECTIVE_DEFAULTS[self.objective]
         fov = self.fov_um if self.fov_um is not None else defaults.fov_um
         return dataclasses.replace(

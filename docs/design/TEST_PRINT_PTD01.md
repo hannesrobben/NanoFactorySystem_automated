@@ -4,6 +4,8 @@ Status: approved 2026-11-25 (decisions D1–D8, D10–D16 taken in the decision 
 D9 is answered by the lab check T148). **Superseded in its two-stage plan by `PARAMETER_TESTS.md`
 (version 2, T157):** single-stage tests on absolute axes (Quick PT, Full PT-01, Voxel PT-01). The library
 architecture (§4) and the field geometry of F1–F7 stay valid where version 2 does not say otherwise.
+The version-1 code (`ptd01`, `factories`, `StageAAxes`, `mains/Experiments/ptd01/`) is in the attic since
+2026-11-26 (T164, `docs/ATTIC_INDEX.md`).
 
 Date: 2026-11-25. Todo: T136 (this document). Used by: T137–T151. Review of the plan:
 `docs/reviews/PTD01_PLAN_REVIEW_2026-11-25.md`. Improvement ideas for existing code found during the

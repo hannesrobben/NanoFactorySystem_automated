@@ -156,3 +156,23 @@ def test_real_backend_constructs_the_same_objects(test_config, tmp_path, monkeyp
     assert _without_load(commands)[:len(STARTUP_COMMANDS)] == STARTUP_COMMANDS
     assert f'PROGRAM 1 LOAD "{tmp_path / "__zline__.pgm"}"' in commands  # current working directory, as before
     assert (tmp_path / "A3200.log").is_file()
+
+
+def test_zline_after_a_program_on_its_task_loads_the_zline_program_again(test_config, dummy_backend, tmp_path):
+    # T135: layer programs run on task 1, where init_zline() loaded the z-line program
+    from nanofactorysystem.aerobasic.programs import AeroBasicProgram
+
+    world = dummy_backend.world
+    with System("Test", "Zeiss 20x", backend=dummy_backend, **sys_args()) as system:
+        system.moveabs(x=100.0, y=50.0, z=20010.0)
+        system.zline(1.0, 100.0, 10.0, 20.0)
+        program = AeroBasicProgram()
+        program.send("DWELL 0.01")
+        task = system.controller.run_program_as_task(program, task_id=1)
+        task.wait_to_finish(update_interval=0.01)
+        task.finish()                                   # removes the program, as after a printed layer
+
+        system.zline(1.0, 100.0, 10.0, 20.0)
+
+    zline_runs = [r for r in world.calllog.filter(device="program") if r.call.endswith("__zline__.pgm")]
+    assert len(zline_runs) == 2 and len(world.exposures) == 2

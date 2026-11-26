@@ -3179,3 +3179,28 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** `python -m pytest test/lab_checks/test_program_loading_lab.py test/devices/test_camera_timeout.py test/devices/test_camera.py`: 30 passed, 1 skipped.
 - **Commits:** `46994e1` fix(camera): bound the wait for an image by the exposure in ms [T102]; `1c8d3d1` feat(lab): add the controller-state and camera steps to session 3b [T153]; this docs(todo) commit.
 - **Follow-ups:** lab session 3b (maintainer; restart the A3200 software after it, because `states` leaves the IFOV modes set).
+
+### 2026-11-26 12:20 CET — [T153, T164, T122, T112, T166, T114, T111, T109, T154, T124, T130, T135, T133, T96, T148, T80, T81] Lab session 3b and the open todos of this repository
+- **Status:** done for T164, T162, T122, T112, T166, T114, T111, T109, T124, T130, T135, T133, T80, T81; partial for T154, T148, T96, T102, T101 (lab or decision open)
+- **Changes:**
+  - `mains/lab_checks/program_loading_lab.py`, `docs/guides/PROGRAM_LOADING_LAB_TESTS.md`, `test/lab_checks/test_program_loading_lab.py`: session 3b steps `states` (T101), `camera` (T102), `path-limit` (T154).
+  - `nanofactorysystem/camera/camera.py`, `test/devices/test_camera_timeout.py` (new): bounded image wait (T102).
+  - Attic (T164): `mains/Experiments/ptd01/` (13 files), `nanofactorysystem/testprint/ptd01.py`, `factories.py`, `test/testprint/test_testprint_ptd01.py`, `test_testprint_factories.py`, `test/integration/test_ptd01_fields.py`, `test_ptd01_chain.py`, `test/golden/ptd01_f3.txt` (deleted, in `attic/`); `nanofactorysystem/testprint/calibration.py` (StageAAxes removed), `__init__.py`; `test/testprint/conftest.py`, `ptd_examples.py`, `test_testprint_calibration.py`; `test/analysis/test_ptd_analysis.py` (on version 2); `docs/ATTIC_INDEX.md`, `docs/design/TEST_PRINT_PTD01.md`, `analysis/README.md`, `mains/parametertest/README.md`, `mains/Experiments/old_experiment/README.md`.
+  - `test/integration/test_main_entry.py`, `test_main_png.py` (T122).
+  - `mains/Experiments/old_experiment/experiment_template.py`, `mains/lab_checks/new_features_check.py` (T112).
+  - `mains/main_3D_model.py` (rewritten), `test/integration/test_main_3d_model.py` (new) (T166).
+  - `nanofactorysystem/aerobasic/programs/drawings/ifov_gratings.py`, `test/test_aerobasic/test_ifov_rectangles.py` (new) (T114).
+  - `nanofactorysystem/parameter.py`, `test/test_parameter.py` (T111); `nanofactorysystem/dhm/dhmclient.py`, `test/dhm/test_dhmclient_errors.py` (new) (T109).
+  - `nanofactorysystem/storage/experiment_store.py`, `storage/schema.py` (1.2), `docs/design/EXPERIMENT_STORAGE.md`, `test/storage/test_experiment_store.py`, `test/analysis/test_experiment_analysis.py`, `test/integration/test_dry_run_materials.py` (T124).
+  - `nanofactorysystem/experiment.py`: options `structure_program` (T124), `optimize_programs` (T130), `max_r1_per_structure` and `confirm_recovery` (T133), task-load note for the library path (T135), `plot_experiment` through the layout (T80); `test/test_experiment.py`.
+  - `nanofactorysystem/devices/aerotech/__init__.py` (T135 load count, T154 path limit), `devices/a3200.py` (T135), `test/backends/test_dummy_system.py`, `test/devices/test_aerotech.py`.
+  - `nanofactorysystem/devices/aerotech/health.py`, `backends/real.py`, `backends/dummy/__init__.py`, `mains/controller_health.py`, `docs/design/PROGRAM_LOADING.md`, `test/devices/test_health.py` (T133).
+  - `nanofactorysystem/testprint/power_switch.py` (new), `mains/lab_checks/power_switch_check.py` (new), `docs/design/POWER_SWITCH_CHECK.md` (new), `docs/guides/POWER_SWITCH_CHECK.md` (new), `test/testprint/test_power_switch.py` (new) (T148).
+  - `nanofactorysystem/layout.py` (new), `nanofactorysystem/substrate_plan.py`, `test/test_layout.py` (new) (T80).
+  - `nanofactorysystem/print_strategies.py` (new), `nanofactorysystem/experiment_spec.py`, `test/test_print_strategies.py` (new) (T81).
+  - `CLAUDE.md`, `test/README.md`: every change described.
+  - `TODO.md`: done entries, T154/T148/T96 to In Progress, T78 blocked by T101, status lines; `WORKLOG.md`: this entry.
+- **Tests:** full suite before T80/T81: 713 passed, 15 skipped (the four T122 failures are gone); after T80/T81 the related tests passed (layout, spec, substrate, experiment: 34 passed; strategies and layout: 8 passed); final full run on the branch: 725 passed, 15 skipped (18 min). Session 3b (with `path-limit` cherry-picked as `a90322e`) was merged into `main_HR` as `a5096f9` and pushed on request.
+- **Commits:** `46994e1`, `1c8d3d1`, `db0ba3e` (branch `feat/lab-session-3b`); `197f0c7`, `bfef02d`, `015f763`, `2b8d4e7`, `81a98c7`, `dcfd497`, `3a2fde8`, `ece4b9c`, `8f6a872`, `1adf8b4`, `4ab6354`, `bbabb39`, `09b79d4`, `33ee66f`, `ce4935d`, `52ca47c` (branch `feat/backlog-2026-11-26`); this docs(todo) commit.
+- **Follow-ups:** lab session 3b (T153 incl. T101, T102, T154), T148 print with the A3200-help questions, then T149; T78 after T101; T165, T167 later; T96/T97 default of `plot_experiment(show=)` to decide; T131, T67 (maintainer names evaluations), T69 on the lab day.
+- **Note:** commit hunks of `experiment.py` were split per todo by rebuilding each staged version from the edit scripts; the intermediate commits were not tested one by one, the final state is.

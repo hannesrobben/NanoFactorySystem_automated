@@ -13,7 +13,7 @@ import time
 import uuid
 from logging import Logger
 from pathlib import Path
-from typing import Iterator, Optional, Literal
+from typing import Callable, Iterator, Optional, Literal
 from enum import Enum
 
 import cv2 as cv
@@ -26,13 +26,14 @@ from nanofactorysystem import System, ImageContainer, mkdir, getLogger
 from nanofactorysystem.aerobasic import SingleAxis, AxisStatusDataItem
 from nanofactorysystem.aerobasic.ascii import AerotechError
 from nanofactorysystem.devices.aerotech.health import (EXEC_PROGRAM_NAMES, HealthReport, controller_health,
-                                                       recover_r0)
+                                                       recover_r0, recover_r1, reset_controller)
 from nanofactorysystem.devices.aerotech.loader import DEFAULT_KB_PER_LINE, MemoryBudget, ProgramRunner, max_part_lines
 from nanofactorysystem.aerobasic.programs import AeroBasicProgram
 from nanofactorysystem.aerobasic.programs.drawings import DrawableObject, DrawableAeroBasicProgram
 from nanofactorysystem.aerobasic.programs.drawings.lines import Corner
 from nanofactorysystem.aerobasic.programs.drawings.qr_code import QRCode, QrErrorCorrection
 from nanofactorysystem.aerobasic.programs.setups import DefaultSetup, SetupIFOV
+from nanofactorysystem.aerobasic.programs.optimize import optimize_file
 from nanofactorysystem.aerobasic.programs.split import (MAX_PROGRAM_LINES, ProgramSplitError, count_lines,
                                                         existing_parts, remove_parts, split_program_file)
 from nanofactorysystem.backends import BackendLike
@@ -56,6 +57,8 @@ from nanofactorysystem.time_estimate import (DEFAULT_LAYER_OVERHEAD_S, TimeEstim
 from nanofactorysystem.storage.substrate_store import (SubstrateRecord, SubstrateStore, check_not_synced,
                                                        default_root, layout_area_um)
 from nanofactorysystem.storage import schema
+from nanofactorysystem.layout import draw_layout, experiment_layout
+from nanofactorysystem.storage.experiment_store import STRUCTURE_PROGRAM_MODES
 from nanofactorysystem.voxel.materials import MaterialRegistry, material_names, unregistered_snapshot
 from nanofactorysystem.dhm.optimage import optImageMedian
 from nanofactorysystem.utils.visualization import read_file, plot_movements
@@ -173,7 +176,11 @@ class Experiment(object):
                  plan_id: Optional[str] = None,
                  max_program_lines: Optional[int] | str = "auto",
                  stop_on_failure: bool = True,
-                 program_loader: str = "ascii"):
+                 program_loader: str = "ascii",
+                 optimize_programs: bool = False,
+                 structure_program: str = "compressed",
+                 max_r1_per_structure: int = 2,
+                 confirm_recovery: Optional[Callable[[str], bool]] = None):
         """ Experiment on one substrate.
 
         Only the newer parameters are documented here; see the class
@@ -278,6 +285,30 @@ class Experiment(object):
             ``libraryDll``), run on task 1 while the next part is compiled
             without a task (add-ahead, T129/T132, ``devices/aerotech/loader.py``).
             Opt-in until the lab validation.
+        optimize_programs : bool
+            Shorten every layer program while building with
+            ``aerobasic.programs.optimize`` (trailing zeros, modal feed rates
+            and axis words, collinear moves merged; the exposed path changes
+            by at most 10 nm). Default False (T130, maintainer decision: opt-in
+            until a lab print with optimised programs). The reduction is logged
+            per structure.
+        structure_program : {"compressed", "reference"}
+            How the whole-structure program is stored in the experiment file
+            (T124): ``"compressed"`` (default) as gzip-compressed UTF-8 bytes,
+            ``"reference"`` only its SHA-256, line count and file (the layer
+            programs are stored anyway).
+        max_r1_per_structure : int
+            Recovery level R1 (restart the ASCII interface, nothing moves) runs
+            automatically when the controller is still not healthy after R0,
+            at most this many times per structure, so that a persistent error
+            never ends in a loop of restarts (T133, maintainer decision
+            2026-11-26). Beyond the limit printing stops.
+        confirm_recovery : callable, optional
+            ``confirm(question) -> bool`` before recovery level R2 (controller
+            reset), which is offered only before anything of the experiment
+            was printed. Default: a message box on the lab hardware (a console
+            message is too easy to miss), never on the dummy backend. A GUI
+            passes its own dialog (T96).
 
         Raises
         ------
@@ -297,6 +328,13 @@ class Experiment(object):
         self.program_loader = str(program_loader).lower()
         if self.program_loader not in ("ascii", "library"):
             raise ValueError(f"program_loader must be 'ascii' or 'library', not {program_loader!r}")
+        self.optimize_programs = bool(optimize_programs)
+        self.max_r1_per_structure = int(max_r1_per_structure)
+        self._confirm_recovery = confirm_recovery
+        self._r1_used: dict[str, int] = {}
+        self.structure_program_mode = str(structure_program).lower()
+        if self.structure_program_mode not in STRUCTURE_PROGRAM_MODES:
+            raise ValueError(f"structure_program must be one of {STRUCTURE_PROGRAM_MODES}, not {structure_program!r}")
         self._loader = None
         self._health_log: list[str] = []
 
@@ -970,50 +1008,10 @@ class Experiment(object):
                           facecolor='none', lw=2, label="Resin Drop")
         ax.add_patch(ellipse)
 
-        # Draw the outer rectangle
-        outer_rectangle = Rectangle(self.rectangle_tl, self.grid_width, self.grid_height, edgecolor='blue',
-                                    facecolor='none', lw=2, label="Experiment Field")
-        ax.add_patch(outer_rectangle)
-
-        # Draw the grid of rectangles
-        center_xs = []
-        center_ys = []
-        for i, (x, y) in enumerate(self.iter_experiment_locations()):
-            x_tl = x - self.structure_size / 2
-            y_tl = y - self.structure_size / 2
-            rect = Rectangle(
-                (x_tl, y_tl),
-                width=self.structure_size,
-                height=self.structure_size,
-                edgecolor='green',
-                facecolor='none',
-                lw=1
-            )
-            ax.text(x_tl, y_tl, f"{i}", color="green")
-            ax.add_patch(rect)
-            center_xs.append(x)
-            center_ys.append(y)
-
-        ax.scatter(center_xs, center_ys, s=3, marker="x", color="green", label="Structures")
-
-        plane_fit_points = self.sample_points_for_plane_fitting()
-        ax.scatter(*zip(*plane_fit_points), s=3, marker=".", color="red", label="Plane Fitting Probe Points")
-
-        # Corners (the double corner marks the orientation) and QR code
+        # Experiment rectangle, grid cells, plane-fit points, corners and QR code from the layout data (T80)
+        draw_layout(ax, experiment_layout(self))
         layout = self._layout()
-        corners = [c for c in layout.corners if not c.double]
-        if corners:
-            ax.scatter([c.center_um[0] for c in corners], [c.center_um[1] for c in corners], s=12, marker="s",
-                       color="orange", label="Corners")
-        double = layout.double_corner
-        if double is not None:
-            ax.scatter([double.center_um[0]], [double.center_um[1]], s=30, marker="D", color="darkred",
-                       label="Double corner (orientation)")
-        for corner in layout.corners:
-            ax.annotate(corner.position, corner.center_um, fontsize=6, color="darkorange")
-        if layout.qrcode_um is not None:
-            ax.scatter([layout.qrcode_um[0]], [layout.qrcode_um[1]], s=20, marker="s", color="black",
-                       label="QR code")
+
         label = f"{self.experiment_label} " if self.experiment_label else ""
         ax.set_title(f"Experiment {label}{self.qr_text}", fontsize=8)
 
@@ -1448,6 +1446,7 @@ class Experiment(object):
         structure_pgm = DrawableAeroBasicProgram(coordinate_system)
         layer_pgm_paths = []
         layer_powers = []
+        optimized = []
         # NOTE What to do with tiles
         x_structure_center = structure_center_absolute_mm["X"]
         y_structure_center = structure_center_absolute_mm["Y"]
@@ -1489,6 +1488,8 @@ class Experiment(object):
             # Store layer program file
             layer_pgm_path = pgm_path / f"program_{name}.{layer_id:03d}.txt"
             layer_pgm.write(layer_pgm_path)
+            if self.optimize_programs:
+                optimized.append(optimize_file(layer_pgm_path, layer_pgm_path))  # in place (T130)
             layer_pgm_paths.append(str(layer_pgm_path))
 
             # Add layer program to structure program
@@ -1500,6 +1501,13 @@ class Experiment(object):
         # Store structure program file
         structure_pgm_path = path / f"program_{name}.txt"
         structure_pgm.write(structure_pgm_path)
+        if self.optimize_programs:
+            optimize_file(structure_pgm_path, structure_pgm_path)
+            before = sum(s.bytes_before for s in optimized)
+            after = sum(s.bytes_after for s in optimized)
+            self.log.info(f"{name}: layer programs optimised from {sum(s.lines_before for s in optimized)} to "
+                          f"{sum(s.lines_after for s in optimized)} lines, {before} to {after} bytes "
+                          f"({100 * (1 - after / max(before, 1)):.0f} % smaller, T130)")
 
         # Structure configuration
         structure_config = {
@@ -1819,7 +1827,8 @@ class Experiment(object):
         return ProgramRunner(self._loader, self.a3200.api, self.memory_budget(), exec_dir=self.path / "exec",
                              logger=self.log)
 
-    def check_controller(self, context: str, *, recover: bool = False) -> HealthReport:
+    def check_controller(self, context: str, *, recover: bool = False,
+                         structure: Optional[str] = None) -> HealthReport:
         """ Run the controller health check (T133) and store it in the experiment log ``/logs/health``.
 
         Parameters
@@ -1828,7 +1837,11 @@ class Experiment(object):
             When the check runs (for the log).
         recover : bool
             Run recovery level R0 first (stop the printing tasks, remove the package's programs,
-            acknowledge faults; nothing moves).
+            acknowledge faults; nothing moves). If the controller is still not healthy, recovery
+            level R1 (restart the ASCII interface) follows, at most ``max_r1_per_structure`` times
+            per structure.
+        structure : str, optional
+            Structure the check belongs to (for the R1 limit).
 
         Returns
         -------
@@ -1844,34 +1857,86 @@ class Experiment(object):
                                                              on_removed=self.a3200.program_removed)]
         report = controller_health(api, tasks=tasks, check_processes=self.system.backend.name == "real")
         lines.append(report.text())
+        key = structure or ""
+        if recover and not report.ok and self._r1_used.get(key, 0) < self.max_r1_per_structure:
+            self._r1_used[key] = self._r1_used.get(key, 0) + 1
+            try:
+                lines += [f"  R1 ({self._r1_used[key]} of {self.max_r1_per_structure}): {step}"
+                          for step in recover_r1(api, self.system.backend.restart_ascii_interface)]
+            except AerotechError as error:
+                lines.append(f"  R1 failed: {error}")
+            report = controller_health(api, tasks=tasks, check_processes=self.system.backend.name == "real")
+            lines.append(report.text())
+        elif recover and not report.ok:
+            lines.append(f"  R1 not run: the limit of {self.max_r1_per_structure} per structure is reached")
         text = "\n".join(lines)
         (self.log.info if report.ok and not report.warnings else self.log.warning)(text)
         self._health_log.append(text)
         self.store.write_log("health", "\n\n".join(self._health_log))
         return report
 
-    def _ensure_controller_ready(self) -> None:
-        """ Health check before printing; on a problem R0 and a second check (T133).
+    def _ensure_controller_ready(self, structure: Optional[str] = None) -> None:
+        """ Health check before printing; on a problem R0, R1 and a second check (T133).
+
+        If the controller is still not healthy and nothing of this experiment was printed yet (so it
+        is between experiments), recovery level R2 (controller reset) is offered through
+        ``confirm_recovery``; after a reset the axes must be enabled and homed by hand.
+
+        Parameters
+        ----------
+        structure : str, optional
+            Structure about to be printed (for the R1 limit).
 
         Raises
         ------
         AerotechError
-            If the controller is still not healthy after R0.
+            If the controller is still not healthy, or after an R2 reset.
         """
 
-        report = self.check_controller("before printing")
+        report = self.check_controller("before printing", structure=structure)
         if report.ok:
             return
-        report = self.check_controller("after a problem before printing", recover=True)
-        if not report.ok:
-            raise AerotechError("The controller is not ready to print: " + "; ".join(report.problems)
-                                + ". See /logs/health in the experiment file (T133).")
+        report = self.check_controller("after a problem before printing", recover=True, structure=structure)
+        if report.ok:
+            return
+        problems = "; ".join(report.problems)
+        if not self._anything_printed():
+            question = (f"The controller is not ready to print: {problems}.\n\nRecovery level R2 resets the "
+                        f"controller: every axis is disabled and loses its home, every program is removed. "
+                        f"Nothing of this experiment was printed yet. Move the objective to a safe Z first.\n\n"
+                        f"Reset the controller now? (Afterwards enable and home all axes, then restart.)")
+            if self._ask_recovery(question):
+                steps = reset_controller(self.a3200.api)
+                self._health_log.append(f"[{utc_timestamp()}] R2 after the operator agreed\n"
+                                        + "\n".join(f"  R2: {s}" for s in steps))
+                self.store.write_log("health", "\n\n".join(self._health_log))
+                raise AerotechError("The controller was reset (R2): enable and home all axes (Femtika software or "
+                                    "Motion Composer), then run the experiment again (restart_experiment). T133.")
+        raise AerotechError("The controller is not ready to print: " + problems
+                            + ". See /logs/health in the experiment file (T133).")
+
+    def _anything_printed(self) -> bool:
+        """ True if a layer of this experiment was printed (in this or an earlier session). """
+
+        progress = self.store.read(include_captures=False).progress
+        return any(entry.get("status") == "ok" for entries in progress.values() for entry in entries)
+
+    def _ask_recovery(self, question: str) -> bool:
+        """ Ask the operator before R2 (T133): ``confirm_recovery``, a message box on the lab hardware, else no. """
+
+        if self._confirm_recovery is not None:
+            return bool(self._confirm_recovery(question))
+        if self.system.backend.name != "real":
+            self.log.warning("R2 would need the operator's consent; not asked on simulated hardware.")
+            return False
+        from nanofactorysystem.experiment_spec import messagebox_confirm
+        return messagebox_confirm(question)
 
     def _stop_printing(self, name: str, layer_id: int, error: Exception) -> None:
         """ Store everything and raise :class:`PrintStoppedError` (``stop_on_failure``, T128). """
 
         try:
-            self.check_controller(f"after the failure of layer {layer_id} of {name}", recover=True)
+            self.check_controller(f"after the failure of layer {layer_id} of {name}", recover=True, structure=name)
         except Exception as health_error:  # the original failure is the one to report
             self.log.error(f"Health check after the failure not possible: {health_error}")
         export_progress(self.store.read(include_captures=False), self.path)
@@ -1894,6 +1959,7 @@ class Experiment(object):
 
         remaining = [(self._layer_id(f), Path(f)) for f in files]
         failed = False
+        self.a3200.note_task_load(1)  # the parts replace a program kept on task 1 (the z-line program, T135)
         while remaining:
             paths = dict(remaining)
             done: list[int] = []
@@ -1981,7 +2047,9 @@ class Experiment(object):
         for file in config["layer_files"]:
             self.store.write_layer_program(name, self._layer_id(file), Path(file).read_text(),
                                            self._relative(file))
-        self.store.write_structure_program(name, Path(config["program_file"]).read_text())
+        self.store.write_structure_program(name, Path(config["program_file"]).read_text(),
+                                           mode=self.structure_program_mode,
+                                           file=self._relative(config["program_file"]))
 
     @staticmethod
     def _layer_power(layer_power, layer_id: int) -> float:
@@ -2073,7 +2141,7 @@ class Experiment(object):
         # Every layer must be loadable before the first one is printed: too long programs are split (or were
         # split by the build); a program that cannot be split raises ProgramSplitError here (T125)
         layer_parts = self._prepare_layers([Path(p) for p in pgm_files_list], name)
-        self._ensure_controller_ready()
+        self._ensure_controller_ready(name)
         self.store.set_status(schema.STATUS_PRINTING)
         self.store.set_structure_status(name, "printing")
 

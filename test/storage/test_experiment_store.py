@@ -246,3 +246,38 @@ def test_spec_and_inputs_round_trip(store, tmp_path):
         assert f["inputs/block_height.npy"].attrs["file"] == "inputs/block_height.npy"
     store.write_spec(dict(spec, name="y"))  # replaces
     assert store.read_spec()["name"] == "y"
+
+
+def test_structure_program_is_stored_compressed_and_reads_back(store):
+    store.add_structure(structure())
+    text = "".join(f"LINEAR X{i:.4f} Y{i % 7:.4f}\n" for i in range(20000))  # 20 000 similar lines (T124)
+
+    store.write_structure_program("rect", text)
+
+    assert store.read_structure_program("rect") == text
+    with h5py.File(store.path, "r") as f:
+        dataset = f["structures/rect/program"]
+        assert dataset.dtype == np.uint8 and dataset.compression == "gzip"
+        assert dataset.attrs["storage"] == "compressed" and dataset.attrs["format"] == "txt"
+        assert dataset.attrs["n_lines"] == 20000
+        assert dataset.id.get_storage_size() < len(text.encode()) / 3
+
+
+def test_structure_program_as_reference_only(store, tmp_path):
+    store.add_structure(structure())
+    store.write_structure_program("rect", "LINEAR X1\nLINEAR X2\n", mode="reference", file="programs/rect.txt")
+
+    assert store.read_structure_program("rect") is None
+    with h5py.File(store.path, "r") as f:
+        attrs = f["structures/rect/program"].attrs
+        assert attrs["storage"] == "reference" and attrs["file"] == "programs/rect.txt" and len(attrs["sha256"]) == 64
+    with pytest.raises(ValueError, match="mode"):
+        store.write_structure_program("rect", "x", mode="zip")
+
+
+def test_structure_program_of_an_old_file_is_read(store):
+    store.add_structure(structure())
+    with h5py.File(store.path, "r+") as f:                       # layout of schema 1.0 / 1.1: a scalar string
+        f["structures/rect"].create_dataset("program", data="LINEAR X1\n", dtype=h5py.string_dtype())
+
+    assert store.read_structure_program("rect") == "LINEAR X1\n"

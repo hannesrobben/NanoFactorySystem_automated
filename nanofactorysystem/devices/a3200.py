@@ -452,13 +452,23 @@ class A3200(Parameter, AerotechController):
         time.sleep(duration)
         self.laseroff()
 
-    def init_zline(self, fn=None):
+    def init_zline(self, fn=None, *, reload: bool = False):
 
-        """ Load and compile zline program. """
+        """ Load and compile the z-line program on the first free task.
+
+        Parameters
+        ----------
+        fn : str, optional
+            Program file (default ``__zline__.pgm`` in ``program_dir`` or the
+            current folder).
+        reload : bool
+            Load it again on its task, e.g. after another program ran there
+            (T135); otherwise a loaded z-line program is kept.
+        """
 
         # Sanity check
         name = "zline"
-        if name in self["tasks"]:
+        if name in self["tasks"] and not reload:
             return
 
         # Default file name
@@ -467,12 +477,15 @@ class A3200(Parameter, AerotechController):
             if self.program_dir is not None:
                 fn = str(self.program_dir / fn)
 
-        # First free task number
-        tasks = self["tasks"].values()
-        if len(tasks) == 0:
-            task_id = 1
+        # First free task number (the same task when reloading)
+        if name in self["tasks"]:
+            task_id = self["tasks"][name]
         else:
-            task_id = min(set(range(1, max(tasks) + 2)) - set(tasks))
+            tasks = self["tasks"].values()
+            if len(tasks) == 0:
+                task_id = 1
+            else:
+                task_id = min(set(range(1, max(tasks) + 2)) - set(tasks))
 
         # Store AeroBasic program as file
         self["tasks"][name] = task_id
@@ -486,6 +499,7 @@ class A3200(Parameter, AerotechController):
         # Load AeroBasic program 1 from file
         path = os.path.join(os.getcwd(), fn)
         self.load(task_id, path)
+        self._zline_loads = self.task_load_count(task_id)
 
         # Done
         return task_id
@@ -501,8 +515,14 @@ class A3200(Parameter, AerotechController):
         if name not in self["tasks"]:
             self.init_zline()
 
-        # Task number        
+        # Task number
         task = self["tasks"][name]
+
+        # Another program ran on this task since the z-line program was loaded (layer programs use task 1,
+        # T135): START would run nothing or that program, so load the z-line program again
+        if self.task_load_count(task) != getattr(self, "_zline_loads", 0):
+            self.log.info(f"Another program ran on task {task}: loading the z-line program again.")
+            self.init_zline(reload=True)
 
         # Store task parameters as global variables
         if self.z + 0.5 * dz > self["zMax"]:

@@ -24,10 +24,39 @@ from nanofactorysystem.devices.coordinate_system import Point2D, Point3D
 from nanofactorysystem.experiment import ProgramSource
 from nanofactorysystem.experiment_spec import ExperimentSpec, StructureSpec, run_experiment
 from nanofactorysystem.plane_fitting import PlaneFitMode
+from nanofactorysystem.structure_factories import BuildContext, structure_factory
 
 # Substrate of the current print: resin drop edges and experiment center in µm (from main.py)
 RESIN_EDGES = [[5720, 22330], [-3333, 22420], [1660, 17212], [1200, 27190]]
 CENTER = Point2D(1310, 19500)
+
+
+@structure_factory("experiment_template.stage_rectangle")
+def stage_rectangle(context: BuildContext, *, size_um: float, height_um: float, hatch_um: float, slice_um: float,
+                    velocity_um_s: float) -> Rectangle3D:
+    """ A rectangle printed with the stages, with the X acceleration of the controller (T112).
+
+    A fixed ``acceleration=500`` µm/s² gave a run-up of 2 mm before every hatch line (about 50 min for a
+    50 x 50 x 3 µm block); the controller value is the one the stages really use.
+
+    Parameters
+    ----------
+    context : BuildContext
+        Values of the running experiment (``accel_x_um``).
+    size_um, height_um : float
+        Edge length and height in µm.
+    hatch_um, slice_um : float
+        Hatch and slice distance in µm.
+    velocity_um_s : float
+        Writing speed in µm/s.
+
+    Returns
+    -------
+    Rectangle3D
+    """
+
+    return Rectangle3D(Point3D(0, 0, -1), size_um, size_um, height_um, hatch_size=hatch_um, slice_size=slice_um,
+                       velocity=velocity_um_s, acceleration=context.accel_x_um)
 
 
 def drawing_spec(objective: str = "Zeiss 20x", center: Point2D = CENTER) -> ExperimentSpec:
@@ -49,8 +78,7 @@ def drawing_spec(objective: str = "Zeiss 20x", center: Point2D = CENTER) -> Expe
                 power_mw=0.7, axes="ABZ"),
             StructureSpec(
                 "rectangle",
-                Rectangle3D(Point3D(0, 0, -1), 50, 50, 3, hatch_size=0.5, slice_size=0.5, velocity=1000,
-                            acceleration=500),
+                factory=stage_rectangle(size_um=50, height_um=3, hatch_um=0.5, slice_um=0.5, velocity_um_s=1000),
                 power_mw=0.7, axes="XYZ", repeat=1),
         ],
     )

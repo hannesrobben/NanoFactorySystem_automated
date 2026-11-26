@@ -262,13 +262,36 @@ class Rectangle2D_IFOV(DrawableObject):
             velocity: float,
             power: float = None,
             hatching_direction: HatchingDirection,
-            angle: float = 0.0
+            angle: float = 0.0,
+            objective: str = "Zeiss 63x"
     ):
+        """ One IFOV layer of parallel hatch lines in a (rotated) rectangle.
+
+        Parameters
+        ----------
+        center : Point2D or Point3D
+            Centre of the rectangle (local µm).
+        x_length, y_length : float
+            Edge lengths in µm.
+        hatch_size : float
+            Distance of the hatch lines in µm.
+        velocity : float
+            Kept for the time estimate; IFOV writes with the fixed speed of the objective.
+        power : float, optional
+            Laser power in mW.
+        hatching_direction : HatchingDirection
+            Direction along which the lines are stacked.
+        angle : float
+            Rotation in degrees.
+        objective : str
+            Objective whose IFOV configuration and writing speed the layer uses (T114; default as before).
+        """
         super().__init__()
         self.center = center
         self.x_length = x_length
         self.y_length = y_length
         self.phi = angle
+        self.objective = objective
 
         self.hatch_size = hatch_size
         self.velocity = velocity
@@ -395,7 +418,8 @@ class Rectangle2D_IFOV(DrawableObject):
             velocity=self.velocity,
             power=self.power,
         )
-        program.add_programm(ifov_lines.draw_on(coordinate_system))
+        for layer in ifov_lines.iterate_layers(coordinate_system, objective=self.objective):
+            program.add_programm(layer)
         yield program
 
 
@@ -413,9 +437,26 @@ class Rectangle3D_IFOV(DrawableObject):
             angle: float = 0.0,
             power: float = None,
             alternate_hatching: bool = False,
-            hatching_direction: HatchingDirection = HatchingDirection.X
+            hatching_direction: HatchingDirection = HatchingDirection.X,
+            objective: str = "Zeiss 63x"
     ):
+        """ A block of IFOV layers (``Rectangle2D_IFOV``) from z = 0 to ``height``.
+
+        Parameters
+        ----------
+        alternate_hatching : bool
+            Turn the hatch direction by 90° from layer to layer: layer ``i`` uses ``hatching_direction`` for even
+            ``i`` and the flipped direction for odd ``i``. The object is not changed, so every iteration gives
+            the same programs (T114).
+        hatching_direction : HatchingDirection
+            Direction of the first layer.
+        objective : str
+            Objective whose IFOV configuration and writing speed the layers use (T114; default as before).
+
+        The other parameters are those of ``Rectangle2D_IFOV`` plus ``height`` and ``slice_size`` in µm.
+        """
         super().__init__()
+        self.objective = objective
         self.center = center
         self.x_length = x_length
         self.y_length = y_length
@@ -451,8 +492,9 @@ class Rectangle3D_IFOV(DrawableObject):
                 hatch_size=self.hatch_size,
                 velocity=self.velocity,
                 power=self.power,
-                hatching_direction=self.hatching_direction,
-                angle=self.angle
+                hatching_direction=self.layer_direction(i),
+                angle=self.angle,
+                objective=self.objective
             )
             program = DrawableAeroBasicProgram(coordinate_system)
 
@@ -463,5 +505,10 @@ class Rectangle3D_IFOV(DrawableObject):
             else:
                 program.add_programm(rectangle.draw_on(coordinate_system))
             yield program
-            if self.alternate_hatching:
-                self.hatching_direction = self.hatching_direction.flip()
+
+    def layer_direction(self, index: int) -> HatchingDirection:
+        """ Hatch direction of layer ``index`` (alternating from the first direction if ``alternate_hatching``). """
+
+        if self.alternate_hatching and index % 2 == 1:
+            return self.hatching_direction.flip()
+        return self.hatching_direction

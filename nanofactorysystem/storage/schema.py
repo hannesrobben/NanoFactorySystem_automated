@@ -6,8 +6,9 @@
 """Names and version of the experiment file schema (docs/design/EXPERIMENT_STORAGE.md §5, §9)."""
 
 FILE_TYPE = "nanofactory.experiment"
-# 1.0: T47; 1.1: /metadata/materials (material snapshots, T75). Readers accept every 1.x file.
-SCHEMA_VERSION = "1.1"
+# 1.0: T47; 1.1: /metadata/materials (material snapshots, T75); 1.2: whole-structure program compressed or as
+# reference (T124). Readers accept every 1.x file.
+SCHEMA_VERSION = "1.2"
 FILE_NAME = "experiment.h5"
 LOCK_NAME = "experiment.lock"
 

@@ -84,6 +84,10 @@ def _get_json_attrs(obj) -> dict:
     return values
 
 
+#: Storage forms of the whole-structure program (T124)
+STRUCTURE_PROGRAM_MODES = ("compressed", "reference")
+
+
 def _replace_text(group: h5py.Group, name: str, text: str) -> h5py.Dataset:
     if name in group:
         del group[name]
@@ -628,11 +632,51 @@ class ExperimentStore:
             _set_attrs(dataset, {"layer_id": int(layer_id), "file": file,
                                  "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()})
 
-    def write_structure_program(self, structure: str, text: str) -> None:
-        """ Store the whole-structure program text. """
+    def write_structure_program(self, structure: str, text: str, *, mode: str = "compressed",
+                                file: str = "") -> None:
+        """ Store the whole-structure program (T124).
 
+        The program is the concatenation of the layer programs, which are stored separately; for a
+        large structure (main_PNG print of 2026-11-21: 48 million lines) a second uncompressed copy
+        was a single text scalar of more than 2 GB.
+
+        Parameters
+        ----------
+        structure : str
+            Structure name.
+        text : str
+            Program text.
+        mode : {"compressed", "reference"}
+            ``"compressed"`` (default): UTF-8 bytes in a chunked gzip dataset (attribute
+            ``format = "txt"``, so the unpack tool writes it as a text file). ``"reference"``: only the
+            SHA-256, the line count and ``file`` are stored (for a later queue mode, F38).
+        file : str
+            Program file relative to the experiment folder (stored as attribute).
+
+        Raises
+        ------
+        ValueError
+            For another mode.
+        """
+
+        import hashlib
+        if mode not in STRUCTURE_PROGRAM_MODES:
+            raise ValueError(f"Structure program mode must be one of {STRUCTURE_PROGRAM_MODES}, not {mode!r}")
+        data = text.encode("utf-8")
+        attrs = {"storage": mode, "sha256": hashlib.sha256(data).hexdigest(), "n_lines": text.count("\n"),
+                 "n_bytes": len(data), "file": file, "encoding": "utf-8"}
         with self._write() as f:
-            _replace_text(f[f"structures/{structure}"], "program", text)
+            group = f[f"structures/{structure}"]
+            if "program" in group:
+                del group["program"]
+            if mode == "compressed":
+                array = np.frombuffer(data, dtype=np.uint8)
+                dataset = group.create_dataset("program", data=array, compression="gzip", compression_opts=4,
+                                               chunks=(min(max(len(array), 1), 1 << 20),))
+                attrs["format"] = "txt"
+            else:
+                dataset = group.create_dataset("program", data=np.zeros(0, dtype=np.uint8))
+            _set_attrs(dataset, attrs)
 
     def write_slicer_job(self, structure: str, job, time_estimate=None) -> None:
         """ Copy a slicer ``ToolpathJob`` into the structure (schema of ``slicer/storage.py``). """
@@ -924,6 +968,24 @@ class ExperimentStore:
         with self._read() as f:
             dataset = f[_attr(f["capture_index"], capture_id)]["products"][name]
             return dataset[()], json.loads(_attr(dataset, "metadata_json"))
+
+    def read_structure_program(self, structure: str) -> Optional[str]:
+        """ Return the whole-structure program, or None if only a reference is stored (T124).
+
+        Reads the compressed form and the text scalar of files before T124.
+        """
+
+        with self._read() as f:
+            group = f[f"structures/{structure}"]
+            if "program" not in group:
+                return None
+            dataset = group["program"]
+            storage = _attr(dataset, "storage")
+            if storage == "reference":
+                return None
+            if storage == "compressed":
+                return dataset[()].tobytes().decode("utf-8")
+            return _text(dataset[()])
 
     def read_program(self, structure: str, layer_id: int) -> str:
         """ Return the text of a stored layer program. """

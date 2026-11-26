@@ -46,7 +46,8 @@ def test_structure_from_the_image_settings(main_png):
     assert height_map.png_sha256 is not None
 
 
-def test_spec_is_one_ifov_structure_in_the_drop_center(main_png):
+def test_spec_is_one_ifov_structure_in_the_drop_center(main_png, monkeypatch):
+    monkeypatch.setattr(main_png, "CENTER", None)  # the SETTINGS block may hold a lab value (T122)
     spec = main_png.experiment_spec(main_png.structure())
     drop = ellipse_through(main_png.settings.RESIN_EDGES)
     assert spec.name == "png_block"
