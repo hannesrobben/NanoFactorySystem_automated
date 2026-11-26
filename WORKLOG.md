@@ -3213,3 +3213,42 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** none (documentation only).
 - **Commits:** `cb2ccc2` docs(system): hand over the next steps of parameter tests and print path; this docs(todo) commit.
 - **Follow-ups:** `ptd.import_voxel_measurements` defaults to the PTD-01 version-1 field ids (0, 1, 2); for version 2 `fields=` must be given per test (checked in AP2 step 2.6, new todo if code has to change).
+
+### 2026-11-26 14:19 CET — [T83] Capture reservation, raw references and groups in the store
+- **Status:** done
+- **Changes:**
+  - `docs/design/EXPERIMENT_STORAGE.md`: §15 rewritten as the binding layout of schema 1.3 (it was still marked "not yet approved" although T71 was approved on 2026-11-18): one product rule (`header_json` + one dataset per buffer, the MIRA `LayerProduct.to_h5` layout), capture attributes and `frames` table, product attributes, `/dhm_groups`, `/metadata/dhm` (T79), calibration and orphans (references only, SI4), unpack; schema row in §5.1, status line.
+  - `docs/design/DHM_SERVICE_INTEGRATION.md`: storage summary (§9) follows §15 (`propagation_index` instead of `n_medium`, product layout, `LayerProduct` per group).
+  - `nanofactorysystem/storage/experiment_store.py`: `reserve_capture`, `update_capture_job`, `add_dhm_result` (idempotent by job id, `recovered`), `read_dhm_result`, `read_capture_job`, `capture_jobs`, `open_captures`, `add_layer_product`, `read_layer_product`, `dhm_groups`, `add_dhm_orphan`, `read_dhm_orphans`, `write_dhm_calibration`, `read_dhm_calibrations`; capture group creation shared with `add_capture` (legacy captures written as before).
+  - `nanofactorysystem/storage/schema.py`: schema 1.3; job states, adapters, group and calibration kinds.
+  - `analysis/experiment_analysis/unpack.py`: `captures.csv` with `job_id`, `job_state`, `products`.
+  - `test/storage/dhm_example.py` (new), `test/storage/data/dhm_example/experiment.h5` (new), `test/storage/data/contracts/` (new: ProductSet, LayerProduct, GroupSpec examples of DHMConnect `b04fe69` with `MANIFEST.json`): generator and example file of §15 with contract-valid headers (checked with the DHMConnect validator).
+  - `test/storage/test_dhm_storage.py` (new): round trips, legacy defaults, idempotency, recovery, validation, unpack, vendored example equals its generator.
+  - `test/integration/test_dry_run_materials.py`: expects schema 1.3.
+  - `test/README.md`: new tests listed.
+  - `TODO.md`: T83 and T79 to Done. `WORKLOG.md`: this entry and the T79 entry.
+- **Tests:** fresh venv `%LOCALAPPDATA%\Temp\nfsv2` (Python 3.12; the old `nfsv` is broken): full suite on the branch 742 passed, 15 skipped, 1 failed (the schema assertion fixed in `02227ab`, then 2 passed); `test/storage` 55 passed after the last changes. The T122 entry-script failures are gone (fixed on `main_HR`).
+- **Commits:** `f2a45ac` docs(design): fix the experiment.h5 layout of DHM service results [T83]; `c9cdfd6` feat(storage): store DHM service results in experiment.h5 [T83]; `c4f768d` test(storage): build the example products from the contract examples [T83]; `b687eed` test(storage): store a contract GroupSpec with the example group [T83]; `02227ab` test(integration): expect experiment schema 1.3 in the materials dry run [T83]; this docs(todo) commit.
+- **Follow-ups:** the example file is vendored by DHMConnect (DL-B7, `831f382`), OffAxisHolo (K12, `3086217`) and MIRA (MI-62); regenerate and re-vendor it when §15 changes. T84 / T86 write through these methods (AP5). Part of the cross-repository work package AP4 (planning 2026-11-26).
+
+### 2026-11-26 14:19 CET — [T79] Experiment configuration record
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/storage/experiment_store.py`: `write_dhm_session` (needs a session; adapter and pixel source validated, never Koala), `write_parameter_set` (once per `config_hash`, different content refused), `read_dhm_metadata`; `read()` fills `record.dhm`.
+  - `nanofactorysystem/storage/records.py`: `ExperimentRecord.dhm`.
+  - `nanofactorysystem/storage/schema.py`: DHM pixel sources.
+  - `nanofactorysystem/storage/summary.py`: `dhm_config` and a DHM line in the summary header, only when a DHM record exists (stored summaries of older experiments unchanged).
+  - `test/storage/dhm_example.py`, `test/storage/data/dhm_example/experiment.h5`, `test/storage/test_dhm_storage.py`, `test/README.md`: session record and parameter set in the example; tests.
+- **Tests:** see the T83 entry (same branch and runs).
+- **Commits:** `5674b82` feat(storage): record the DHM configuration per session [T79]; the docs(todo) commit of T83.
+- **Follow-ups:** the adapters (T82 legacy, T84 service) call `write_dhm_session` once per session and `write_parameter_set` per new hash (AP5). The print camera stays in `/metadata/system/devices_json`.
+
+### 2026-11-26 14:25 CET — [T83] Example file: tiles on their GroupSpec positions (follow-up)
+- **Status:** done
+- **Changes:**
+  - `test/storage/dhm_example.py`: capture positions and footprint of both ProductSets on the GroupSpec positions; border band and minimum overlap of the GroupSpec scaled to the 16 px example tiles, so MIRA MI-62 can rerun the stitching of the example group offline.
+  - `test/storage/data/dhm_example/experiment.h5`: regenerated (headers still valid for the DHMConnect schemas).
+  - `WORKLOG.md`: this entry.
+- **Tests:** `test/storage/test_dhm_storage.py` 18 passed; MIRA `tests/test_experiment_file.py` passed with the new file.
+- **Commits:** `12686ef` test(storage): place the example tiles on their GroupSpec positions [T83]; this docs(todo) commit.
+- **Follow-ups:** the vendored copies in DHMConnect and OffAxisHolo are the earlier `c4f768d` version (their tests do not use the group); refresh them with the next layout change.

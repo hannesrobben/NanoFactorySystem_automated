@@ -1,0 +1,155 @@
+{
+  "message_type": "GroupSpec",
+  "schema_version": "1.0",
+  "group_kind": "layer",
+  "structure": {
+    "structure_id": "pillar_03",
+    "occupied_um": [
+      [
+        [
+          840.0,
+          1190.0
+        ],
+        [
+          840.0,
+          1210.0
+        ],
+        [
+          860.0,
+          1210.0
+        ],
+        [
+          860.0,
+          1190.0
+        ]
+      ]
+    ],
+    "target_ref": "tgt-pillar_03-L004",
+    "material": {
+      "material_id": "sz2080",
+      "name": "SZ2080",
+      "registry_version": "1",
+      "wavelength_nm": 674.994,
+      "states": {
+        "uncured": {
+          "n": 1.508,
+          "source": "maintainer measurement 2026"
+        },
+        "cured_in_resin": {
+          "n": 1.52,
+          "source": "maintainer measurement 2026"
+        },
+        "cured_developed": {
+          "n": 1.52,
+          "source": "maintainer measurement 2026, checked against air"
+        }
+      }
+    }
+  },
+  "layer_index": 4,
+  "positions": [
+    {
+      "tile_index": 0,
+      "planned_um": {
+        "x": 1191.0,
+        "y": 841.0,
+        "z": 32.5
+      },
+      "role": "ring",
+      "n_frames": 10
+    },
+    {
+      "tile_index": 1,
+      "planned_um": {
+        "x": 1200.0,
+        "y": 841.0,
+        "z": 32.5
+      },
+      "role": "ring",
+      "n_frames": 10
+    },
+    {
+      "tile_index": 2,
+      "planned_um": {
+        "x": 1209.0,
+        "y": 841.0,
+        "z": 32.5
+      },
+      "role": "ring",
+      "n_frames": 10
+    },
+    {
+      "tile_index": 3,
+      "planned_um": {
+        "x": 1191.0,
+        "y": 850.0,
+        "z": 32.5
+      },
+      "role": "ring",
+      "n_frames": 10
+    },
+    {
+      "tile_index": 4,
+      "planned_um": {
+        "x": 1200.0,
+        "y": 850.0,
+        "z": 32.5
+      },
+      "role": "center",
+      "n_frames": 10
+    },
+    {
+      "tile_index": 5,
+      "planned_um": {
+        "x": 1209.0,
+        "y": 850.0,
+        "z": 32.5
+      },
+      "role": "ring",
+      "n_frames": 10
+    },
+    {
+      "tile_index": 6,
+      "planned_um": {
+        "x": 1191.0,
+        "y": 859.0,
+        "z": 32.5
+      },
+      "role": "ring",
+      "n_frames": 10
+    },
+    {
+      "tile_index": 7,
+      "planned_um": {
+        "x": 1200.0,
+        "y": 859.0,
+        "z": 32.5
+      },
+      "role": "ring",
+      "n_frames": 10
+    },
+    {
+      "tile_index": 8,
+      "planned_um": {
+        "x": 1209.0,
+        "y": 859.0,
+        "z": 32.5
+      },
+      "role": "ring",
+      "n_frames": 10
+    }
+  ],
+  "stitching": {
+    "min_positions": 9,
+    "min_coverage": 4,
+    "min_overlap_um": 23.0,
+    "border_band_um": 6.5,
+    "unwrap": "fast2d"
+  },
+  "jitter_seed": 20261118,
+  "plan_generator": {
+    "name": "nanofactorysystem.dhm.plan",
+    "version": "0.1"
+  },
+  "created_utc": "2026-11-18T09:11:58Z"
+}

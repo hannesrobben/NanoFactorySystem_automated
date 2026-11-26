@@ -202,8 +202,10 @@ Per DHM capture: `job_id`, `job_state`, `recipe_json`, `context_json`; raw holog
 are transferred, otherwise `raw_ref_json` (host, path, SHA-256, frame count); a `frames` table (one row per
 frame: index, used, reject reason, metric columns); per product dataset the traceability attributes
 (`schema_version`, `config_hash`, `background_id`, `warnings_json`, `quality_json`, `pixel_pitch_um`,
-`z_um`, `wavelength_um`, `n_medium`, `timings_json`, `versions_json`). Group results of speckle sets and
-stitching rasters go to `/dhm_groups/<group_id>`. Schema 1.x minor addition; legacy captures are unchanged.
+`z_um`, `propagation_index`, `wavelength_um`, `timings_json`, `versions_json`); the `ProductSet` itself as
+`header_json` + one dataset per buffer. Group results (the stitched `LayerProduct`, N1) go to
+`/dhm_groups/<group_id>/product` in the same layout. Schema 1.3 (minor addition, T83); legacy captures are
+unchanged.
 
 ## 10. Decisions
 

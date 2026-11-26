@@ -1,0 +1,126 @@
+{
+  "message_type": "LayerProduct",
+  "schema_version": "1.0",
+  "product_id": "lp-000017",
+  "context_id": "ctx-3f2a",
+  "job_id": "job-000240",
+  "group_id": "grp-0007",
+  "group_kind": "layer",
+  "experiment_uuid": "6b1f3c1e-2d4a-4f7e-9c0a-1b2c3d4e5f60",
+  "structure_id": "pillar_03",
+  "layer_index": 4,
+  "grid": {
+    "origin_um": [
+      800.0,
+      1150.0
+    ],
+    "pixel_um": [
+      0.1738,
+      0.1738
+    ],
+    "shape": [
+      600,
+      600
+    ]
+  },
+  "tiles": [
+    {
+      "product_id": "ps-000231",
+      "tile_index": 3,
+      "planned_um": {
+        "x": 1200.0,
+        "y": 850.0,
+        "z": 32.5
+      },
+      "actual_um": {
+        "x": 1200.02,
+        "y": 849.98,
+        "z": 32.5
+      },
+      "registration": {
+        "shift_um": [
+          0.04,
+          -0.02
+        ],
+        "method": "stage_prior+phase_correlation",
+        "residual_um": 0.01
+      },
+      "piston_rad": 0.31,
+      "tilt_rad_per_um": [
+        0.0001,
+        -0.0002
+      ],
+      "anchor": "ring_substrate",
+      "residual_rad": 0.02,
+      "border_band_um": 6.5,
+      "reference_source": "mask_a_priori",
+      "reference_fraction": 0.71,
+      "unwrap": {
+        "method": "fast2d",
+        "k_offset": 0,
+        "consistent": true,
+        "residues": 0
+      },
+      "flagged": false
+    }
+  ],
+  "member_ids": [
+    "ps-000231"
+  ],
+  "quality": {
+    "n_tiles": 1,
+    "n_flagged": 0,
+    "phase_noise_rad": 0.03,
+    "unwrap_method": "fast2d",
+    "coverage_min": 1,
+    "recovered": false
+  },
+  "z_um": -2.4,
+  "propagation_index": 1.508,
+  "n_surround": 1.508,
+  "wavelength_um": 0.674994,
+  "background_ids": [
+    "bg-0008"
+  ],
+  "parameter_set_id": "zeiss63x-insitu-v1",
+  "config_hash": "af2c68e689d640b9bbfd8f9e0cdaa6923aab578f591682466bbd4bdf5ec8a38f",
+  "versions": {
+    "dhmconnect": "0.1.0",
+    "offaxisholo": "0.4.0",
+    "mira": "0.3.0"
+  },
+  "timings_s": {
+    "stitch": 0.8
+  },
+  "warnings": [],
+  "buffers": [
+    {
+      "name": "phase_rad",
+      "dtype": "float32",
+      "shape": [
+        600,
+        600
+      ],
+      "byte_order": "little"
+    },
+    {
+      "name": "intensity_rel",
+      "dtype": "float32",
+      "shape": [
+        600,
+        600
+      ],
+      "byte_order": "little"
+    },
+    {
+      "name": "valid",
+      "dtype": "uint8",
+      "shape": [
+        600,
+        600
+      ],
+      "byte_order": "little"
+    }
+  ],
+  "created_utc": "2026-11-18T09:12:20.000Z"
+}

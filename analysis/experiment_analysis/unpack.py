@@ -23,7 +23,8 @@ files at the top::
 
 Captures are in ``structures/<name>/captures/<id>/`` (``image.png`` or
 ``holograms/``); ``tables/captures.csv`` lists them with structure, phase,
-layer and stage position.
+layer, stage position and, for DHM captures, job id, job state and products
+(docs/design/EXPERIMENT_STORAGE.md §15.6).
 """
 import logging
 import shutil
@@ -86,15 +87,18 @@ analysis/                    results stored by analysis scripts
 """
 
 
-def _captures_table(record) -> list[dict]:
+def _captures_table(record, jobs: Optional[dict] = None) -> list[dict]:
+    jobs = jobs or {}
     rows = []
     for c in record.captures:
+        job = jobs.get(c.capture_id, {})
         actual = {f"actual_{axis.lower()}_um": c.actual_um.get(axis) for axis in "XYZAB"}
         commanded = dict(zip(("commanded_x_um", "commanded_y_um", "commanded_z_um"), c.commanded_um))
         rows.append({"capture_id": c.capture_id, "structure": c.structure, "kind": c.kind, "phase": c.phase,
                      "layer_id": c.layer_id, "image_index": c.image_index, "image_count": c.image_count,
                      "offset_x_um": c.offset_um[0], "offset_y_um": c.offset_um[1], **commanded, **actual,
-                     "time": c.time,
+                     "time": c.time, "job_id": job.get("job_id", ""), "job_state": job.get("job_state", ""),
+                     "products": " ".join(job.get("products", [])),
                      "folder": f"structures/{c.structure}/captures/{c.capture_id}"})
     return rows
 
@@ -131,7 +135,8 @@ def _write_overview_files(file: ExperimentFile, target: Path, options: ConvertOp
     tables = target / "tables"
     tables.mkdir(exist_ok=True)
     for name, rows in (("summary", data["structures"]), ("structures", _structures_table(record)),
-                       ("captures", _captures_table(record)), ("progress", _progress_table(record)),
+                       ("captures", _captures_table(record, file.store.capture_jobs())),
+                       ("progress", _progress_table(record)),
                        ("sessions", record.sessions)):
         if rows:
             write_records_csv(tables / f"{name}.csv", rows, options)

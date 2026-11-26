@@ -37,8 +37,8 @@ with an evaluation after every layer capture; a camera live feed; a core that a 
 | 3 | Experiment scripts and substrate main | T51, T52 (done) | – |
 | 4 | Voxel database and voxel-aware slicing | T53, T54, T31 (done) | T53 design approved by the maintainer |
 | 5 | Concept for phases 6–10 | T70, T71, T72, T73, T74, T100 (done; all approved 2026-11-18) | – |
-| 6 | Information model | T75, T76, T77 (done), T78, T79, T80, T81, T101, T108 (T103 → F39) | – |
-| 7 | DHM service integration | T82, T83, T84, T85, T86, T87, T105, T106 | T84 needs DHMConnect DL-C1, DL-C2; T87 needs DL-H2 and K14 |
+| 6 | Information model | T75, T76, T77, T79 (done), T78, T80, T81, T101, T108 (T103 → F39) | – |
+| 7 | DHM service integration | T83 (done), T82, T84, T85, T86, T87, T105, T106 | T84 needs DHMConnect DL-C1, DL-C2; T87 needs DL-H2 and K14 |
 | 8 | Operating modes and calibration | T88, T89, T90, T91, T92, T104, T107 | T90 needs MIRA MI-53 for the real evaluator; T104 needs MIRA MI-41 for the fit; T107 needs OffAxisHolo K10 for the sweep |
 | 9 | Camera live feed | T102, T93, T94, T95 | T102 before T93 (hard prerequisite, `CAMERA_LIVE.md`) |
 | 10 | Core ready for a GUI | T96, T97 | – |
@@ -146,16 +146,6 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
 
 ### Phase 6 — Information model
 
-- [ ] T79: Experiment configuration record [phase: 6]
-  - Priority: medium
-  - Size: S
-  - Depends on: T70
-  - Done when:
-    - objective, camera information and DHM information (service version, parameter set and hash,
-      pixel size and its source) are stored once per session and shown in the summary;
-    - the full DHM parameter set is stored **once per `config_hash`** in `experiment.h5` (DL-A3 a), so an
-      experiment is traceable without the DHM-PC; products reference it by hash and parameter-set id.
-
 - [ ] T101: Find out which controller states persist between programs and experiments (found during T70) [phase: 6]
   - Priority: medium
   - Size: S
@@ -185,29 +175,6 @@ session 2026-11-17/18, master plan v0.4). Still deferred and relevant here:
       `acquire_background`, `measure`, `result`, `close`);
     - `LegacyDhmAdapter` wraps today's `Dhm`; `Experiment` talks only to the protocol;
     - golden command logs and stored data of the legacy mode are unchanged.
-
-- [ ] T83: Capture reservation, raw references and groups in the store [phase: 7]
-  - Priority: high
-  - Size: M
-  - Depends on: –
-  - Done when:
-    - `ExperimentStore.reserve_capture()` returns the capture id before the acquisition;
-    - a `LayerProduct` (contract `GroupProduct`, master plan v0.4 N1) is stored in full per structure and
-      layer; its member `ProductSet`s and raw frames are stored as references only (`raw_ref` / product
-      id, host, path, SHA-256); results recovered after a restart are marked `recovered` (SI4);
-      `/dhm_orphans` holds references only;
-    - a capture can be stored without holograms but with `raw_ref` (host, path, SHA-256), `job_id`,
-      frame records (metrics, `used`, `reject_reason`) and selection mask; group products are stored
-      under `/dhm_groups/<group_id>`;
-    - every product carries `schema_version`, `config_hash`, `background_id` and `warnings` (handover
-      2026-11-16 §3), so it can be traced to its background and parameter set;
-    - the schema version is raised and old files are still read; `json_copies` and the unpack tool
-      in `analysis/` know the new entries; `docs/design/EXPERIMENT_STORAGE.md` is current (OffAxisHolo
-      K12 reads the file with `h5py` only, without file locking, by that document).
-  - Note (from MIRA MI-10, 2026-11-18): MIRA `LayerProduct.to_h5` / `from_h5` (`h5py` only) use the
-    layout attribute `header_json` (the contract header) + one dataset per buffer under its contract name
-    (`phase_rad`, `intensity_rel`, `valid` as uint8, optional `field`). Proposal for the `LayerProduct`
-    group under `/dhm_groups/<group_id>`; if T83 chooses another layout, add a MIRA todo to adapt the reader.
 
 - [ ] T84: Service adapter and fake service [phase: 7]
   - Priority: high
@@ -723,6 +690,8 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T83: Capture reservation, raw references and groups in the store — 2026-11-26 — `EXPERIMENT_STORAGE.md` §15 fixed as the binding layout of schema 1.3 (approved with T71); `ExperimentStore.reserve_capture` / `update_capture_job` / `add_dhm_result` (ProductSet as `header_json` + buffers, frame table, flat traceability attributes, idempotent by job id, `recovered`) / `add_layer_product` (`/dhm_groups`, MIRA layout, GroupSpec) / orphans as references / `/calibration/dhm`; legacy captures unchanged; `captures.csv` with job columns; example file `test/storage/data/dhm_example/experiment.h5` with contract-valid headers, vendored by DHMConnect, OffAxisHolo K12 and MIRA MI-62 — commits: `f2a45ac`, `c9cdfd6`, `c4f768d`, `b687eed`, `02227ab`.
+- [x] T79: Experiment configuration record — 2026-11-26 — `/metadata/dhm/sessions/<n>` once per session (adapter, versions, parameter set id and hash, camera, objective, pixel size and its source, never Koala) and the full parameter set once per `config_hash` (`/metadata/dhm/parameter_sets`, refused if the content differs); `ExperimentRecord.dhm`; summary entry `dhm_config` and a DHM line in the header only when a record exists; the print camera stays in `/metadata/system/devices_json` — commits: `5674b82`.
 - [x] T133: Controller health check and recovery levels — 2026-11-26 — Health check and R0 (`1d969e6`); R1 automatic after a detected error with `max_r1_per_structure` (2), R2 only between experiments after consent in a message box (`confirm_recovery`), R3 and all levels in `mains/controller_health.py` (maintainer decision 2026-11-26). — commits: `1d969e6`, `09b79d4`
 - [x] T130: Program optimiser — 2026-11-26 — Optimiser (`b063502`) plus the opt-in build option `Experiment(optimize_programs=)` (maintainer decision; golden files unchanged). — commits: `b063502`, `1adf8b4`
 - [x] T81: Extension point for dynamic slicing and hatching — 2026-11-26 — `print_strategies.py` registry (`static` only), `StructureSpec(strategy=, strategy_params=)` stored with the spec, unknown names refused; new strategies are registered without changing the core (maintainer requirement). — commits: `52ca47c`

@@ -304,6 +304,11 @@ class ExperimentRecord:
     spec : dict, optional
         The experiment spec (``ExperimentSpec.to_json()``) stored in ``/spec``
         (T77); None for files written without one.
+    dhm : dict
+        DHM configuration record (T79, ``/metadata/dhm``): ``sessions`` (session
+        number → adapter, versions, parameter set, pixel size and its source) and
+        ``parameter_sets`` (config hash → id and full set); empty for files
+        written without it.
     """
 
     uuid: str
@@ -331,6 +336,7 @@ class ExperimentRecord:
     time_estimate: Optional[dict] = None
     materials: dict[str, dict] = field(default_factory=dict)
     spec: Optional[dict] = None
+    dhm: dict = field(default_factory=dict)
 
     def structure(self, name: str) -> StructureRecord:
         """ Return the structure with the given name. """

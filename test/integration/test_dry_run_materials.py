@@ -52,7 +52,7 @@ def test_substrate_resin_by_registry_name(test_config, dummy_backend, no_sleep, 
     # M4: the names reach the sample section the tools read
     assert record.system["sys_args"]["sample"]["material"] == "ResinX"
     assert record.system["sys_args"]["sample"]["substrate"] == "cover slip glass"
-    assert record.schema_version == "1.2"
+    assert record.schema_version == "1.3"
 
 
 @pytest.mark.slow

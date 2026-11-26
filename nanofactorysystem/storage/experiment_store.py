@@ -126,6 +126,57 @@ def _property_table(properties: list[dict]) -> np.ndarray:
     return np.array(rows, dtype=list(PROPERTY_COLUMNS))
 
 
+def _frames_table(frames: list[dict]) -> np.ndarray:
+    """ ``FrameRecord`` 1.0 dicts as the compound table of §15.1 (one float column per metric key). """
+
+    keys = sorted({key for frame in frames for key in (frame.get("metrics") or {})})
+    dtype = [("index", "i4"), ("used", "?"), ("reject_reason", TEXT)] + [(f"metric_{k}", "f8") for k in keys]
+    rows = []
+    for frame in frames:
+        metrics = frame.get("metrics") or {}
+        rows.append((int(frame["index"]), bool(frame["used"]), frame.get("reject_reason") or "",
+                     *[_nan_if_none(metrics.get(k)) for k in keys]))
+    return np.array(rows, dtype=dtype)
+
+
+def _frames_from_table(table: np.ndarray, acquisition: list) -> list[dict]:
+    """ Inverse of :func:`_frames_table`; ``acquisition`` is the stored list of per-frame objects. """
+
+    metric_names = [name for name in table.dtype.names if name.startswith("metric_")]
+    frames = []
+    for i, row in enumerate(table):
+        reason = _text(row["reject_reason"])
+        frame = {"index": int(row["index"]), "used": bool(row["used"]), "reject_reason": reason or None,
+                 "metrics": {name[7:]: _none_if_nan(row[name]) for name in metric_names}}
+        if i < len(acquisition) and acquisition[i] is not None:
+            frame["acquisition"] = acquisition[i]
+        frames.append(frame)
+    return frames
+
+
+def _write_product(group: h5py.Group, header: dict, buffers) -> None:
+    """ Write a contract product: attribute ``header_json`` and one dataset per buffer (§15). """
+
+    for name, data in buffers:
+        data = np.asarray(data)
+        if data.dtype == bool:
+            data = data.astype(np.uint8)
+        if name in group:
+            del group[name]
+        dataset = group.create_dataset(name, data=data, **COMPRESSION)
+        dataset.attrs["created"] = utc_timestamp()
+    group.attrs["header_json"] = _json(header)
+
+
+def _read_product(group: h5py.Group) -> tuple[dict, dict[str, np.ndarray]]:
+    """ Inverse of :func:`_write_product`: the header and the buffers named in its descriptors. """
+
+    header = json.loads(_attr(group, "header_json"))
+    descriptors = header.get("buffers") or (header.get("reconstruction") or {}).get("buffers") or []
+    names = [d["name"] for d in descriptors] or [n for n in group if isinstance(group[n], h5py.Dataset)]
+    return header, {name: group[name][()] for name in names if name in group}
+
+
 def _properties_from_table(table: np.ndarray) -> list[dict]:
     """ Inverse of :func:`_property_table`. """
 
@@ -774,24 +825,30 @@ class ExperimentStore:
 
         data = np.asarray(data)
         with self._write() as f:
-            number = int(_attr(f, "next_capture", 0))
-            capture.capture_id = f"{number:04d}"
-            f.attrs["next_capture"] = number + 1
-            group = f[f"structures/{capture.structure}/captures"].create_group(capture.capture_id)
-            record = capture.to_dict()
-            record["actual_um"] = [float(capture.actual_um.get(axis, np.nan)) for axis in "XYZAB"]
-            record["commanded_um"] = [np.nan if v is None else float(v) for v in capture.commanded_um]
-            record["session"] = self.session
-            _set_attrs(group, {k: v for k, v in record.items() if k not in ("capture_id",)})
+            group = self._new_capture_group(f, capture)
             group.attrs["device_json"] = _json(device)
             name = "image" if capture.kind == "camera" else "holograms"
             chunks = data.shape if data.ndim == 2 else (1,) + data.shape[1:]
             group.create_dataset(name, data=data, chunks=chunks, **COMPRESSION)
             if capture_times_s is not None:
                 group.create_dataset("capture_times_s", data=np.asarray(capture_times_s, dtype=float))
-            group.create_group("products")
-            _group(f, "capture_index").attrs[capture.capture_id] = group.name
         return capture.capture_id
+
+    def _new_capture_group(self, f: h5py.File, capture: CaptureRecord) -> h5py.Group:
+        """ Create the group of a new capture with its record, ``products`` and index entry; set the id. """
+
+        number = int(_attr(f, "next_capture", 0))
+        capture.capture_id = f"{number:04d}"
+        f.attrs["next_capture"] = number + 1
+        group = f[f"structures/{capture.structure}/captures"].create_group(capture.capture_id)
+        record = capture.to_dict()
+        record["actual_um"] = [float(capture.actual_um.get(axis, np.nan)) for axis in "XYZAB"]
+        record["commanded_um"] = [np.nan if v is None else float(v) for v in capture.commanded_um]
+        record["session"] = self.session
+        _set_attrs(group, {k: v for k, v in record.items() if k not in ("capture_id",)})
+        group.create_group("products")
+        _group(f, "capture_index").attrs[capture.capture_id] = group.name
+        return group
 
     def add_dhm_product(self, capture_id: str, name: str, data: np.ndarray, metadata: dict) -> None:
         """ Store a product derived from a DHM capture (phase, amplitude, …).
@@ -818,6 +875,433 @@ class ExperimentStore:
             dataset = products.create_dataset(name, data=np.asarray(data), **COMPRESSION)
             _set_attrs(dataset, {"created": utc_timestamp()})
             dataset.attrs["metadata_json"] = _json(metadata)
+
+    # ------------------------------------------------- DHM service results (T83)
+
+    def reserve_capture(self, capture: CaptureRecord, *, recipe: dict, context: dict, adapter: str = "service",
+                        group_id: str = "", config_hash: str = "", parameter_set_id: str = "") -> str:
+        """ Create a DHM capture before the acquisition (``job_state = "reserved"``, §15.1).
+
+        The group exists before anything is sent to the DHM service, so a
+        result can always be matched to its capture, also after a crash.
+
+        Parameters
+        ----------
+        capture : CaptureRecord
+            Metadata (``kind = "dhm"``); ``capture_id`` is set by this method.
+        recipe : dict
+            Effective recipe of this capture (unknown keys included).
+        context : dict
+            ``CaptureContext`` as it will be sent.
+        adapter : {"service", "fake", "legacy"}
+            Adapter that takes the capture.
+        group_id : str
+            Group (``/dhm_groups``) the capture belongs to, empty if none.
+        config_hash, parameter_set_id : str
+            Parameter set of the reconstruction, if known before the job.
+
+        Returns
+        -------
+        str
+            Capture id.
+
+        Raises
+        ------
+        ValueError
+            For a capture that is not a DHM capture or an unknown adapter.
+        """
+
+        if capture.kind != "dhm":
+            raise ValueError(f"reserve_capture() is for DHM captures, not {capture.kind!r}")
+        if adapter not in schema.DHM_ADAPTERS:
+            raise ValueError(f"Unknown DHM adapter {adapter!r}; expected one of {schema.DHM_ADAPTERS}")
+        with self._write() as f:
+            group = self._new_capture_group(f, capture)
+            _set_attrs(group, {"adapter": adapter, "job_id": "", "job_state": "reserved", "error": "",
+                               "group_id": group_id, "config_hash": config_hash,
+                               "parameter_set_id": parameter_set_id})
+            group.attrs["recipe_json"] = _json(recipe)
+            group.attrs["context_json"] = _json(context)
+            group.attrs["raw_ref_json"] = _json({})
+        return capture.capture_id
+
+    def update_capture_job(self, capture_id: str, *, job_state: str, job_id: Optional[str] = None,
+                           error: Optional[str] = None, raw_ref: Optional[dict] = None) -> None:
+        """ Record a state change of the job of a reserved capture.
+
+        Parameters
+        ----------
+        capture_id : str
+        job_state : str
+            One of :data:`schema.DHM_JOB_STATES`.
+        job_id : str, optional
+            Job id of the service (set when the job is sent).
+        error : str, optional
+            Reason of a failed job.
+        raw_ref : dict, optional
+            Raw frames that stayed on the DHM-PC (``host``, ``path``, ``sha256``, ``n_frames``, ``keep_raw``).
+        """
+
+        if job_state not in schema.DHM_JOB_STATES:
+            raise ValueError(f"Unknown job state {job_state!r}; expected one of {schema.DHM_JOB_STATES}")
+        with self._write() as f:
+            group = f[_attr(f["capture_index"], capture_id)]
+            # None keeps the stored value (_set_attrs would delete the attribute)
+            _set_attrs(group, {k: v for k, v in (("job_state", job_state), ("job_id", job_id), ("error", error))
+                               if v is not None})
+            if raw_ref is not None:
+                group.attrs["raw_ref_json"] = _json(raw_ref)
+
+    def add_dhm_result(self, capture_id: str, header: dict, buffers, *, raw_ref: Optional[dict] = None,
+                       recovered: Optional[dict] = None) -> bool:
+        """ Store the ``ProductSet`` of a capture (§15.2) and its frame records (§15.1).
+
+        Idempotent: a second delivery of the same job (after a restart, ``sync``)
+        is recognised by the job id and dropped.
+
+        Parameters
+        ----------
+        capture_id : str
+            Reserved capture the result belongs to.
+        header : dict
+            ``ProductSet`` 1.0 header as delivered (incl. ``reconstruction``
+            with its ``buffers`` descriptors).
+        buffers : iterable of (str, ndarray)
+            Buffers by contract name (``phase_rad``, ``intensity_rel``, ``valid``, ``field``).
+        raw_ref : dict, optional
+            Reference to the raw frames on the DHM-PC; default: ``header["raw_ref"]``.
+        recovered : dict, optional
+            ``reason``, ``original_session`` when the result was fetched after a restart (SI4).
+
+        Returns
+        -------
+        bool
+            True if stored, False if this job's result was stored already.
+        """
+
+        buffers = [(name, np.asarray(data)) for name, data in buffers]
+        reconstruction = header.get("reconstruction") or {}
+        quality = reconstruction.get("quality") or {}
+        job_id = header.get("job_id", "")
+        with self._write() as f:
+            group = f[_attr(f["capture_index"], capture_id)]
+            if _attr(group, "job_state") in ("stored", "acknowledged") and _attr(group, "job_id") == job_id:
+                return False
+            products = group["products"]
+            _write_product(products, header, buffers)
+            _set_attrs(products, {"message_type": header.get("message_type", "ProductSet"),
+                                  "schema_version": header.get("schema_version", ""),
+                                  "product_id": header.get("product_id", ""), "job_id": job_id})
+            flat = {
+                "schema_version": reconstruction.get("schema_version", ""),
+                "config_hash": reconstruction.get("config_hash") or header.get("config_hash") or "",
+                "parameter_set_id": reconstruction.get("parameter_set_id") or header.get("parameter_set_id") or "",
+                "background_id": quality.get("background_id") or header.get("background_id") or "",
+                "background_created": quality.get("background_created_utc") or "",
+                "background_age_s": _nan_if_none(quality.get("background_age_s")),
+                "pixel_um": np.asarray(reconstruction.get("pixel_um", [np.nan, np.nan]), dtype=float),
+                "z_um": _nan_if_none(reconstruction.get("z_um")),
+                "propagation_index": _nan_if_none(reconstruction.get("propagation_index")),
+                "wavelength_um": _nan_if_none(reconstruction.get("wavelength_um")),
+            }
+            for name, _ in buffers:
+                dataset = products[name]
+                _set_attrs(dataset, flat)
+                for key, value in (("quality", quality), ("timings", reconstruction.get("timings_s", {})),
+                                   ("versions", reconstruction.get("versions", {})),
+                                   ("warnings", reconstruction.get("warnings", []))):
+                    dataset.attrs[f"{key}_json"] = _json(value)
+            frames = reconstruction.get("frames") or []
+            if "frames" in group:
+                del group["frames"]
+            if frames:
+                table = group.create_dataset("frames", data=_frames_table(frames))
+                table.attrs["acquisition_json"] = _json([frame.get("acquisition") for frame in frames])
+            _set_attrs(group, {"job_id": job_id, "job_state": "stored", "error": "",
+                               "config_hash": flat["config_hash"], "parameter_set_id": flat["parameter_set_id"]})
+            if raw_ref is None:
+                raw_ref = header.get("raw_ref")
+            if raw_ref is not None:
+                group.attrs["raw_ref_json"] = _json(raw_ref)
+            if recovered is not None:
+                group.attrs["recovered"] = True
+                group.attrs["recovered_json"] = _json({"time": utc_timestamp(), **recovered})
+        return True
+
+    def read_dhm_result(self, capture_id: str) -> tuple[dict, dict[str, np.ndarray]]:
+        """ Return the ``ProductSet`` header and buffers of a capture (written by :meth:`add_dhm_result`).
+
+        Raises
+        ------
+        KeyError
+            If the capture holds no service result.
+        """
+
+        with self._read() as f:
+            products = f[_attr(f["capture_index"], capture_id)]["products"]
+            if "header_json" not in products.attrs:
+                raise KeyError(f"Capture {capture_id} holds no DHM service result")
+            return _read_product(products)
+
+    def read_capture_job(self, capture_id: str) -> dict:
+        """ Return the service attributes of a capture (§15.1) with the defaults for legacy captures.
+
+        Returns
+        -------
+        dict
+            ``adapter``, ``job_id``, ``job_state``, ``error``, ``group_id``,
+            ``config_hash``, ``parameter_set_id``, ``recipe``, ``context``,
+            ``raw_ref``, ``recovered`` and, if stored, ``frames`` (``FrameRecord`` dicts).
+        """
+
+        with self._read() as f:
+            group = f[_attr(f["capture_index"], capture_id)]
+            job = {"adapter": _attr(group, "adapter", "legacy"), "job_id": _attr(group, "job_id", ""),
+                   "job_state": _attr(group, "job_state", "stored"), "error": _attr(group, "error", ""),
+                   "group_id": _attr(group, "group_id", ""), "config_hash": _attr(group, "config_hash", ""),
+                   "parameter_set_id": _attr(group, "parameter_set_id", ""),
+                   "recipe": json.loads(_attr(group, "recipe_json", "{}")),
+                   "context": json.loads(_attr(group, "context_json", "{}")),
+                   "raw_ref": json.loads(_attr(group, "raw_ref_json", "{}")),
+                   "recovered": bool(_attr(group, "recovered", False))}
+            if "frames" in group:
+                table = group["frames"]
+                job["frames"] = _frames_from_table(table[()], json.loads(_attr(table, "acquisition_json", "[]")))
+            return job
+
+    def capture_jobs(self) -> dict[str, dict]:
+        """ Return ``job_id``, ``job_state`` and the product names of every capture (one file open).
+
+        Legacy captures report ``job_state = "stored"`` and an empty job id;
+        camera captures are included with empty values.
+        """
+
+        jobs = {}
+        with self._read() as f:
+            if "capture_index" not in f:
+                return jobs
+            for capture_id, path in sorted(f["capture_index"].attrs.items()):
+                group = f[_text(path)]
+                dhm = _attr(group, "kind") == "dhm"
+                products = sorted(group["products"]) if "products" in group else []
+                jobs[capture_id] = {"job_id": _attr(group, "job_id", ""),
+                                    "job_state": _attr(group, "job_state", "stored" if dhm else ""),
+                                    "products": products}
+        return jobs
+
+    def open_captures(self, states=("reserved", "sent", "acquired")) -> list[dict]:
+        """ Return id, structure, job id and state of every capture whose job is in one of ``states``.
+
+        Used after a restart (``sync``) and at the end of a session (``missing``).
+        """
+
+        result = []
+        with self._read() as f:
+            if "capture_index" not in f:
+                return result
+            for capture_id, path in sorted(f["capture_index"].attrs.items()):
+                group = f[_text(path)]
+                state = _attr(group, "job_state")
+                if state in states:
+                    result.append({"capture_id": capture_id, "structure": _attr(group, "structure"),
+                                   "job_id": _attr(group, "job_id", ""), "job_state": state})
+        return result
+
+    def add_layer_product(self, group_id: str, header: dict, buffers, *, kind: str, structure: str, phase: str,
+                          layer_id: int, members: list[str], job_id: str = "", job_state: str = "stored",
+                          group_spec: Optional[dict] = None, recipe: Optional[dict] = None,
+                          recovered: Optional[dict] = None) -> None:
+        """ Store a group and its ``LayerProduct`` under ``/dhm_groups/<group_id>`` (§15.3).
+
+        Parameters
+        ----------
+        group_id : str
+            Group id of the service.
+        header : dict
+            ``LayerProduct`` 1.0 header as delivered.
+        buffers : iterable of (str, ndarray)
+            ``phase_rad``, ``intensity_rel``, ``valid``, optional ``field``.
+        kind : {"layer", "speckle", "background"}
+        structure, phase : str
+        layer_id : int
+        members : list of str
+            Capture ids of the member captures in position order.
+        job_id, job_state : str
+            Job of the group.
+        group_spec, recipe : dict, optional
+            ``GroupSpec`` as sent and the effective recipe.
+        recovered : dict, optional
+            ``reason``, ``original_session`` when fetched after a restart (SI4).
+        """
+
+        if kind not in schema.DHM_GROUP_KINDS:
+            raise ValueError(f"Unknown group kind {kind!r}; expected one of {schema.DHM_GROUP_KINDS}")
+        with self._write() as f:
+            parent = _group(f, "dhm_groups")
+            if group_id in parent:
+                del parent[group_id]
+            group = parent.create_group(group_id)
+            _set_attrs(group, {"kind": kind, "structure": structure, "phase": phase, "layer_id": int(layer_id),
+                               "job_id": job_id, "job_state": job_state, "recovered": recovered is not None})
+            group.attrs["group_spec_json"] = _json(group_spec or {})
+            group.attrs["recipe_json"] = _json(recipe or {})
+            if recovered is not None:
+                group.attrs["recovered_json"] = _json({"time": utc_timestamp(), **recovered})
+            group.create_dataset("members", data=np.asarray(members, dtype=object), dtype=TEXT)
+            _write_product(group.create_group("product"), header, buffers)
+
+    def read_layer_product(self, group_id: str) -> tuple[dict, dict[str, np.ndarray], dict]:
+        """ Return header, buffers and group attributes (incl. ``members``) of a stored group. """
+
+        with self._read() as f:
+            group = f[f"dhm_groups/{group_id}"]
+            header, buffers = _read_product(group["product"])
+            info = _get_json_attrs(group)
+            info["members"] = [_text(m) for m in group["members"][()]]
+            return header, buffers, info
+
+    def dhm_groups(self) -> list[str]:
+        """ Return the ids of the stored DHM groups. """
+
+        with self._read() as f:
+            return sorted(f["dhm_groups"]) if "dhm_groups" in f else []
+
+    def add_dhm_orphan(self, job_id: str, reference: dict) -> None:
+        """ Record a result of an unknown capture as reference only (``/dhm_orphans/<job_id>``, SI4).
+
+        Parameters
+        ----------
+        job_id : str
+        reference : dict
+            ``result_id``, ``message_type``, ``structure``, ``layer_id``, ``time``,
+            ``host``, ``path``, ``sha256``, ``size_bytes``, ``reason``.
+        """
+
+        with self._write() as f:
+            parent = _group(f, "dhm_orphans")
+            group = parent.require_group(job_id)
+            _set_attrs(group, {k: ("" if v is None else v) for k, v in reference.items()})
+
+    def read_dhm_orphans(self) -> dict[str, dict]:
+        """ Return the orphan references by job id. """
+
+        with self._read() as f:
+            return {job: _get_json_attrs(g) for job, g in sorted(f["dhm_orphans"].items())} if "dhm_orphans" in f \
+                else {}
+
+    def write_dhm_calibration(self, kind: str, calibration_id: str, *, parameters: dict, result: dict,
+                              job_id: str = "") -> None:
+        """ Store a calibration of the DHM service under ``/calibration/dhm/<kind>/<id>`` (§15.5).
+
+        Parameters
+        ----------
+        kind : {"exposure", "opl_scan", "background"}
+        calibration_id : str
+        parameters, result : dict
+        job_id : str
+        """
+
+        if kind not in schema.DHM_CALIBRATION_KINDS:
+            raise ValueError(f"Unknown calibration kind {kind!r}; expected one of {schema.DHM_CALIBRATION_KINDS}")
+        with self._write() as f:
+            group = _group(f, f"calibration/dhm/{kind}").require_group(calibration_id)
+            _set_attrs(group, {"time": utc_timestamp(), "session": self._session or "", "job_id": job_id})
+            group.attrs["parameters_json"] = _json(parameters)
+            group.attrs["result_json"] = _json(result)
+
+    def write_dhm_session(self, info: dict) -> None:
+        """ Store the DHM configuration of the current session (``/metadata/dhm/sessions/<n>``, T79, §15.4).
+
+        Parameters
+        ----------
+        info : dict
+            ``adapter`` (``legacy``, ``service``, ``fake``), ``pixel_source``
+            (``parameter_set``, ``calibration``, ``nominal``), ``pixel_um``
+            ((y, x)), ``service_version``, ``protocol_version``,
+            ``software_versions``, ``parameter_set_id``, ``config_hash``,
+            ``camera``, ``objective``; further keys are stored as given.
+
+        Raises
+        ------
+        RuntimeError
+            Outside a session (``begin_session``).
+        ValueError
+            For an unknown adapter or pixel source.
+        """
+
+        if self._session is None:
+            raise RuntimeError("write_dhm_session() needs an open session (begin_session)")
+        if info.get("adapter") not in schema.DHM_ADAPTERS:
+            raise ValueError(f"Unknown DHM adapter {info.get('adapter')!r}; expected one of {schema.DHM_ADAPTERS}")
+        if info.get("pixel_source") not in schema.DHM_PIXEL_SOURCES:
+            raise ValueError(f"Unknown pixel source {info.get('pixel_source')!r}; expected one of "
+                             f"{schema.DHM_PIXEL_SOURCES} (never Koala)")
+        values = dict(info)
+        if "pixel_um" in values:
+            values["pixel_um"] = np.asarray(values["pixel_um"], dtype=float)
+        with self._write() as f:
+            parent = _group(f, "metadata/dhm/sessions")
+            if self._session in parent:
+                del parent[self._session]
+            group = parent.create_group(self._session)
+            _set_attrs(group, {k: ("" if v is None else v) for k, v in values.items()})
+            group.attrs["written"] = utc_timestamp()
+
+    def write_parameter_set(self, config_hash: str, parameter_set_id: str, parameter_set: dict) -> bool:
+        """ Store a reconstruction parameter set once per hash (``/metadata/dhm/parameter_sets``, DL-A3 a).
+
+        Parameters
+        ----------
+        config_hash : str
+            Hash of the parameter set as sent by the service.
+        parameter_set_id : str
+        parameter_set : dict
+            The full parameter set (contract ``ParameterSet``).
+
+        Returns
+        -------
+        bool
+            True if written, False if this hash is stored already with the same content.
+
+        Raises
+        ------
+        ValueError
+            If the hash is stored already with a different parameter set.
+        """
+
+        text = json.dumps(parameter_set, sort_keys=True, default=_json_default)
+        with self._write() as f:
+            parent = _group(f, "metadata/dhm/parameter_sets")
+            if config_hash in parent:
+                stored = _attr(parent[config_hash], "parameter_set_json")
+                if json.loads(stored) != json.loads(text):
+                    raise ValueError(f"Parameter set {config_hash} is stored already with different content")
+                return False
+            group = parent.create_group(config_hash)
+            _set_attrs(group, {"parameter_set_id": parameter_set_id, "first_used": utc_timestamp()})
+            group.attrs["parameter_set_json"] = text
+        return True
+
+    def read_dhm_metadata(self) -> dict:
+        """ Return the DHM configuration record (``sessions``, ``parameter_sets``), see ``ExperimentRecord.dhm``. """
+
+        with self._read() as f:
+            return self._read_dhm_metadata(f)
+
+    @staticmethod
+    def _read_dhm_metadata(f: h5py.File) -> dict:
+        if "metadata/dhm" not in f:
+            return {}
+        group = f["metadata/dhm"]
+        return {"sessions": {n: _get_json_attrs(g) for n, g in sorted(group.get("sessions", {}).items())},
+                "parameter_sets": {h: _get_json_attrs(g) for h, g in sorted(group.get("parameter_sets", {}).items())}}
+
+    def read_dhm_calibrations(self, kind: str) -> dict[str, dict]:
+        """ Return the stored calibrations of one kind by id. """
+
+        with self._read() as f:
+            path = f"calibration/dhm/{kind}"
+            return {cid: _get_json_attrs(g) for cid, g in sorted(f[path].items())} if path in f else {}
 
     # ---------------------------------------------------------------- reading
 
@@ -896,6 +1380,7 @@ class ExperimentStore:
             if "time_estimate" in f:
                 record.time_estimate = _get_json_attrs(f["time_estimate"])
             record.materials = self._read_materials(f)
+            record.dhm = self._read_dhm_metadata(f)
             if "spec/spec_json" in f:
                 record.spec = json.loads(_text(f["spec/spec_json"][()]))
             for name, group in f.get("structures", {}).items():
