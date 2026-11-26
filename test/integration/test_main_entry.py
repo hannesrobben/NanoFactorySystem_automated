@@ -24,9 +24,16 @@ def load(monkeypatch, relative: str, name: str):
     return module
 
 
+# Resin drop around the experiment centres of main.py (x 1310 µm, y 21000 / 23000 µm). The tests set it themselves
+# because RESIN_EDGES in the SETTINGS block of main.py is the lab value of the current substrate (T122).
+TEST_RESIN_EDGES = [[5720, 22330], [-3333, 22420], [1660, 17212], [1200, 27190]]
+
+
 @pytest.fixture
 def main_module(monkeypatch):
-    return load(monkeypatch, "main.py", "nanofactory_main")
+    module = load(monkeypatch, "main.py", "nanofactory_main")
+    monkeypatch.setattr(module, "RESIN_EDGES", TEST_RESIN_EDGES)
+    return module
 
 
 @pytest.fixture
