@@ -7,9 +7,14 @@ results are in section 6 of `docs/design/PROGRAM_LOADING.md`.
 
 Goal: the three open checks of session 3, this time **with enabled and homed axes**. In session 3 every motion
 step ran with disabled axes and ended in a task error at its first motion line; the loading itself worked.
-After session 3b the library loader can print a real layer with the laser.
+After session 3b the library loader can print a real layer with the laser. Added in the todo review of
+2026-11-26: which controller states persist between programs (T101, step `states`) and the unit of the camera
+exposure time (T102, step `camera`).
 
-Plan about 35 minutes. No step switches the laser on.
+The add-ahead mode (task 1 only, the next part compiled while the current one runs) is decided by `runner` and
+`layer-dry` here: the maintainer switches the default loader only after these pass (T129).
+
+Plan about 45 minutes. No step switches the laser on.
 
 ### Safety
 
@@ -18,6 +23,10 @@ Plan about 35 minutes. No step switches the laser on.
 - `layer-dry` moves the galvo and the stage in X/Y (layer 68: only to its start position, which the script sets
   to the current position), never Z; the laser gate is forced off and the power set to 0. Objective at a safe Z,
   shutter closed. Type `DRY` to confirm.
+- `states` moves only the galvo axis A by 0.05 mm and back (immediate `MOVEINC`) after each phase; its programs set
+  modes, the laser gate OFF and contain no motion. It leaves the controller with the modes of an IFOV layer program
+  (ramp rate 0, galvo rotation -0.6°): restart the A3200 software after the session, as before every lab session.
+- `camera` moves nothing; it only grabs images.
 
 ### Preparation
 
@@ -42,7 +51,9 @@ Plan about 35 minutes. No step switches the laser on.
 | 2 | `python program_loading_lab.py ascii-names` | 1 min | T152: must end with `PASSED` (copies under `~\nfs_lab`). |
 | 3 | `python program_loading_lab.py runner --axes-safe --lines 100000` | 12 min | T132: 4 parts on task 1 with add-ahead; every part to its last line, gaps < 1 s. |
 | 4 | objective at a safe Z, shutter closed: `python program_loading_lab.py layer-dry --file $layer --axes-safe --part-lines 200000 --max-parts 3` (type `DRY`) | 15 min | P5: 3 parts of the real layer 68, dry, on task 1; every part to its last line, gaps < 1 s, PC within the budget. |
-| 5 | `python program_loading_lab.py system` | 1 min | Final state |
+| 5 | shutter closed: `python program_loading_lab.py states --axes-safe` | 3 min | T101: per phase the task modes (absolute, ramp mode rate, velocity on, wait auto, …), ramp rates and the measured galvo rotation; nothing to judge on site. |
+| 6 | `python program_loading_lab.py system` | 1 min | Final state |
+| 7 | close the camera view of the Femtika software (or the Femtika software): `python program_loading_lab.py camera` | 2 min | T102: grab time per `ExposureTime` unit; the log line ends with `unit us` if the unit is µs. If the camera cannot be opened, close the program that holds it and repeat. |
 
 If a step stops with a task error, the message now names the error code; send the folder anyway.
 
@@ -55,6 +66,8 @@ Send back the session folder `program_loading_lab_<date>` and the console output
 | All three pass | The library loader is ready: next one real layer (or a small structure) with the laser via `Experiment(program_loader="library")`, then the default switch (R9) |
 | `ascii-names` fails again at the short path | The ASCII fallback needs another look (T152); the library loader is not affected |
 | `runner` or `layer-dry` fail with an error code | Evaluate the code; the loader code is changed only if the cause is in it |
+| `states` | T101: the reset commands that `DefaultSetup` and `SetupIFOV` need (T78) are listed in `INFORMATION_MODEL.md` §7; a mode that leaks into `IFOV_off` experiments gets a `fix:` todo |
+| `camera` says `unit us` | T102 is done (the bounded timeout assumes µs); otherwise the timeout is changed to the measured unit |
 
 
 ## Session 3 (T153)
