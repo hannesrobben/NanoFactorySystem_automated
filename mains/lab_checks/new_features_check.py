@@ -35,6 +35,7 @@ from nanofactorysystem.devices.coordinate_system import Point2D, Point3D
 from nanofactorysystem.experiment import ProgramSource
 from nanofactorysystem.experiment_spec import ExperimentSpec, StructureSpec, messagebox_confirm
 from nanofactorysystem.plane_fitting import PlaneFitMode
+from nanofactorysystem.structure_factories import BuildContext, structure_factory
 from nanofactorysystem.substrate_plan import SubstrateExperiment, SubstrateSpec, run_substrate
 
 OBJECTIVE = "Zeiss 63x"
@@ -70,12 +71,28 @@ After the run, check in each experiment folder:
 """
 
 
+@structure_factory("new_features_check.rectangle")
+def rectangle(context: BuildContext) -> Rectangle3D:
+    """ A 30 x 30 x 3 µm stage rectangle with the X acceleration of the controller (T112).
+
+    A fixed ``acceleration=500`` µm/s² gave a run-up of 2 mm before every hatch line.
+
+    Parameters
+    ----------
+    context : BuildContext
+        Values of the running experiment (``accel_x_um``).
+
+    Returns
+    -------
+    Rectangle3D
+    """
+
+    return Rectangle3D(Point3D(0, 0, -1), 30, 30, 3, hatch_size=0.5, slice_size=1.0, velocity=1000,
+                       acceleration=context.accel_x_um)
+
+
 def drawing_spec(center: Point2D = DRAWING_CENTER) -> ExperimentSpec:
     """ Small rectangles in a 2x2 grid with camera images, overview, power per layer and a repetition. """
-
-    def rectangle():
-        return Rectangle3D(Point3D(0, 0, -1), 30, 30, 3, hatch_size=0.5, slice_size=1.0, velocity=1000,
-                           acceleration=500)
 
     return ExperimentSpec(
         name="check_drawing",
@@ -88,8 +105,8 @@ def drawing_spec(center: Point2D = DRAWING_CENTER) -> ExperimentSpec:
         overview_single_images=True,
         default_power_mw=POWER_MW,
         structures=[
-            StructureSpec("rect", rectangle(), power_mw=POWER_MW, axes="XYZ", repeat=1),
-            StructureSpec("ramp", rectangle(), power_mw=POWER_MW, axes="XYZ", layer_power=LAYER_POWERS_MW),
+            StructureSpec("rect", factory=rectangle(), power_mw=POWER_MW, axes="XYZ", repeat=1),
+            StructureSpec("ramp", factory=rectangle(), power_mw=POWER_MW, axes="XYZ", layer_power=LAYER_POWERS_MW),
             StructureSpec.empty(),
         ],
     )
