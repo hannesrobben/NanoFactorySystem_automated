@@ -3,8 +3,9 @@
 The health check has no side effects: it reads the ASCII interface, the task states of the
 printing tasks, the axis faults and states, the memory of the PC and of the A3200 processes. R0
 stops the printing tasks, removes the programs this package loads under fixed names and
-acknowledges faults; it moves nothing. The levels R1-R3 (restart the ASCII interface, controller
-reset, restart the A3200 software) follow after lab session 2 (T134).
+acknowledges faults; it moves nothing. R1 restarts the ASCII interface (runs automatically after a
+detected error, with a limit per structure), R2 resets the controller and R3 restarts the A3200
+software; R2 and R3 run only after the operator agreed (maintainer decision 2026-11-26, T133).
 """
 from __future__ import annotations
 
@@ -12,6 +13,7 @@ import csv
 import io
 import subprocess
 import sys
+import time
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
@@ -193,3 +195,100 @@ def recover_r0(api, *, tasks: tuple[int, ...] = (1, 2), program_names: tuple[str
     except AerotechError as error:
         done.append(f"faults not acknowledged: {error}")
     return done
+
+
+def terminate_ascii_interface() -> str:
+    """ Terminate ``A3200AsciiInterface.exe`` (recovery level R1); the A3200 software starts it again.
+
+    Lab session 2 (2026-11-25): respawned after 0.3 s, ASCII reachable after 1.0 s, LOAD works again; tasks,
+    programs and axes are unchanged. It does not clear a program name blocked by a refused LOAD (session 3).
+
+    Returns
+    -------
+    str
+        Output of ``taskkill``.
+    """
+
+    result = subprocess.run(["taskkill", "/IM", "A3200AsciiInterface.exe", "/F"], capture_output=True, text=True,
+                            timeout=30)
+    return (result.stdout or result.stderr).strip()
+
+
+def recover_r1(api, restart: Callable[[], str], *, wait_s: float = 30.0, interval_s: float = 0.5,
+               sleep: Callable[[float], None] = time.sleep) -> list[str]:
+    """ Recovery level R1: restart the ASCII interface and reconnect (T133).
+
+    Nothing moves; tasks, programs and axes stay as they are. Used automatically by ``Experiment`` only after
+    a detected error and only a limited number of times per structure.
+
+    Parameters
+    ----------
+    api : AerotechAsciiInterface
+        Interface to reconnect.
+    restart : callable
+        Terminates the interface process (:func:`terminate_ascii_interface`, or the backend's simulation).
+    wait_s : float
+        Longest wait until the interface answers again.
+    interval_s : float
+        Seconds between connection attempts.
+    sleep : callable
+        Sleep function (the dummy backend passes its virtual clock).
+
+    Returns
+    -------
+    list of str
+        What was done, for the log.
+
+    Raises
+    ------
+    AerotechError
+        If the interface does not answer within ``wait_s``.
+    """
+
+    done = [f"ASCII interface terminated: {restart() or 'ok'}"]
+    api.close()
+    waited = 0.0
+    while True:
+        try:
+            api.connect()
+            api.send("~VERSION")
+            done.append(f"ASCII interface answers again after {waited:.1f} s")
+            return done
+        except (OSError, AerotechError) as error:
+            api.close()
+            if waited >= wait_s:
+                raise AerotechError(f"R1: the ASCII interface did not answer within {wait_s:.0f} s ({error}).")
+        sleep(interval_s)
+        waited += interval_s
+
+
+def reset_controller(api) -> list[str]:
+    """ Recovery level R2: ``~RESETCONTROLLER`` (T133). Only between experiments and after the operator agreed.
+
+    Lab session 2: 7.9 s; every axis is disabled and unhomed and every program removed. Afterwards the axes
+    must be enabled and homed (Femtika software or Motion Composer) and the setup sent again.
+
+    Returns
+    -------
+    list of str
+        What was done, for the log.
+    """
+
+    reply = api.send("~RESETCONTROLLER")
+    return [f"controller reset ({reply or 'ok'}); enable and home all axes before the next experiment"]
+
+
+def restart_a3200_service() -> str:
+    """ Recovery level R3: restart the service ``A3200CommService`` (administrator rights, lab session 3).
+
+    Returns
+    -------
+    str
+        Output of PowerShell ``Restart-Service``.
+    """
+
+    result = subprocess.run(["powershell", "-NoProfile", "-Command", "Restart-Service A3200CommService -Force"],
+                            capture_output=True, text=True, timeout=300)
+    if result.returncode != 0:
+        raise AerotechError(f"R3 failed (administrator rights needed?): {(result.stderr or result.stdout).strip()}")
+    return (result.stdout or "A3200CommService restarted").strip()

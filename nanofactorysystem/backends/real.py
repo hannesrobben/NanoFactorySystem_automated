@@ -40,6 +40,12 @@ class RealBackend:
 
         return None
 
+    def restart_ascii_interface(self) -> str:
+        """ Terminate ``A3200AsciiInterface.exe`` for recovery level R1 (T133); the A3200 software restarts it. """
+
+        from nanofactorysystem.devices.aerotech.health import terminate_ascii_interface
+        return terminate_ascii_interface()
+
     def program_loader(self, dll: Optional[str] = None):
         """ Return a :class:`LibraryLoader` (A3200 C library, T129); raises if the library is not usable. """
 

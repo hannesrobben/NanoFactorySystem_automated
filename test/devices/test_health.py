@@ -102,3 +102,52 @@ def test_recovery_level_r0_removes_the_given_names(api, transport):
     assert steps == ["task 1 stopped", "nfs_abc123_0001_layer.pgm removed", "faults acknowledged"]
     assert removed == ["nfs_abc123_0001_layer.pgm"]
     assert 'REMOVEPROGRAM "nfs_abc123_0001_layer.pgm"' in transport.world.calllog.commands()
+
+
+def test_recovery_level_r1_restarts_the_interface_and_reconnects(api, transport):
+    # T133: R1 terminates the ASCII interface (here simulated) and reconnects; nothing moves
+    from nanofactorysystem.devices.aerotech.health import recover_r1
+    restarts = []
+
+    steps = recover_r1(api, lambda: restarts.append(1) or "terminated")
+
+    assert restarts == [1] and steps[0] == "ASCII interface terminated: terminated"
+    assert "answers again" in steps[1] and api.is_opened
+    assert controller_health(api, check_processes=False).ok
+
+
+def test_recovery_level_r1_gives_up_after_the_wait(api, transport):
+    from nanofactorysystem.aerobasic.ascii import AerotechError
+    from nanofactorysystem.devices.aerotech.health import recover_r1
+    transport.refuse_connection = True
+
+    with pytest.raises(AerotechError, match="did not answer within 2 s"):
+        recover_r1(api, lambda: "", wait_s=2.0, interval_s=0.5, sleep=lambda s: None)
+
+
+def test_recovery_level_r2_resets_the_controller(api, transport):
+    from nanofactorysystem.devices.aerotech.health import reset_controller
+
+    steps = reset_controller(api)
+
+    assert "controller reset" in steps[0] and "enable and home" in steps[0]
+
+
+def test_controller_health_script_recovery_levels(capsys):
+    # T133: R1 without question, R2 and R3 only after the confirmation (a message box on the lab PC)
+    import importlib.util
+    from pathlib import Path
+
+    script = Path(__file__).parents[2] / "mains" / "controller_health.py"
+    spec = importlib.util.spec_from_file_location("controller_health", script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    questions = []
+
+    assert module.main(["--dry-run", "--r1"], confirm=lambda q: questions.append(q) or True) == 0
+    assert "R1: ASCII interface terminated: simulated" in capsys.readouterr().out and not questions
+    assert module.main(["--dry-run", "--r2"], confirm=lambda q: questions.append(q) or False) == 1
+    assert "R2 not confirmed" in capsys.readouterr().out and "R2 resets the controller" in questions[-1]
+    module.main(["--dry-run", "--r2"], confirm=lambda q: True)
+    assert "R2: controller reset" in capsys.readouterr().out
+    assert module.main(["--dry-run", "--r3"], confirm=lambda q: False) == 1

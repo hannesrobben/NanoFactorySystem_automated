@@ -1214,3 +1214,33 @@ def test_structure_program_is_stored_compressed_or_as_reference(test_config, dum
     (tmp_path / "bad").mkdir()
     with pytest.raises(ValueError, match="structure_program"):
         make_experiment(tmp_path / "bad", dummy_backend, structure_program="zip")
+
+
+def test_r1_runs_at_most_the_limit_per_structure_and_r2_only_after_consent(experiment, dummy_backend):
+    # T133 (maintainer decision 2026-11-26): R1 automatically after a detected error, limited per structure;
+    # R2 only after the operator agreed and only before anything of the experiment was printed
+    from nanofactorysystem.aerobasic.ascii import AerotechError
+    add_rectangle(experiment)
+    experiment.build_programs()
+    original = dummy_backend.transport._axis_item
+    dummy_backend.transport._axis_item = lambda axis, item: (
+        "4" if (axis, item) == ("Z", "AxisFault") else original(axis, item))
+    questions = []
+    experiment._confirm_recovery = lambda question: questions.append(question) or False
+    experiment.max_r1_per_structure = 1
+
+    for _ in range(2):
+        with pytest.raises(AerotechError, match="not ready to print"):
+            experiment.print_experiment()
+
+    restarts = [c for c in dummy_backend.calllog.filter(device="controller") if c.call == "restart_ascii_interface"]
+    assert len(restarts) == 1                                     # the limit of 1 per structure
+    health = "".join(ExperimentStore.open(experiment.path).read_logs("health").values())
+    assert "R1 (1 of 1)" in health and "R1 not run: the limit of 1" in health
+    assert len(questions) == 2 and "R2 resets the controller" in questions[0]
+    assert "~RESETCONTROLLER" not in dummy_backend.calllog.commands()   # declined
+
+    experiment._confirm_recovery = lambda question: True
+    with pytest.raises(AerotechError, match="controller was reset"):
+        experiment.print_experiment()
+    assert "~RESETCONTROLLER" in dummy_backend.calllog.commands()
