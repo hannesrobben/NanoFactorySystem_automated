@@ -3204,3 +3204,12 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Commits:** `46994e1`, `1c8d3d1`, `db0ba3e` (branch `feat/lab-session-3b`); `197f0c7`, `bfef02d`, `015f763`, `2b8d4e7`, `81a98c7`, `dcfd497`, `3a2fde8`, `ece4b9c`, `8f6a872`, `1adf8b4`, `4ab6354`, `bbabb39`, `09b79d4`, `33ee66f`, `ce4935d`, `52ca47c` (branch `feat/backlog-2026-11-26`); this docs(todo) commit.
 - **Follow-ups:** lab session 3b (T153 incl. T101, T102, T154), T148 print with the A3200-help questions, then T149; T78 after T101; T165, T167 later; T96/T97 default of `plot_experiment(show=)` to decide; T131, T67 (maintainer names evaluations), T69 on the lab day.
 - **Note:** commit hunks of `experiment.py` were split per todo by rebuilding each staged version from the edit scripts; the intermediate commits were not tested one by one, the final state is.
+
+### 2026-11-26 13:34 CET — [AP2/AP3 handover] Next steps of the parameter tests and the print path
+- **Status:** done
+- **Changes:**
+  - `docs/system/handover/next_steps_parametertests_and_print_path_2026-11-26.md` (new): work packages AP2 (T148 result, T149 Quick PT / Full PT-01 / Voxel PT-01, D13, voxel fit, import into the voxel database) and AP3 (R9 / T129, T131, T130 default, T165, T167) with prerequisites, decisions, acceptance and files, from the cross-repository planning of 2026-11-26.
+  - `WORKLOG.md`: this entry.
+- **Tests:** none (documentation only).
+- **Commits:** `cb2ccc2` docs(system): hand over the next steps of parameter tests and print path; this docs(todo) commit.
+- **Follow-ups:** `ptd.import_voxel_measurements` defaults to the PTD-01 version-1 field ids (0, 1, 2); for version 2 `fields=` must be given per test (checked in AP2 step 2.6, new todo if code has to change).
