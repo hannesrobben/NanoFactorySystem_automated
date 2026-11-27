@@ -3264,3 +3264,19 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** `python -m pytest test/test_drop_direction.py` failed before the fix (2 tests) and passes after it; full `python -m pytest`: 744 passed, 15 skipped
 - **Commits:** `7e9acdd` fix(tools): keep the highest-z focus range for a drop facing down [T168]
 - **Follow-ups:** UP keeps the highest-z range as before (maintainer decision); the lab must pull the fix before restarting the aborted parameter test. The aborted experiment is restarted by running the remaining experiments into the same substrate (index entry set to `planned`).
+
+### 2026-11-27 09:40 CET — [T148] Redesign of the power switch lab check
+- **Status:** partial (code and documents done; the lab print and its evaluation are the maintainer's)
+- **Changes:**
+  - `nanofactorysystem/testprint/power_switch.py`: `PowerSwitchLines` rewritten: 50 µm lines that switch the power at x = 0 between two `LINEAR` moves; one line without pause, one per dwell with `WAIT MOVEDONE` before `$AO` and `DWELL` after it (5 / 20 / 100 / 500 ms); 11 z levels −1 … +1 µm in 0.2 µm, one IFOV block per level without `LOOKAHEAD FAST`; `WAIT MOVEDONE`, low power and 0.5 s settle before every line where the previous motion ended (points at standstill kept on purpose, maintainer). The old pattern (one IFOV block per segment) had an implicit pause between the powers.
+  - `mains/lab_checks/power_switch_check.py`: settings and spec of the new pattern; `REPETITIONS` 5–10 (default 6) as grid cells in two rows via `StructureSpec.repeat`.
+  - `nanofactorysystem/backends/dummy/a3200.py`: `WAIT MOVEDONE` / `WAIT INPOS` accepted by the fake controller.
+  - `test/testprint/test_power_switch.py`: tests rewritten for the new pattern (rows, z levels, order around the switch, invalid arguments, dry run with repetitions); the old tests checked the replaced pattern.
+  - `test/README.md`: description of `test_power_switch.py`.
+  - `docs/design/POWER_SWITCH_CHECK.md`: §3 test pattern and §4 evaluation for the new lines.
+  - `docs/guides/POWER_SWITCH_CHECK.md`: settings, SEM images and decision table.
+  - `future_todo.md`: F40 power switch check with explicit laser gate (`GALVO LASEROVERRIDE`).
+  - `TODO.md`: status line of T148.
+- **Tests:** `python -m pytest test/testprint/test_power_switch.py`: 5 passed (incl. the slow dry run with 6 repetitions, estimated print time 21 min); full `python -m pytest`: still running at the time of the commit (first run with `-p no:logging`: 140 passed before an unrelated `caplog` setup error caused by that flag).
+- **Commits:** `8b544d5` feat(dummy): accept WAIT MOVEDONE and WAIT INPOS in the fake controller [T148], `9cdd3ea` feat(testprint): switch the power in the middle of running lines [T148], `cb025e3` docs(testprint): describe the redesigned power switch check, add F40 [T148], plus this bookkeeping commit
+- **Follow-ups:** lab print and evaluation (T148); F40.
