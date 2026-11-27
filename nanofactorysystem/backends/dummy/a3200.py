@@ -28,7 +28,7 @@ _IDLE, _READY, _RUNNING, _COMPLETE, _ERROR = 2, 3, 4, 7, 8
 # Command prefixes that are accepted without changing the simulated state
 _NOOP_PREFIXES = (
     "ACKNOWLEDGEALL", "PRIMARY", "SECONDS", "MINUTES", "METRIC", "ENGLISH", "LOOKAHEAD", "CRITICAL",
-    "RAMP", "WAIT MODE", "ENCODER", "GALVO", "IFOV", "APPLYDEFAULTS", "ABORT", "DVAR", "END PROGRAM",
+    "RAMP", "WAIT MODE", "WAIT MOVEDONE", "WAIT INPOS", "ENCODER", "GALVO", "IFOV", "APPLYDEFAULTS", "ABORT", "DVAR", "END PROGRAM",
 )
 
 _NUMBER = r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?"

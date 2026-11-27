@@ -526,6 +526,7 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
       design §12 (D9);
     - runs before the lab print of the parameter tests (T149).
   - Status 2026-11-26: research and lab tooling done (`33ee66f`): `docs/design/POWER_SWITCH_CHECK.md`, `docs/guides/POWER_SWITCH_CHECK.md`, `mains/lab_checks/power_switch_check.py`, `testprint/power_switch.py`. Finding: since A3200 6.01 motion commands are buffered and `$AO` may run ahead of them; the pattern shows that too. Open: three questions in the A3200 help on the lab PC, the print and its evaluation (maintainer).
+  - Status 2026-11-27: test pattern redesigned with the maintainer (`8b544d5`, `9cdd3ea`, `cb025e3`): 50 µm lines switching 0.25 → 0.75 mW at x = 0 inside running motion (no block between the halves), one line without pause and four with `WAIT MOVEDONE` + `DWELL` 5 / 20 / 100 / 500 ms, 11 z levels −1 … +1 µm, `LOOKAHEAD FAST` removed, 5–10 repetitions as grid cells; points at standstill are kept on purpose. Explicit laser gate as F40. Open: the A3200 help questions, the print and its evaluation (maintainer).
 
 - [ ] T154: ASCII `PROGRAM LOAD` cannot open program files at long paths (found during T153) [phase: B]
   - Priority: low

@@ -1,147 +1,176 @@
-"""Line pairs with power switches for the lab check of the attenuator settling (T148, decision D9).
+"""Lines that switch the laser power in their middle, for the lab check of the power switch (T148, decision D9).
 
-``PowerSwitchLines`` writes ``repetitions`` line pairs. Each line consists of ``n_segments`` segments of
-``segment_um`` along x whose power alternates between ``power_low_mw`` and ``power_high_mw``; every segment is
-its own IFOV block that starts with ``$AO[0].A=…`` (``SET_POWER``), exactly like the blocks of
-``ParameterFieldStructure``. The first line of a pair switches without a pause, the second line, ``pair_gap_um``
-next to it, is written the same way with ``DWELL dwell_s`` after every power change. Two reference lines at
-constant low and high power follow below the pairs.
+``PowerSwitchLines`` writes one group of lines, ``line_gap_um`` apart, on every z level from ``z_min_um`` to
+``z_max_um`` (step ``slice_um``), so every line becomes a small wall. Each line runs along +x from
+``-length/2`` to ``+length/2``: the first half with ``power_low_mw``, then the power command ``$AO[0].A=…``
+(``SET_POWER``) at x = 0, the second half with ``power_high_mw``. The switch therefore lies at the same place
+(x = 0) of every line and every z level.
 
-What the print shows (SEM or camera, width along the line):
+The first line of the group switches without any pause (``LINEAR`` → ``$AO`` → ``LINEAR``). Each further line
+uses one dwell of ``dwells_s``: ``LINEAR`` → ``WAIT MOVEDONE`` → ``$AO`` → ``DWELL`` → ``LINEAR``.
 
-- a narrow start of a segment after a switch to the high power (and a wide start after a switch to the low
-  power) means the attenuator settles slower than the motion starts: the dwell line next to it shows whether
-  ``dwell_s`` is enough;
-- a widened *end* of a segment before a switch to the high power means the power command was executed before
-  the preceding motion ended (A3200 6.01 and later buffer motion commands, ``$AO`` is not buffered and may run
-  ahead of them); then a dwell does not help and the power change needs a synchronised command.
+Why the two kinds of line (``docs/design/POWER_SWITCH_CHECK.md`` §2): since A3200 6.01 the controller buffers
+motion commands (``LINEAR``, ``RAPID``, ``DWELL``), but not ``$AO``, which can run ahead of the buffered motion.
 
-Maintainer decisions 2026-11-26: lines only, line pairs 2 µm apart, 0.25 ↔ 0.75 mW, several dwell levels,
-10 repetitions. The module changes no existing code (phase-11 rule).
+- On the line without a pause a transition that starts *before* x = 0 shows that ``$AO`` runs ahead of the
+  motion; a transition *after* x = 0 shows the settling of the attenuator (length / IFOV speed).
+- ``WAIT MOVEDONE`` on the dwell lines holds the program until the first half is written, so the power changes
+  at x = 0 and the line stands still for the dwell; the shortest dwell without a transition after x = 0 is the
+  settling time.
+
+Before every line the program waits for the previous line to finish (``WAIT MOVEDONE``), sets the low power and
+waits ``settle_s`` where the previous motion ended, so every first half starts with a settled low power. Points
+written while the line stands still (in a ``DWELL``) are part of what the check shows; nothing is moved away.
+``LOOKAHEAD FAST`` is removed from the IFOV header (it has no function since 6.01). With
+``GALVO LASEROVERRIDE A AUTO`` it is not documented whether the laser is on while the line stands still in a
+``DWELL``; a variant that gates the laser explicitly is a future idea (``future_todo.md``).
+
+Maintainer decisions 2026-11-27: 50 µm lines, 0.25 → 0.75 mW at the middle, z from -1 to +1 µm in 0.2 µm
+steps, 5 µm between the lines, one line without pause and four dwell levels, 5-10 repetitions (grid cells of
+the lab script). The module changes no existing code (phase-11 rule).
 """
 from __future__ import annotations
 
-from typing import Iterator
+from typing import Iterator, Optional, Sequence
 
-from nanofactorysystem.aerobasic.programs import AeroBasicProgram
+from nanofactorysystem.aerobasic import SingleAxis
+from nanofactorysystem.aerobasic.constants.system import WaitMode
 from nanofactorysystem.aerobasic.programs.drawings import DrawableAeroBasicProgram, DrawableObject
-from nanofactorysystem.aerobasic.programs.drawings.lines import IFOV_Lines
-from nanofactorysystem.devices.coordinate_system import CoordinateSystem, Point2D, Point3D
+from nanofactorysystem.aerobasic.programs.drawings.base import IFOV_AeroBasicProgram
+from nanofactorysystem.aerobasic.programs.drawings.lines import set_ifov_speeds
+from nanofactorysystem.devices.coordinate_system import CoordinateSystem, Point3D
+from nanofactorysystem.devices.power_calibration import PowerCalibration, resolve_power_calibration
 
-__all__ = ["PowerSwitchLines"]
+__all__ = ["PowerSwitchLines", "DEFAULT_DWELLS_S", "WAIT_AXES"]
+
+#: Dwell levels after the power change (maintainer decision 2026-11-27, about a factor 4-5 apart).
+DEFAULT_DWELLS_S = (0.005, 0.02, 0.1, 0.5)
+#: Axes ``WAIT MOVEDONE`` waits for: the IFOV axes A/B and the stages X/Y they are paired with.
+WAIT_AXES = "X Y A B"
+#: Fit kind of the power calibration, the same as ``IFOV_Lines`` uses.
+FIT_KIND = "polynomial"
 
 
 class PowerSwitchLines(DrawableObject):
-    """ Line pairs with alternating power segments, without and with a dwell after each power change (T148).
+    """ Lines that switch from a low to a high power at x = 0, without and with dwell, on several z levels (T148).
 
     Parameters
     ----------
     center : Point3D
-        Centre of the pattern (local µm); its z is the writing plane relative to the substrate.
+        Centre of the pattern (local µm); its z is the reference plane the z levels are relative to.
     power_low_mw, power_high_mw : float
-        The two powers the segments alternate between, starting with the low power.
-    dwell_s : float
-        Dwell after every power change on the second line of each pair (0 writes both lines alike).
-    repetitions : int
-        Number of line pairs.
-    n_segments : int
-        Segments per line (at least 2).
-    segment_um : float
-        Length of one segment in µm.
-    pair_gap_um : float
-        Distance of the two lines of a pair in µm.
-    pair_pitch_um : float
-        Distance of consecutive pairs in µm.
-    reference_gap_um : float
-        Distance of the two reference lines from the last pair (and from each other) in µm.
+        Power of the first half (-x) and of the second half (+x) of every line.
+    dwells_s : sequence of float
+        One line per dwell after the line without pause; every value > 0.
+    line_length_um : float
+        Length of a line; the switch is at its middle.
+    line_gap_um : float
+        Distance between neighbouring lines in µm.
+    z_min_um, z_max_um, slice_um : float
+        z levels ``z_min_um, z_min_um + slice_um, …, z_max_um`` relative to ``center.Z`` (z = 0: interface).
+    settle_s : float
+        Wait after setting the low power before each line, where the previous motion ended (the end of the
+        previous line; the centre before the first line).
     velocity : float
         Kept for the time estimate; IFOV writes with the fixed IFOV speed of the objective.
     objective : str
         Objective of the IFOV configuration.
+    calibration : PowerCalibration, optional
+        Power calibration; default as ``IFOV_Lines`` (the active one, else the one of the configuration).
 
     Raises
     ------
     ValueError
-        For fewer than 2 segments, no repetition or a negative dwell.
+        For no or a non-positive dwell, a non-positive length, gap or slice, ``z_max_um < z_min_um`` or a
+        negative ``settle_s``.
     """
 
     def __init__(self, center: Point3D, *, power_low_mw: float = 0.25, power_high_mw: float = 0.75,
-                 dwell_s: float = 0.05, repetitions: int = 10, n_segments: int = 4, segment_um: float = 6.0,
-                 pair_gap_um: float = 2.0, pair_pitch_um: float = 6.0, reference_gap_um: float = 4.0,
-                 velocity: float = 5000.0, objective: str = "Zeiss 63x"):
+                 dwells_s: Sequence[float] = DEFAULT_DWELLS_S, line_length_um: float = 50.0,
+                 line_gap_um: float = 5.0, z_min_um: float = -1.0, z_max_um: float = 1.0, slice_um: float = 0.2,
+                 settle_s: float = 0.5, velocity: float = 5000.0, objective: str = "Zeiss 63x",
+                 calibration: Optional[PowerCalibration] = None):
         super().__init__()
-        if int(n_segments) < 2 or int(repetitions) < 1 or dwell_s < 0:
-            raise ValueError("PowerSwitchLines needs n_segments >= 2, repetitions >= 1 and dwell_s >= 0")
+        dwells = [float(d) for d in dwells_s]
+        if not dwells or min(dwells) <= 0:
+            raise ValueError("PowerSwitchLines needs at least one dwell, every dwell > 0")
+        if line_length_um <= 0 or line_gap_um <= 0 or slice_um <= 0:
+            raise ValueError("line_length_um, line_gap_um and slice_um must be > 0")
+        if z_max_um < z_min_um or settle_s < 0:
+            raise ValueError("PowerSwitchLines needs z_max_um >= z_min_um and settle_s >= 0")
         self.center = center
         self.power_low_mw = float(power_low_mw)
         self.power_high_mw = float(power_high_mw)
-        self.dwell_s = float(dwell_s)
-        self.repetitions = int(repetitions)
-        self.n_segments = int(n_segments)
-        self.segment_um = float(segment_um)
-        self.pair_gap_um = float(pair_gap_um)
-        self.pair_pitch_um = float(pair_pitch_um)
-        self.reference_gap_um = float(reference_gap_um)
+        self.dwells_s = dwells
+        self.line_length_um = float(line_length_um)
+        self.line_gap_um = float(line_gap_um)
+        self.z_min_um = float(z_min_um)
+        self.z_max_um = float(z_max_um)
+        self.slice_um = float(slice_um)
+        self.settle_s = float(settle_s)
         self.velocity = float(velocity)
         self.objective = objective
+        self.calibration = calibration
 
     @property
     def center_point(self) -> Point3D:
         return self.center
 
-    @property
-    def length_um(self) -> float:
-        """ Length of one line in µm. """
+    def z_levels_um(self) -> list[float]:
+        """ The z levels relative to ``center.Z`` in ascending order, rounded to 1 nm. """
 
-        return self.n_segments * self.segment_um
+        n = int(round((self.z_max_um - self.z_min_um) / self.slice_um))
+        return [round(self.z_min_um + k * self.slice_um, 3) for k in range(n + 1)]
 
-    def line_rows(self) -> list[tuple[float, str]]:
-        """ The y position (µm, relative to the centre) and kind of every line: ``"switch"``, ``"dwell"``,
-        ``"reference_low"``, ``"reference_high"``; from top to bottom. """
+    def line_rows(self) -> list[tuple[float, Optional[float]]]:
+        """ The y position (µm, relative to the centre) and dwell (None: no pause) of every line, top to bottom. """
 
-        height = (self.repetitions - 1) * self.pair_pitch_um + self.pair_gap_um + 2 * self.reference_gap_um
-        top = height / 2
-        rows = []
-        for r in range(self.repetitions):
-            y = top - r * self.pair_pitch_um
-            rows += [(y, "switch"), (y - self.pair_gap_um, "dwell")]
-        last = top - (self.repetitions - 1) * self.pair_pitch_um - self.pair_gap_um
-        rows += [(last - self.reference_gap_um, "reference_low"), (last - 2 * self.reference_gap_um, "reference_high")]
-        return rows
+        dwells: list[Optional[float]] = [None, *self.dwells_s]
+        top = (len(dwells) - 1) * self.line_gap_um / 2
+        return [(round(top - k * self.line_gap_um, 6), dwell) for k, dwell in enumerate(dwells)]
 
-    def _segments(self, y: float, kind: str) -> list[tuple[float, list[list[Point2D]]]]:
-        """ (power, [line]) per block of one line, in writing order (+x). """
+    def _power_value(self, power_mw: float) -> float:
+        return float(resolve_power_calibration(self.calibration, FIT_KIND).ptoa(power_mw))
 
-        x0 = -self.length_um / 2
-        if kind == "reference_low":
-            return [(self.power_low_mw, [[Point2D(x0, y), Point2D(-x0, y)]])]
-        if kind == "reference_high":
-            return [(self.power_high_mw, [[Point2D(x0, y), Point2D(-x0, y)]])]
-        blocks = []
-        for k in range(self.n_segments):
-            power = self.power_low_mw if k % 2 == 0 else self.power_high_mw
-            start, end = x0 + k * self.segment_um, x0 + (k + 1) * self.segment_um
-            blocks.append((power, [[Point2D(start, y), Point2D(end, y)]]))
-        return blocks
+    def _layer(self, coordinate_system: CoordinateSystem, z_um: float) -> DrawableAeroBasicProgram:
+        """ One IFOV block that writes every line of the group on one z level. """
 
-    def _block(self, coordinate_system: CoordinateSystem, power: float, lines: list,
-               dwell: bool) -> DrawableAeroBasicProgram:
-        leaf = IFOV_Lines(reference_point=Point3D(self.center.X, self.center.Y, self.center.Z), lines=lines,
-                          velocity=self.velocity, power=power)
-        program = DrawableAeroBasicProgram(coordinate_system)
-        for sub_program in leaf.iterate_layers(coordinate_system, objective=self.objective):
-            program.add_programm(sub_program)
-        if dwell and self.dwell_s > 0:
-            pause = AeroBasicProgram()
-            pause.DWELL(self.dwell_s)
-            for index, line in enumerate(program.lines):
-                if line.startswith("$AO[0].A="):
-                    program.lines[index + 1:index + 1] = ["' Dwell after the power change (T148)", *pause.lines]
-                    break
-        return program
+        low, high = self._power_value(self.power_low_mw), self._power_value(self.power_high_mw)
+        half = self.line_length_um / 2
+        program = IFOV_AeroBasicProgram(coordinate_system)
+        program.initialise_IFOV_configuration(objective=self.objective)
+        program.lines[:] = [line for line in program.lines if line.strip().upper() != "LOOKAHEAD FAST"]
+        set_ifov_speeds(program, self.objective)
+        program.COMPENSATE_GALVO_ROTATION(axis=SingleAxis.A)
+        program.ABSOLUTE()
+        program.RAPID(X=self.center.X, Y=self.center.Y, Z=self.center.Z + z_um)
+        program.RESET_GALVO()
+        program.START_IFOV()
+        for y, dwell in self.line_rows():
+            kind = "no pause" if dwell is None else f"WAIT MOVEDONE + DWELL {dwell:g} s"
+            program.comment(f"\nT148 line at y = {y:.2f} um, z = {z_um:.3f} um: {kind}")
+            program.WAIT(WaitMode.MOVE_DONE, WAIT_AXES)
+            program.comment(f"Power set to {self.power_low_mw} mW (settled before the line)")
+            program.SET_POWER(power=low)
+            if self.settle_s > 0:
+                program.DWELL(self.settle_s)
+            program.RAPID(A=-half, B=y)
+            program.LINEAR(A=0.0, B=y)
+            if dwell is not None:
+                program.WAIT(WaitMode.MOVE_DONE, WAIT_AXES)
+            program.comment(f"Power set to {self.power_high_mw} mW (switch at x = 0)")
+            program.SET_POWER(power=high)
+            if dwell is not None:
+                program.DWELL(dwell)
+            program.LINEAR(A=half, B=y)
+        program.WAIT(WaitMode.MOVE_DONE, WAIT_AXES)
+        program.end_ifov_program()
+        layer = DrawableAeroBasicProgram(coordinate_system)
+        layer.add_programm(program)
+        return layer
 
     def iterate_layers(self, coordinate_system: CoordinateSystem, plot_name=None) -> Iterator[DrawableAeroBasicProgram]:
-        """ Yield one layer program with every line (one IFOV block per segment).
+        """ Yield one layer program per z level in ascending z.
 
         Parameters
         ----------
@@ -155,9 +184,5 @@ class PowerSwitchLines(DrawableObject):
         """
 
         del plot_name
-        program = DrawableAeroBasicProgram(coordinate_system)
-        for y, kind in self.line_rows():
-            program.comment(f"\nT148 {kind} line at y = {y:.2f} um")
-            for power, lines in self._segments(y, kind):
-                program.add_programm(self._block(coordinate_system, power, lines, dwell=kind == "dwell"))
-        yield program
+        for z_um in self.z_levels_um():
+            yield self._layer(coordinate_system, z_um)

@@ -485,3 +485,15 @@ the decision session. **Every one of them must be discussed with the maintainer 
         `config`s of an experiment file 1.0 (or 1.1 without `/spec`), marked `reconstructed: true`; factories
         become `drawing` geometries (INFORMATION_MODEL.md §6.4);
       - a test rebuilds the spec of a dry-run file whose `/spec` was removed and compares the built structures.
+
+## F40: Power switch check with the laser gated explicitly (`GALVO LASEROVERRIDE`)
+- **Status:** idea of the maintainer, 2026-11-27 (during the redesign of T148).
+- **Goal:** A variant of the T148 lines (`testprint/power_switch.PowerSwitchLines`) that switches the laser on
+  and off explicitly with `GALVO LASEROVERRIDE A ON` / `OFF` around the power change and the dwell, instead of
+  `GALVO LASEROVERRIDE A AUTO`; it separates the settling of the attenuator from the dose written while the
+  line stands still.
+- **Context:** with `AUTO` it is not documented whether the laser is on during a `DWELL`; T148 prints with
+  `AUTO` and shows points at standstill as they come.
+- **Prerequisites:** T148 result; the A3200 help on `GALVO LASEROVERRIDE` (on/off timing relative to buffered
+  motion).
+- **Open questions:** Is `GALVO LASEROVERRIDE` buffered with the motion or executed ahead of it like `$AO`?
