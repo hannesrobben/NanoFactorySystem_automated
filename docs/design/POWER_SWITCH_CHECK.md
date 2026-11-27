@@ -1,6 +1,6 @@
 # Work order: power switch inside a running program (T148, decision D9)
 
-Status: work order for the lab check, 2026-11-26. Todo: T148. Lab script: `mains/lab_checks/power_switch_check.py`;
+Status: work order for the lab check, 2026-11-26; test pattern redesigned 2026-11-27 (maintainer). Todo: T148. Lab script: `mains/lab_checks/power_switch_check.py`;
 guide: `docs/guides/POWER_SWITCH_CHECK.md`. Pattern: `nanofactorysystem/testprint/power_switch.py`.
 
 ## 1 Question
@@ -48,35 +48,49 @@ checklist): index entries "Motion Command Buffering" / "Lookahead", `$AO`, `DWEL
 `CRITICAL START`, `WAIT MOVEDONE`, `VELOCITY ON`. Questions: (a) is `$AO` executed ahead of buffered motion in
 `VELOCITY ON`; (b) does `IFOV OFF` or `CRITICAL START/END` flush the motion buffer; (c) is `WAIT MOVEDONE A B`
 (or `WAIT INPOS`) before `$AO` the documented way to keep the order, and what does it cost (stop of the
-coordinated motion is intended here, the laser gate is off between blocks).
+coordinated motion is intend## 3 Test pattern (maintainer decisions 2026-11-27, replaces the line pairs of 2026-11-26)
 
-## 3 Test pattern (maintainer decision 2026-11-26: lines only)
+The line pairs with one IFOV block per segment did not test a power change inside running motion: between two
+segments the full block header (`IFOV OFF/ON`, `RAPID`s, configuration) ran with the laser off, an implicit pause
+of unknown length. The pattern was redesigned:
 
-One IFOV experiment, Zeiss 63x, writing plane z = 0, three structures in a 1 × 3 grid, one per dwell level
-(10 / 50 / 200 ms). Each structure (`PowerSwitchLines`):
+One IFOV experiment, Zeiss 63x, `REPETITIONS` (5-10, default 6) grid cells in two rows, each with the same line
+group (`PowerSwitchLines`):
 
-- 10 line pairs, pairs 6 µm apart. Each line has four 6 µm segments along +x with 0.25, 0.75, 0.25, 0.75 mW;
-  **every segment is its own IFOV block starting with `$AO`**, built with `IFOV_Lines` like the blocks of the
-  parameter tests;
-- the first line of a pair switches without a pause, the second line **2 µm below** is written the same way
-  with `DWELL <dwell>` right after each `$AO`;
-- two reference lines (0.25 and 0.75 mW constant) 4 µm below the last pair.
+- **one line:** 50 µm along +x, x = -25 … 0 µm with 0.25 mW, x = 0 … +25 µm with 0.75 mW; the power command sits
+  between the two `LINEAR` moves, so the switch is at x = 0 on every line;
+- **five lines, 5 µm apart:** the first switches without a pause (`LINEAR` → `$AO` → `LINEAR`); the others wait
+  for the motion and dwell (`LINEAR` → `WAIT MOVEDONE X Y A B` → `$AO` → `DWELL d` → `LINEAR`) with
+  d = 5 / 20 / 100 / 500 ms;
+- **z levels:** every line on 11 levels from -1 to +1 µm around the fitted interface (0.2 µm steps), one layer
+  program (one IFOV block with all five lines) per level, so each line becomes a small wall;
+- **before every line:** `WAIT MOVEDONE`, `$AO` low power, `DWELL 0.5 s` where the previous motion ended (end of
+  the previous line, centre before the first), so the first half always starts with a settled low power;
+- `LOOKAHEAD FAST` is removed from the block header (no function since 6.01, §2); everything else is the header
+  of the parameter-test blocks, with `GALVO LASEROVERRIDE A AUTO`.
 
-Every power change happens in both directions (low → high, high → low), at three positions per line.
+Points written while the line stands still (in a `DWELL`) are part of the result and are not moved away
+(maintainer). A variant with the laser gated explicitly is F40.
 
 ## 4 Evaluation (SEM, or camera if the widths differ enough)
 
-Per segment boundary, compare the width at the end of a segment, at the start of the next one and in the
-middle of both against the reference lines:
+Along every line, compare the width around x = 0 with the middle of both halves (x = ±12.5 µm):
 
-| Observation on the line without dwell | Meaning | Consequence |
+| Observation | Meaning | Consequence |
 |---|---|---|
-| no transition zone | the attenuator settles before the next line starts | `dwell_after_power_s = 0` (D9) |
-| start of the next segment has the old width over a length L, the dwell line does not | settling time ≈ L / v (IFOV speed of the 63x) | `dwell_after_power_s` = the shortest dwell level without the zone |
-| **end** of the previous segment already has the new width | `$AO` runs ahead of the buffered motion (§2) | a dwell does not help: synchronise the power change (`WAIT MOVEDONE` before `$AO` or `SYNCCALL`) in a new todo, repeat T148 |
+| line without pause: transition starts **before** x = 0 | `$AO` runs ahead of the buffered motion (§2); its lead ≈ length × IFOV speed | power changes in the parameter tests need `WAIT MOVEDONE` before `$AO` (new todo, decision D9) |
+| line without pause: transition starts at x = 0 and extends over L after it | the power command keeps the order; the attenuator settles in ≈ L / v (IFOV speed of the 63x) | compare with the dwell lines |
+| dwell lines: transition zone after x = 0 disappears from dwell d on | settling time ≤ d | `dwell_after_power_s` = d (with `WAIT MOVEDONE` before `$AO`) |
+| no transition zone on any line, switch at x = 0 | `$AO` in order and settled in time | `dwell_after_power_s = 0` (D9) |
+| point / bulge at x = 0 on the dwell lines | the laser stays on during `DWELL` (`AUTO`) | note it; F40 tests the explicit laser gate |
+
+The 11 z levels show the same transition on every level (and the wall height shows the voxel length of both
+powers); the repetitions give the spread.
 
 The result and the value of `dwell_after_power_s` go into WORKLOG.md and `TEST_PRINT_PTD01.md` §12 (D9);
 `DWELL_AFTER_POWER_S` in `mains/parametertest/common.py` is set from it.
+
+`mains/parametertest/common.py` is set from it.
 
 ## 5 Sources
 

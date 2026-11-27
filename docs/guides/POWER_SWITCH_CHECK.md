@@ -14,8 +14,9 @@ Background and evaluation: `docs/design/POWER_SWITCH_CHECK.md`. About 45 minutes
 ## Settings
 
 In `mains/lab_checks/power_switch_check.py`, SETTINGS block: `RESIN_EDGES` and `CENTER` of the current drop,
-`SUBSTRATE_LABEL` (or None), `USER`. Leave the powers (0.25 / 0.75 mW), the dwells (10 / 50 / 200 ms) and the
-10 repetitions as they are.
+`SUBSTRATE_LABEL` (or None), `USER`, `REPETITIONS` (5-10, default 6). Leave the powers (0.25 / 0.75 mW), the
+dwells (5 / 20 / 100 / 500 ms), the line length (50 µm, switch at the middle) and the z levels (-1 … +1 µm in
+0.2 µm steps) as they are.
 
 ## Run
 
@@ -28,14 +29,15 @@ python -m lab_checks.power_switch_check              # plane fit and print after
 
 ## After the print
 
-- Develop as usual, SEM image of every structure (all three fit in one 200 µm field of view at medium
-  magnification; then one close-up per structure of the first three pairs and the reference lines).
+- Develop as usual, SEM image of every grid cell (the five 50 µm lines of a cell fit in one 60 µm field), then
+  a close-up of x = 0 of every line (tilted view if possible: the lines are 2 µm high walls).
 - Send the experiment folder (or only `experiment.h5` and the SEM images) and `checklist.txt`.
 
 ## What it decides
 
 | Result | Consequence |
 |---|---|
-| no transition zone | D9: no dwell needed, `DWELL_AFTER_POWER_S = 0` stays |
-| transition at the start of segments, gone with dwell X | `DWELL_AFTER_POWER_S = X` in `mains/parametertest/common.py` |
-| the end of a segment already has the new width | new todo: synchronise the power change, then repeat T148 |
+| switch at x = 0, no transition zone on any line | D9: no dwell needed, `DWELL_AFTER_POWER_S = 0` stays |
+| transition after x = 0, gone on the dwell lines from dwell X on | `DWELL_AFTER_POWER_S = X` (with `WAIT MOVEDONE` before `$AO`) in `mains/parametertest/common.py` |
+| line without pause: transition already before x = 0 | `$AO` runs ahead of the motion: new todo, power changes need `WAIT MOVEDONE` |
+| point at x = 0 on the dwell lines | laser on during `DWELL`; note it (F40) |
