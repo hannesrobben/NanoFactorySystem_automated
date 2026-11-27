@@ -38,9 +38,10 @@ from nanofactorysystem.testprint.power_switch import PowerSwitchLines
 USER = "Hannes"
 OBJECTIVE = "Zeiss 63x"
 RESIN = "SZ2080"
-RESIN_EDGES = [[-4900, -2300], [4300, -700], [-800, -5900], [-200, 3600]]  # LAB: right, left, near, far (µm)
-CENTER = Point2D(0, -1500)                     # LAB: centre of the experiment (absolute stage µm)
-SUBSTRATE_LABEL: Optional[str] = None          # None: the next free label of the user
+RESIN_EDGES = [[-2500, 17000], [-100, 27000], [5300, 21100], [-6000, 22000]]    # LAB: right, left, near, far (µm)
+# RESIN_EDGES = [[-4900, -2300], [4300, -700], [-800, -5900], [-200, 3600]]  # LAB: right, left, near, far (µm)
+CENTER = Point2D(-4000, 25000)                     # LAB: centre of the experiment (absolute stage µm)
+SUBSTRATE_LABEL: Optional[str] = "SZ_2080_test"          # None: the next free label of the user
 DWELLS_S = (0.01, 0.05, 0.2)                   # dwell after every power change of the second line of each pair
 POWER_LOW_MW, POWER_HIGH_MW = 0.25, 0.75       # maintainer decision 2026-11-26
 REPETITIONS = 10

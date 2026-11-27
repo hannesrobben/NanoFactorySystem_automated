@@ -39,8 +39,8 @@ SETUP = "IFOV_on"
 RESIN = "SZ2080"                                     # LAB: registry name of the resin
 INPUTS_FILE = HERE / f"parameter_tests_{RESIN}.json"  # material start file (one per material)
 # LAB: edges of the resin drop measured with the camera: right, left, near, far (as in T113)
-RESIN_EDGES = [[-4900, -2300], [4300, -700], [-800, -5900], [-200, 3600]]
-SUBSTRATE_LABEL: Optional[str] = None                # LAB: e.g. "HR-26-004"; None = next free label
+RESIN_EDGES = [[-2500, 17000], [-100, 27000], [5300, 21100], [-6000, 22000]]
+SUBSTRATE_LABEL: Optional[str] = "SZ_2080_test"          # None: the next free label of the user
 CORNER_POWER_MW = 0.7                                # corners and QR code (as in T113)
 # Reduced corner markers with QR code (D2) and a margin that keeps the markers out of the grid: the QR code
 # (140 µm, centred on the upper edge of the rectangle) reaches 70 µm inside; maintainer requirement
@@ -50,15 +50,19 @@ MARKER_CLEARANCE_UM = 20.0
 MARGIN_UM = 90.0
 DWELL_AFTER_POWER_S = 0.0                            # D9: set from the lab check T148
 # Unattended run: set all three to False, then nothing waits for a click
-ASK_EACH_STEP = True                                 # confirm plane fit and printing inside every experiment
-ASK_BETWEEN = True                                   # confirm before starting the next experiment
-SHOW_PLOTS = True                                    # layout plot windows (must be closed to continue)
+ASK_EACH_STEP = False                                 # confirm plane fit and printing inside every experiment
+ASK_BETWEEN = False                                   # confirm before starting the next experiment
+SHOW_PLOTS = False                                    # layout plot windows (must be closed to continue)
 
 # LAB: centre of every experiment (columns 800 µm apart, rows 900 µm; checked by check_layout)
-_COLUMNS = [-2800, -2000, -1200, -400, 400, 1200, 2000, 2800]
-CENTERS = {"quick": Point2D(_COLUMNS[0], 1200)}
-CENTERS.update({f"full_f{i}": Point2D(_COLUMNS[i], 1200) for i in range(1, 8)})
-CENTERS.update({f"voxel_{i}": Point2D(_COLUMNS[i % 8], 300 if i < 8 else -600) for i in range(10)})
+# _COLUMNS = [-2800, -2000, -1200, -400, 400, 1200, 2000, 2800]
+# CENTERS = {"quick": Point2D(_COLUMNS[0], 1200)}
+# CENTERS.update({f"full_f{i}": Point2D(_COLUMNS[i], 1200) for i in range(1, 8)})
+# CENTERS.update({f"voxel_{i}": Point2D(_COLUMNS[i % 8], 300 if i < 8 else -600) for i in range(10)})
+_COLUMNS = [-2000, -1000, 0, 1000, 2000]
+CENTERS = {"quick": Point2D(_COLUMNS[2], 20000)}
+CENTERS.update({f"full_f{i}": Point2D(_COLUMNS[i%4], 21000 if i < 5 else 22000) for i in range(8)})
+CENTERS.update({f"voxel_{i}": Point2D(_COLUMNS[i % 5], 23000 if i < 5 else 24000) for i in range(10)})
 
 TESTS = ("quick", "full", "voxel")
 
