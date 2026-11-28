@@ -3280,3 +3280,29 @@ Format and rules: see "Work log (mandatory)" in CLAUDE.md.
 - **Tests:** `python -m pytest test/testprint/test_power_switch.py`: 5 passed (incl. the slow dry run with 6 repetitions, estimated print time 21 min); full `python -m pytest`: still running at the time of the commit (first run with `-p no:logging`: 140 passed before an unrelated `caplog` setup error caused by that flag).
 - **Commits:** `8b544d5` feat(dummy): accept WAIT MOVEDONE and WAIT INPOS in the fake controller [T148], `9cdd3ea` feat(testprint): switch the power in the middle of running lines [T148], `cb025e3` docs(testprint): describe the redesigned power switch check, add F40 [T148], plus this bookkeeping commit
 - **Follow-ups:** lab print and evaluation (T148); F40.
+
+### 2026-11-28 17:03 CET — [T169] Diagnosis of the stopped DOE layer 69: error code, axis faults, disabled axes, close()
+- **Status:** done
+- **Changes:**
+  - `nanofactorysystem/devices/aerotech/task.py`: `error_info` keeps the raw task error code and location when the controller refuses `ERRORDECODE` (lab ASCII interface; the "Compiler Error" of 2026-11-28 belonged to that refused command, not to the layer program) and appends the axis faults with flag names, read before R0 acknowledges them
+  - `nanofactorysystem/devices/aerotech/health.py`: `axis_faults`, `describe_axis_fault`; a disabled or unhomed axis is a problem (the check after R0 said "ok" with X disabled)
+  - `nanofactorysystem/backends/dummy/a3200.py`: `DriveStatus` from the simulated enabled axes
+  - `nanofactorysystem/system.py`: `close()` logs a failed home move and still saves the log and closes the devices (the home move hid the `PrintStoppedError`)
+  - `test/backends/test_dummy_controller.py`, `test/devices/test_health.py`, `test/backends/test_dummy_system.py`: new tests; the expected fault text in `test_axis_fault_and_task_error_are_problems` now includes the flag name (message extended, assertion not weakened)
+  - `test/README.md`, `CLAUDE.md`: descriptions
+  - `TODO.md`: T169, T170 in Done, T171 added
+- **Analysis:** the layer program and its split are correct (the 11 parts reproduce the body line by line; X0 Y19 Z25.33 mm is the IFOV base position, the leading `LINEAR X Y` is code from 2024/2026-03). The task went to the error state at 24 % of part 6 (code 51, location 5) and X was disabled afterwards: an axis fault on X; its type is unknown because R0 acknowledged it before it was read (T171).
+- **Tests:** new tests failed before the fix and pass after it; full `python -m pytest`: 748 passed, 15 skipped (51 min)
+- **Commits:** `e5f5ac9` fix(devices): report task error code and axis faults, flag disabled axes [T169], `1d503ab` fix(system): keep closing when the home move fails [T169], `9a1a2d4` docs: describe the failure diagnosis and the layer continuation [T169, T170]
+- **Follow-ups:** T171 (cause of the X fault)
+
+### 2026-11-28 17:03 CET — [T170] Continue a stopped layer without double exposure
+- **Status:** done (the lab run of layer 69 is the maintainer's)
+- **Changes:**
+  - `nanofactorysystem/resume_layer.py` (new): `failure_point` (from `/logs/a3200`), `layer_program_for_part`, `plan_resume` (maps the reported part line to the layer line with the same split plan; rest from the first `RAPID` behind it plus a margin line; optional `next_column`), `write_resume_program`, `mark_layer_printed`
+  - `mains/resume_layer.py` (new): `plan` / `run` (health check, confirmation, parts on task 1, then mark) / `mark`, `--dry-run`
+  - `test/test_resume_layer.py` (new): 9 tests incl. the script end to end on the fake controller
+  - `test/README.md`, `CLAUDE.md`: descriptions
+- **Tests:** `python -m pytest test/test_resume_layer.py`: 9 passed; on the real layer 69 program a reported part-6 line maps to the identical layer line (e.g. part line 19200 → layer line 418899, rest from 418901, 390510 body lines)
+- **Commits:** `c9d797e` feat(experiment): continue a stopped layer behind its last printed line [T170], `9a1a2d4` (docs)
+- **Follow-ups:** none
