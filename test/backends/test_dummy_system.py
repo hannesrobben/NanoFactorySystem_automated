@@ -72,6 +72,19 @@ def test_system_roles(test_config, dummy_backend):
         assert isinstance(system.dhm, protocols.DhmRole)
 
 
+def test_close_finishes_when_the_home_move_fails(test_config, dummy_backend, caplog):
+    # Lab 2026-11-28 (T169): an axis fault disabled X; the home move in close() raised "The axis is not
+    # enabled", hid the PrintStoppedError and skipped saving the log and closing the camera
+    system = System("Test", "Zeiss 20x", backend=dummy_backend, **sys_args())
+    dummy_backend.transport.fail_next(r"^LINEAR", error="The axis is not enabled.", count=10)
+
+    system.close()
+
+    assert not system.opened
+    assert (dummy_backend.workdir / "A3200.log").is_file()
+    assert "Home move failed while closing" in caplog.text
+
+
 def test_system_motion_zline_and_laser_state(test_config, dummy_backend):
     world = dummy_backend.world
     with System("Test", "Zeiss 20x", backend=dummy_backend, **sys_args()) as system:

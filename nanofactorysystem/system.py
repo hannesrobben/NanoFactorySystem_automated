@@ -129,10 +129,19 @@ class System(Parameter):
 
     def close(self, home=True):
 
-        """ Close connection to hardware devices. """
+        """ Close connection to hardware devices.
+
+        A failed home move (e.g. an axis disabled by a fault) is logged and
+        does not stop the rest of the closing, so that the log is saved, the
+        devices are closed and an exception that caused the close stays
+        visible (T169).
+        """
 
         if home and self.opened:
-            self.home(wait=False)
+            try:
+                self.home(wait=False)
+            except RuntimeError as error:  # AerotechError; the controller may be faulted
+                self.log.error(f"Home move failed while closing, the stages stay where they are: {error}")
 
         if self.dhm is not None:
             self.dhm.close()
