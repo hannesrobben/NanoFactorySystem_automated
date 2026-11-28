@@ -466,7 +466,7 @@ class FakeA3200Transport:
         if item == "AccelerationRate":
             return self._format(self.acceleration[axis])
         if item == "DriveStatus":
-            return str(0x02000000 | 0x00000001)  # InPosition | Enabled
+            return str(0x02000000 | (0x00000001 if axis in self.world.enabled else 0))  # InPosition | Enabled
         if item == "AxisStatus":
             return str(0x00000001)  # Homed
         if item in ("AxisFault", "AxisFaultMask"):

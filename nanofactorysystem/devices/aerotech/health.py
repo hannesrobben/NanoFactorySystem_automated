@@ -20,6 +20,7 @@ from typing import Callable, Optional
 from nanofactorysystem.aerobasic import SingleAxis, TaskStatusDataItem
 from nanofactorysystem.aerobasic.ascii import AerotechError
 from nanofactorysystem.aerobasic.constants import AxisStatus, AxisStatusDataItem
+from nanofactorysystem.aerobasic.constants.axes import AxisFault
 from nanofactorysystem.aerobasic.constants.tasks import TaskState
 from nanofactorysystem.devices.aerotech.library import used_memory_gb
 
@@ -29,6 +30,54 @@ EXEC_PROGRAM_NAMES = ("python_aerobasic_program.pgm",)
 """Fixed execution name used before T152; R0 still removes it (left over by an older version)."""
 #: A 32-bit A3200 process above this working set is close to its 2 GB address space (lab 2026-11-24: 1.87 GB)
 PROCESS_WARNING_GB = 1.5
+
+
+def describe_axis_fault(fault: int) -> str:
+    """ Names of the bits set in an ``AxisFault`` value, e.g. ``"PositionError|VelocityError"``.
+
+    Parameters
+    ----------
+    fault : int
+        Value of ``AXISSTATUS(<axis>, DATAITEM_AxisFault)``.
+
+    Returns
+    -------
+    str
+        The flag names joined by ``|``; bits without a name are given as hexadecimal rest.
+    """
+
+    names = [flag.name for flag in AxisFault if flag.value & fault]
+    rest = fault & ~sum(flag.value for flag in AxisFault)
+    if rest:
+        names.append(f"0x{rest:08X}")
+    return "|".join(names) if names else "none"
+
+
+def axis_faults(api, axes=AXES) -> dict[str, int]:
+    """ Read the fault value of every axis that has one (no side effects, nothing is acknowledged).
+
+    Parameters
+    ----------
+    api : AerotechAsciiInterface
+        Connected ASCII interface.
+    axes : iterable of SingleAxis
+        Axes to read.
+
+    Returns
+    -------
+    dict of str to int
+        Axis name to ``AxisFault`` value, only axes with a fault.
+
+    Raises
+    ------
+    AerotechError, ValueError
+        If the status cannot be read.
+    """
+
+    axes = tuple(axes)
+    values = api.STATUS(*[(axis, AxisStatusDataItem.AxisFault) for axis in axes]).split()
+    faults = {axis.name: int(float(v.replace(",", "."))) for axis, v in zip(axes, values)}
+    return {name: fault for name, fault in faults.items() if fault}
 
 
 @dataclass
@@ -136,7 +185,13 @@ def controller_health(api, *, tasks: tuple[int, ...] = (1, 2), check_processes: 
             report.axes[axis.name] = {"fault": fault, "enabled": bool(drive & 1),
                                       "homed": bool(status & AxisStatus.Homed.value)}
             if fault:
-                report.problems.append(f"axis {axis.name} has fault {fault}")
+                report.problems.append(f"axis {axis.name} has fault {fault} ({describe_axis_fault(fault)})")
+            elif not report.axes[axis.name]["enabled"]:
+                # Lab 2026-11-28 (T169): an axis fault during a print disables the axis; acknowledging the
+                # fault (R0) does not enable it again, and every later move fails
+                report.problems.append(f"axis {axis.name} is disabled")
+            if not report.axes[axis.name]["homed"]:
+                report.problems.append(f"axis {axis.name} is not homed")
     except (AerotechError, ValueError) as error:
         report.problems.append(f"axis states not readable: {error}")
     if check_processes:

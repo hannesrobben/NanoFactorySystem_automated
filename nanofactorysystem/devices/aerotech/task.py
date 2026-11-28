@@ -106,19 +106,38 @@ class Task:
         return self.file_path.name if self.file_path is not None else None
 
     def error_info(self) -> str:
-        """ Decoded task error: ``"<code>: <text>"`` from ``TaskErrorCode`` and ``TaskErrorLocation``.
+        """ Task error and axis faults at the moment of the failure, for the error message.
 
-        Returns a note instead of raising if the error cannot be read.
+        With ``ERRORDECODE``: ``"<code>: <text>"`` from ``TaskErrorCode`` and
+        ``TaskErrorLocation``. The ASCII interface of the lab controller refuses
+        ``ERRORDECODE`` (lab 2026-11-28, T169); the code and location are then
+        reported undecoded. The fault of every axis that has one is appended
+        (``axis faults: X PositionError``), read before any recovery
+        acknowledges it. Never raises: what cannot be read is noted instead.
         """
 
         try:
-            error_code, error_location = self.api.STATUS(
+            error_code, error_location = (int(float(v)) for v in self.api.STATUS(
                 (self.task_id, TaskStatusDataItem.TaskErrorCode),
                 (self.task_id, TaskStatusDataItem.TaskErrorLocation)
-            ).split(" ")
-            return f"{error_code}: {self.api.ERROR_DECODE(int(error_code), int(error_location))}"
+            ).split(" "))
         except (AerotechError, ValueError) as error:
-            return f"(error code not readable: {error})"
+            info = f"(task error code not readable: {error})"
+        else:
+            try:
+                info = f"{error_code}: {self.api.ERROR_DECODE(error_code, error_location)}"
+            except AerotechError as error:
+                info = (f"task error {error_code} at location {error_location} "
+                        f"(ERRORDECODE not available: {error})")
+        from nanofactorysystem.devices.aerotech.health import axis_faults, describe_axis_fault
+        try:
+            faults = axis_faults(self.api)
+        except (AerotechError, ValueError) as error:
+            return f"{info}; axis faults not readable: {error}"
+        if faults:
+            info += "; axis faults: " + ", ".join(f"{axis} {describe_axis_fault(fault)} ({fault})"
+                                                  for axis, fault in faults.items())
+        return info
 
     @property
     def task_mode(self) -> TaskMode:

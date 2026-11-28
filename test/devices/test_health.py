@@ -45,7 +45,20 @@ def test_axis_fault_and_task_error_are_problems(api, transport):
     report = controller_health(api, check_processes=False)
 
     assert not report.ok
-    assert report.problems == ["task 2 is in the error state", "axis Z has fault 4"]
+    assert report.problems == ["task 2 is in the error state", "axis Z has fault 4 (CwEOTLimit)"]
+
+
+def test_disabled_or_unhomed_axis_is_a_problem(api, transport):
+    # Lab 2026-11-28 (T169): after an axis fault and R0 the X axis was disabled and the check still said "ok"
+    transport.world.enabled.discard("X")
+    original = transport._axis_item
+    transport._axis_item = lambda axis, item: "0" if (axis, item) == ("B", "AxisStatus") else original(axis, item)
+
+    report = controller_health(api, check_processes=False)
+
+    assert not report.ok
+    assert report.problems == ["axis X is disabled", "axis B is not homed"]
+    assert report.axes["X"] == {"fault": 0, "enabled": False, "homed": True}
 
 
 def test_unreachable_interface(transport):
