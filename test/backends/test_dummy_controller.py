@@ -175,6 +175,29 @@ def test_program_error_while_running(tmp_path, transport, world, no_sleep):
     assert task.task_state == TaskState.error
 
 
+def test_task_error_keeps_code_and_axis_faults_when_errordecode_is_refused(tmp_path, transport, world, no_sleep):
+    # Lab 2026-11-28 (T169): the real ASCII interface refuses ERRORDECODE, so the message showed only
+    # "Compiler Error" of that refused command; the task error code and the axis fault must still be reported,
+    # read before R0 acknowledges the fault
+    a3200 = Aerotech3200(transport_factory=lambda: transport, program_dir=tmp_path)
+    a3200.connect()
+    transport.program_error_next(error_code=51, error_location=5, running_polls=2)
+    transport.fail_next(r"ERRORDECODE", code="INVALID", error="Compiler Error: The program failed to compile.")
+    original = transport._axis_item
+    transport._axis_item = lambda axis, item: "1" if (axis, item) == ("X", "AxisFault") else original(axis, item)
+    program = AeroBasicProgram()
+    program.send("LINEAR X1 F1")
+
+    task = a3200.run_program_as_task(program, task_id=1)
+    with pytest.raises(TaskFailedError) as error:
+        task.wait_to_finish()
+
+    message = str(error.value)
+    assert "task error 51 at location 5" in message
+    assert "ERRORDECODE not available" in message
+    assert "axis faults: X PositionError" in message
+
+
 def test_program_error_before_start(tmp_path, transport, world, no_sleep):
     a3200 = Aerotech3200(transport_factory=lambda: transport, program_dir=tmp_path)
     a3200.connect()

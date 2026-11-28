@@ -435,6 +435,14 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
 
 ### Phase B — Backlog (from T19 `todo_notes.md`, lab checks, follow-ups)
 
+- [ ] T171: Find the cause of the X axis fault in the DOE print of 2026-11-28 (found during T169) [phase: B]
+  - Priority: high
+  - Size: S
+  - Depends on: T169
+  - Layer 69 of `surface_16bit` (IFOV, 63x, 2048 µm field) stopped with task error 51 at location 5 in part 6 of 11; X was disabled afterwards, the fault itself was acknowledged by R0 before it was read. `A3200CallbackService.exe` grew from 0.03 to 1.1 GB during the print.
+  - Done when:
+    - the next failure (with T169) names the axis fault, or the controller fault log of 2026-11-28 is read in the A3200 software;
+    - the cause (e.g. position error of the IFOV tracking, process memory) is recorded in WORKLOG.md with a todo for the fix.
 - [ ] T69: Run the lab check of the new features on the lab PC (follow-up of T68) [phase: B]
   - Priority: low
   - Size: S
@@ -691,6 +699,8 @@ found on the way are future todos (F18–F30, F36), not part of these todos.
 
 ## Done
 <!-- Claude Code adds: - [x] T<n>: title — YYYY-MM-DD — 1–2 sentences on what changed — commits: `<sha>`, … -->
+- [x] T169: Task failures hid their cause and the health check passed a disabled axis (found during the DOE print of 2026-11-28) — 2026-11-28 — A task error now carries its raw code/location when the lab controller refuses `ERRORDECODE` plus the axis faults read before R0; a disabled or unhomed axis is a health problem; `System.close()` logs a failed home move instead of hiding the print error. — commits: `e5f5ac9`, `1d503ab`, `9a1a2d4`
+- [x] T170: Continue a stopped layer without exposing its printed part twice (found during the DOE print of 2026-11-28) — 2026-11-28 — `nanofactorysystem/resume_layer.py` and `mains/resume_layer.py plan|run|mark` read the stop from `/logs/a3200`, write the rest of the layer from the first `RAPID` behind it and record the layer as printed for the restart. — commits: `c9d797e`, `9a1a2d4`
 - [x] T168: Layer scanner kept the immersion oil for a drop facing down (found during the parameter-test print, follow-up of T43) — 2026-11-26 — Positive z points downwards, so for DOWN the oil above the substrate has the smaller z; the scanner now keeps the highest-z focus range for both directions (UP unchanged, maintainer decision 2026-11-26), with a regression test of the lab case. — commits: `7e9acdd`
 - [x] T83: Capture reservation, raw references and groups in the store — 2026-11-26 — `EXPERIMENT_STORAGE.md` §15 fixed as the binding layout of schema 1.3 (approved with T71); `ExperimentStore.reserve_capture` / `update_capture_job` / `add_dhm_result` (ProductSet as `header_json` + buffers, frame table, flat traceability attributes, idempotent by job id, `recovered`) / `add_layer_product` (`/dhm_groups`, MIRA layout, GroupSpec) / orphans as references / `/calibration/dhm`; legacy captures unchanged; `captures.csv` with job columns; example file `test/storage/data/dhm_example/experiment.h5` with contract-valid headers, vendored by DHMConnect, OffAxisHolo K12 and MIRA MI-62 — commits: `f2a45ac`, `c9cdfd6`, `c4f768d`, `b687eed`, `02227ab`.
 - [x] T79: Experiment configuration record — 2026-11-26 — `/metadata/dhm/sessions/<n>` once per session (adapter, versions, parameter set id and hash, camera, objective, pixel size and its source, never Koala) and the full parameter set once per `config_hash` (`/metadata/dhm/parameter_sets`, refused if the content differs); `ExperimentRecord.dhm`; summary entry `dhm_config` and a DHM line in the header only when a record exists; the print camera stays in `/metadata/system/devices_json` — commits: `5674b82`.
