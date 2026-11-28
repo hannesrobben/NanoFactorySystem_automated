@@ -1,0 +1,165 @@
+{
+  "schema": "nanofactory.parameter_tests/1",
+  "material": "IP-DIP2",
+  "powers_mw": [
+    0.1,
+    0.2,
+    0.3,
+    0.4,
+    0.5,
+    0.6,
+    0.7,
+    0.8,
+    0.9,
+    1.0
+  ],
+  "label_power_mw": 0.5,
+  "support": {
+    "power_mw": 0.5,
+    "hatch_um": 0.2,
+    "slice_um": 0.25
+  },
+  "anchor_depth_um": 1.0,
+  "quick": {
+    "walls": {
+      "groups": 2,
+      "walls_per_group": 3,
+      "length_um": 8.0,
+      "pitch_um": 1.5,
+      "z_from_um": -1.0,
+      "z_to_um": 1.0,
+      "slice_um": 0.25
+    },
+    "pads": {
+      "size_um": 5.0,
+      "hatch_um": [
+        0.1,
+        0.2,
+        0.4,
+        0.6
+      ],
+      "z_from_um": -1.0,
+      "z_to_um": 1.0,
+      "slice_um": 0.25
+    }
+  },
+  "full": {
+    "f1": {
+      "passes": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "line_length_um": 7.0,
+      "line_pitch_um": 2.5
+    },
+    "f2": {
+      "spans_um": [
+        2.0,
+        4.0,
+        7.0,
+        10.0
+      ],
+      "pedestal_um": [
+        2.0,
+        3.0,
+        3.0
+      ],
+      "line_below_top_um": 0.5,
+      "gap_um": 2.0
+    },
+    "f3": {
+      "spacing_um": [
+        0.2,
+        0.4,
+        0.6,
+        0.8,
+        1.0,
+        1.2
+      ],
+      "line_length_um": 6.0,
+      "group_gap_um": 1.5
+    },
+    "f4": {
+      "hatch_um": [
+        0.1,
+        0.2,
+        0.4,
+        0.6
+      ],
+      "pad_um": 6.0,
+      "ramp_um": 1.6,
+      "layers": 3,
+      "slice_um": 0.3
+    },
+    "f5": {
+      "slice_um": [
+        0.1,
+        0.2,
+        0.3,
+        0.5
+      ],
+      "hatch_um": 0.2,
+      "wedge_um": [
+        8.0,
+        4.0,
+        3.0
+      ],
+      "cap_um": [
+        8.0,
+        2.0
+      ]
+    },
+    "f6": {
+      "line_length_um": 6.0,
+      "grid_pitch_um": 2.5,
+      "rod_pitch_um": 1.5,
+      "woodpile_layers": 4,
+      "woodpile_dz_um": 0.4
+    },
+    "f7": {
+      "heights_um": [
+        2.0,
+        4.0,
+        6.0,
+        8.0,
+        10.0
+      ],
+      "pillar_diameter_um": 1.5,
+      "base_um": [
+        6.0,
+        6.0,
+        1.4
+      ],
+      "hatch_um": 0.2,
+      "slice_um": 0.25
+    }
+  },
+  "voxel": {
+    "base_um": 20.0,
+    "base_height_um": 2.0,
+    "slice_um": 0.25,
+    "hatch_um": 0.2,
+    "gaps_um": [
+      0.0,
+      0.2,
+      0.4,
+      0.6,
+      0.8,
+      1.0,
+      1.2,
+      1.4,
+      1.6,
+      1.8,
+      2.0
+    ],
+    "lid_layers": 4,
+    "cell_pitch_um": 100.0,
+    "grid": [
+      3,
+      4
+    ]
+  },
+  "source": "Start values of the parameter tests (design PARAMETER_TESTS.md, decided 2026-11-25); LAB: check the power ladder and the support power for the material."
+}
