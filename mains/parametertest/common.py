@@ -36,11 +36,12 @@ HERE = Path(__file__).resolve().parent
 USER = "Hannes"                                      # user key "user:<name>" of ~/nanofactory.json
 OBJECTIVE = "Zeiss 63x"                              # IFOV setup and fixed writing speed of the 63x
 SETUP = "IFOV_on"
-RESIN = "SZ2080"                                     # LAB: registry name of the resin
+RESIN = "IP-DIP2"                                     # LAB: registry name of the resin
 INPUTS_FILE = HERE / f"parameter_tests_{RESIN}.json"  # material start file (one per material)
 # LAB: edges of the resin drop measured with the camera: right, left, near, far (as in T113)
-RESIN_EDGES = [[-2500, 17000], [-100, 27000], [5300, 21100], [-6000, 22000]]
-SUBSTRATE_LABEL: Optional[str] = "SZ_2080_test"          # None: the next free label of the user
+# RESIN_EDGES = [[-2500, 17000], [-100, 27000], [5300, 21100], [-6000, 22000]]
+RESIN_EDGES = [[5700, 19000], [-3200, 22100], [2600, 14200], [200, 25800]]
+SUBSTRATE_LABEL: Optional[str] = "IP_DIP2_test"          # None: the next free label of the user
 CORNER_POWER_MW = 0.7                                # corners and QR code (as in T113)
 # Reduced corner markers with QR code (D2) and a margin that keeps the markers out of the grid: the QR code
 # (140 µm, centred on the upper edge of the rectangle) reaches 70 µm inside; maintainer requirement
@@ -53,16 +54,17 @@ DWELL_AFTER_POWER_S = 0.0                            # D9: set from the lab chec
 ASK_EACH_STEP = False                                 # confirm plane fit and printing inside every experiment
 ASK_BETWEEN = False                                   # confirm before starting the next experiment
 SHOW_PLOTS = False                                    # layout plot windows (must be closed to continue)
+SKIP_CORNER = True                                        # skip the corner markers and QR code (for dry runs)
 
 # LAB: centre of every experiment (columns 800 µm apart, rows 900 µm; checked by check_layout)
 # _COLUMNS = [-2800, -2000, -1200, -400, 400, 1200, 2000, 2800]
 # CENTERS = {"quick": Point2D(_COLUMNS[0], 1200)}
 # CENTERS.update({f"full_f{i}": Point2D(_COLUMNS[i], 1200) for i in range(1, 8)})
 # CENTERS.update({f"voxel_{i}": Point2D(_COLUMNS[i % 8], 300 if i < 8 else -600) for i in range(10)})
-_COLUMNS = [-2000, -1000, 0, 1000, 2000]
-CENTERS = {"quick": Point2D(_COLUMNS[2], 20000)}
-CENTERS.update({f"full_f{i}": Point2D(_COLUMNS[i%4], 21000 if i < 5 else 22000) for i in range(8)})
-CENTERS.update({f"voxel_{i}": Point2D(_COLUMNS[i % 5], 23000 if i < 5 else 24000) for i in range(10)})
+_COLUMNS = [-1000, 0, 1000, 2000, 3000]
+CENTERS = {"quick": Point2D(_COLUMNS[2], 19000)}
+CENTERS.update({f"full_f{i}": Point2D(_COLUMNS[i%4], 20000 if i < 5 else 21000) for i in range(8)})
+CENTERS.update({f"voxel_{i}": Point2D(_COLUMNS[i % 5], 22000 if i < 5 else 23000) for i in range(10)})
 
 TESTS = ("quick", "full", "voxel")
 
@@ -124,7 +126,7 @@ def _spec(name: str, test: str, tags: list, center: Point2D, grid: tuple, struct
     spec = ExperimentSpec(
         name=name, description=description, tags=["parameter_test", test, *tags], objective=OBJECTIVE, center=center,
         grid=grid, structure_size_um=structure_size_um, padding_um=padding_um, margin_um=MARGIN_UM,
-        skip_corner=False, corner=FIELD_CORNER, structures=structures, program_source=ProgramSource.DRAWING,
+        skip_corner=SKIP_CORNER, corner=FIELD_CORNER, structures=structures, program_source=ProgramSource.DRAWING,
         setup=SETUP, default_power_mw=CORNER_POWER_MW, plane_fit_mode=PlaneFitMode.CORNERS, dhm_usage=False,
         camera_capture=True, overview_capture=True, materials={"resin": RESIN}, layer_overhead_s=5.0,
         sys_args=_sys_args(name))

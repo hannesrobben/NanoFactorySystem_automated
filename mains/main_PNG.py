@@ -68,7 +68,7 @@ GRAY_OFFSET = 0  # gray value of height 0 (top of the socket); darker pixels cou
 # =================================================================================================
 # Printing: defaults that usually stay as they are
 # =================================================================================================
-POWER_MW = 0.3  # laser power
+POWER_MW = 0.25  # laser power
 SLICE_UM = 0.1  # layer height of the structure
 HATCH_UM: Optional[float] = None  # line distance; None: the pixel size
 SOCKET_HEIGHT_UM = (
@@ -82,18 +82,19 @@ ADAPTIVE_SLICING = (
 )
 ALTERNATING_HATCH = True  # turn the raster lines by 90° from layer to layer
 CENTER: Optional[Point2D] = Point2D(
-    500, -25000  # absolute stage position (µm); None: center of the resin drop
+    0, 19000  # absolute stage position (µm); None: center of the resin drop
 )
-CAMERA_CAPTURE = True  # camera image after every layer
-OVERVIEW_CAPTURE = False  # stitched camera mosaic of the area before and after printing
-MARGIN_AROUND_UM = 100.0  # free space around the image inside the experiment area
+CAMERA_CAPTURE = False  # camera image after every layer
+OVERVIEW_CAPTURE = True  # stitched camera mosaic of the area before and after printing
+MARGIN_AROUND_UM = 1000.0  # free space around the image inside the experiment area
 # Unattended run: set both to False, then nothing waits for a click
+
 ASK_EACH_STEP = False  # message boxes before plane fit and printing
 SHOW_PLOTS = (
     False  # preview and layout windows (must be closed to continue); False: none,
 )
 # experiment.png is written into the folder anyway
-SUBSTRATE_LABEL: Optional[str] = "DOE_circle_V1"
+SUBSTRATE_LABEL: Optional[str] = "DOE_circle_V2"
 # Substrate (folder below dataRoot of the user in ~/nanofactory.json) the experiment is entered
 # into: created if new, otherwise the experiment is added and checked for overlap with the
 # experiments already on it; substrate_layout.json/.png are updated.

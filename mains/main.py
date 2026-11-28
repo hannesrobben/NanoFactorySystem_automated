@@ -71,12 +71,14 @@ OBJECTIVE = "Zeiss 63x"        # "Zeiss 20x" or "Zeiss 63x"
 # Edges of the resin drop in absolute stage coordinates (µm): right, left, near, far.
 # Measure them with the camera; four points define the ellipse of the printable area.
 # RESIN_EDGES = [[5720, 22330], [-3333, 22420], [1660, 17212], [1200, 27190]]
-RESIN_EDGES = [[1500, -32700], [-400, -19100], [-5400, -24700], [6300, -25700]]
+RESIN_EDGES = [[3200,	19100], [-3900,	19100], [300,	22350], [-200,	15900]]
+
 
 # Root folder for single experiments (task "experiment"/"slicer"/"spec_file"):
 # the experiment is written to <OUTPUT_ROOT>/<spec.name>. None: the substrate folder below the
 # data root (then SUBSTRATE_LABEL is used).
-OUTPUT_ROOT: Optional[Path] = Path(r"C:\Users\Nanofactory\Desktop\Hannes\Experiment data")
+# OUTPUT_ROOT: Optional[Path] = Path(r"C:\Users\Nanofactory\Desktop\Hannes\Experiment data")
+OUTPUT_ROOT: Optional[Path] = None
 
 # Substrate label, e.g. "HR-26-001". None: a new substrate with the next free label of the user.
 SUBSTRATE_LABEL: Optional[str] = None
